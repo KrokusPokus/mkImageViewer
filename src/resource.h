@@ -346,21 +346,12 @@
 
 // in the main menu
 // these position must be changed if menu items are inserted
-#define SUBMENU_POS_OPENWITH 3
-#define SUBMENU_POS_MODDATE 9
-#define SUBMENU_POS_WALLPAPER 10
-#define SUBMENU_POS_NAVIGATION 23
-#define SUBMENU_POS_DISPLAY_ORDER 24
-#define SUBMENU_POS_MOVIE 25
-#define SUBMENU_POS_TRANSFORM 27
-#define SUBMENU_POS_TRANSFORM_LOSSLESS 28
-#define SUBMENU_POS_ZOOM 36
-#define SUBMENU_POS_AUTOZOOMMODE 37
-#define SUBMENU_POS_SETTINGS 39
-#define SUBMENU_POS_USER_COMMANDS 41
-
-// in the crop menu
-#define SUBMENU_POS_CROPMODE 3
+#define SUBMENU_POS_TRANSFORM 2
+#define SUBMENU_POS_ZOOM 3
+#define SUBMENU_POS_MOVIE 5
+#define SUBMENU_POS_NAVIGATION 15
+#define SUBMENU_POS_DISPLAY_ORDER 16
+#define SUBMENU_POS_AUTOZOOMMODE 17
 
 // Next default values for new objects
 // 

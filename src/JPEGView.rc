@@ -65,118 +65,6 @@ FONT 8, "MS Shell Dlg"
 BEGIN
 END
 
-IDD_SLIDESHOWDLG DIALOG 0, 0, 0, 0
-STYLE DS_SETFONT | WS_VISIBLE
-FONT 8, "MS Shell Dlg"
-BEGIN
-END
-
-IDD_HELP DIALOGEX 0, 0, 800, 600
-STYLE DS_SETFONT | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
-BEGIN
-END
-
-IDD_SETFILEEXTENSIONS DIALOGEX 8, 7, 363, 368
-STYLE DS_SETFONT | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
-BEGIN
-    CONTROL         "",IDC_FILEEXTENSIONS,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | WS_TABSTOP,10,36,339,298,WS_EX_CLIENTEDGE
-    LTEXT           "",IDC_HINT_FILE_EXT,13,9,336,25,NOT WS_GROUP
-    PUSHBUTTON      "",IDC_FE_CANCEL,253,344,96,15
-    DEFPUSHBUTTON   "",IDC_FE_OK,154,344,96,15
-END
-
-IDD_OPENWITH DIALOGEX 6, 6, 386, 196
-STYLE DS_SETFONT | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
-BEGIN
-    LTEXT           "",IDC_OPENWITHMENULABEL,8,7,134,9,NOT WS_GROUP
-    LISTBOX         IDC_OPENWITHENTRIES,8,19,182,99,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | NOT WS_BORDER | WS_VSCROLL | WS_TABSTOP,WS_EX_CLIENTEDGE
-    PUSHBUTTON      "",IDC_OW_NEW,202,19,78,14
-    PUSHBUTTON      "",IDC_OW_EDIT,202,39,80,15
-    PUSHBUTTON      "",IDC_OW_DELETE,202,59,80,15
-    EDITTEXT        IDC_OW_TITLE,74,125,116,12,NOT WS_BORDER,WS_EX_CLIENTEDGE
-    EDITTEXT        IDC_OW_SHORTCUT,285,125,72,12,NOT WS_BORDER,WS_EX_CLIENTEDGE
-    PUSHBUTTON      "?",IDC_OW_SHORTCUT_HELP,365,124,14,15
-    EDITTEXT        IDC_OW_APP,8,155,294,13,ES_READONLY | NOT WS_BORDER,WS_EX_CLIENTEDGE
-    PUSHBUTTON      "",IDC_OW_BROWSE,307,154,70,14
-    DEFPUSHBUTTON   "",IDC_OW_CLOSE,290,175,88,14
-    LTEXT           "",IDC_OW_TITLE_LABEL,8,128,54,10,NOT WS_GROUP
-    LTEXT           "",IDC_OW_APP_LABEL,8,144,86,10,NOT WS_GROUP
-    LTEXT           "",IDC_OW_SHORTCUT_LABEL,205,128,70,10,NOT WS_GROUP
-END
-
-IDD_RESIZE DIALOGEX 0, 0, 309, 104
-STYLE DS_SETFONT | DS_FIXEDSYS | DS_CENTER | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-EXSTYLE WS_EX_TOOLWINDOW
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
-BEGIN
-    EDITTEXT        IDC_RS_ED_PERCENTS,87,7,88,14,ES_AUTOHSCROLL | ES_NUMBER
-    EDITTEXT        IDC_RS_ED_WIDTH,87,23,88,14,ES_AUTOHSCROLL | ES_NUMBER
-    EDITTEXT        IDC_RS_ED_HEIGHT,87,39,88,14,ES_AUTOHSCROLL | ES_NUMBER
-    COMBOBOX        IDC_RS_CB_FILTER,87,55,88,50,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,167,83,63,14
-    PUSHBUTTON      "Cancel",IDCANCEL,239,83,63,14
-    LTEXT           "Filter",IDC_RS_LABEL_FILTER,7,56,69,12
-    LTEXT           "New size:",IDC_RS_LABEL_NEW_PERCENTS,7,8,69,12
-    LTEXT           "New height:",IDC_RS_LABEL_NEW_HEIGHT,7,40,69,12
-    LTEXT           "New width:",IDC_RS_LABEL_NEW__WIDTH,7,24,69,12
-    LTEXT           "%",IDC_RS_LABEL_PERCENTS,184,9,25,9
-    LTEXT           "Pixel",IDC_RS_PIXELS,184,25,69,12
-    LTEXT           "Pixel",IDC_RS_PIXELS2,184,42,69,12
-END
-
-IDD_PRINT DIALOGEX 0, 0, 521, 350
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
-FONT 8, "MS Shell Dlg", 0, 0, 0x1
-BEGIN
-    DEFPUSHBUTTON   "Print",IDOK,388,328,61,14
-    PUSHBUTTON      "Cancel",IDCANCEL,453,328,61,14
-    LTEXT           "_Printer:",IDC_PD_LABEL_PRINTER,313,6,72,8
-    LTEXT           "",IDC_PD_PRINTER,368,6,145,8
-    PUSHBUTTON      "_Change...",IDC_PD_BTN_CHANGE_PRINTER,408,23,105,14
-    LTEXT           "_Paper:",IDC_PD_PAPER_TITLE,313,52,62,8
-    COMBOBOX        IDC_PD_CB_PAPER,378,49,135,30,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "_Tray:",IDC_PD_PAPER_SOURCE_TITLE,313,71,63,8
-    COMBOBOX        IDC_PD_CB_PAPER_SOURCE,378,68,135,30,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "_Orientation:",IDC_PD_TITLE_ORIENTATION,313,91,62,18
-    COMBOBOX        IDC_PD_CB_ORIENTATION,414,87,99,30,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "_Size:",IDC_PD_SIZE_TITLE,313,113,61,8
-    CONTROL         "_Fit to paper",IDC_PD_RB_FIT,"Button",BS_AUTORADIOBUTTON | WS_GROUP,378,113,127,10
-    CONTROL         "_Fill with crop",IDC_PD_RB_FILL,"Button",BS_AUTORADIOBUTTON,378,129,127,10
-    CONTROL         "",IDC_PD_RB_FIXED,"Button",BS_AUTORADIOBUTTON,378,147,10,10
-    EDITTEXT        IDC_PD_ED_WIDTH,390,145,38,14,ES_AUTOHSCROLL
-    EDITTEXT        IDC_PD_ED_HEIGHT,447,145,38,14,ES_AUTOHSCROLL
-    LTEXT           "x",IDC_PD_X,435,147,8,8
-    LTEXT           "cm",IDC_PD_CM,494,147,16,8
-    LTEXT           "_Margins:",IDC_PD_MARGINS_TITLE,313,169,61,8
-    LTEXT           "_Left",IDC_PD_LEFT_TITLE,390,169,47,8
-    EDITTEXT        IDC_PD_ED_LEFT,390,180,38,14,ES_AUTOHSCROLL
-    LTEXT           "_Right",IDC_PD_RIGHT_TITLE,447,169,52,8
-    EDITTEXT        IDC_PD_ED_RIGHT,447,180,38,14,ES_AUTOHSCROLL
-    LTEXT           "cm",IDC_PD_CM2,494,182,16,8
-    LTEXT           "_Top",IDC_PD_TOP_TITLE,390,197,47,8
-    EDITTEXT        IDC_PD_ED_TOP,390,208,38,14,ES_AUTOHSCROLL
-    LTEXT           "_Bottom",IDC_PD_BOTTOM_TITLE,447,197,52,8
-    EDITTEXT        IDC_PD_ED_BOTTOM,447,208,38,14,ES_AUTOHSCROLL
-    LTEXT           "cm",IDC_PD_CM3,494,210,16,8
-    LTEXT           "_Scaling mode:",IDC_PD_SCALING_TITLE,313,233,64,20
-    CONTROL         "_Printer driver",IDC_PD_RB_SCALING_DRIVER,"Button",BS_AUTORADIOBUTTON | WS_GROUP,381,232,95,10
-    CONTROL         "JPEGView",IDC_PD_RB_SCALING_JPEGVIEW,"Button",BS_AUTORADIOBUTTON,381,249,49,10
-    LTEXT           "_Alignment:",IDC_PD_ALIGNMENT_TITLE,313,268,63,19
-    CONTROL         "",IDC_PD_RB_00,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE | WS_GROUP,381,266,19,17
-    CONTROL         "",IDC_PD_RB_10,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,400,266,19,17
-    CONTROL         "",IDC_PD_RB_20,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,419,266,19,17
-    CONTROL         "",IDC_PD_RB_01,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,381,283,19,17
-    CONTROL         "",IDC_PD_RB_11,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,400,283,19,17
-    CONTROL         "",IDC_PD_RB_21,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,419,283,19,17
-    CONTROL         "",IDC_PD_RB_02,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,381,300,19,17
-    CONTROL         "",IDC_PD_RB_12,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,400,300,19,17
-    CONTROL         "",IDC_PD_RB_22,"Button",BS_AUTORADIOBUTTON | BS_PUSHLIKE,419,300,19,17
-END
-
-
 /////////////////////////////////////////////////////////////////////////////
 //
 // DESIGNINFO
@@ -187,22 +75,6 @@ GUIDELINES DESIGNINFO
 BEGIN
     IDD_MAINDLG, DIALOG
     BEGIN
-    END
-
-    IDD_RESIZE, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 302
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 97
-    END
-
-    IDD_PRINT, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 514
-        TOPMARGIN, 6
-        BOTTOMMARGIN, 342
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -217,55 +89,38 @@ POPUPMENU MENU
 BEGIN
     POPUP "PopupMenu"
     BEGIN
-        MENUITEM "Stop slide show/movie\t0xff", IDM_STOP_MOVIE
-        MENUITEM SEPARATOR
-        MENUITEM "Open image...",               IDM_OPEN
-        POPUP "Open image with"
+        MENUITEM "Next image",                      IDM_NEXT
+        MENUITEM "Previous image",                  IDM_PREV
+        POPUP "Current View"
         BEGIN
-            MENUITEM "_empty_",                     IDM_ABOUT
-        END
-        MENUITEM "Save processed image...\t0x5de", IDM_SAVE
-        MENUITEM "Reload image",                IDM_RELOAD
-        MENUITEM "Open containing folder in Explorer", IDM_EXPLORE
-        MENUITEM "Print image...",              IDM_PRINT
-        MENUITEM "Batch rename/copy...",        IDM_BATCH_COPY
-        POPUP "Set modification date"
-        BEGIN
-            MENUITEM "to current date",             IDM_TOUCH_IMAGE
-            MENUITEM "to EXIF date",                IDM_TOUCH_IMAGE_EXIF
-            MENUITEM "to EXIF date (all files in folder)", IDM_TOUCH_IMAGE_EXIF_FOLDER
-        END
-        MENUITEM SEPARATOR
-        MENUITEM "Copy to clipboard",           IDM_COPY
-        MENUITEM "Copy original size image",    IDM_COPY_FULL
-        MENUITEM "Copy file path",              IDM_COPY_PATH
-        MENUITEM "Paste from clipboard",        IDM_PASTE
-        MENUITEM SEPARATOR
-        MENUITEM "Show picture info (EXIF)",    IDM_SHOW_FILEINFO
-        MENUITEM "Show filename",               IDM_SHOW_FILENAME
-        MENUITEM "Show navigation panel",       IDM_SHOW_NAVPANEL
-        MENUITEM SEPARATOR
-        MENUITEM "Next image",                  IDM_NEXT
-        MENUITEM "Previous image",              IDM_PREV
-        POPUP "Navigation"
-        BEGIN
-            MENUITEM "Loop folder",                 IDM_LOOP_FOLDER
-            MENUITEM "Loop recursively",            IDM_LOOP_RECURSIVELY
-            MENUITEM "Loop siblings",               IDM_LOOP_SIBLINGS
-        END
-        POPUP "Display order"
-        BEGIN
-            MENUITEM "Modification date",           IDM_SORT_MOD_DATE
-            MENUITEM "Creation date",               IDM_SORT_CREATION_DATE
-            MENUITEM "File name",                   IDM_SORT_NAME
-            MENUITEM "File size",                   IDM_SORT_SIZE
-            MENUITEM "Random",                      IDM_SORT_RANDOM
+            MENUITEM "Rotate +90",                  IDM_ROTATE_90
+            MENUITEM "Rotate -90",                  IDM_ROTATE_270
             MENUITEM SEPARATOR
-            MENUITEM "Ascending",                   IDM_SORT_ASCENDING
-            MENUITEM "Descending",                  IDM_SORT_DESCENDING
+            MENUITEM "Mirror horizontally",         IDM_MIRROR_H
+            MENUITEM "Mirror vertically",           IDM_MIRROR_V
+            MENUITEM SEPARATOR
+            MENUITEM "Fit to window",               IDM_FIT_TO_SCREEN
+            MENUITEM "Fill with crop",              IDM_FILL_WITH_CROP
+            MENUITEM SEPARATOR
+            MENUITEM "400 %",                       IDM_ZOOM_400
+            MENUITEM "200 %",                       IDM_ZOOM_200
+            MENUITEM "100 %",                       IDM_ZOOM_100
+            MENUITEM "50 %",                        IDM_ZOOM_50
+            MENUITEM "25 %",                        IDM_ZOOM_25
         END
+        POPUP "Window"
+        BEGIN
+            MENUITEM "Full screen mode",            IDM_FULL_SCREEN_MODE
+            MENUITEM "Fit window to image",         IDM_FIT_WINDOW_TO_IMAGE
+            MENUITEM "Hide window title bar",       IDM_HIDE_TITLE_BAR
+            MENUITEM "Set window always on top",    IDM_ALWAYS_ON_TOP
+
+        END
+        MENUITEM SEPARATOR
         POPUP "Play folder as slideshow/movie"
         BEGIN
+            MENUITEM "Pause Slideshow/Movie\t0xff", IDM_STOP_MOVIE
+			MENUITEM SEPARATOR
             MENUITEM "Slideshow",                   IDM_SLIDESHOW_START
             MENUITEM "Waiting time\t1 sec",         IDM_SLIDESHOW_1
             MENUITEM "Waiting time\t2 sec",         IDM_SLIDESHOW_2
@@ -317,91 +172,47 @@ BEGIN
             MENUITEM "Playback speed\t100 fps",         IDM_MOVIE_100_FPS
         END
         MENUITEM SEPARATOR
-        POPUP "Transform image"
-        BEGIN
-            MENUITEM "Rotate +90",                  IDM_ROTATE_90
-            MENUITEM "Rotate -90",                  IDM_ROTATE_270
-            MENUITEM "Rotate...",                   IDM_ROTATE
-            MENUITEM "Change size...",              IDM_CHANGESIZE
-            MENUITEM "Perspective correction...",   IDM_PERSPECTIVE
-            MENUITEM SEPARATOR
-            MENUITEM "Mirror horizontally",         IDM_MIRROR_H
-            MENUITEM "Mirror vertically",           IDM_MIRROR_V
-        END
-        POPUP "Lossless JPEG transformations"
-        BEGIN
-            MENUITEM "Rotate +90\t0x24B9",          IDM_ROTATE_90_LOSSLESS
-            MENUITEM "Rotate -90\t0x24C3",          IDM_ROTATE_270_LOSSLESS
-            MENUITEM "Rotate 180",                  IDM_ROTATE_180_LOSSLESS
-            MENUITEM SEPARATOR
-            MENUITEM "Mirror horizontally",         IDM_MIRROR_H_LOSSLESS
-            MENUITEM "Mirror vertically",           IDM_MIRROR_V_LOSSLESS
-        END
-        MENUITEM "Auto correction",             IDM_AUTO_CORRECTION
-        MENUITEM "Local density correction",    IDM_LDC
-        MENUITEM "Keep parameters",             IDM_KEEP_PARAMETERS
+        MENUITEM "Reload image",                    IDM_RELOAD_FULL
+        MENUITEM "Edit image in default editor",       IDM_OPEN_DEFAULT_EDITOR
+        MENUITEM "Copy scaled image content to clipboard",   IDM_COPY
+        MENUITEM "Copy original image content to clipboard", IDM_COPY_FULL
+        MENUITEM "Copy file path to clipboard",              IDM_COPY_PATH
+		MENUITEM "Cut file to clipboard",           IDM_CUT_FILE
+        MENUITEM "Open containing folder in Explorer", IDM_EXPLORE
         MENUITEM SEPARATOR
-        MENUITEM "Save parameters to DB",       IDM_SAVE_PARAM_DB
-        MENUITEM "Clear parameters from DB",    IDM_CLEAR_PARAM_DB
-        MENUITEM SEPARATOR
-        POPUP "Zoom"
+        POPUP "Folder Mode"
         BEGIN
-            MENUITEM "Fit to screen",               IDM_FIT_TO_SCREEN
-            MENUITEM "Fill with crop",              IDM_FILL_WITH_CROP
-            MENUITEM "Span all screens",            IDM_SPAN_SCREENS
-            MENUITEM "Full screen mode",            IDM_FULL_SCREEN_MODE
-            MENUITEM "Fit window to image",         IDM_FIT_WINDOW_TO_IMAGE
-            MENUITEM SEPARATOR
-            MENUITEM "Hide window title bar",       IDM_HIDE_TITLE_BAR
-            MENUITEM "Set window always on top",    IDM_ALWAYS_ON_TOP
-            MENUITEM SEPARATOR
-            MENUITEM "400 %",                       IDM_ZOOM_400
-            MENUITEM "200 %",                       IDM_ZOOM_200
-            MENUITEM "100 %\t0x3a98",               IDM_ZOOM_100
-            MENUITEM "50 %",                        IDM_ZOOM_50
-            MENUITEM "25 %",                        IDM_ZOOM_25
+            MENUITEM "Loop folder",                 IDM_LOOP_FOLDER
+            MENUITEM "Loop recursively",            IDM_LOOP_RECURSIVELY
+            MENUITEM "Loop siblings",               IDM_LOOP_SIBLINGS
         END
-        POPUP "Auto zoom mode"
+        POPUP "Sort Order"
+        BEGIN
+            MENUITEM "Modification date",           IDM_SORT_MOD_DATE
+            MENUITEM "Creation date",               IDM_SORT_CREATION_DATE
+            MENUITEM "File name",                   IDM_SORT_NAME
+            MENUITEM "File size",                   IDM_SORT_SIZE
+            MENUITEM "Random",                      IDM_SORT_RANDOM
+            MENUITEM SEPARATOR
+            MENUITEM "Ascending",                   IDM_SORT_ASCENDING
+            MENUITEM "Descending",                  IDM_SORT_DESCENDING
+        END
+        POPUP "Auto Zoom Mode"
         BEGIN
             MENUITEM "None",                        IDM_AUTO_ZOOM_NONE
-            MENUITEM "Fit to screen (no zoom)",     IDM_AUTO_ZOOM_FIT_NO_ZOOM
-            MENUITEM "Fill with crop (no zoom)",    IDM_AUTO_ZOOM_FILL_NO_ZOOM
-            MENUITEM "Fit to screen",               IDM_AUTO_ZOOM_FIT
+            MENUITEM "Fit to window",               IDM_AUTO_ZOOM_FIT
             MENUITEM "Fill with crop",              IDM_AUTO_ZOOM_FILL
+            MENUITEM "Fit to window (never upsize)",     IDM_AUTO_ZOOM_FIT_NO_ZOOM
+            MENUITEM "Fill with crop (never upsize)",    IDM_AUTO_ZOOM_FILL_NO_ZOOM
             MENUITEM "Book Mode",                   IDM_AUTO_ZOOM_BOOK_MODE
         END
+        MENUITEM "Auto Contrast",             IDM_AUTO_CORRECTION
         MENUITEM SEPARATOR
-        POPUP "Settings/Admin"
-        BEGIN
-            MENUITEM "Edit global settings...",     IDM_EDIT_GLOBAL_CONFIG
-            MENUITEM "Edit user settings...",       IDM_EDIT_USER_CONFIG
-            MENUITEM "Update user settings...",     IDM_UPDATE_USER_CONFIG
-            MENUITEM "Manage 'Open image with' menu...", IDM_MANAGE_OPEN_WITH_MENU
-            MENUITEM SEPARATOR
-            MENUITEM "Set current parameters as default values...", IDM_SAVE_PARAMETERS
-            MENUITEM SEPARATOR
-            MENUITEM "Set as default viewer...",    IDM_SET_AS_DEFAULT_VIEWER
-            MENUITEM SEPARATOR
-            MENUITEM "Backup parameter DB...",      IDM_BACKUP_PARAMDB
-            MENUITEM "Restore parameter DB...",     IDM_RESTORE_PARAMDB
-        END
-        MENUITEM SEPARATOR
-        POPUP "User commands"
-        BEGIN
-            MENUITEM "_empty_",                     IDM_ABOUT
-        END
-        MENUITEM SEPARATOR
-        MENUITEM "About JPEGView...",           IDM_ABOUT
+		MENUITEM "Edit global config file",     IDM_EDIT_GLOBAL_CONFIG
+		MENUITEM "Edit user config file",       IDM_EDIT_USER_CONFIG
+		MENUITEM "Update user config format",     IDM_UPDATE_USER_CONFIG
         MENUITEM SEPARATOR
         MENUITEM "Exit\t0xffff",                IDM_EXIT
-    END
-END
-
-SLIDESHOWMENU MENU
-BEGIN
-    POPUP "SlideShowMenu"
-    BEGIN
-        MENUITEM "Stop slide show/movie\tEsc",  IDM_STOP_MOVIE
     END
 END
 
