@@ -1,6 +1,8 @@
 #ifndef WORKTHREAD_H
 #define WORKTHREAD_H
 
+#include <list>
+
 // Base class for requests processed by a worker thread (i.e. an instance of CWorkThread class) 
 class CRequestBase {
 public:

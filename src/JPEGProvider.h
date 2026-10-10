@@ -1,6 +1,8 @@
 #ifndef JPEGPROVIDER_H
 #define JPEGPROVIDER_H
 
+#include <list>
+
 class CJPEGImage;
 class CImageLoadThread;
 class CFileList;

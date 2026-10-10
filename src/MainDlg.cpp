@@ -1341,7 +1341,7 @@ LRESULT CMainDlg::OnTimer(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL&
 	} else if (wParam == PAN_TIMER_EVENT_ID) {
 		if (m_pCurrentImage != NULL) {
 			::KillTimer(this->m_hWnd, PAN_TIMER_EVENT_ID);
-			::timeBeginPeriod(1);
+            //::timeBeginPeriod(1);
 
 			bool bUp = 0;
 			bool bDown = 0;
@@ -1366,7 +1366,7 @@ LRESULT CMainDlg::OnTimer(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL&
 					bRight = (::GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
 
 					if ((bUp == false) && (bDown == false) && (bLeft == false) && (bRight == false)) {
-						::timeEndPeriod(1);
+                        //::timeEndPeriod(1);
 						m_bPanTimerActive = false;
 						break;
 					} else {
@@ -1421,7 +1421,7 @@ LRESULT CMainDlg::OnTimer(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL&
 					}
 				}
 			} else {
-				UINT timestart = timeGetTime();
+                UINT timestart = Helpers::GetTimeMs();
 				UINT timenow = 0;
 				
 				UINT modu_old = 4294967295;
@@ -1434,11 +1434,11 @@ LRESULT CMainDlg::OnTimer(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL&
 					bRight = (::GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
 
 					if ((bUp == false) && (bDown == false)  && (bLeft == false)  && (bRight == false)) {
-						::timeEndPeriod(1);
+                        //::timeEndPeriod(1);
 						m_bPanTimerActive = false;
 						break;
 					} else {
-						timenow = timeGetTime();
+                        timenow = Helpers::GetTimeMs();
 						modu = ((timenow-timestart)*100) % 1668;	 // 1663 on intel
 						INT BorderDistanceY = 0;
 
@@ -4158,6 +4158,8 @@ void CMainDlg::AnimateTransition() {
 	for (int i = 0; i <= nSteps; i++) {
 		switch (m_eTransitionEffect)
 		{
+        case Helpers::TE_None:
+            break;
 		case Helpers::TE_Blend:
 			{
 				if (i == nSteps) {

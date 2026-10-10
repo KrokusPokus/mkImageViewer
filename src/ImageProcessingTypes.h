@@ -1,6 +1,8 @@
 #ifndef IMAGEPROCESSINGTYPES_H
 #define IMAGEPROCESSINGTYPES_H
 
+#include <string>
+
 /// signed 8 bit integer value
 typedef signed char int8;
 /// unsigned 8 bit integer value

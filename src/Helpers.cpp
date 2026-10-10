@@ -1,4 +1,4 @@
-//#include "Helpers.h"
+#include "Helpers.h"
 #include "immintrin.h"
 //#include "NLS.h"
 #include "MultiMonitorSupport.h"
@@ -7,10 +7,12 @@
 #include "SettingsProvider.h"
 #include <math.h>
 
-#include <thread>	// [GF] Needed for NumConcurrentThreads()
-#include <string_view>
-#include <cwctype>
 #include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <cwctype>
+#include <string_view>
+#include <thread>	// [GF] Needed for NumConcurrentThreads()
 
 namespace Helpers {
 
@@ -1216,4 +1218,9 @@ bool CanReadAhead(CJPEGImage* pImage) {
         });
     }
 
+    uint32_t GetTimeMs() {
+        using namespace std::chrono;
+        auto now = steady_clock::now();
+        return static_cast<uint32_t>(duration_cast<milliseconds>(now.time_since_epoch()).count());
+    }
 } // namespace Helpers

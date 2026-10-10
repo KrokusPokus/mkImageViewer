@@ -4,6 +4,8 @@
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 
+#include <cmath>
+
 void * TurboJpeg::ReadImage(int &width,
 					   int &height,
 					   int &nchannels,
@@ -28,7 +30,7 @@ void * TurboJpeg::ReadImage(int &width,
 		width = tj3Get(hDecoder, TJPARAM_JPEGWIDTH);
 		height = tj3Get(hDecoder, TJPARAM_JPEGHEIGHT);
 		chromoSubsampling = (TJSAMP)tj3Get(hDecoder, TJPARAM_SUBSAMP);
-		if (abs((double)width * height) > MAX_IMAGE_PIXELS) {
+        if (std::abs((double)width * height) > MAX_IMAGE_PIXELS) {
 			outOfMemory = true;
 		} else if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION && chromoSubsampling != TJSAMP_UNKNOWN) {
 			pPixelData = new(std::nothrow) unsigned char[TJPAD(static_cast<std::size_t>(width) * 3) * height];

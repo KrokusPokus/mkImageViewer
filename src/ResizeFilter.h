@@ -3,6 +3,8 @@
 
 #include "ImageProcessingTypes.h"
 
+#include <list>
+
 // Maximal length of filter kernels. The kernels may be shorter but never longer.
 #define MAX_FILTER_LEN 64
 

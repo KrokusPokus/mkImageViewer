@@ -4,19 +4,10 @@
 #define NOMINMAX
 #endif
 
-// ============================================================================
-// 1. C++ Standard Library & C++11 Typen
-// ============================================================================
-//#include <cstdint>
 #include <cassert>
-#include <vector>
-#include <string>
-#include <list>
-#include <memory>
-//#include <algorithm>
 
 // ============================================================================
-// 3. Windows-spezifische Altlasten (Nur unter Windows kompilieren)
+// Windows-spezifische Altlasten (Nur unter Windows kompilieren)
 // ============================================================================
 #if defined(_WIN32) || defined(WIN32)
     #ifndef WIN32_LEAN_AND_MEAN
@@ -29,13 +20,10 @@
     #define _CRT_SECURE_NO_DEPRECATE
 
     // Nur falls WTL/ATL in einzelnen Dateien noch schrittweise abgebaut wird:
-    #include <tchar.h>
-    #include <assert.h>
     #include <atlbase.h>
     #include <atlapp.h>		// WTL-sf\Include
     #include <atldlgs.h>	// WTL-sf\Include: DROPFILES, CFSTR_PREFERREDDROPEFFECT
-    #include <atlmisc.h>	// WTL-sf\Include: CSize, CRect, CPoint
-    #include <mmsystem.h>   // timeBeginPeriod(), timeEndPeriod(), timeGetTime()
+    #include <atlmisc.h>	// WTL-sf\Include: CSize, CRect, CPoint, CString
 
     extern CAppModule _Module;
 

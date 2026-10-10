@@ -370,6 +370,7 @@ namespace Helpers {
 /*GF*/	CString GetUnixPathFromWine(LPCTSTR szDosPath);
 /*GF*/  bool IsLinuxBinaryAvailable(LPCTSTR szUnixPath);
 /*GF*/  constexpr bool EqualsIgnoreCase(std::wstring_view a, std::wstring_view b) noexcept;
+/*GF*/  uint32_t GetTimeMs();
 }
 
 #endif // HELPERS_H
