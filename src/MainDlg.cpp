@@ -14,7 +14,6 @@
 #include "SettingsProvider.h"
 #include "MultiMonitorSupport.h"
 #include "HistogramCorr.h"
-#include "UserCommand.h"
 #include "Clipboard.h"
 #include "ParameterDB.h"
 #include "NLS.h"
@@ -385,9 +384,14 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
     ::ShowCursor(m_bMouseOn);
 
     // intitialize list of files to show with startup file (and folder)
-    m_pFileList = new CFileList(m_sStartupFile, *m_pDirectoryWatcher,
-        (m_eForcedSorting == Helpers::FS_Undefined) ? sp.Sorting() : m_eForcedSorting, sp.IsSortedAscending(), sp.WrapAroundFolder(),
-        0, m_eForcedSorting != Helpers::FS_Undefined);
+    m_pFileList = new CFileList(m_sStartupFile,
+								*m_pDirectoryWatcher,
+								(m_eForcedSorting == Helpers::FS_Undefined) ? sp.Sorting() : m_eForcedSorting,
+								sp.IsSortedAscending(),
+								sp.WrapAroundFolder(),
+								0,
+								m_eForcedSorting != Helpers::FS_Undefined);
+
     m_pFileList->SetNavigationMode(sp.Navigation());
 
     // create thread pool for processing requests on multiple CPU cores
@@ -1197,13 +1201,6 @@ LRESULT CMainDlg::OnKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOOL& /
         }
     }
 
-    if (!bHandled) {
-        // look if any of the user commands wants to handle this key
-        if (m_pFileList->Current() != NULL) {
-            HandleUserCommands(CKeyMap::GetCombinedKeyCode((int)wParam, bAlt, bCtrl, bShift));
-        }
-    }
-
     return 1;
 }
 
@@ -1215,8 +1212,6 @@ LRESULT CMainDlg::OnSysKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, 
         int nCommand = m_pKeyMap->GetCommandIdForKey((int)wParam, true, false, bShift);
         if (nCommand > 0) {
             ExecuteCommand(nCommand);
-        } else if (m_pFileList->Current() != NULL) {
-            HandleUserCommands(CKeyMap::GetCombinedKeyCode((int)wParam, true, false, bShift));
         }
     }
     return 1;
@@ -1704,19 +1699,33 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                     break;
                 }
 
-                // Qt Core (funktioniert auch ohne QApplication!)
                 QString currentFileName = QString::fromWCharArray(pRawFileName);
-                QFileInfo fileInfo(currentFileName);
-                QString fileSizeStr = Helpers::FormatFileSize(fileInfo.size());
+				bool allowDelete = false;
 
-                // Nachrichtentext mit QString zusammenbauen
-                QString message = QString("%1\n\n%2\n\n%3 %4")
-                                      .arg("Do you really want to permanently delete this file?")
-                                      .arg(currentFileName)
-                                      .arg("Size:")
-                                      .arg(fileSizeStr);
+                Helpers::EDeleteConfirmation confirmationPolicy = CSettingsProvider::This().DeleteConfirmation();
+                if (confirmationPolicy == Helpers::DC_Never) {
+					allowDelete = true;
+				} else {
+					// Need to ask the user
 
-                if (IDYES == ::MessageBox(m_hWnd, reinterpret_cast<LPCWSTR>(message.utf16()), CNLS::GetString(_T("Confirm")), MB_YESNOCANCEL | MB_ICONQUESTION)) {
+					// Qt Core (funktioniert auch ohne QApplication!)
+					QFileInfo fileInfo(currentFileName);
+					QString fileSizeStr = Helpers::FormatFileSize(fileInfo.size());
+
+					// Nachrichtentext mit QString zusammenbauen
+					QString message = QString("%1\n\n%2\n\n%3 %4")
+										  .arg("Do you really want to permanently delete this file?")
+										  .arg(currentFileName)
+										  .arg("Size:")
+										  .arg(fileSizeStr);
+
+                    int ret = ::MessageBox(m_hWnd, reinterpret_cast<LPCWSTR>(message.utf16()), CNLS::GetString(_T("Confirm")), MB_YESNOCANCEL | MB_ICONQUESTION);
+					if (ret == IDYES) {
+						allowDelete = true;
+					}
+				}
+
+                if (allowDelete) {
                     CFileList* fileListOfDeletedImage = m_pFileList;
                     GotoImage(POS_AwayFromCurrent, NO_REQUEST);
                     if (QFile::remove(currentFileName)) {
@@ -2463,12 +2472,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             OpenDefaultEditor();
             break;
     }
-    if (nCommand >= IDM_FIRST_USER_CMD && nCommand <= IDM_LAST_USER_CMD) {
-        ExecuteUserCommand(HelpersGUI::FindUserCommand(nCommand - IDM_FIRST_USER_CMD));
-    }
-    if (nCommand >= IDM_FIRST_OPENWITH_CMD && nCommand <= IDM_LAST_OPENWITH_CMD) {
-        ExecuteUserCommand(HelpersGUI::FindOpenWithCommand(nCommand - IDM_FIRST_OPENWITH_CMD));
-    }
 }
 
 void CMainDlg::ChangeFolderLanguage() {
@@ -2715,7 +2718,7 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
     
     // recreate file list based on image opened
     Helpers::ESorting eOldSorting = m_pFileList->GetSorting();
-    bool oOldAscending = m_pFileList->IsSortedAscending();
+    bool bOldAscending = m_pFileList->IsSortedAscending();
     delete m_pFileList;
 
     // [GF] Recognize Book type sources & load bookmark and adjust zoom mode accordingly.
@@ -2752,7 +2755,13 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
     }
 
     m_sStartupFile = sFileName;
-    m_pFileList = new CFileList(m_sStartupFile, *m_pDirectoryWatcher, eOldSorting, oOldAscending, CSettingsProvider::This().WrapAroundFolder());
+
+    m_pFileList = new CFileList(m_sStartupFile,
+								*m_pDirectoryWatcher,
+								eOldSorting,
+								bOldAscending,
+								CSettingsProvider::This().WrapAroundFolder());
+
     // free current image and all read ahead images
     InitParametersForNewImage();
     m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
@@ -2770,72 +2779,6 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
     m_sSaveDirectory = _T("");
     MouseOff();
     this->Invalidate(FALSE);
-}
-
-void CMainDlg::HandleUserCommands(uint32 virtualKeyCode) {
-    if (::GetFileAttributes(CurrentFileName(false)) == INVALID_FILE_ATTRIBUTES) {
-        return; // file does not exist
-    }
-
-    // iterate over user command list
-    std::list<CUserCommand*>::iterator iter;
-    std::list<CUserCommand*> & userCmdList = CSettingsProvider::This().UserCommandList();
-    for (iter = userCmdList.begin( ); iter != userCmdList.end( ); iter++ ) {
-        if ((*iter)->GetKeyCode() == virtualKeyCode) {
-            ExecuteUserCommand(*iter);
-            return;
-        }
-    }
-    // iterate over open with command list
-    std::list<CUserCommand*> & openWithCmdList = CSettingsProvider::This().OpenWithCommandList();
-    for (iter = openWithCmdList.begin( ); iter != openWithCmdList.end( ); iter++ ) {
-        if ((*iter)->GetKeyCode() == virtualKeyCode) {
-            ExecuteUserCommand(*iter);
-            return;
-        }
-    }
-}
-
-void CMainDlg::ExecuteUserCommand(CUserCommand* pUserCommand) {
-    MouseOn();
-    LPCTSTR sCurrentFileName = CurrentFileName(false);
-    if (pUserCommand != NULL && pUserCommand->CanExecute(this->m_hWnd, sCurrentFileName)) {
-        bool bReloadCurrent = false;
-        // First go to next, then execute the command and reload current file.
-        // Otherwise we get into troubles when the current image was deleted or moved.
-        CFileList* oldFileList = m_pFileList;
-        if (pUserCommand->MoveToNextAfterCommand()) {
-            // don't send a request if we reload all, it would be canceled anyway later
-            GotoImage(POS_AwayFromCurrent, pUserCommand->NeedsReloadAll() ? NO_REQUEST : 0);
-        }
-        if (pUserCommand->Execute(this->m_hWnd, sCurrentFileName)) {
-            if (pUserCommand->NeedsReloadAll() || pUserCommand->NeedsReloadFileList()) {
-                m_pFileList->Reload(NULL, false);
-                if (oldFileList != m_pFileList) {
-                    // If GotoImage(POS_AwayFromCurrent) changed the file list, the old file list also needs to be reloaded
-                    oldFileList->Reload(NULL, false);
-                }
-                m_pFileList->DeleteHistory(true);
-            }
-            if (pUserCommand->NeedsReloadAll()) {
-                m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
-                m_pJPEGProvider->ClearAllRequests();
-                m_pCurrentImage = NULL;
-                bReloadCurrent = true;
-            } else {
-                if (pUserCommand->NeedsReloadFileList()) {
-                    bReloadCurrent = m_pFileList->Current() == NULL; // needs "reload" in this case
-                    Invalidate();
-                }
-                if (pUserCommand->NeedsReloadCurrent() && !pUserCommand->MoveToNextAfterCommand()) {
-                    bReloadCurrent = true;
-                }
-            }
-            if (bReloadCurrent) {
-                ReloadImage(false);
-            }
-        }
-    }
 }
 
 void CMainDlg::StartDragging(int nX, int nY, bool bDragWithZoomNavigator) {
@@ -3599,7 +3542,7 @@ void CMainDlg::SaveParameters() {
             m_eAutoZoomModeWindowed, m_eAutoZoomModeFullscreen, false, m_bShowFileName, false, m_eTransitionEffect);
     }
 }
-
+/*
 CRect CMainDlg::ScreenToDIB(const CSize& sizeDIB, const CRect& rect) {
     int nOffsetX = (sizeDIB.cx - m_clientRect.Width())/2;
     int nOffsetY = (sizeDIB.cy - m_clientRect.Height())/2;
@@ -3640,7 +3583,7 @@ bool CMainDlg::ImageToScreen(float & fX, float & fY) {
 
     return true;
 }
-
+*/
 /// <summary>
 /// Get current filename/filepath
 /// </summary>

@@ -212,21 +212,6 @@ public:
 	static void* RotateHQ(CPoint targetOffset, CSize targetSize, double dRotation, CSize sourceSize, 
 		const void* pSourcePixels, int nChannels, COLORREF backColor);
 
-	// Trapezoid correction (used for perspective correction) using bicubic interpolation of 32 or 24 bpp BGR(A) image.
-	// This method is used for perspective correction.
-	// Notice that the A channel is not processed and set to fixed value 0xFF.
-	// Notice that the returned image is always 32 bpp!
-	// targetOffset: Offset for start of clipping window (in the region given by sourceSize)
-	// targetSize: Size of target image - returned DIB has this size
-	// trapezoid: Trapezoid end points, height + 1 must equal sourceSize.cy
-	// sourceSize: Size of source image
-	// pSourcePixels: Source image
-	// nChannels: Number of channels (bytes) in source image, must be 3 or 4
-	// backColor: Color to fill background of rotated image
-	// Returns a 32 bpp DIB of size targetSize
-	static void* TrapezoidHQ(CPoint targetOffset, CSize targetSize, const CTrapezoid& trapezoid, CSize sourceSize, 
-		const void* pSourcePixels, int nChannels, COLORREF backColor);
-
 	// Gauss filtering of a 16 bpp 1 channel image. In the image with size fullSize, the rectangle rect at position offset is filtered.
 	// The returned image has size 'rect'.
 	static int16* GaussFilter16bpp1Channel(CSize fullSize, CPoint offset, CSize rect, double dRadius, const int16* pPixels);

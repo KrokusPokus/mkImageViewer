@@ -249,11 +249,6 @@ namespace Helpers {
 		return (value + padvalue - 1) & ~(padvalue - 1);
 	}
 
-	// Difference of next padded value and value. padvalue must be a power of 2.
-	inline int PaddedBytes(int value, int padvalue) {
-		return (padvalue - ((value & (padvalue - 1)))) & (padvalue - 1);
-	}
-
 	// calculate CRC table for a CRC check
 	void CalcCRCTable(unsigned int crc_table[256]);
 
@@ -292,9 +287,6 @@ namespace Helpers {
 
 	// Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
 	CString GetMultiframeIndex(CJPEGImage* pImage);
-
-	// replaces the file info format string by the actual values from the image and file list
-    QString GetFileInfoString(LPCTSTR sFormat, CJPEGImage* pImage, CFileList* pFilelist, double dZoom);
 
 	// Returns the windows version in the format Major * 100 + Minor, e.g. 602 for Windows 8
 	int GetWindowsVersion();
@@ -339,7 +331,7 @@ namespace Helpers {
 /*GF*/	bool isRunningUnderWine();
 /*GF*/	CString GetUnixPathFromWine(LPCTSTR szDosPath);
 /*GF*/  bool IsLinuxBinaryAvailable(LPCTSTR szUnixPath);
-/*GF*/  constexpr bool EqualsIgnoreCase(std::wstring_view a, std::wstring_view b) noexcept;
+/*GF*/  //constexpr bool EqualsIgnoreCase(std::wstring_view a, std::wstring_view b) noexcept;
 /*GF*/  uint32_t GetTimeMs();
 /*GF*/  QString formatOutputZoomFactor(double m_dZoom);
 

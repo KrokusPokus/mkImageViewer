@@ -227,17 +227,6 @@ CFileList::~CFileList() {
 	m_fileList.clear();
 }
 
-CString CFileList::GetSupportedFileEndings() {
-	LPCTSTR* allFileEndings = GetSupportedFileEndingList();
-	CString sList;
-	for (int i = 0; i < nNumEndings; i++) {
-		sList += _T("*.");
-		sList += allFileEndings[i];
-		if (i+1 < nNumEndings) sList += _T(";");
-	}
-	return sList;
-}
-
 void CFileList::Reload(LPCTSTR sFileName, bool clearForwardHistory) {
 	LPCTSTR sCurrent = sFileName;
 	if (sCurrent == NULL) {
@@ -279,6 +268,7 @@ bool CFileList::CurrentFileExists() const {
 	return false;
 }
 
+/*
 void CFileList::FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName) {
 	if (_tcsicmp(sOldFileName, m_sInitialFile) == 0) {
 		m_sInitialFile = sNewFileName;
@@ -290,7 +280,9 @@ void CFileList::FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName) {
 		}
 	}
 }
+*/
 
+/*
 void CFileList::ModificationTimeChanged() {
 	if (m_iter != m_fileList.end()) {
 		LPCTSTR sName = m_iter->GetName();
@@ -304,6 +296,7 @@ void CFileList::ModificationTimeChanged() {
 		}
 	}
 }
+*/
 
 CFileList* CFileList::Next() {
 	m_nMarkedIndexShow = -1;
@@ -425,7 +418,7 @@ LPCTSTR CFileList::CurrentDirectory() const {
         return NULL;
     }
 }
-
+/*
 int CFileList::CurrentIndex() const {
 	int i = 0;
 	std::list<CFileDesc>::const_iterator iter;
@@ -437,7 +430,9 @@ int CFileList::CurrentIndex() const {
 	}
 	return -1;
 }
+*/
 
+/*
 const FILETIME* CFileList::CurrentModificationTime() const {
 	if (m_iter != m_fileList.end()) {
 		return &(m_iter->GetLastModTime());
@@ -445,6 +440,7 @@ const FILETIME* CFileList::CurrentModificationTime() const {
 		return NULL;
 	}
 }
+*/
 
 LPCTSTR CFileList::PeekNextPrev(int nIndex, bool bForward, bool bToggle) {
 	if (bToggle) {

@@ -69,9 +69,9 @@ set(SOURCES
     ICCProfileTransform.cpp
     ImageLoadThread.cpp
     JPEGImage.cpp
-    JPEGLosslessTransform.cpp
+
     JPEGProvider.cpp
-    JPEGView.cpp
+    main.cpp
     JXLWrapper.cpp
     KeyMap.cpp
     LocalDensityCorr.cpp
@@ -89,7 +89,7 @@ set(SOURCES
     SettingsProvider.cpp
     stdafx.cpp
     TJPEGWrapper.cpp
-    UserCommand.cpp
+
     WEBPWrapper.cpp
     WorkThread.cpp
     XMMImage.cpp

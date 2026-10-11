@@ -316,23 +316,6 @@ CSettingsProvider::CSettingsProvider(void) {
 	// The default of 2 means: Two pages forward + two pages backward.
 	m_nCacheRange = GetInt(_T("CacheRange"), 2, 0, 8);
 
-// -------------------------------------------------------------------------------------------
-
-	// read all user commands
-	CString sCmd;
-	int nIndex = 0;
-	do {
-		CString sKey;
-		sKey.Format(_T("UserCmd%d"), nIndex++);
-		sCmd = GetString(sKey, _T(""));
-		if (sCmd.GetLength() > 0) {
-			CUserCommand* pUserCmd = new CUserCommand(nIndex - 1, sCmd, true);
-			if (pUserCmd->IsValid()) {
-				m_userCommands.push_back(pUserCmd);
-			}
-		}
-	} while (sCmd.GetLength() > 0 || nIndex <= 3);
-	
 }
 
 CImageProcessingParams CSettingsProvider::LandscapeModeParams(const CImageProcessingParams& templParams) {
@@ -552,45 +535,6 @@ void CSettingsProvider::UpdateUserSettings() {
 	if (::MoveFile(sINIFileName, sINIFileName + _T(".old"))) {
 		::MoveFile(newINIFileName, sINIFileName);
 	}
-}
-
-int CSettingsProvider::DeleteOpenWithCommand(CUserCommand* pCommand) {
-	MakeSureUserINIExists();
-
-	int index = 0;
-	std::list<CUserCommand*>::iterator iter;
-	for (iter = m_openWithCommands.begin( ); iter != m_openWithCommands.end( ); iter++ ) {
-		if (*iter == pCommand)
-			break;
-		index++;
-	}
-
-	if (index < m_openWithCommands.size()) {
-		CString sKey;
-		sKey.Format(_T("OpenWith%d"), pCommand->GetIndex());
-
-		WriteString(sKey, _T("[deleted]"));
-
-		m_openWithCommands.remove(pCommand);
-		delete pCommand;
-
-		m_bUserINIExists = true;
-		return index;
-	}
-
-	return -1;
-}
-
-void CSettingsProvider::ChangeOpenWithCommand(CUserCommand* pCommand, const CString& sCommandString) {
-	CUserCommand* pChangedCommand = new CUserCommand(pCommand->GetIndex(), sCommandString, false);
-	m_openWithCommands.insert(std::find(m_openWithCommands.begin(), m_openWithCommands.end(), pCommand), pChangedCommand);
-	m_openWithCommands.remove(pCommand);
-	delete pCommand;
-
-	CString sKey;
-	sKey.Format(_T("OpenWith%d"), pChangedCommand->GetIndex());
-
-	WriteString(sKey, sCommandString);
 }
 
 void CSettingsProvider::MakeSureUserINIExists() {

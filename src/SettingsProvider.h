@@ -3,7 +3,6 @@
 
 #include "Helpers.h"
 #include "FileList.h"
-#include "UserCommand.h"
 #include "ProcessParams.h"
 
 #include <unordered_map>
@@ -105,9 +104,6 @@ public:
 	// Copies the user INI file (in AppData/Roaming) from the INI file template JPEGView.ini.tpl
 	void CopyUserINIFromTemplate();
 
-	std::list<CUserCommand*> & UserCommandList() { return m_userCommands; }
-	std::list<CUserCommand*> & OpenWithCommandList() { return m_openWithCommands; }
-
 	// This will only save a subset of settings to the INI file located in AppData\JPEGView\JPEGView.ini.
 	// Note that this INI file has precedence over the INI file at the program directory
 	void SaveSettings(const CImageProcessingParams& procParams,
@@ -121,13 +117,7 @@ public:
 	void SaveStickyWindowRect(CRect rect);
 	
 	// Update user settings with settings from INI file template
-	void UpdateUserSettings();
-
-	// Deletes the open with command, returns index of the deleted command, -1 if invalid
-	int DeleteOpenWithCommand(CUserCommand* pCommand);
-
-	// Replaces the existing open with command by a new command
-	void ChangeOpenWithCommand(CUserCommand* pCommand, const CString& sCommandString);
+    void UpdateUserSettings();
 
 	// Gets the path where the global INI file and the EXE is located
 	LPCTSTR GetEXEPath() { return m_sEXEPath; }
@@ -233,9 +223,6 @@ private:
 	int m_zoomPauseFactor;
 	bool m_bWindowBorderlessOnStartup;
 	bool m_bWindowAlwaysOnTopOnStartup;
-
-	std::list<CUserCommand*> m_userCommands;
-	std::list<CUserCommand*> m_openWithCommands;
 
 	TCHAR* m_pIniGlobalSectionBuffer;
 	TCHAR* m_pIniUserSectionBuffer;

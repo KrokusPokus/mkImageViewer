@@ -1444,22 +1444,6 @@ void* TrapezoidHQ_Core(CPoint targetOffset, CSize targetSize, const CTrapezoid& 
 	return pTargetPixels;
 }
 
-void* CBasicProcessing::TrapezoidHQ(CPoint targetOffset, CSize targetSize, const CTrapezoid& trapezoid, CSize sourceSize, 
-									const void* pSourcePixels, int nChannels, COLORREF backColor) {
-	 if (pSourcePixels == NULL || (nChannels != 3 && nChannels != 4)) {
-		return NULL;
-	}
-
-	uint8* pTargetPixels = new(std::nothrow) uint8[targetSize.cx * 4 * targetSize.cy];
-	if (pTargetPixels == NULL) return NULL;
-
-	CProcessingThreadPool& threadPool = CProcessingThreadPool::This();
-	CRequestTrapezoid request(pSourcePixels, targetOffset, targetSize, trapezoid, sourceSize, pTargetPixels, nChannels, backColor);
-	bool bSuccess = threadPool.Process(&request);
-
-	return bSuccess ? pTargetPixels : NULL;
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Helper methods for high quality resizing (C++ implementation)
 /////////////////////////////////////////////////////////////////////////////////////////////

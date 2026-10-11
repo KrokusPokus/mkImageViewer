@@ -24,7 +24,6 @@ class CZoomNavigatorCtl;
 class CCropCtl;
 class CKeyMap;
 class CDirectoryWatcher;
-class CUserCommand;
 
 enum EMouseEvent;
 
@@ -140,40 +139,12 @@ public:
 		int nTransitionTime, bool bAutoExit, int nDisplayMonitor);
 
 	// Called by the different controller classes
-	HWND GetHWND() { return m_hWnd; }
-	bool IsShowFileName() { return m_bShowFileName; }
-	bool IsInMovieMode() { return m_bMovieMode; }
-	bool IsInZoomMode() { return m_bZoomModeOnLeftMouse; }
-	bool IsPlayingAnimation() { return m_bIsAnimationPlaying; }
 	bool IsFullScreenMode() { return m_bFullScreenMode; }
-	bool IsLandscapeMode() { return m_bLandscapeMode; }
-	bool IsHQResampling() { return m_bHQResampling; }
-	bool IsAutoContrast() { return m_bAutoContrast; }
-	bool IsAutoContrastSection() { return m_bAutoContrastSection; }
-	bool IsLDC() { return m_bLDC; }
 	bool IsKeepParams() { return m_bKeepParams; }
-	bool IsSpanVirtualDesktop() { return m_bSpanVirtualDesktop; }
-	bool IsDoDragging() { return m_bDoDragging; }
-	bool IsInZooming() { return m_bInZooming; }
-	bool IsShowZoomFactor() { return m_bShowZoomFactor; }
-	bool IsPanMouseCursorSet() { return m_bPanMouseCursorSet; }
-	bool IsMouseOn() { return m_bMouseOn; }
-	bool IsWindowBorderless() { return m_bWindowBorderless; }
-	bool IsAlwaysOnTop() { return m_bAlwaysOnTop; }
-
-	CPoint GetMousePos() { return CPoint(m_nMouseX, m_nMouseY); }
-	double GetZoom() { return m_dZoom; }
 	int GetRotation() { return m_nRotation; }
 	CJPEGImage* GetCurrentImage() { return m_pCurrentImage; }
-	CPanelMgr* GetPanelMgr() { return m_pPanelMgr; }
 	LPCTSTR CurrentFileName(bool bFileTitle);
-	CFileList* GetFileList() { return m_pFileList; }
-	const CRect& ClientRect() { return m_clientRect; }
 	const CRect& WindowRectOnClose() { return m_windowRectOnClose; } // only valid after having closed the window
-	const CRect& MonitorRect() { return m_monitorRect; }
-	const CSize& VirtualImageSize() { return m_virtualImageSize; }
-	CJPEGProvider* GetJPEGProvider() { return m_pJPEGProvider; }
-	CPoint GetDIBOffset() { return m_DIBOffsets; }
 	double GetZoomMultiplier(CJPEGImage* pImage, const CRect& clientRect);
 	Helpers::EAutoZoomMode GetAutoZoomMode() { return m_bFullScreenMode ? m_eAutoZoomModeFullscreen : m_eAutoZoomModeWindowed; }
 	CPoint GetOffsets() { return m_offsets; }
@@ -193,8 +164,8 @@ public:
 	void DoDragging();
 	void EndDragging();
 	void SetCursorForMoveSection();
-	bool ScreenToImage(float & fX, float & fY); 
-	bool ImageToScreen(float & fX, float & fY);
+    //bool ScreenToImage(float & fX, float & fY);
+    //bool ImageToScreen(float & fX, float & fY);
 	void ExecuteCommand(int nCommand);
 	int TrackPopupMenu(CPoint pos, HMENU hMenu);
 	void AdjustWindowToImage(bool bAfterStartup);
@@ -289,8 +260,6 @@ private:
 	CRect m_clientRect;
 	CRect m_windowRectOnClose;
 	CString m_sSaveDirectory;
-	CString m_sSaveExtension;
-	CPanelMgr* m_pPanelMgr;
 	CKeyMap* m_pKeyMap;
 	Helpers::ETransitionEffect m_eTransitionEffect;
 	int m_nTransitionTime;
@@ -306,8 +275,6 @@ private:
 
 	void ExploreFile();
 	void OpenFile(LPCTSTR sFileName, bool bAfterStartup);
-	void HandleUserCommands(uint32 virtualKeyCode);
-	void ExecuteUserCommand(CUserCommand* pUserCommand);
 	void GotoImage(EImagePosition ePos, int nFlags);
 	bool PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, bool bAdjustWindowToImage);
 	double GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge);
@@ -322,7 +289,7 @@ private:
 	void ExchangeProcessingParams();
 	void SaveParameters();
 	void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool noAdjustWindow, bool bMoveBack = false);
-	CRect ScreenToDIB(const CSize& sizeDIB, const CRect& rect);
+
 	void ToggleMonitor();
 	CRect GetZoomTextRect();
 	CRect GetToastTextRect();
@@ -341,6 +308,8 @@ private:
 	void AdjustAnimationFrameTime();
 	void StopAnimation();
 	void ToggleAlwaysOnTop();
+
+    //CRect ScreenToDIB(const CSize& sizeDIB, const CRect& rect);
 
 /*##################################################################*/
 /* Custom private functions and variables of the linear scaling mod */

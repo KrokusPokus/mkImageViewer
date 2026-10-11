@@ -2,12 +2,10 @@
 #define HELPERSGUI_H
 
 #include "Helpers.h"
-#include "JPEGLosslessTransform.h"
 
 enum EProcessingFlags;
 class CImageProcessingParams;
 class CKeyMap;
-class CUserCommand;
 
 namespace HelpersGUI {
 
@@ -45,9 +43,6 @@ namespace HelpersGUI {
 	// Draws a text with a black outline to improve readability. nFormat is according to format in GDI DrawText method.
 	void DrawTextBordered(CDC& dc, LPCTSTR sText, const CRect& rect, UINT nFormat);
 
-	// Draws a rectangle with line width 1 pixel, respectively 2 pixels for high resolution DPI (> 196 dpi)
-	void DrawRectangle(CDC & dc, const CRect& rect);
-
 	// Draws a 32 bit DIB centered in the given target area, filling the remaining area with the given brush
 	// The bmInfo struct will be initialized by this method and does not need to be preinitialized.
 	// Return value is the top, left coordinate of the painted DIB in the target area
@@ -62,22 +57,6 @@ namespace HelpersGUI {
 
 	// Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
 	void DrawImageLoadErrorText(CDC& dc, const CRect& clientRect, LPCTSTR sFailedFileName, int nFileLoadError, int nLoadErrorDetail);
-
-	// Convert a menu item command ID to a transformation enumeration for lossless JPEG transformation
-	CJPEGLosslessTransform::ETransformation CommandIdToLosslessTransformation(int nCommandId);
-
-	// Convert the error result code from lossless JPEG transformation to a string
-	LPCTSTR LosslessTransformationResultToString(CJPEGLosslessTransform::EResult eResult);
-
-	// Creates the submenu containing the user commands in hMenu, returns if there are any menu items
-	bool CreateUserCommandsMenu(HMENU hMenu);
-	// Creates the submenu containing the open with.. commands in hMenu, returns if there are any menu items
-	bool CreateOpenWithCommandsMenu(HMENU hMenu);
-
-	// Finds a user command given the menu index in the menu as created above
-	CUserCommand* FindUserCommand(int index);
-	// Finds a open with command given the menu index in the menu as created above
-	CUserCommand* FindOpenWithCommand(int index);
 }
 
 #endif // HELPERSGUI_H

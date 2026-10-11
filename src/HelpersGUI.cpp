@@ -56,43 +56,6 @@ static HFONT CreateFontFromINIDescription(HDC dc, LPCTSTR sIniFileDescription)
 			CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, VARIABLE_PITCH, sFontName);
 }
 
-static bool CreateCommandsMenu(HMENU hMenu, std::list<CUserCommand*> & commandList, int firstCommandId) {
-	bool hasItems = false;
-	int count = 0;
-	std::list<CUserCommand*>::iterator iter;
-	::DeleteMenu(hMenu, 0, MF_BYPOSITION);
-	for (iter = commandList.begin( ); iter != commandList.end( ); iter++ ) {
-		LPCTSTR menuItemText = (*iter)->MenuItemText();
-		if (menuItemText != NULL) {
-			hasItems = true;
-			CString itemText(menuItemText);
-			CString shortcutKey = CKeyMap::GetShortcutKey((*iter)->GetKeyCode());
-			if (!shortcutKey.IsEmpty()) {
-				itemText += _T('\t');
-				itemText += shortcutKey;
-			}
-			::AppendMenu(hMenu, MF_ENABLED | MF_STRING, (UINT_PTR)(firstCommandId + count), itemText);
-			count++;
-		}
-	}
-	return hasItems;
-}
-
-CUserCommand* FindCommand(int index, std::list<CUserCommand*> & commandList) {
-	int count = 0;
-	std::list<CUserCommand*>::iterator iter;
-	for (iter = commandList.begin( ); iter != commandList.end( ); iter++ ) {
-		LPCTSTR menuItemText = (*iter)->MenuItemText();
-		if (menuItemText != NULL) {
-			if (count == index) {
-				return *iter;
-			}
-			count++;
-		}
-	}
-	return NULL;
-}
-
 namespace HelpersGUI {
 
 	float DPIScalingFactor = -1.0f; // is set to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
@@ -211,15 +174,6 @@ namespace HelpersGUI {
 
         if (oldBkMode != TRANSPARENT) {
 			dc.SetBkMode(oldBkMode);
-		}
-	}
-
-	void DrawRectangle(CDC & dc, const CRect& rect) {
-		dc.Rectangle(rect);
-		if (HelpersGUI::DPIScalingFactor >= 2) {
-			CRect copy(rect);
-			copy.DeflateRect(1, 1);
-			dc.Rectangle(copy);
 		}
 	}
 
@@ -444,52 +398,4 @@ namespace HelpersGUI {
 		}
 		dc.DrawText(buff, -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
 	}
-
-	CJPEGLosslessTransform::ETransformation CommandIdToLosslessTransformation(int nCommandId) {
-		switch (nCommandId) {
-			case IDM_ROTATE_90_LOSSLESS:
-			case IDM_ROTATE_90_LOSSLESS_CONFIRM:
-				return CJPEGLosslessTransform::Rotate90;
-			case IDM_ROTATE_270_LOSSLESS:
-			case IDM_ROTATE_270_LOSSLESS_CONFIRM:
-				return CJPEGLosslessTransform::Rotate270;
-			case IDM_ROTATE_180_LOSSLESS:
-				return CJPEGLosslessTransform::Rotate180;
-			case IDM_MIRROR_H_LOSSLESS:
-				return CJPEGLosslessTransform::MirrorH;
-			case IDM_MIRROR_V_LOSSLESS:
-				return CJPEGLosslessTransform::MirrorV;
-			default:
-				return (CJPEGLosslessTransform::ETransformation)(-1);
-		}
-	}
-
-	LPCTSTR LosslessTransformationResultToString(CJPEGLosslessTransform::EResult eResult) {
-		switch (eResult) {
-		case CJPEGLosslessTransform::ReadFileFailed:
-			return CNLS::GetString(_T("Reading the JPEG file from disk failed"));
-		case CJPEGLosslessTransform::WriteFileFailed:
-			return CNLS::GetString(_T("Writing the resulting JPEG file to disk failed"));
-		case CJPEGLosslessTransform::TransformationFailed:
-			return CNLS::GetString(_T("Performing the transformation failed"));
-		default:
-			return _T("");
-		}
-	}
-
-	bool CreateUserCommandsMenu(HMENU hMenu) {
-		return CreateCommandsMenu(hMenu, CSettingsProvider::This().UserCommandList(), IDM_FIRST_USER_CMD);
-	}
-
-	bool CreateOpenWithCommandsMenu(HMENU hMenu) {
-		return CreateCommandsMenu(hMenu, CSettingsProvider::This().OpenWithCommandList(), IDM_FIRST_OPENWITH_CMD);
-	}
-
-	CUserCommand* FindUserCommand(int index) {
-		return FindCommand(index, CSettingsProvider::This().UserCommandList());
-	}
-
-	CUserCommand* FindOpenWithCommand(int index) {
-		return FindCommand(index, CSettingsProvider::This().OpenWithCommandList());
-    }
 }

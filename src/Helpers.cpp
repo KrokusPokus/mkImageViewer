@@ -638,27 +638,6 @@ LPCTSTR ConvertTransitionEffectToString(ETransitionEffect effect) {
 	}
 }
 
-static bool IsInFileEndingList(LPCTSTR sFileEndings, LPCTSTR sEnding, int nStartOffset = 1, int nEndingOffset = -1) {
-	const int BUFFER_SIZE = 256;
-	TCHAR buffer[BUFFER_SIZE];
-	_tcsncpy_s(buffer, BUFFER_SIZE, sFileEndings, _TRUNCATE);
-	LPTSTR sStart = buffer, sCurrent = buffer;
-	while (*sCurrent != 0) {
-		while (*sCurrent != 0 && *sCurrent != _T(';')) {
-			sCurrent++;
-		}
-		if (*sCurrent == _T(';')) {
-			*sCurrent = 0;
-			sCurrent++;
-		}
-		if (_tcsicmp(sStart + nStartOffset, sEnding + nEndingOffset) == 0) {
-			return true;
-		}
-		sStart = sCurrent;
-	}
-	return false;
-}
-
 EImageFormat GetImageFormat(LPCTSTR sFileName) {
 	LPCTSTR sEnding = _tcsrchr(sFileName, _T('.'));
 	if (sEnding != NULL) {
@@ -799,69 +778,6 @@ CString GetMultiframeIndex(CJPEGImage* pImage) {
 		return s;
 	}
 	return CString(_T(""));
-}
-
-QString GetFileInfoString(const QString& sFormat, CJPEGImage* pImage, CFileList* pFilelist, double dZoom) {
-    if (!pImage) {
-        return QString();
-    }
-
-    QString sFileInfo;
-/*
-    bool isClipboardImage = pImage->IsClipboardImage();
-
-    if (sFormat == QStringLiteral("<i>  <p>")) {
-        if (isClipboardImage) {
-            return QString("Clipboard Image");
-        }
-        return QString("[%1/%2]  %3%4")
-            .arg(pFilelist->CurrentIndex() + 1)
-            .arg(pFilelist->Size())
-            .arg(pFilelist->Current())
-            .arg(GetMultiframeIndex(pImage));
-    }
-
-    sFileInfo = sFormat;
-    sFileInfo.replace("\\t", "        ");
-
-    if (sFileInfo.contains("<f>")) {
-        QString sFileName = isClipboardImage
-                                ? QString("Clipboard Image")
-                                : pFilelist->CurrentFileTitle() + GetMultiframeIndex(pImage);
-        sFileInfo.replace("<f>", sFileName);
-    }
-
-    if (sFileInfo.contains("<p>")) {
-        QString sFilePath = isClipboardImage
-                                ? CNLS::GetString("Clipboard Image")
-                                : pFilelist->Current() + GetMultiframeIndex(pImage);
-        sFileInfo.replace("<p>", sFilePath);
-    }
-
-    if (sFileInfo.contains("<i>")) {
-        QString sIndex;
-        if (!isClipboardImage) {
-            sIndex = QString("[%1/%2]").arg(pFilelist->CurrentIndex() + 1).arg(pFilelist->Size());
-        }
-        sFileInfo.replace("<i>", sIndex);
-    }
-
-    if (sFileInfo.contains("<z>")) {
-        QString sZoom = QString("%1 %").arg(static_cast<int>(dZoom * 100 + 0.5));
-        sFileInfo.replace("<z>", sZoom);
-    }
-
-    if (sFileInfo.contains("<s>")) {
-        QString sSize = QString("%1 x %2").arg(pImage->OrigWidth()).arg(pImage->OrigHeight());
-        sFileInfo.replace("<s>", sSize);
-    }
-
-    if (sFileInfo.contains("<l>")) {
-        qint64 fileSize = isClipboardImage ? 0 : GetFileSize(pFilelist->Current());
-        sFileInfo.replace("<l>", FormatFileSize(fileSize));
-    }
-*/
-    return sFileInfo.trimmed();
 }
 
 int GetWindowsVersion() {
@@ -1055,6 +971,7 @@ bool CanReadAhead(CJPEGImage* pImage) {
 		return (dwAttr != INVALID_FILE_ATTRIBUTES && !(dwAttr & FILE_ATTRIBUTE_DIRECTORY));
 	}
 
+    /*
     constexpr bool EqualsIgnoreCase(std::wstring_view a, std::wstring_view b) noexcept {
         if (a.size() != b.size()) {
             return false;
@@ -1063,6 +980,7 @@ bool CanReadAhead(CJPEGImage* pImage) {
             return std::towlower(c1) == std::towlower(c2);
         });
     }
+    */
 
     uint32_t GetTimeMs() {
         using namespace std::chrono;

@@ -51,7 +51,7 @@ public:
 	// Return value:
 	// The returned DIB is a 32 bpp DIB (BGRA). Note that the returned pointer must not
 	// be deleted by the caller and is only valid until another call to GetDIB() is done, the CJPEGImage
-	// object is disposed or the Rotate(), Crop() or any other method affecting original pixels is called!
+    // object is disposed or the Rotate() or any other method affecting original pixels is called!
 	// Note: The method tries to satisfy consecutive requests as efficient as possible. Calling the GetDIB()
 	// method multiple times with the same set of parameters will return the same image starting from the second
 	// call without doing image processing anymore.
@@ -84,10 +84,6 @@ public:
 	// Applies to original pixels!
 	bool Mirror(bool bHorizontally);
 
-	// Crops the image. 
-	// Applies to original pixels!
-	bool Crop(CRect cropRect);
-
 	// Rotate the image clockwise by 90, 180 or 270 degrees. All other angles are invalid.
 	// Applies to original pixels!
 	bool Rotate(int nRotation);
@@ -98,16 +94,6 @@ public:
 	// In all cases the size of the image in pixels is changed by the rotation.
 	// Returns false if not enough memory is available to perform the operation.
 	bool RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKeepAspectRatio);
-
-	// Resizes the original pixels to the given target size.
-	// Returns false if not enough memory is available to perform the operation or if specified size is not valid.
-	bool ResizeOriginalPixels(EResizeFilter filter, CSize newSize);
-
-	// Gets histogram of the original, unprocessed image
-	const CHistogram* GetOriginalHistogram();
-
-	// Gets the histogram of the processed image - histogram is over the whole image, not only the visible section
-	const CHistogram* GetProcessedHistogram();
 
 	// Gets the hash value of the pixels, for JPEGs the hash is on the compressed pixels
 	__int64 GetPixelHash() const { return m_nPixelHash; }
@@ -215,8 +201,6 @@ public:
 	// processing parameters for this file (maybe different from the global ones)
 	void SetFileDependentProcessParams(LPCTSTR sFileName, CProcessParams* pParams);
 
-	// Sets the regions of the returned DIB that are dimmed out (set dimRects to NULL for no dimming)
-	void SetDimRects(const CDimRect* dimRects, int numberOfRects);
 	// Disable/enable dimming with the set dim rects (default is enabled)
 	void EnableDimming(bool bEnable);
 
@@ -283,12 +267,6 @@ public:
 
 	// Converts the target offset from 'center of image' based format to pixel coordinate format 
 	static CPoint ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset);
-
-	// Debug: Returns if this could be a night shot (heuristic, between 0 and 1)
-	float IsNightShot() const;
-
-	// Debug: Returns if this could be a sun set (heuristic, between 0 and 1)
-	float IsSunset() const;
 
 	// Debug: Ticks (milliseconds) of the last operation
 	double LastOpTickCount() const { return m_dLastOpTickCount; }
@@ -466,9 +444,6 @@ private:
 
 	// Called when the original pixels have changed (rotate, crop, unsharp mask), all cached pixel data gets invalid
 	void InvalidateAllCachedPixelData();
-
-	// Create a thumbnail image of this image
-	CJPEGImage* CreateThumbnailImage();
 
 	// Create histogram of the processed DIB (in original size) using the given image processing parameters
 	const CHistogram* GetHistogramOfProcessedDIB(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags);

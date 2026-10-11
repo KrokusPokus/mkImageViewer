@@ -204,28 +204,6 @@ CJPEGImage::~CJPEGImage(void) {
 	m_pRawMetadata = NULL;
 }
 
-const CHistogram* CJPEGImage::GetOriginalHistogram() {
-	assert(!m_bIsThumbnailImage);
-	if (m_pLDC == NULL) {
-		m_pLDC = new CLocalDensityCorr(*this, true);
-	}
-	return m_pLDC->GetHistogram();
-}
-
-const CHistogram* CJPEGImage::GetProcessedHistogram() {
-	assert(!m_bIsThumbnailImage);
-	if (m_pHistogramThumbnail == NULL) {
-		m_pHistogramThumbnail = CreateThumbnailImage();
-	}
-	return (m_imageProcParams.Contrast == -1) ? NULL : 
-		m_pHistogramThumbnail->GetHistogramOfProcessedDIB(
-		CImageProcessingParams(m_imageProcParams.Contrast, m_imageProcParams.Gamma, m_imageProcParams.Saturation,
-		0.0, m_imageProcParams.ColorCorrectionFactor, m_imageProcParams.ContrastCorrectionFactor, 
-		m_imageProcParams.LightenShadows, m_imageProcParams.DarkenHighlights, m_imageProcParams.LightenShadowSteepness, 
-		m_imageProcParams.CyanRed, m_imageProcParams.MagentaGreen, m_imageProcParams.YellowBlue), 
-		SetProcessingFlag(m_eProcFlags, PFLAG_HighQualityResampling, false));
-}
-
 const CHistogram* CJPEGImage::GetHistogramOfProcessedDIB(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
 	assert(m_bIsThumbnailImage);
 	CSize origSize(m_nOrigWidth, m_nOrigHeight);
@@ -261,60 +239,6 @@ bool CJPEGImage::RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKe
 	m_rotationParams.FreeRotation = fmod(360 * dRotation / (2 * 3.141592653), 360);
 	m_rotationParams.Flags = SetRotationFlag(m_rotationParams.Flags, RFLAG_AutoCrop, bAutoCrop);
 	m_rotationParams.Flags = SetRotationFlag(m_rotationParams.Flags, RFLAG_KeepAspectRatio, bKeepAspectRatio);
-
-	return true;
-}
-
-bool CJPEGImage::ResizeOriginalPixels(EResizeFilter filter, CSize newSize) {
-	int newWidth = newSize.cx, newHeight = newSize.cy;
-	if (newWidth <= 0 || newHeight <= 0) {
-		return false;
-	}
-	if (((long long)newWidth) * newHeight > MAX_IMAGE_PIXELS) {
-		return false;
-	}
-	if (newWidth > MAX_IMAGE_DIMENSION || newHeight > MAX_IMAGE_DIMENSION) {
-		return false;
-	}
-	if (newWidth == m_nOrigWidth && newHeight == m_nOrigHeight) {
-		return true;
-	}
-
-	InvalidateAllCachedPixelData();
-
-	void* pResizedPixels = m_pOrigPixels;
-	int currentWidth = m_nOrigWidth;
-	int currentHeight = m_nOrigHeight;
-	int channels = m_nOriginalChannels;
-	double totalFactor = (double)currentWidth / newWidth;
-	int steps = (totalFactor > 5) ? (int)ceil(log(totalFactor) / log(5.0)) : 1;
-	double factor = (steps > 1) ? pow(totalFactor, 1.0 / steps) : 1.0;
-	for (int i = 0; i < steps; i++) {
-		EResizeFilter usedFilter;
-		int oldWidth = currentWidth, oldHeight = currentHeight;
-		if (i != steps - 1 && filter != Resize_PointFilter) {
-			currentWidth = (int)(currentWidth / factor);
-			currentHeight = (int)(currentHeight / factor);
-			usedFilter = (filter == Resize_SharpenMedium) ? Resize_SharpenLow : Resize_NoAliasing;
-		} else {
-			currentWidth = newWidth;
-			currentHeight = newHeight;
-			usedFilter = filter;
-		}
-		void* pOldPixels = pResizedPixels;
-		pResizedPixels = InternalResize(pResizedPixels, channels, usedFilter, CSize(currentWidth, currentHeight), CSize(oldWidth, oldHeight));
-		if (pResizedPixels == NULL)
-			return false;
-		delete[] pOldPixels;
-		channels = 4;
-	}
-
-	m_nOrigWidth = newWidth;
-	m_nOrigHeight = newHeight;
-	m_nOriginalChannels = 4;
-	m_pOrigPixels = pResizedPixels;
-	MarkAsDestructivelyProcessed();
-	m_bIsProcessedNoParamDB = true;
 
 	return true;
 }
@@ -581,66 +505,6 @@ bool CJPEGImage::Mirror(bool bHorizontally) {
 	return true;
 }
 
-bool CJPEGImage::Crop(CRect cropRect) {
-	// Cropping can only be done in 32 bpp
-	if (!ConvertSrcTo4Channels()) {
-		return false;
-	}
-
-	InvalidateAllCachedPixelData();
-	void* pNewOriginalPixels = CBasicProcessing::Crop32bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, cropRect);
-	if (pNewOriginalPixels == NULL) {
-		return false;
-	}
-	delete[] m_pOrigPixels;
-	m_pOrigPixels = pNewOriginalPixels;
-	m_nOrigWidth = cropRect.Width();
-	m_nOrigHeight = cropRect.Height();
-	m_bCropped = true;
-	MarkAsDestructivelyProcessed();
-	m_bIsProcessedNoParamDB = true;
-
-	return true;
-}
-
-void CJPEGImage::SetDimRects(const CDimRect* dimRects, int numberOfRects) {
-	bool bIdentical = false;
-	if (m_pDIBPixelsLUTProcessed) {
-		bool bCanReuseDIB = false;
-		if (numberOfRects >= m_nNumDimRects) {
-			bCanReuseDIB = true;
-			for (int i = 0; i < m_nNumDimRects; i++) {
-				if (dimRects[i].Rect != m_pDimRects[i].Rect || dimRects[i].Factor != m_pDimRects[i].Factor) {
-					bCanReuseDIB = false;
-					break;
-				}
-			}
-		}
-		if (bCanReuseDIB) {
-			bIdentical = numberOfRects == m_nNumDimRects;
-			// only dim the new rectangles
-			for (int i = m_nNumDimRects; i < numberOfRects; i++) {
-				CBasicProcessing::DimRectangle32bpp(DIBWidth(), DIBHeight(), m_pDIBPixelsLUTProcessed,
-					dimRects[i].Rect, dimRects[i].Factor);
-			}
-		} else {
-			// force to recreate processed DIB on next access
-			delete[] m_pDIBPixelsLUTProcessed;
-			m_pDIBPixelsLUTProcessed = NULL;
-			m_pLastDIB = NULL;
-		}
-	}
-	if (!bIdentical) {
-		delete[] m_pDimRects;
-		m_pDimRects = NULL;
-		m_nNumDimRects = numberOfRects;
-		if (numberOfRects > 0) {
-			m_pDimRects = new CDimRect[numberOfRects];
-			memcpy(m_pDimRects, dimRects, numberOfRects*sizeof(CDimRect));
-		}
-	}
-}
-
 void CJPEGImage::EnableDimming(bool bEnable) {
 	if (bEnable != m_bEnableDimming && m_pDimRects != NULL) {
 		m_bEnableDimming = bEnable;
@@ -661,22 +525,6 @@ void CJPEGImage::VerifyDIBPixelsCreated() {
 	if (m_pDIBPixels == NULL) {
 		EResizeType eResizeType = GetResizeType(m_FullTargetSize, CSize(m_nOrigWidth, m_nOrigHeight));
 		m_pDIBPixels = Resample(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_eProcFlags, m_imageProcParams.Sharpen, m_dRotationLQ, eResizeType);
-	}
-}
-
-float CJPEGImage::IsNightShot() const {
-	if (m_pLDC != NULL) {
-		return m_pLDC->GetHistogram()->IsNightShot();
-	} else {
-		return -1;
-	}
-}
-
-float CJPEGImage::IsSunset() const {
-	if (m_pLDC != NULL) {
-		return m_pLDC->IsSunset();
-	} else {
-		return -1;
 	}
 }
 
@@ -1331,33 +1179,6 @@ void CJPEGImage::InvalidateAllCachedPixelData() {
 	delete m_pHistogramThumbnail;
 	m_pHistogramThumbnail = NULL;
 	m_ClippingSize = CSize(0, 0);
-}
-
-CJPEGImage* CJPEGImage::CreateThumbnailImage() {
-	if (m_pLDC == NULL) {
-		m_pLDC = new CLocalDensityCorr(*this, true);
-	}
-	void* pPixels = NULL;
-	int nWidth, nHeight;
-	if (m_nOrigWidth*m_nOrigHeight < 120000) {
-		// take a copy of the original pixels
-		nWidth = m_nOrigWidth;
-		nHeight = m_nOrigHeight;
-		if (m_nOriginalChannels == 3) {
-			pPixels = CBasicProcessing::Convert3To4Channels(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels);
-		} else {
-			int nSizeBytes = m_nOrigWidth*m_nOrigHeight*4;
-			pPixels = new uint8[nSizeBytes];
-			memcpy(pPixels, m_pOrigPixels, nSizeBytes);
-		}
-	} else {
-		// take the small image from the LDC
-		CSize psiSize = m_pLDC->GetPSISize();
-		nWidth = psiSize.cx;
-		nHeight = psiSize.cy;
-		pPixels = m_pLDC->GetPSImageAsDIB();
-	}
-	return new CJPEGImage(nWidth, nHeight, pPixels, NULL, 4, -1, IF_CLIPBOARD, false, 0, 1, 0, m_pLDC, true);
 }
 
 void CJPEGImage::DrawGridLines(void * pDIB, const CSize& dibSize) {
