@@ -78,40 +78,7 @@ public:
 		return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, NULL, pTrapezoid, 0.0, bShowGrid, bNotUsed);
 	}
 
-	// Gets a thumbnail of the original image.
-	// The returned thumbnail (32 bpp DIB) has the specified size. 'Size' should not be larger than 400 x 300 pixels
-	void* GetThumbnailDIB(CSize size, const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags);
-
-	// Gets a thumbnail of a section of the original image.
-	// The returned thumbnail (32 bpp DIB) has the size 'clippingSize'. 'ClippingSize' should not be larger than 400 x 300 pixels
-	// The parameters are the same as with GetDIB() - see there.
-	void* GetThumbnailDIB(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
-		const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags);
-
-	// Same as GetThumbnailDIB() but with low quality rotation. The rotation angle is specified in radians.
-	void* GetThumbnailDIBRotated(CSize size, const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags, double dRotation);
-
-	// Same as GetThumbnailDIB() but with trapezoid correction.
-	void* GetThumbnailDIBTrapezoid(CSize size, const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags, const CTrapezoid& trapezoid);
-
-	// Performs unsharp masking to a section in the original image, then applies image processing as requested and
-	// return resulting 32 bpp DIB. The returned DIB has the same resolution as the original image.
-	// The original image pixels are not touched by this operation.
-	// clippingSize: Sub-rectangle in original size image to render (the returned DIB has this size)
-	// targetOffset: Offset in original size image
-	// See GetDIB() for more information.
-	void* GetDIBUnsharpMasked(CSize clippingSize, CPoint targetOffset,
-		const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-		const CUnsharpMaskParams & unsharpMaskParams);
-
-	// Frees any resources hold to speed up GetDIBUnsharpMasked(). Subsequent calls to GetDIBUnsharpMasked() will work but may be slower.
-	void FreeUnsharpMaskResources();
-
-	// Operations on original pixels of the image
-
-	// Apply unsharp masking to the original image pixels. Cannot be undone except by reloading the image from disk.
-	// Returns false if not enough memory is available to perform the operation.
-	bool ApplyUnsharpMaskToOriginalPixels(const CUnsharpMaskParams & unsharpMaskParams);
+    // Operations on original pixels of the image
 
 	// Mirrors the image horizontally or vertically.
 	// Applies to original pixels!
@@ -131,12 +98,6 @@ public:
 	// In all cases the size of the image in pixels is changed by the rotation.
 	// Returns false if not enough memory is available to perform the operation.
 	bool RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKeepAspectRatio);
-
-	// Transform original pixels into horizontal trapezoid. The original pixels are replaced by this operation.
-	// See RotateOriginalPixels() for auto crop parameter and keep aspect ratio parameter.
-	// In all cases the size of the image in pixels is changed by this operation.
-	// Returns false if not enough memory is available to perform the operation.
-	bool TrapezoidOriginalPixels(const CTrapezoid& trapezoid, bool bAutoCrop, bool bKeepAspectRatio);
 
 	// Resizes the original pixels to the given target size.
 	// Returns false if not enough memory is available to perform the operation or if specified size is not valid.
@@ -178,13 +139,6 @@ public:
 	// Gets or sets the JPEG chromo sampling. See turbojpeg.h for the TJSAMP enumeration.
 	TJSAMP GetJPEGChromoSampling() { return m_eJPEGChromoSampling; }
 	void SetJPEGChromoSampling(TJSAMP eSampling) { m_eJPEGChromoSampling = eSampling; }
-
-	// Gets if lossless JPEG transformations can be applied to this image.
-	// Checks if this is a JPEG image and if the dimension of this image is dividable by the JPEG block size used.
-	bool CanUseLosslessJPEGTransformations();
-
-	// Trims the given rectangle to MCU block size of this image (allowing lossless JPEG transformations)
-	void TrimRectToMCUBlockSize(CRect& rect);
 
 	// Declare the cached DIB as invalid - forcing it to be regenerated on next GetDIB() call
 	void SetDIBInvalid() { m_ClippingSize = CSize(0, 0); }

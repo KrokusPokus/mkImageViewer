@@ -25,14 +25,10 @@ namespace HelpersGUI {
 	};
 
 	// Scaling factor to scale from 96 dpi to actual screen DPI, 96 dpi -> 1.0, 120 dpi -> 1.2
-	extern float ScreenScaling;
+	extern float DPIScalingFactor;
 
 	// Scales a pixel value given in 96 DPI to screen pixels, taking the screen DPI into account
-	int ScaleToScreen(int value);
-
-	// Creates a bold version of the font that is currently selected in the given DC.
-	// The caller is responsible for deleting the returned font when no longer used.
-	HFONT CreateBoldFontOfSelectedFont(CDCHandle dc);
+	int ScaleWithDPI(int value);
 
 	// Selects the default GUI font into the given DC.
 	void SelectDefaultGUIFont(HDC dc);

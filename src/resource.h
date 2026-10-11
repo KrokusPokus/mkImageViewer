@@ -156,9 +156,6 @@
 #define IDM_PASTE			2550		// :KeyMap: paste image from clipboard
 #define IDM_BATCH_COPY		2600		// :KeyMap: open batch copy dialog
 #define IDM_RENAME			2610		// :KeyMap: rename current file, only works when image processing panel can be shown (i.e. panel not disabled in INI and window size is big enough)
-#define IDM_MOVE_TO_RECYCLE_BIN 2620		// :KeyMap: delete the current file on disk - no confirmation (by moving it to the recycle bin)
-#define IDM_MOVE_TO_RECYCLE_BIN_CONFIRM 2621		// :KeyMap: delete the current file on disk - with user confirmation (by moving it to the recycle bin)
-#define IDM_MOVE_TO_RECYCLE_BIN_CONFIRM_PERMANENT_DELETE 2622		// :KeyMap: delete the current file on disk - confirmation when no recycle bin for this drive
 #define IDM_DELETE_FILE		2623		// :KeyMap: delete file completely
 #define IDM_TOUCH_IMAGE		2700		// :KeyMap: set modification time to current time
 #define IDM_TOUCH_IMAGE_EXIF 2710		// :KeyMap: set modification time to EXIF time

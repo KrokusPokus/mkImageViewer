@@ -26,9 +26,6 @@ public:
 	const int* GetChannelB() const { return &(m_ChannelB[0]); }
 	const int* GetChannelGrey() const { return &(m_ChannelGrey[0]); }
 
-	// Returns if the original, unprocessed pixels are used for this histogram
-	bool UsingOrigPixels() const { return m_bUseOrigPixels; }
-
 	// Mean values of the channels
 	int GetBMean() const { return m_nBMean; }
 	int GetGMean() const { return m_nGMean; }

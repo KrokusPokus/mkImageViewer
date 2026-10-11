@@ -245,9 +245,6 @@ public:
 	static void* UnsharpMask(CSize fullSize, CPoint offset, CSize rect, double dAmount, double dThreshold, 
 		const int16* pGrayImage, const int16* pSmoothedGrayImage, const void* pSourcePixels, void* pTargetPixels, int nChannels);
 
-	// Debug: Gives some timing info of the last resize operation
-	static LPCTSTR TimingInfo();
-
 private:
 	CBasicProcessing(void);
 };

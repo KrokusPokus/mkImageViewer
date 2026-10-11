@@ -19,9 +19,6 @@
 
 #define ALPHA_OPAQUE 0xFF000000
 
-// holds last resize timing info
-static TCHAR s_TimingInfo[256];
-
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Processing images stripwise on thread pool
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -2190,36 +2187,32 @@ void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, 
 	int nStartX = nIncOffsetX + nIncrementX*fullTargetOffset.x - 65536*nFirstX;
 	int nStartY = nIncOffsetY + nIncrementY*fullTargetOffset.y - 65536*nFirstY;
 
-	// Resize Y
-	double t1 = Helpers::GetExactTickCount();
+    // Create
 	CXMMImage* pImage1 = new CXMMImage(sourceSize.cx, sourceSize.cy, nFirstX, nLastX, nFirstY, nLastY, pPixels, nChannels, 4);
 	if (pImage1->AlignedPtr() == NULL) {
 		delete pImage1;
 		return NULL;
 	}
-	double t2 = Helpers::GetExactTickCount();
+
+    // Resize Y
 	CXMMImage* pImage2 = ApplyFilter_SSE(pImage1->GetHeight(), clippedTargetSize.cy, pImage1->GetWidth(), nStartY, 0, nIncrementY, kernelsY, nFilterOffsetY, pImage1, false);
 	delete pImage1;
 	if (pImage2 == NULL) return NULL;
-	double t3 = Helpers::GetExactTickCount();
+
 	// Rotate
 	CXMMImage* pImage3 = Rotate(pImage2, 4);
 	delete pImage2;
 	if (pImage3 == NULL) return NULL;
-	double t4 = Helpers::GetExactTickCount();
+
 	// Resize Y again
 	CXMMImage* pImage4 = ApplyFilter_SSE(pImage3->GetHeight(), clippedTargetSize.cx, clippedTargetSize.cy, nStartX, 0, nIncrementX, kernelsX, nFilterOffsetX, pImage3, true);
 	delete pImage3;
 	if (pImage4 == NULL) return NULL;
-	double t5 = Helpers::GetExactTickCount();
+
 	// Rotate back
 	void* pTargetDIB = RotateToDIB(pImage4, 4, pTarget);
-	double t6 = Helpers::GetExactTickCount();
 
 	delete pImage4;
-
-	_stprintf_s(s_TimingInfo, 256, _T("Create: %.2f, Filter1: %.2f, Rotate: %.2f, Filter2: %.2f, Rotate: %.2f"), t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5);
-	
 	return pTargetDIB;
 }
 
@@ -2252,36 +2245,32 @@ void* SampleDown_HQ_AVX_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSiz
 	int nStartX = nIncOffsetX + nIncrementX*fullTargetOffset.x - 65536 * nFirstX;
 	int nStartY = nIncOffsetY + nIncrementY*fullTargetOffset.y - 65536 * nFirstY;
 
-	// Resize Y
-	double t1 = Helpers::GetExactTickCount();
+    // Create
 	CXMMImage* pImage1 = new CXMMImage(sourceSize.cx, sourceSize.cy, nFirstX, nLastX, nFirstY, nLastY, pPixels, nChannels, 8);
 	if (pImage1->AlignedPtr() == NULL) {
 		delete pImage1;
 		return NULL;
 	}
-	double t2 = Helpers::GetExactTickCount();
+
+    // Resize Y
 	CXMMImage* pImage2 = ApplyFilter_AVX(pImage1->GetHeight(), clippedTargetSize.cy, pImage1->GetWidth(), nStartY, 0, nIncrementY, kernelsY, nFilterOffsetY, pImage1, false);
 	delete pImage1;
 	if (pImage2 == NULL) return NULL;
-	double t3 = Helpers::GetExactTickCount();
+
 	// Rotate
 	CXMMImage* pImage3 = Rotate(pImage2, 8);
 	delete pImage2;
 	if (pImage3 == NULL) return NULL;
-	double t4 = Helpers::GetExactTickCount();
+
 	// Resize Y again
 	CXMMImage* pImage4 = ApplyFilter_AVX(pImage3->GetHeight(), clippedTargetSize.cx, clippedTargetSize.cy, nStartX, 0, nIncrementX, kernelsX, nFilterOffsetX, pImage3, true);
 	delete pImage3;
 	if (pImage4 == NULL) return NULL;
-	double t5 = Helpers::GetExactTickCount();
+
 	// Rotate back
 	void* pTargetDIB = RotateToDIB(pImage4, 8, pTarget);
-	double t6 = Helpers::GetExactTickCount();
 
 	delete pImage4;
-
-	_stprintf_s(s_TimingInfo, 256, _T("Create: %.2f, Filter1: %.2f, Rotate: %.2f, Filter2: %.2f, Rotate: %.2f"), t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5);
-
 	return pTargetDIB;
 }
 
@@ -2506,9 +2495,4 @@ void* CBasicProcessing::UnsharpMask(CSize fullSize, CPoint offset, CSize rect, d
 
 	delete[] pThresholdLUTBase;
 	return bSuccess ? pTargetPixels : NULL;
-}
-
-
-LPCTSTR CBasicProcessing::TimingInfo() {
-	return s_TimingInfo;
 }

@@ -168,22 +168,11 @@ public:
 	CPanelMgr* GetPanelMgr() { return m_pPanelMgr; }
 	LPCTSTR CurrentFileName(bool bFileTitle);
 	CFileList* GetFileList() { return m_pFileList; }
-	CNavigationPanelCtl* GetNavPanelCtl() { return m_pNavPanelCtl; }
-	CEXIFDisplayCtl* GetEXIFDisplayCtl() { return m_pEXIFDisplayCtl; }
-	CUnsharpMaskPanelCtl* GetUnsharpMaskPanelCtl() { return m_pUnsharpMaskPanelCtl; }
-	CImageProcPanelCtl* GetImageProcPanelCtl() { return m_pImageProcPanelCtl; }
-	CRotationPanelCtl* GetRotationPanelCtl() { return m_pRotationPanelCtl; }
-	CTiltCorrectionPanelCtl* GetTiltCorrectionPanelCtl() { return m_pTiltCorrectionPanelCtl; }
-	CZoomNavigatorCtl* GetZoomNavigatorCtl() { return m_pZoomNavigatorCtl; }
-	CWndButtonPanelCtl* GetWndButtonPanelCtl() { return m_pWndButtonPanelCtl; }
-	CInfoButtonPanelCtl* GetInfoButtonPanelCtl() { return m_pInfoButtonPanelCtl; }
-	CCropCtl* GetCropCtl() { return m_pCropCtl; }
 	const CRect& ClientRect() { return m_clientRect; }
 	const CRect& WindowRectOnClose() { return m_windowRectOnClose; } // only valid after having closed the window
 	const CRect& MonitorRect() { return m_monitorRect; }
 	const CSize& VirtualImageSize() { return m_virtualImageSize; }
 	CJPEGProvider* GetJPEGProvider() { return m_pJPEGProvider; }
-	CKeyMap* GetKeyMap() { return m_pKeyMap; }
 	CPoint GetDIBOffset() { return m_DIBOffsets; }
 	double GetZoomMultiplier(CJPEGImage* pImage, const CRect& clientRect);
 	Helpers::EAutoZoomMode GetAutoZoomMode() { return m_bFullScreenMode ? m_eAutoZoomModeFullscreen : m_eAutoZoomModeWindowed; }
@@ -211,9 +200,6 @@ public:
 	void AdjustWindowToImage(bool bAfterStartup);
 	bool IsAdjustWindowToImage();
 	bool IsImageExactlyFittingWindow();
-	Helpers::ETransitionEffect GetTransitionEffect() { return m_eTransitionEffect; }
-	int GetTransitionTime() { return m_nTransitionTime; }
-	bool IsInSlideShowWithTransition() { return m_bMovieMode && UseSlideShowTransitionEffect(); }
 
 private:
 
@@ -304,16 +290,6 @@ private:
 	CRect m_windowRectOnClose;
 	CString m_sSaveDirectory;
 	CString m_sSaveExtension;
-	CCropCtl* m_pCropCtl;
-	CZoomNavigatorCtl* m_pZoomNavigatorCtl;
-	CImageProcPanelCtl* m_pImageProcPanelCtl;
-	CNavigationPanelCtl* m_pNavPanelCtl;
-	CEXIFDisplayCtl* m_pEXIFDisplayCtl;
-	CWndButtonPanelCtl* m_pWndButtonPanelCtl;
-	CInfoButtonPanelCtl* m_pInfoButtonPanelCtl;
-	CUnsharpMaskPanelCtl* m_pUnsharpMaskPanelCtl;
-	CRotationPanelCtl* m_pRotationPanelCtl;
-	CTiltCorrectionPanelCtl* m_pTiltCorrectionPanelCtl;
 	CPanelMgr* m_pPanelMgr;
 	CKeyMap* m_pKeyMap;
 	Helpers::ETransitionEffect m_eTransitionEffect;
@@ -333,10 +309,6 @@ private:
 	void HandleUserCommands(uint32 virtualKeyCode);
 	void ExecuteUserCommand(CUserCommand* pUserCommand);
 	void GotoImage(EImagePosition ePos, int nFlags);
-	void AdjustLDC(int nMode, double dInc);
-	void AdjustGamma(double dFactor);
-	void AdjustContrast(double dInc);
-	void AdjustSharpen(double dInc);
 	bool PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, bool bAdjustWindowToImage);
 	double GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge);
 	CProcessParams CreateProcessParams(bool bNoProcessingAfterLoad);
@@ -352,7 +324,8 @@ private:
 	void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool noAdjustWindow, bool bMoveBack = false);
 	CRect ScreenToDIB(const CSize& sizeDIB, const CRect& rect);
 	void ToggleMonitor();
-	CRect GetZoomTextRect(CRect imageProcessingArea);
+	CRect GetZoomTextRect();
+	CRect GetToastTextRect();
 	void EditINIFile(bool bGlobalINI);
 	int GetLoadErrorAfterOpenFile();
 	void CheckIfApplyAutoFitWndToImage(bool bInInitDialog);
@@ -400,7 +373,6 @@ private:
 	// [sdneon] Toast stuff
 	CString m_strToast;
 	void SetToast(LPCTSTR a_strToast, DWORD a_nDurationMs = 3000);
-	void SetToastIfEmpty(LPCTSTR a_strToast, DWORD a_nDurationMs = 3000);
 	void ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting);
 	
 	int m_customAnimationFrameTime;

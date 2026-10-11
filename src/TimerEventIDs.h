@@ -1,16 +1,11 @@
 #ifndef TIMEREVENTIDS_H
 #define TIMEREVENTIDS_H
 
-#define SLIDESHOW_TIMER_EVENT_ID 1 // Slideshow timer ID
-#define ZOOM_TIMER_EVENT_ID 2 // Zoom refinement timer ID
-#define ZOOM_TEXT_TIMER_EVENT_ID 3 // Zoom label timer ID
-#define AUTOSCROLL_TIMER_EVENT_ID 4 // when cropping, auto scroll timer ID
-#define NAVPANEL_TIMER_EVENT_ID 5 // to show nav panel
-#define NAVPANEL_ANI_TIMER_EVENT_ID 6 // animation timer for navigation panel
-#define NAVPANEL_START_ANI_TIMER_EVENT_ID 7 // animation start timer for navigation panel
-#define IPPANEL_TIMER_EVENT_ID 8 // to show image processing panel in window mode
-#define ANIMATION_TIMER_EVENT_ID 9 // GIF animation timer ID
-#define PAN_TIMER_EVENT_ID 10 // [GF] Smooth scroll panning timer ID
-#define TOAST_EXPIRY_TIMER_EVENT_ID 11 // [sdneon] Toast timer ID
+#define SLIDESHOW_TIMER_EVENT_ID 1    // Slideshow timer ID
+#define ZOOM_TIMER_EVENT_ID 2         // Zoom refinement timer ID
+#define ZOOM_TEXT_TIMER_EVENT_ID 3    // Zoom label timer ID
+#define ANIMATION_TIMER_EVENT_ID 4    // Animation timer ID
+#define PAN_TIMER_EVENT_ID 6          // [GF] Smooth scroll panning timer ID
+#define TOAST_EXPIRY_TIMER_EVENT_ID 6 // [sdneon] Toast timer ID
 
 #endif // TIMEREVENTIDS_H

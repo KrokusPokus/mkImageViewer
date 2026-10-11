@@ -204,65 +204,6 @@ CJPEGImage::~CJPEGImage(void) {
 	m_pRawMetadata = NULL;
 }
 
-bool CJPEGImage::CanUseLosslessJPEGTransformations() {
-	return m_eImageFormat == IF_JPEG && (m_nOrigWidth % tjMCUWidth[m_eJPEGChromoSampling]) == 0 &&
-		(m_nOrigHeight % tjMCUHeight[m_eJPEGChromoSampling]) == 0;
-}
-
-void CJPEGImage::TrimRectToMCUBlockSize(CRect& rect) {
-	int nBlockWidth = tjMCUWidth[m_eJPEGChromoSampling];
-	rect.left = rect.left & ~(nBlockWidth - 1);
-	rect.right = (rect.right + (nBlockWidth - 1)) & ~(nBlockWidth - 1);
-	if (rect.right > m_nOrigWidth) {
-		rect.right -= nBlockWidth; 
-	}
-
-	int nBlockHeight = tjMCUHeight[m_eJPEGChromoSampling];
-	rect.top = rect.top & ~(nBlockHeight - 1);
-	rect.bottom = (rect.bottom + (nBlockHeight - 1)) & ~(nBlockHeight - 1);
-	if (rect.bottom > m_nOrigHeight) {
-		rect.bottom -= nBlockHeight; 
-	}
-}
-
-void* CJPEGImage::GetThumbnailDIB(CSize size, const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
-	return GetThumbnailDIB(size, size, CPoint(0, 0), imageProcParams, eProcFlags);
-}
-
-void* CJPEGImage::GetThumbnailDIB(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
-	assert(!m_bIsThumbnailImage);
-	if (m_pThumbnail == NULL) {
-		m_pThumbnail = CreateThumbnailImage();
-	}
-	return m_pThumbnail->GetDIB(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags);
-}
-
-void* CJPEGImage::GetThumbnailDIBRotated(CSize size, const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags, double dRotation) {
-	assert(!m_bIsThumbnailImage);
-	if (m_pThumbnail == NULL) {
-		m_pThumbnail = CreateThumbnailImage();
-	}
-	return m_pThumbnail->GetDIBRotated(size, size, CPoint(0, 0), imageProcParams, eProcFlags, dRotation, false);
-}
-
-void* CJPEGImage::GetThumbnailDIBTrapezoid(CSize size, const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags, const CTrapezoid& trapezoid) {
-	assert(!m_bIsThumbnailImage);
-	if (m_pThumbnail == NULL) {
-		m_pThumbnail = CreateThumbnailImage();
-	}
-	return m_pThumbnail->GetDIBTrapezoid(size, size, CPoint(0, 0), imageProcParams, eProcFlags, &trapezoid, false);
-}
-
-void* CJPEGImage::GetDIBUnsharpMasked(CSize clippingSize, CPoint targetOffset,
-									  const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags, 
-									  const CUnsharpMaskParams & unsharpMaskParams) {
-	assert(!m_bIsThumbnailImage);
-	bool bUseUnsharpMask = unsharpMaskParams.Amount > 0 && unsharpMaskParams.Radius > 0;
-	bool bParametersChanged;
-	return GetDIBInternal(CSize(m_nOrigWidth, m_nOrigHeight), clippingSize, targetOffset, imageProcParams, 
-		eProcFlags, bUseUnsharpMask ? &unsharpMaskParams : NULL, NULL, 0.0, false, bParametersChanged);
-}
-
 const CHistogram* CJPEGImage::GetOriginalHistogram() {
 	assert(!m_bIsThumbnailImage);
 	if (m_pLDC == NULL) {
@@ -301,39 +242,6 @@ const CHistogram* CJPEGImage::GetHistogramOfProcessedDIB(const CImageProcessingP
 	return m_pCachedProcessedHistogram;
 }
 
-void CJPEGImage::FreeUnsharpMaskResources() {
-	delete[] m_pGrayImage;
-	m_pGrayImage = NULL;
-	delete[] m_pSmoothGrayImage;
-	m_pSmoothGrayImage = NULL;
-}
-
-bool CJPEGImage::ApplyUnsharpMaskToOriginalPixels(const CUnsharpMaskParams & unsharpMaskParams) {
-	InvalidateAllCachedPixelData();
-
-	double dStartTime = Helpers::GetExactTickCount();
-
-	bool bSuccess = false;
-	int16* pGray = CBasicProcessing::Create1Channel16bppGrayscaleImage(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, m_nOriginalChannels);
-	if (pGray != NULL) {
-		int16* pSmoothed = CBasicProcessing::GaussFilter16bpp1Channel(CSize(m_nOrigWidth, m_nOrigHeight), CPoint(0, 0), 
-			CSize(m_nOrigWidth, m_nOrigHeight), unsharpMaskParams.Radius, pGray);
-		if (pSmoothed != NULL) {
-			bSuccess = NULL != CBasicProcessing::UnsharpMask(CSize(m_nOrigWidth, m_nOrigHeight), CPoint(0,0), CSize(m_nOrigWidth, m_nOrigHeight), 
-				unsharpMaskParams.Amount, unsharpMaskParams.Threshold, pGray, pSmoothed, m_pOrigPixels, m_pOrigPixels, m_nOriginalChannels);
-		}
-		delete[] pSmoothed;
-	}
-	delete[] pGray;
-
-	m_dUnsharpMaskTickCount = Helpers::GetExactTickCount() - dStartTime;
-
-	MarkAsDestructivelyProcessed();
-	m_bIsProcessedNoParamDB = true;
-
-	return bSuccess;
-}
-
 bool CJPEGImage::RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKeepAspectRatio) {
 	InvalidateAllCachedPixelData();
 
@@ -353,47 +261,6 @@ bool CJPEGImage::RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKe
 	m_rotationParams.FreeRotation = fmod(360 * dRotation / (2 * 3.141592653), 360);
 	m_rotationParams.Flags = SetRotationFlag(m_rotationParams.Flags, RFLAG_AutoCrop, bAutoCrop);
 	m_rotationParams.Flags = SetRotationFlag(m_rotationParams.Flags, RFLAG_KeepAspectRatio, bKeepAspectRatio);
-
-	return true;
-}
-
-bool CJPEGImage::TrapezoidOriginalPixels(const CTrapezoid& trapezoid, bool bAutoCrop, bool bKeepAspectRatio) {
-	InvalidateAllCachedPixelData();
-
-	int nXStart, nXEnd;
-	int nYStart = trapezoid.y1, nYEnd = trapezoid.y2;
-
-	if (bAutoCrop) {
-		if (bKeepAspectRatio) {
-			CRect rect = Helpers::CalculateMaxIncludedRectKeepAR(trapezoid, (double)m_nOrigWidth / m_nOrigHeight);
-			nXStart = rect.left; nXEnd = rect.right;
-			nYStart = rect.top; nYEnd = rect.bottom;
-		} else {
-			// Calculate the maximum included rectangle
-            nXStart = std::max(trapezoid.x1s, trapezoid.x2s);
-            nXEnd = std::min(trapezoid.x1e, trapezoid.x2e);
-		}
-	} else {
-        nXStart = std::min(trapezoid.x1s, trapezoid.x2s);
-        nXEnd = std::max(trapezoid.x1e, trapezoid.x2e);
-	}
-
-	if (nXStart >= nXEnd) {
-		return false;
-	}
-
-	CSize newSize(nXEnd - nXStart + 1, nYEnd - nYStart + 1);
-	void* pTransformedPixels = CBasicProcessing::TrapezoidHQ(CPoint(nXStart, nYStart), newSize, trapezoid, 
-		CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, CSettingsProvider::This().ColorBackground());
-	if (pTransformedPixels == NULL) return false;
-	delete[] m_pOrigPixels;
-
-	m_nOrigWidth = newSize.cx;
-	m_nOrigHeight = newSize.cy;
-	m_nOriginalChannels = 4;
-	m_pOrigPixels = pTransformedPixels;
-	MarkAsDestructivelyProcessed();
-	m_bIsProcessedNoParamDB = true;
 
 	return true;
 }

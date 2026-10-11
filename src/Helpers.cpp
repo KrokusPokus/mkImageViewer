@@ -1,22 +1,21 @@
 #include "Helpers.h"
 #include "immintrin.h"
-//#include "NLS.h"
 #include "MultiMonitorSupport.h"
 #include "JPEGImage.h"
 #include "FileList.h"
 #include "SettingsProvider.h"
-#include <math.h>
 
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cwctype>
+#include <QString>
 #include <string_view>
 #include <thread>	// [GF] Needed for NumConcurrentThreads()
 
 namespace Helpers {
 
-float ScreenScaling = -1.0f;
+float DPIScalingFactor = -1.0f;
 
 TCHAR CReplacePipe::sm_buffer[MAX_SIZE_REPLACE_PIPE];
 
@@ -149,71 +148,6 @@ CPoint LimitOffsets(const CPoint& offsets, const CSize & rectSize, const CSize &
     return CPoint(std::max<long>(-nMaxOffsetX, std::min<int>(+nMaxOffsetX, offsets.x)), std::max<long>(-nMaxOffsetY, std::min<int>(+nMaxOffsetY, offsets.y)));
 }
 
-CRect InflateRect(const CRect& rect, float fAmount) {
-	CRect r(rect);
-	int nAmount = (int)(fAmount * r.Width());
-	r.InflateRect(-nAmount, -nAmount);
-	return ((r.Height() & 1) == 1) ? CRect(r.left, r.top, r.right, r.bottom - 1) : r;
-}
-
-CRect FitRectIntoRect(CSize size, CRect fitRect) {
-	double ratioSource = (double)size.cx / size.cy;
-	double ratioTarget = (double)fitRect.Width() / fitRect.Height();
-	if (ratioSource > ratioTarget) {
-		// fit x
-		int targetHeight = Helpers::RoundToInt(fitRect.Width() / ratioSource);
-		int startY = fitRect.top + (fitRect.Height() - targetHeight) / 2;
-		return CRect(fitRect.left, startY, fitRect.right, startY + targetHeight);
-	} else {
-		// fit y
-		int targetWidth = Helpers::RoundToInt(fitRect.Height() * ratioSource);
-		int startX = fitRect.left + (fitRect.Width() - targetWidth) / 2;
-		return CRect(startX, fitRect.top, startX + targetWidth, fitRect.bottom);
-	}
-}
-
-CRect FillRectAroundRect(CSize size, CRect fillRect) {
-	double ratioSource = (double)size.cx / size.cy;
-	double ratioTarget = (double)fillRect.Width() / fillRect.Height();
-	if (ratioSource > ratioTarget) {
-		// fill height
-		int targetWidth = Helpers::RoundToInt(fillRect.Height() * ratioSource);
-		int startX = fillRect.left + (fillRect.Width() - targetWidth) / 2;
-		return CRect(startX, fillRect.top, startX + targetWidth, fillRect.bottom);
-	} else {
-		// fill width
-		int targetHeight = Helpers::RoundToInt(fillRect.Width() / ratioSource);
-		int startY = fillRect.top + (fillRect.Height() - targetHeight) / 2;
-		return CRect(fillRect.left, startY, fillRect.right, startY + targetHeight);
-	}
-}
-
-void GetZoomParameters(float & fZoom, CPoint & offsets, CSize imageSize, CSize windowSize, CRect zoomRect) {
-	int nZoomWidth = zoomRect.Width();
-	int nZoomHeight = zoomRect.Height();
-
-	bool bTakeW = ((float)windowSize.cx/windowSize.cy < (float)nZoomWidth/nZoomHeight);
-	if (bTakeW) {
-		// Width is dominating
-		fZoom = (float)windowSize.cx/nZoomWidth;
-	} else {
-		// Height is dominating
-		fZoom = (float)windowSize.cy/nZoomHeight;
-	}
-	if (fZoom < 0.0001 || fZoom > Helpers::ZoomMax) {
-		fZoom = -1.0f;
-		return;
-	}
-
-	int nZoomRectMiddleX = (zoomRect.right + zoomRect.left)/2;
-	int nOffsetX = Helpers::RoundToInt(fZoom*imageSize.cx*0.5 - fZoom*nZoomRectMiddleX);
-
-	int nZoomRectMiddleY = (zoomRect.bottom + zoomRect.top)/2;
-	int nOffsetY = Helpers::RoundToInt(fZoom*imageSize.cy*0.5 - fZoom*nZoomRectMiddleY);
-
-	offsets = CPoint(nOffsetX, nOffsetY);
-}
-
 #ifdef _WIN64
 static CPUType ProbeSSEorAVX2() {
 	__try {
@@ -298,24 +232,6 @@ static bool CPUSupportsHWMultiprocessing(void) {
 	} else {
 		return false;
 	}  
-}
-
-int NumCoresPerPhysicalProc(void) {
-	if (!CPUSupportsHWMultiprocessing()) {
-		return 1;
-	}
-
-	int output[4];
-
-	// check if cpuid supports leaf 4
-	__cpuid(output, 0);
-	if (output[0] < 4)
-		return 1; // not support, single core
-
-	// start with index = 0; Leaf 4 reports
-	__cpuidex(output, 4, 0);
-
-	return (int)((output[0] & 0xFC000000) >> 26) + 1;
 }
 
 bool PatternMatch(LPCTSTR & sMatchingPattern, LPCTSTR sString, LPCTSTR sPattern) {
@@ -545,22 +461,6 @@ CString GetJPEGComment(void* pJPEGStream, int nStreamLength) {
 	return (nGoodChars > nCommentLen * 8 / 10) ? CString((LPCSTR)pComment, nCommentLen) : CString("");
 }
 
-void ClearJPEGComment(void* pJPEGStream, int nStreamLength) {
-	uint8* pCommentSeg = (uint8*)FindJPEGMarker(pJPEGStream, nStreamLength, 0xFE);
-	if (pCommentSeg == NULL) {
-		return;
-	}
-	pCommentSeg += 2;
-	int nCommentLen = pCommentSeg[0]*256 + pCommentSeg[1] - 2;
-	if (nCommentLen <= 0) {
-		return;
-	}
-	pCommentSeg += 2;
-	if ((uint8*)pJPEGStream + nStreamLength > pCommentSeg + nCommentLen) {
-		memset(pCommentSeg, 0, nCommentLen);
-	}
-}
-
 double GetExactTickCount() {
 	static __int64 nFrequency = -1;
 	if (nFrequency == -1) {
@@ -663,34 +563,6 @@ bool CanDisplayImageWithoutResize(HWND hWnd, CJPEGImage* pImage) {
 	CRect workingArea = CMultiMonitorSupport::GetWorkingRect(hWnd);
 	CSize borderSize = GetTotalBorderSize();
 	return pImage->OrigWidth() + borderSize.cx <= workingArea.Width() && pImage->OrigHeight() + borderSize.cy <= workingArea.Height();
-}
-
-CRect CalculateMaxIncludedRectKeepAR(const CTrapezoid& trapezoid, double dAspectRatio) {
-	int w1 = trapezoid.x1e - trapezoid.x1s;
-	int w2 = trapezoid.x2e - trapezoid.x2s;
-	if ((trapezoid.x1s >= trapezoid.x2s && trapezoid.x1e <= trapezoid.x2e) || (trapezoid.x1s <= trapezoid.x2s && trapezoid.x1e >= trapezoid.x2e)) {
-		int h = trapezoid.y2 - trapezoid.y1;
-		double dTerm = (double)(w2 - w1)/h;
-		bool bPyramid = w1 < w2;
-		double dY =  bPyramid ? (dAspectRatio * h - w1)/(dAspectRatio + dTerm) : w1/(dAspectRatio - dTerm);
-		double dAlpha = dY/h;
-		double dX = (trapezoid.x2s - trapezoid.x1s)*dAlpha;
-		dX += trapezoid.x1s;
-		dY += trapezoid.y1;
-		return CRect((int)(dX + 0.5), bPyramid ? (int)(dY + 0.5) : trapezoid.y1, 
-			(int)(trapezoid.x1e + (trapezoid.x2e - trapezoid.x1e)*dAlpha + 0.5), bPyramid ? trapezoid.y2 : (int)(dY + 0.5));
-	}
-	if (trapezoid.x1s < trapezoid.x2s) {
-		if (w1 < w2) 
-			return CalculateMaxIncludedRectKeepAR(CTrapezoid(trapezoid.x2s, trapezoid.x1e, trapezoid.y1, trapezoid.x2s, trapezoid.x2e, trapezoid.y2), dAspectRatio);
-		else
-			return CalculateMaxIncludedRectKeepAR(CTrapezoid(trapezoid.x1s, trapezoid.x1e, trapezoid.y1, trapezoid.x2s, trapezoid.x1e, trapezoid.y2), dAspectRatio);
-	} else {
-		if (w1 < w2) 
-			return CalculateMaxIncludedRectKeepAR(CTrapezoid(trapezoid.x1s, trapezoid.x2e, trapezoid.y1, trapezoid.x2s, trapezoid.x2e, trapezoid.y2), dAspectRatio);
-		else
-			return CalculateMaxIncludedRectKeepAR(CTrapezoid(trapezoid.x1s, trapezoid.x1e, trapezoid.y1, trapezoid.x1s, trapezoid.x2e, trapezoid.y2), dAspectRatio);
-	}
 }
 
 CSize GetMaxClientSize(HWND hWnd) {
@@ -819,32 +691,6 @@ EImageFormat GetImageFormat(LPCTSTR sFileName) {
 		}
 	}
 	return IF_Unknown;
-}
-
-bool IsRawImageFormat(LPCTSTR sExt)
-{
-	return IsInFileEndingList(CSettingsProvider::This().FileEndingsRAW(), sExt, 2, 0); //2: skip "*." in ref, 0: no '.' in given ext
-}
-
-// Returns the short form of the path (including the file name)
-CString GetShortFilePath(LPCTSTR sPath) {
-	TCHAR shortPath[MAX_PATH];
-	if (::GetShortPathName(sPath, (LPTSTR)(&shortPath), MAX_PATH) != 0) {
-		return CString(shortPath);
-	} else {
-        //int nError = ::GetLastError();
-		return CString(sPath);
-	}
-}
-
-// Returns the short form of the path but the file name remains untouched
-CString ReplacePathByShortForm(LPCTSTR sPath) {
-	LPCTSTR sLast = _tcsrchr(sPath, _T('\\'));
-	if (sLast != NULL) {
-		CString sShortPath = GetShortFilePath(CString(sPath).Left((int)(sLast - sPath)));
-		return sShortPath + sLast;
-	}
-	return CString(sPath);
 }
 
 // strstr() ignoring case
@@ -1223,4 +1069,27 @@ bool CanReadAhead(CJPEGImage* pImage) {
         auto now = steady_clock::now();
         return static_cast<uint32_t>(duration_cast<milliseconds>(now.time_since_epoch()).count());
     }
+
+    QString formatOutputZoomFactor(double m_dZoom) {
+        // Skalierungsfaktor-Ausgabe für Werte > 200%
+        if (m_dZoom > 100.0) {
+            return QString::number(m_dZoom, 'f', 0) + "x";
+        }
+        if (m_dZoom > 10.0) {
+            return QString::number(m_dZoom, 'f', 1) + "x";
+        }
+        if (m_dZoom > 2.0) {
+            return QString::number(m_dZoom, 'f', 2) + "x";
+        }
+
+        // Prozent-Ausgabe für kleine Werte mit 2 signifikanten Stellen
+        if (m_dZoom > 0.0) {
+            int decimals = std::max(0, 1 - static_cast<int>(std::floor(std::log10(m_dZoom * 100))));
+            return QString::number(m_dZoom * 100, 'f', decimals) + " %";
+        }
+
+        // Fallback
+        return QString::number(qRound(m_dZoom * 100)) + " %";
+    }
+
 } // namespace Helpers

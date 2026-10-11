@@ -141,7 +141,7 @@ void CDirectoryWatcher::ThreadFunc(void* arg) {
 				// file written in directory, check if the displayed file has changed and send message to registered window if yes
 				bSetupNewDirectory = ::FindNextChangeNotification(waitHandles[3]) == FALSE;
 				
-				// wait a short time, otherwise the file may can not be read yet
+				// wait a short time, otherwise the file may not be read yet
 				::WaitForSingleObject(thisPtr->m_terminateEvent, 250);
 
 				bool sendMessage = false;

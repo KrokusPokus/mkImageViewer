@@ -95,29 +95,15 @@ CUserCommand* FindCommand(int index, std::list<CUserCommand*> & commandList) {
 
 namespace HelpersGUI {
 
-	float ScreenScaling = -1.0f;
+	float DPIScalingFactor = -1.0f; // is set to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
 
 	HFONT DefaultGUIFont = NULL;
 	HFONT SystemFont = NULL;
 	HFONT DefaultFileNameFont = NULL;
 
-	int ScaleToScreen(int value)
+	int ScaleWithDPI(int value)
 	{
-		return (int)(value * ScreenScaling + 0.5f);
-	}
-
-	HFONT CreateBoldFontOfSelectedFont(CDCHandle dc) {
-		TCHAR buff[LF_FACESIZE];
-		if (::GetTextFace(dc, LF_FACESIZE, buff) != 0) {
-			TEXTMETRIC textMetrics;
-			::GetTextMetrics(dc, &textMetrics);
-			LOGFONT logFont{ 0 };
-			logFont.lfHeight = textMetrics.tmHeight;
-			logFont.lfWeight = FW_BOLD;
-			_tcsncpy_s(logFont.lfFaceName, LF_FACESIZE, buff, LF_FACESIZE);  
-			return ::CreateFontIndirect(&logFont);
-		}
-		return NULL;
+		return (int)(value * DPIScalingFactor + 0.5f);
 	}
 
 	void SelectDefaultGUIFont(HDC dc) {
@@ -204,7 +190,11 @@ namespace HelpersGUI {
 	}
 
 	void DrawTextBordered(CDC& dc, LPCTSTR sText, const CRect& rect, UINT nFormat) {
-        int oldBkMode = dc.SetBkMode(TRANSPARENT);
+		int oldBkMode = dc.GetBkMode();
+        if (oldBkMode != TRANSPARENT) {
+			dc.SetBkMode(TRANSPARENT);
+		}
+		
 		COLORREF oldColor = dc.SetTextColor(RGB(0, 0, 0));
 
 		CRect textRect = rect;
@@ -219,12 +209,14 @@ namespace HelpersGUI {
 		dc.SetTextColor(oldColor);
 		dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
 
-        dc.SetBkMode(oldBkMode);
+        if (oldBkMode != TRANSPARENT) {
+			dc.SetBkMode(oldBkMode);
+		}
 	}
 
 	void DrawRectangle(CDC & dc, const CRect& rect) {
 		dc.Rectangle(rect);
-		if (HelpersGUI::ScreenScaling >= 2) {
+		if (HelpersGUI::DPIScalingFactor >= 2) {
 			CRect copy(rect);
 			copy.DeflateRect(1, 1);
 			dc.Rectangle(copy);
@@ -413,7 +405,7 @@ namespace HelpersGUI {
 		const int BUF_LEN = 512;
 		TCHAR buff[BUF_LEN];
 		buff[0] = 0;
-		CRect rectText(0, clientRect.Height()/2 - HelpersGUI::ScaleToScreen(40), clientRect.Width(), clientRect.Height());
+		CRect rectText(0, clientRect.Height()/2 - HelpersGUI::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
 		switch (nFileLoadError) {
 			case FileLoad_PasteFromClipboardFailed:
 				_tcsncpy_s(buff, BUF_LEN, CNLS::GetString(_T("Pasting image from clipboard failed!")), BUF_LEN);

@@ -200,26 +200,11 @@ namespace Helpers {
 	// outerRect has top,left coordinates 0/0
 	CPoint LimitOffsets(const CPoint& offsets, const CSize & rectSize, const CSize & outerRect);
 
-	// Inflate rectangle by given factor
-	CRect InflateRect(const CRect& rect, float fAmount);
-
-	// Fits a rectangle with the specified size into a fit rectangle and returns the adjusted rectangle, maintaining the aspect ratio of the size
-	CRect FitRectIntoRect(CSize size, CRect fitRect);
-
-	// Fills a rectangle with the specified size around a fit rectangle and returns the adjusted rectangle, maintaining the aspect ratio of the size
-	CRect FillRectAroundRect(CSize size, CRect fillRect);
-
-	// Gets the parameters for zooming the given zoom rectangle in an image of given size to a given window size.
-	void GetZoomParameters(float & fZoom, CPoint & offsets, CSize imageSize, CSize windowSize, CRect zoomRect);
-
 	// Gets a window rectangle (in screen coordinates) that fits the given image
 	CRect GetWindowRectMatchingImageSize(HWND hWnd, CSize minSize, CSize maxSize, double& dZoom, CJPEGImage* pImage, bool bForceCenterWindow, bool bKeepAspectRatio, bool bWindowBorderless, EAutoZoomMode eAutoZoomMode);
 
 	// Gets if the given image can be displayed without sampling down the image.
 	bool CanDisplayImageWithoutResize(HWND hWnd, CJPEGImage* pImage);
-
-	// Calculates the maximum included rectangle in a trapezoid, keeping the given aspect ratio of the sides
-	CRect CalculateMaxIncludedRectKeepAR(const CTrapezoid& trapezoid, double dAspectRatio);
 
 	// Gets the maximum client size for a framed window that fits into the working area of the screen the given window is placed on
 	CSize GetMaxClientSize(HWND hWnd);
@@ -239,9 +224,6 @@ namespace Helpers {
 
 	// Tests if the CPU supports AVX2, SSE, MMX(2)
 	CPUType ProbeCPU(void);
-
-	// Get number of cores per physical processor, not counting hyperthreading
-	int NumCoresPerPhysicalProc(void);
 
 	// Gets the path where JPEGView stores its application data, including a trailing backslash
 	LPCTSTR JPEGViewAppDataPath();
@@ -293,20 +275,8 @@ namespace Helpers {
 	// Gets the content of the JPEG comment tag, empty string if no comment
 	CString GetJPEGComment(void* pJPEGStream, int nStreamLength);
 
-	// Clears the JPEG comment (by filling with NULL characters)
-	void ClearJPEGComment(void* pJPEGStream, int nStreamLength);
-
 	// Gets the image format given a file name (uses the file extension)
 	EImageFormat GetImageFormat(LPCTSTR sFileName);
-
-	// Checks if the image format is RAW given a file extension
-	bool IsRawImageFormat(LPCTSTR sExt);
-
-	// Returns the short form of the path (including the short form of the file name)
-	CString GetShortFilePath(LPCTSTR sPath);
-
-	// Returns the short form of the path but the file name remains untouched
-	CString ReplacePathByShortForm(LPCTSTR sPath);
 
 	// search string in string (as strstr()) ignoring case
 	LPTSTR stristr(LPCTSTR szStringToBeSearched, LPCTSTR szSubstringToSearchFor);
@@ -371,6 +341,8 @@ namespace Helpers {
 /*GF*/  bool IsLinuxBinaryAvailable(LPCTSTR szUnixPath);
 /*GF*/  constexpr bool EqualsIgnoreCase(std::wstring_view a, std::wstring_view b) noexcept;
 /*GF*/  uint32_t GetTimeMs();
-}
+/*GF*/  QString formatOutputZoomFactor(double m_dZoom);
+
+} // namespace Helpers
 
 #endif // HELPERS_H

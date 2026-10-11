@@ -59,7 +59,7 @@ set(SOURCES
     BasicProcessing.cpp
     Clipboard.cpp
     DirectoryWatcher.cpp
-    EXIFHelpers.cpp
+
     EXIFReader.cpp
     FileList.cpp
     HEIFWrapper.cpp

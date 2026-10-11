@@ -32,18 +32,10 @@ public:
 	bool HighQualityResampling() { return m_bHQRS; }
 	bool DefaultSelectionMode() { return m_bDefaultSelectionMode; }
 	bool ShowFileName() { return m_bShowFileName; }
-	bool ShowFileInfo() { return m_bShowFileInfo; }
 	bool ShowEXIFDateInTitle() { return m_bShowEXIFDateInTitle; }
 	bool ShowFullPathInTitle() { return m_bShowFullPathInTitle; }
-	bool ShowHistogram() { return m_bShowHistogram; }
-	bool ShowJPEGComments() { return m_bShowJPEGComments; }
-	bool ShowNavPanel() { return m_bShowNavPanel; }
-	bool ShowBottomPanel() { return m_bShowBottomPanel; }
-	bool ShowZoomNavigator() { return m_bShowZoomNavigator; }
 	bool ShowFullScreen() { return m_bShowFullScreen; }
 	bool AutoFullScreen() { return m_bAutoFullScreen; }
-	float BlendFactorNavPanel() { return m_fBlendFactorNavPanel; }
-	float ScaleFactorNavPanel() { return m_fScaleFactorNavPanel; }
 	bool KeepParams() { return m_bKeepParams; }
 	LPCTSTR Language() { return m_sLanguage; }
 	Helpers::CPUType AlgorithmImplementation() { return m_eCPUAlgorithm; }
@@ -74,15 +66,8 @@ public:
 	bool ForceGDIPlus() { return m_bForceGDIPlus; }
 	Helpers::ESingleInstanceMode SingleInstanceMode() { return m_eSingleInstanceMode; }
 	bool SingleFullScreenInstance() { return m_bSingleFullScreenInstance; }
-	int JPEGSaveQuality() { return m_nJPEGSaveQuality; }
-	int WEBPSaveQuality() { return m_nWEBPSaveQuality; }
-	LPCTSTR DefaultSaveFormat() { return m_sDefaultSaveFormat; }
 	LPCTSTR FileEndingsRAW() { return m_sFileEndingsRAW; }
 	void AddTemporaryRAWFileEnding(LPCTSTR sEnding) { m_sFileEndingsRAW += CString(_T(";*.")) + sEnding; }
-	int DisplayFullSizeRAW() { return m_nDisplayFullSizeRAW; }
-	bool CreateParamDBEntryOnSave() { return m_bCreateParamDBEntryOnSave; }
-	bool SaveWithoutPrompt() { return m_bSaveWithoutPrompt; }
-	bool CropWithoutPromptLosslessJPEG() { return m_bCropWithoutPromptLosslessJPEG; }
 	Helpers::EDeleteConfirmation DeleteConfirmation() { return m_eDeleteConfirmation; }
 	bool AllowFileDeletion() { return m_bAllowFileDeletion; }
 	bool WrapAroundFolder() { return m_bWrapAroundFolder && m_eNavigation == Helpers::NM_LoopDirectory; }
@@ -93,43 +78,23 @@ public:
 	LPCTSTR ACCInclude() { return m_sACCInclude; }
 	LPCTSTR LDCExclude() { return m_sLDCExclude; }
 	LPCTSTR LDCInclude() { return m_sLDCInclude; }
-	LPCTSTR CopyRenamePattern() { return m_sCopyRenamePattern; }
 	CRect DefaultWindowRect() { return m_defaultWindowRect; }
 	CRect StickyWindowRect() { return m_stickyWindowRect; }
 	bool StickyWindowSize() { return m_bStickyWindowSize; }
 	bool DefaultWndToImage() { return m_bDefaultWndToImage; }
 	bool DefaultMaximized() { return m_bDefaultMaximized; }
 	bool ExplicitWindowRect() { return m_bExplicitWindowRect; }
-	CSize DefaultFixedCropSize() { return m_DefaultFixedCropSize; }
 	COLORREF ColorBackground() { return m_colorBackground; }
 	COLORREF ColorGUI() { return m_colorGUI; }
-	COLORREF ColorHighlight() { return m_colorHighlight; }
-	COLORREF ColorSelected() { return m_colorSelected; }
-	COLORREF ColorSlider() { return m_colorSlider; }
-	COLORREF ColorFileName() { return m_colorFileName; }
 	COLORREF ColorTransparency() { return m_colorTransparency; }
 	LPCTSTR DefaultGUIFont() { return m_defaultGUIFont; }
 	LPCTSTR FileNameFont() { return m_fileNameFont; }
-	const CUnsharpMaskParams& UnsharpMaskParams() { return m_unsharpMaskParms; }
-	bool RTShowGridLines() { return m_bRTShowGridLines; }
-	bool RTAutoCrop() { return m_bRTAutoCrop; }
-	bool RTPreserveAspectRatio() { return m_bRTPreserveAspectRatio; }
-	LPCTSTR FileNameFormat() { return m_sFileNameFormat; }
 	bool ReloadWhenDisplayedImageChanged() { return m_bReloadWhenDisplayedImageChanged; }
 	bool AllowEditGlobalSettings() { return m_bAllowEditGlobalSettings; }
-	double PrintMargin() { return m_dPrintMargin; }
-	double DefaultPrintWidth() { return m_dDefaultPrintWidth; }
-	Helpers::EMeasureUnits MeasureUnit() { return m_eMeasureUnit; }
 	CSize MinimalWindowSize() { return m_minimalWindowSize; }
 	int MinimalDisplayTime() { return m_minimalDisplayTime; }
-	CSize UserCropAspectRatio() { return m_userCropAspectRatio; }
-	LPCTSTR WallpaperPath() { return m_sWallpaperPath; }
-	bool SkipFileOpenDialogOnStartup() { return m_bSkipFileOpenDialogOnStartup; }
 	Helpers::EIniEditor IniEditor() { return m_eIniEditor; }
 	LPCTSTR CustomIniEditor() { return m_sIniEditor; }
-	LPCTSTR GPSMapProvider() { return m_sGPSMapProvider; }
-	bool FlashWindowAlert() { return m_bFlashWindowAlert; }
-	bool BeepSoundAlert() { return m_bBeepSoundAlert; }
 	bool WindowBorderlessOnStartup() { return m_bWindowBorderlessOnStartup; }
 	bool WindowAlwaysOnTopOnStartup() { return m_bWindowAlwaysOnTopOnStartup; }
 
@@ -152,9 +117,6 @@ public:
 		bool bShowNavPanel, bool bShowFileName, bool bShowFileInfo,
 		Helpers::ETransitionEffect eSlideShowTransitionEffect);
 
-	// Saves the pattern used in the copy/rename dialog to rename files
-	void SaveCopyRenamePattern(const CString& sPattern);
-
 	// Saves the sticky window size to the INI file
 	void SaveStickyWindowRect(CRect rect);
 	
@@ -164,14 +126,8 @@ public:
 	// Deletes the open with command, returns index of the deleted command, -1 if invalid
 	int DeleteOpenWithCommand(CUserCommand* pCommand);
 
-	// Adds a new open with command
-	void AddOpenWithCommand(const CString& sCommandString);
-
 	// Replaces the existing open with command by a new command
 	void ChangeOpenWithCommand(CUserCommand* pCommand, const CString& sCommandString);
-
-	// Returns the next index for an open with entry
-	int GetNextOpenWithIndex() { return m_nNextOpenWithIndex; }
 
 	// Gets the path where the global INI file and the EXE is located
 	LPCTSTR GetEXEPath() { return m_sEXEPath; }
@@ -202,7 +158,6 @@ private:
 	CString m_sIniFileTitle;
 	bool m_bUserINIExists;
 	bool m_bStoreToEXEPath;
-	int m_nNextOpenWithIndex;
 
 	double m_dContrast;
 	double m_dGamma;
@@ -214,18 +169,10 @@ private:
 	bool m_bHQRS;
 	bool m_bDefaultSelectionMode;
 	bool m_bShowFileName;
-	bool m_bShowFileInfo;
 	bool m_bShowEXIFDateInTitle;
 	bool m_bShowFullPathInTitle;
-	bool m_bShowHistogram;
-	bool m_bShowJPEGComments;
-	bool m_bShowNavPanel;
-	bool m_bShowBottomPanel;
-	bool m_bShowZoomNavigator;
 	bool m_bShowFullScreen;
 	bool m_bAutoFullScreen;
-	float m_fBlendFactorNavPanel;
-	float m_fScaleFactorNavPanel;
 	bool m_bKeepParams;
 	CString m_sLanguage;
 	Helpers::CPUType m_eCPUAlgorithm;
@@ -255,17 +202,10 @@ private:
 	bool m_bForceGDIPlus;
 	Helpers::ESingleInstanceMode m_eSingleInstanceMode;
 	bool m_bSingleFullScreenInstance;
-	int m_nJPEGSaveQuality;
-	int m_nWEBPSaveQuality;
-	CString m_sDefaultSaveFormat;
 	CString m_sFileEndingsRAW;
-	int m_nDisplayFullSizeRAW;
-	bool m_bCreateParamDBEntryOnSave;
 	bool m_bWrapAroundFolder;
-	bool m_bSaveWithoutPrompt;
 	Helpers::EDeleteConfirmation m_eDeleteConfirmation;
 	bool m_bAllowFileDeletion;
-	bool m_bCropWithoutPromptLosslessJPEG;
 	bool m_bExchangeXButtons;
 	bool m_bAutoRotateEXIF;
 	bool m_bUseEmbeddedColorProfiles;
@@ -273,43 +213,23 @@ private:
 	CString m_sACCInclude;
 	CString m_sLDCExclude;
 	CString m_sLDCInclude;
-	CString m_sCopyRenamePattern;
 	CRect m_defaultWindowRect;
 	CRect m_stickyWindowRect;
 	bool m_bDefaultMaximized;
 	bool m_bDefaultWndToImage;
 	bool m_bStickyWindowSize;
 	bool m_bExplicitWindowRect;
-	CSize m_DefaultFixedCropSize;
 	COLORREF m_colorBackground;
 	COLORREF m_colorGUI;
-	COLORREF m_colorHighlight;
-	COLORREF m_colorSelected;
-	COLORREF m_colorSlider;
-	COLORREF m_colorFileName;
 	COLORREF m_colorTransparency;
 	CString m_defaultGUIFont;
 	CString m_fileNameFont;
-	CUnsharpMaskParams m_unsharpMaskParms;
-	bool m_bRTShowGridLines;
-	bool m_bRTAutoCrop;
-	bool m_bRTPreserveAspectRatio;
-	CString m_sFileNameFormat;
 	bool m_bReloadWhenDisplayedImageChanged;
 	bool m_bAllowEditGlobalSettings;
-	double m_dPrintMargin;
-	double m_dDefaultPrintWidth;
-	Helpers::EMeasureUnits m_eMeasureUnit;
 	CSize m_minimalWindowSize;
 	int m_minimalDisplayTime;
-	CSize m_userCropAspectRatio;
-	CString m_sWallpaperPath;
-	bool m_bSkipFileOpenDialogOnStartup;
 	Helpers::EIniEditor  m_eIniEditor;
 	CString m_sIniEditor;
-	CString m_sGPSMapProvider;
-	bool m_bFlashWindowAlert;
-	bool m_bBeepSoundAlert;
 	int m_zoomPauseFactor;
 	bool m_bWindowBorderlessOnStartup;
 	bool m_bWindowAlwaysOnTopOnStartup;
@@ -324,7 +244,6 @@ private:
 
 	CString GetINITemplateName();
 	void MakeSureUserINIExists();
-	CString ReplacePlaceholdersFileNameFormat(const CString& sFileNameFormat);
 	void ReadWriteableINISettings();
 
 	LPCTSTR ReadUserIniString(LPCTSTR key);

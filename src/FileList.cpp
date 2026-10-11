@@ -279,45 +279,6 @@ bool CFileList::CurrentFileExists() const {
 	return false;
 }
 
-bool CFileList::DriveHasRecycleBin(LPCTSTR filePath) {
-	TCHAR driveLetter[3];
-	if (_tcslen(filePath) < 3) return false;
-	driveLetter[0] = filePath[0];
-	driveLetter[1] = filePath[1];
-	driveLetter[2] = 0;
-
-	if (driveLetter[0] == _T('\\') && driveLetter[1] == _T('\\')) return false; // remote drive, no recycle bin
-
-	CString recycleBin = CString((LPCTSTR(driveLetter))) + _T("\\$Recycle.Bin\\");
-
-	DWORD attributes = ::GetFileAttributes(recycleBin);
-	if (attributes == INVALID_FILE_ATTRIBUTES) return false;
-	if (attributes & FILE_ATTRIBUTE_DIRECTORY) return true; // this is a directory!
-
-	return false; // this is not a directory!
-}
-
-bool CFileList::DeleteFile(LPCTSTR fileNameWithPath) const {
-	if (fileNameWithPath != NULL) {
-		// append a double null character
-		TCHAR fileName[MAX_PATH + 1];
-		_tcscpy(fileName, fileNameWithPath);
-		fileName[_tcslen(fileName) + 1] = 0;
-
-		SHFILEOPSTRUCT fileOp{ 0 };
-		fileOp.hwnd = NULL;
-		fileOp.wFunc = FO_DELETE;
-		fileOp.pFrom = fileName;
-		fileOp.pTo = NULL;
-		fileOp.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION;
-		fileOp.hNameMappings = NULL;
-		if (::SHFileOperation(&fileOp) == 0 && !fileOp.fAnyOperationsAborted) {
-			return true;
-		}
-	}
-	return false;
-}
-
 void CFileList::FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName) {
 	if (_tcsicmp(sOldFileName, m_sInitialFile) == 0) {
 		m_sInitialFile = sNewFileName;
