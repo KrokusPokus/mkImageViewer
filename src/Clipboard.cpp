@@ -114,7 +114,7 @@ void CClipboard::CutFileToClipboard(HWND hWnd, LPCTSTR fileName) {
     CopyOriginalFileNameToClipboard(fileName);
 
     // 2. Preferred Drop Effect auf DROPEFFECT_MOVE setzen (Ausschneiden/Verschieben)
-    UINT uFormat = ::RegisterClipboardFormat(CFSTR_PREFERREDDROPEFFECT);
+    UINT uFormat = ::RegisterClipboardFormat(TEXT("Preferred DropEffect"));
     if (uFormat != 0) {
         HGLOBAL hMem = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, sizeof(DWORD));
         if (hMem != NULL) {
@@ -173,51 +173,6 @@ void CClipboard::CutFileToClipboard(HWND hWnd, LPCTSTR fileName) {
 
     ::CloseClipboard();
 }
-
-CJPEGImage* CClipboard::PasteImageFromClipboard(HWND hWnd, const CImageProcessingParams& procParams,
-                                                EProcessingFlags eFlags) {
-    if (!::OpenClipboard(hWnd)) {
-        return NULL;
-    }
-
-    CJPEGImage* pImage = NULL;
-    HANDLE handle = ::GetClipboardData(CF_DIB);
-    if (handle != NULL) {
-        BITMAPINFO* pbmInfo = (BITMAPINFO*)::GlobalLock(handle);
-        if (pbmInfo != NULL) {
-            int nNumColors = pbmInfo->bmiHeader.biClrUsed;
-            if (nNumColors == 0 && pbmInfo->bmiHeader.biBitCount <= 8) {
-                nNumColors = 1 << pbmInfo->bmiHeader.biBitCount;
-            }
-            if (pbmInfo->bmiHeader.biCompression == BI_BITFIELDS) {
-                nNumColors = 3;
-            }
-            char* pDIBBits = (char*)pbmInfo + pbmInfo->bmiHeader.biSize + nNumColors*sizeof(RGBQUAD);
-
-            if (pbmInfo->bmiHeader.biWidth <= MAX_IMAGE_DIMENSION && abs(pbmInfo->bmiHeader.biHeight) <= MAX_IMAGE_DIMENSION) {
-                Gdiplus::Bitmap* pBitmap = new Gdiplus::Bitmap(pbmInfo, pDIBBits);
-                if (pBitmap->GetLastStatus() == Gdiplus::Ok) {
-                    Gdiplus::Rect bmRect(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight());
-                    Gdiplus::BitmapData bmData;
-                    if (pBitmap->LockBits(&bmRect, Gdiplus::ImageLockModeRead, PixelFormat32bppRGB, &bmData) == Gdiplus::Ok) {
-                        assert(bmData.PixelFormat == PixelFormat32bppRGB);
-                        void* pDIB = CBasicProcessing::ConvertGdiplus32bppRGB(bmRect.Width, bmRect.Height, bmData.Stride, bmData.Scan0, true);
-                        pImage = (pDIB == NULL) ? NULL : new CJPEGImage(bmRect.Width, bmRect.Height, pDIB, NULL, 4, 0, IF_CLIPBOARD, false, 0, 1, 0);
-                        pBitmap->UnlockBits(&bmData);
-                    }
-                }
-                delete pBitmap;
-            }
-
-            ::GlobalUnlock(handle);
-        }
-    }
-
-    ::CloseClipboard();
-
-    return pImage;
-}
-
 
 void CClipboard::DoCopy(HWND hWnd, int nWidth, int nHeight, const void* pSourceImageDIB32, LPCTSTR fileName) {
     if (!::OpenClipboard(hWnd)) {

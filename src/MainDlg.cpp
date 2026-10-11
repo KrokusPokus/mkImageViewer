@@ -3119,13 +3119,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 		procParams.ProcFlags = SetProcessingFlag(procParams.ProcFlags, PFLAG_KeepParams, true);
 	}
 	if (ePos == POS_Clipboard) {
-		m_pCurrentImage = CClipboard::PasteImageFromClipboard(m_hWnd, procParams.ImageProcParams, procParams.ProcFlags);
-		if (m_pCurrentImage != NULL) {
-			m_pCurrentImage->SetFileDependentProcessParams(_T("_cbrd_"), &procParams);
-			m_nLastLoadError = HelpersGUI::FileLoad_Ok;
-		} else {
-			m_nLastLoadError = HelpersGUI::FileLoad_PasteFromClipboardFailed;
-		}
+		m_nLastLoadError = HelpersGUI::FileLoad_PasteFromClipboardFailed;
 	} else {
 		m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList, (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,  
 			m_pFileList->Current(), nFrameIndex, procParams,
