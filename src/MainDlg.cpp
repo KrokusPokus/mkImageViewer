@@ -75,9 +75,9 @@ static CImageProcessingParams GetDefaultProcessingParams() {
         sp.YellowBlue());
 }
 
-// Gets hardcoded processing parameters, turning off all processing except sharpening according to INI
+// Gets hardcoded processing parameters, turning off all processing
 static CImageProcessingParams GetNoProcessingParams() {
-    return CImageProcessingParams(0.0, 1.0, 1.0, CSettingsProvider::This().Sharpen(), 0.0, 0.5, 0.5, 0.25, 0.5, 0.0, 0.0, 0.0); 
+    return CImageProcessingParams(0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.25, 0.5, 0.0, 0.0, 0.0); 
 }
 
 // Gets default image processing flags as set in INI file
@@ -135,6 +135,9 @@ static EProcessingFlags _SetLandscapeModeFlags(EProcessingFlags eFlags) {
     }
 }
 
+// Define function pointer type for wine_get_version
+typedef const char* (__cdecl* pwine_get_version)(void);
+    
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Public
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,7 +154,7 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
     m_pImageProcParams = new CImageProcessingParams(GetDefaultProcessingParams());
     InitFromProcessingFlags(GetDefaultProcessingFlags(m_bLandscapeMode), m_bHQResampling, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, m_bLandscapeMode);
 
-    // Initialize second parameter set using hard coded values, turning off all corrections except sharpening
+    // Initialize second parameter set using hard coded values, turning off all corrections
     m_pImageProcParams2 = new CImageProcessingParams(GetNoProcessingParams()); 
     m_eProcessingFlags2 = PFLAG_HighQualityResampling;
 
@@ -255,7 +258,7 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
     m_bDWMenabled = FALSE;
     m_DynDwmFlush = 0;
 
-    m_bIsRunningUnderWine = Helpers::isRunningUnderWine();
+    m_bIsRunningInWine = isRunningInWine();
     
     m_storedWindowPlacement2.length = sizeof(WINDOWPLACEMENT);
     memset(&m_storedWindowPlacement2, 0, sizeof(WINDOWPLACEMENT));
@@ -385,12 +388,12 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
 
     // intitialize list of files to show with startup file (and folder)
     m_pFileList = new CFileList(m_sStartupFile,
-								*m_pDirectoryWatcher,
-								(m_eForcedSorting == Helpers::FS_Undefined) ? sp.Sorting() : m_eForcedSorting,
-								sp.IsSortedAscending(),
-								sp.WrapAroundFolder(),
-								0,
-								m_eForcedSorting != Helpers::FS_Undefined);
+                                *m_pDirectoryWatcher,
+                                (m_eForcedSorting == Helpers::FS_Undefined) ? sp.Sorting() : m_eForcedSorting,
+                                sp.IsSortedAscending(),
+                                sp.WrapAroundFolder(),
+                                0,
+                                m_eForcedSorting != Helpers::FS_Undefined);
 
     m_pFileList->SetNavigationMode(sp.Navigation());
 
@@ -562,7 +565,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 
             if (sFullPath != NULL && sFullPath[0] != _T('\0')) {
                 QString sPath = QString::fromWCharArray(sFullPath);
-                QString sFileSize = Helpers::FormatFileSize(Helpers::GetFileSize(sFullPath));
+                QString sFileSize = FormatFileSize(Helpers::GetFileSize(sFullPath));
 
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     if (m_bIsAnimationPlaying) {
@@ -704,7 +707,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
     if (m_bInZooming || m_bShowZoomFactor) {
         dc.SetTextColor(CSettingsProvider::This().ColorGUI());
         HelpersGUI::SelectDefaultFileNameFont(dc);
-        HelpersGUI::DrawTextBordered(dc, Helpers::formatOutputZoomFactor(m_dZoom).toStdWString().c_str(), GetZoomTextRect(), DT_RIGHT);
+        HelpersGUI::DrawTextBordered(dc, formatOutputZoomFactor(m_dZoom).toStdWString().c_str(), GetZoomTextRect(), DT_RIGHT);
     }
 
     if (!m_strToast.IsEmpty())
@@ -1700,30 +1703,30 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 }
 
                 QString currentFileName = QString::fromWCharArray(pRawFileName);
-				bool allowDelete = false;
+                bool allowDelete = false;
 
                 Helpers::EDeleteConfirmation confirmationPolicy = CSettingsProvider::This().DeleteConfirmation();
                 if (confirmationPolicy == Helpers::DC_Never) {
-					allowDelete = true;
-				} else {
-					// Need to ask the user
+                    allowDelete = true;
+                } else {
+                    // Need to ask the user
 
-					// Qt Core (funktioniert auch ohne QApplication!)
-					QFileInfo fileInfo(currentFileName);
-					QString fileSizeStr = Helpers::FormatFileSize(fileInfo.size());
+                    // Qt Core (funktioniert auch ohne QApplication!)
+                    QFileInfo fileInfo(currentFileName);
+                    QString fileSizeStr = FormatFileSize(fileInfo.size());
 
-					// Nachrichtentext mit QString zusammenbauen
-					QString message = QString("%1\n\n%2\n\n%3 %4")
-										  .arg("Do you really want to permanently delete this file?")
-										  .arg(currentFileName)
-										  .arg("Size:")
-										  .arg(fileSizeStr);
+                    // Nachrichtentext mit QString zusammenbauen
+                    QString message = QString("%1\n\n%2\n\n%3 %4")
+                                          .arg("Do you really want to permanently delete this file?")
+                                          .arg(currentFileName)
+                                          .arg("Size:")
+                                          .arg(fileSizeStr);
 
                     int ret = ::MessageBox(m_hWnd, reinterpret_cast<LPCWSTR>(message.utf16()), CNLS::GetString(_T("Confirm")), MB_YESNOCANCEL | MB_ICONQUESTION);
-					if (ret == IDYES) {
-						allowDelete = true;
-					}
-				}
+                    if (ret == IDYES) {
+                        allowDelete = true;
+                    }
+                }
 
                 if (allowDelete) {
                     CFileList* fileListOfDeletedImage = m_pFileList;
@@ -2645,8 +2648,8 @@ void CMainDlg::OpenDefaultEditor() {
             this->SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_FRAMECHANGED);
         }
 
-        if (m_bIsRunningUnderWine) {
-            CString sUnixPath = Helpers::GetUnixPathFromWine(sCurrentFileName);
+        if (m_bIsRunningInWine) {
+            CString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
 
             if (!sUnixPath.IsEmpty()) {
                 CString sParams;
@@ -2675,16 +2678,16 @@ LONG CMainDlg::SetCurrentWindowStyle() {
 void CMainDlg::ExploreFile() {
     LPCTSTR sCurrentFileName = CurrentFileName(false);
     if (sCurrentFileName != NULL) {
-        if (m_bIsRunningUnderWine) {
-            CString sUnixPath = Helpers::GetUnixPathFromWine(sCurrentFileName);
+        if (m_bIsRunningInWine) {
+            CString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
             if (!sUnixPath.IsEmpty()) {
                 CString sParams;
 
-                if (Helpers::IsLinuxBinaryAvailable(_T("~/.local/bin/mkFolderWidget"))) {
+                if (IsLinuxBinaryAvailable(_T("~/.local/bin/mkFolderWidget"))) {
                     sParams.Format(_T("/unix /bin/sh -c \"mkFolderWidget -f \\\"%s\\\"\""), (LPCTSTR)sUnixPath);
                     ::ShellExecute(m_hWnd, NULL, _T("start.exe"), sParams, NULL, SW_SHOW);
                 }
-                else if (Helpers::IsLinuxBinaryAvailable(_T("/usr/bin/dolphin"))) {
+                else if (IsLinuxBinaryAvailable(_T("/usr/bin/dolphin"))) {
                     sParams.Format(_T("/unix /usr/bin/dolphin --new-window --select \"%s\""), (LPCTSTR)sUnixPath);
                     ::ShellExecute(m_hWnd, NULL, _T("start.exe"), sParams, NULL, SW_SHOW);
                 }
@@ -2757,10 +2760,10 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
     m_sStartupFile = sFileName;
 
     m_pFileList = new CFileList(m_sStartupFile,
-								*m_pDirectoryWatcher,
-								eOldSorting,
-								bOldAscending,
-								CSettingsProvider::This().WrapAroundFolder());
+                                *m_pDirectoryWatcher,
+                                eOldSorting,
+                                bOldAscending,
+                                CSettingsProvider::This().WrapAroundFolder());
 
     // free current image and all read ahead images
     InitParametersForNewImage();
@@ -3695,11 +3698,11 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
         }
     } else {
         CString sWindowText =  sCurrentFileName;
-        sWindowText += Helpers::GetMultiframeIndex(m_pCurrentImage);
+        sWindowText += GetMultiframeIndex(m_pCurrentImage);
         if (CSettingsProvider::This().ShowEXIFDateInTitle()) {
             CEXIFReader* pEXIF = m_pCurrentImage->GetEXIFReader();
             if (pEXIF != NULL && pEXIF->GetAcquisitionTime().wYear > 1600) {
-                sWindowText += " - " + Helpers::SystemTimeToString(pEXIF->GetAcquisitionTime());
+                sWindowText += " - " + SystemTimeToString(pEXIF->GetAcquisitionTime());
             }
         }
         sWindowText += " - " + CString(JPEGVIEW_TITLE);
@@ -4264,4 +4267,170 @@ void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
     CString sSortMode = sSortModes[(int)nSortMode];
     //sSortMode += (bUpCounting ? _T(" ^") : _T(" v"));
     SetToast(sSortMode);
+}
+
+CString CMainDlg::SystemTimeToString(const SYSTEMTIME &time) {
+    TCHAR sBufferDate[64];
+    TCHAR sBufferDay[8];
+    TCHAR sBufferTime[64];
+    ::GetDateFormat(LOCALE_USER_DEFAULT, 0, &time, _T("ddd"), sBufferDay, 8);
+    ::GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, sBufferDate, 64);
+    ::GetTimeFormat(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &time, NULL, sBufferTime, 64);
+    return CString(sBufferDay) + _T(" ") + sBufferDate + _T(" ") + sBufferTime;
+}
+
+// Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
+CString CMainDlg::GetMultiframeIndex(CJPEGImage* pImage) {
+    bool isMultiFrame = pImage != NULL && pImage->NumberOfFrames() > 1;
+    if (isMultiFrame && !pImage->IsAnimation()) {
+        CString s;
+        s.Format(_T(" [%d/%d]"), pImage->FrameIndex() + 1, pImage->NumberOfFrames());
+        return s;
+    }
+    return CString(_T(""));
+}
+
+QString CMainDlg::FormatFileSize(qint64 nFileSize) {
+    if (nFileSize <= 0) {
+        return QString();
+    }
+
+    if (nFileSize <= 1024) {
+        return QString("%1 Bytes").arg(nFileSize);
+    }
+
+    static const QString units[] = { 
+        QStringLiteral("Bytes"), QStringLiteral("KiB"), QStringLiteral("MiB"), 
+        QStringLiteral("GiB"), QStringLiteral("TiB"), QStringLiteral("PiB"), 
+        QStringLiteral("EiB"), QStringLiteral("ZiB"), QStringLiteral("YiB") 
+    };
+
+    double value = static_cast<double>(nFileSize);
+    int exponent = 0;
+    const int maxExponent = static_cast<int>(std::size(units)) - 1;
+
+    while (value >= 1024.0 && exponent < maxExponent) {
+        value /= 1024.0;
+        exponent++;
+    }
+
+    int precision = 0;
+    if (value < 10.0) {
+        precision = 2; // z.B. 1.23 MiB
+    } else if (value < 100.0) {
+        precision = 1; // z.B. 12.3 MiB
+    } else {
+        precision = 0; // z.B. 123 MiB
+    }
+
+    return QString("%1 %2")
+        .arg(value, 0, 'f', precision)
+        .arg(units[exponent]);
+}
+
+QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
+    // Skalierungsfaktor-Ausgabe für Werte > 200%
+    if (m_dZoom > 100.0) {
+        return QString::number(m_dZoom, 'f', 0) + "x";
+    }
+    if (m_dZoom > 10.0) {
+        return QString::number(m_dZoom, 'f', 1) + "x";
+    }
+    if (m_dZoom > 2.0) {
+        return QString::number(m_dZoom, 'f', 2) + "x";
+    }
+
+    // Prozent-Ausgabe für kleine Werte mit 2 signifikanten Stellen
+    if (m_dZoom > 0.0) {
+        int decimals = std::max(0, 1 - static_cast<int>(std::floor(std::log10(m_dZoom * 100))));
+        return QString::number(m_dZoom * 100, 'f', decimals) + " %";
+    }
+
+    // Fallback
+    return QString::number(qRound(m_dZoom * 100)) + " %";
+}
+
+
+bool CMainDlg::isRunningInWine() {
+    // ntdll.dll ist in jedem Windows-Prozess bereits geladen
+    HMODULE hNtDll = GetModuleHandleA("ntdll.dll");
+    if (!hNtDll) {
+        return false;
+    }
+
+    // Check if wine-specific function exists
+    pwine_get_version wine_get_version =
+        (pwine_get_version)GetProcAddress(hNtDll, "wine_get_version");
+
+    if (wine_get_version) {
+        // Optional: Version auslesen (z.B. "9.0")
+        // const char* version = wine_get_version();
+        return true;
+    }
+
+    return false;
+}
+
+// Checks if a linux file exists on host
+bool CMainDlg::IsLinuxBinaryAvailable(LPCTSTR szUnixPath) {
+    if (szUnixPath == NULL || szUnixPath[0] == _T('\0')) return false;
+
+    CString sDosPath;
+
+    if (szUnixPath[0] == _T('~')) {
+        // Within wine, %USERNAME% contains the Linux host user name
+        TCHAR szUser[256] = { 0 };
+        DWORD dwLen = ::GetEnvironmentVariable(_T("USERNAME"), szUser, 256);
+        if (dwLen == 0) {
+            dwLen = ::GetEnvironmentVariable(_T("USER"), szUser, 256);
+        }
+
+        if (dwLen > 0) {
+            // '~' zu 'Z:\home\<username>\...' auflösen
+            sDosPath.Format(_T("Z:\\home\\%s%s"), szUser, szUnixPath + 1);
+        }
+        else {
+            return false;
+        }
+    }
+    else if (szUnixPath[0] == _T('/')) {
+        // Absolute Unix-Pfade wie /usr/bin/... auf Z:\ mappen
+        sDosPath.Format(_T("Z:%s"), szUnixPath);
+    }
+    else {
+        sDosPath = szUnixPath;
+    }
+
+    sDosPath.Replace(_T('/'), _T('\\'));
+
+    // Checks for existence of file on drive Z
+    DWORD dwAttr = ::GetFileAttributes(sDosPath);
+    return (dwAttr != INVALID_FILE_ATTRIBUTES && !(dwAttr & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+
+// Konvertiert einen Windows-Pfad (z.B. Z:\home\...) in einen Unix-Pfad (/home/...)
+CString CMainDlg::GetUnixPathFromWine(LPCTSTR szDosPath) {
+    HMODULE hKernel32 = GetModuleHandle(_T("kernel32.dll"));
+    if (!hKernel32) return _T("");
+
+    // Wine-Signatur: Nimmt LPCWSTR (UTF-16), liefert char* (UTF-8 POSIX-Pfad)
+    typedef char* (__cdecl* pwine_get_unix_file_name)(LPCWSTR);
+    pwine_get_unix_file_name wine_get_unix_file_name =
+        (pwine_get_unix_file_name)GetProcAddress(hKernel32, "wine_get_unix_file_name");
+
+    if (wine_get_unix_file_name) {
+        // Wine nimmt direkt den Unicode-Pfad entgegen (szDosPath)
+        char* unixPathUtf8 = wine_get_unix_file_name(szDosPath);
+        if (unixPathUtf8) {
+            // Konvertiert den UTF-8 char* Stream von Linux direkt in einen Unicode-CString
+            CString sResult(CA2W(unixPathUtf8, CP_UTF8));
+
+            // Den von Wine auf dem Prozess-Heap allokierten Speicher freigeben
+            HeapFree(GetProcessHeap(), 0, unixPathUtf8);
+
+            return sResult;
+        }
+    }
+    return _T("");
 }

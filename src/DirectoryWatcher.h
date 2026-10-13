@@ -5,30 +5,30 @@
 // to the specified window.
 class CDirectoryWatcher {
 public:
-	// The messages are sent to the specified target window.
-	CDirectoryWatcher(HWND hTargetWindow);
-	virtual ~CDirectoryWatcher(void);
+    // The messages are sent to the specified target window.
+    CDirectoryWatcher(HWND hTargetWindow);
+    virtual ~CDirectoryWatcher(void);
 
-	void SetCurrentFile(LPCTSTR fileName);
-	void SetCurrentDirectory(LPCTSTR directoryName);
+    void SetCurrentFile(LPCTSTR fileName);
+    void SetCurrentDirectory(LPCTSTR directoryName);
 
-	// First tries to terminate the thread by setting m_terminateEvent, when no reaction -> kills the thread
-	void Abort();
+    // First tries to terminate the thread by setting m_terminateEvent, when no reaction -> kills the thread
+    void Abort();
 
 private:
-	CRITICAL_SECTION m_lock;
-	HANDLE m_terminateEvent; // Event to terminate the thread
-	HANDLE m_newDirectoryEvent; // New directory needs to be watched
-	HANDLE m_hThread; // watchdog thread
-	HWND m_hTargetWindow;
-	bool m_bTerminate;
+    CRITICAL_SECTION m_lock;
+    HANDLE m_terminateEvent; // Event to terminate the thread
+    HANDLE m_newDirectoryEvent; // New directory needs to be watched
+    HANDLE m_hThread; // watchdog thread
+    HWND m_hTargetWindow;
+    bool m_bTerminate;
 
-	CString m_sCurrentDirectory;
-	CString m_sCurrentFile;
-	BOOL m_bModificationTimeValid;
-	FILETIME m_modificationTimeCurrentFile;
+    CString m_sCurrentDirectory;
+    CString m_sCurrentFile;
+    BOOL m_bModificationTimeValid;
+    FILETIME m_modificationTimeCurrentFile;
 
-	static void  __cdecl ThreadFunc(void* arg);
+    static void  __cdecl ThreadFunc(void* arg);
 };
 
 

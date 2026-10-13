@@ -120,7 +120,7 @@ BEGIN
         POPUP "Play folder as slideshow/movie"
         BEGIN
             MENUITEM "Pause Slideshow/Movie\t0xff", IDM_STOP_MOVIE
-			MENUITEM SEPARATOR
+            MENUITEM SEPARATOR
             MENUITEM "Slideshow",                   IDM_SLIDESHOW_START
             MENUITEM "Waiting time\t1 sec",         IDM_SLIDESHOW_1
             MENUITEM "Waiting time\t2 sec",         IDM_SLIDESHOW_2
@@ -163,12 +163,12 @@ BEGIN
             MENUITEM "Movie",                           IDM_MOVIE_START_FPS
             MENUITEM "Playback speed\t5 fps",           IDM_MOVIE_5_FPS
             MENUITEM "Playback speed\t10 fps",          IDM_MOVIE_10_FPS
-			MENUITEM "Playback speed\t15 fps",          IDM_MOVIE_15_FPS
-			MENUITEM "Playback speed\t20 fps",          IDM_MOVIE_20_FPS
+            MENUITEM "Playback speed\t15 fps",          IDM_MOVIE_15_FPS
+            MENUITEM "Playback speed\t20 fps",          IDM_MOVIE_20_FPS
             MENUITEM "Playback speed\t25 fps",          IDM_MOVIE_25_FPS
             MENUITEM "Playback speed\t30 fps",          IDM_MOVIE_30_FPS
             MENUITEM "Playback speed\t50 fps",          IDM_MOVIE_50_FPS
-			MENUITEM "Playback speed\t60 fps",          IDM_MOVIE_60_FPS
+            MENUITEM "Playback speed\t60 fps",          IDM_MOVIE_60_FPS
             MENUITEM "Playback speed\t100 fps",         IDM_MOVIE_100_FPS
         END
         MENUITEM SEPARATOR
@@ -177,7 +177,7 @@ BEGIN
         MENUITEM "Copy scaled image content to clipboard",   IDM_COPY
         MENUITEM "Copy original image content to clipboard", IDM_COPY_FULL
         MENUITEM "Copy file path to clipboard",              IDM_COPY_PATH
-		MENUITEM "Cut file to clipboard",           IDM_CUT_FILE
+        MENUITEM "Cut file to clipboard",           IDM_CUT_FILE
         MENUITEM "Open containing folder in Explorer", IDM_EXPLORE
         MENUITEM SEPARATOR
         POPUP "Folder Mode"
@@ -207,9 +207,9 @@ BEGIN
         END
         MENUITEM "Auto Contrast",             IDM_AUTO_CORRECTION
         MENUITEM SEPARATOR
-		MENUITEM "Edit global config file",     IDM_EDIT_GLOBAL_CONFIG
-		MENUITEM "Edit user config file",       IDM_EDIT_USER_CONFIG
-		MENUITEM "Update user config format",     IDM_UPDATE_USER_CONFIG
+        MENUITEM "Edit global config file",     IDM_EDIT_GLOBAL_CONFIG
+        MENUITEM "Edit user config file",       IDM_EDIT_USER_CONFIG
+        MENUITEM "Update user config format",     IDM_UPDATE_USER_CONFIG
         MENUITEM SEPARATOR
         MENUITEM "Exit\t0xffff",                IDM_EXIT
     END

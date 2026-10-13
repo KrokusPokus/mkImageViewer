@@ -8,28 +8,28 @@ class CJPEGImage;
 // Allows to copy an image or text to the clipboard and to paste an image from the clipboard
 class CClipboard {
 public:
-	// Copy the pixels of the currently visible part of the image as a 24 bpp DIB to the clipboard
-	// Zoom is as on screen.
-	static void CopyImageToClipboard(HWND hWnd, CJPEGImage * pImage, LPCTSTR fileName);
+    // Copy the pixels of the currently visible part of the image as a 24 bpp DIB to the clipboard
+    // Zoom is as on screen.
+    static void CopyImageToClipboard(HWND hWnd, CJPEGImage * pImage, LPCTSTR fileName);
 
-	// Copy processed full size image as a 24 bpp DIB to the clipboard, i.e. in original resolution.
-	static void CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams,
-		EProcessingFlags eFlags, LPCTSTR fileName);
+    // Copy processed full size image as a 24 bpp DIB to the clipboard, i.e. in original resolution.
+    static void CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams,
+        EProcessingFlags eFlags, LPCTSTR fileName);
 
-	// Copy section of full size image as a 24 bpp DIB to the clipboard, i.e. in original resolution.
-	static void CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams,
-		EProcessingFlags eFlags, CRect clipRect, LPCTSTR fileName);
+    // Copy section of full size image as a 24 bpp DIB to the clipboard, i.e. in original resolution.
+    static void CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams,
+        EProcessingFlags eFlags, CRect clipRect, LPCTSTR fileName);
 
-	// Copy file path to the clipboard.
-	static void CopyPathToClipboard(HWND hWnd, CJPEGImage* pImage, LPCTSTR fileName);
-	
-	static void CutFileToClipboard(HWND hWnd, LPCTSTR fileName);
+    // Copy file path to the clipboard.
+    static void CopyPathToClipboard(HWND hWnd, CJPEGImage* pImage, LPCTSTR fileName);
+    
+    static void CutFileToClipboard(HWND hWnd, LPCTSTR fileName);
 
 private:
-	CClipboard(void);
+    CClipboard(void);
 
-	static void DoCopy(HWND hWnd, int nWidth, int nHeight, const void* pSourceImageDIB32, LPCTSTR fileName);
-	static void DoCopyFileNameText(HWND hWnd, LPCTSTR fileName);
+    static void DoCopy(HWND hWnd, int nWidth, int nHeight, const void* pSourceImageDIB32, LPCTSTR fileName);
+    static void DoCopyFileNameText(HWND hWnd, LPCTSTR fileName);
 };
 
 #endif // CLIPBOARD_H

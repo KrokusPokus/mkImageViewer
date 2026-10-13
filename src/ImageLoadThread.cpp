@@ -43,176 +43,176 @@ volatile int CImageLoadThread::m_curHandle = 0;
 // an actual file on disk - only its name/extension is used here.
 static EImageFormat GetImageFormatInMemory(const unsigned char* pHeader, LPCTSTR sFileName) {
 
-	if (pHeader[0] == 0x42 && pHeader[1] == 0x4d) {
-		return IF_WindowsBMP;
-	} else if (pHeader[0] == 0xff && pHeader[1] == 0xd8) {
-		return IF_JPEG;
-	} else if (pHeader[0] == 0x89 && pHeader[1] == 'P' && pHeader[2] == 'N' && pHeader[3] == 'G' &&
-		pHeader[4] == 0x0d && pHeader[5] == 0x0a && pHeader[6] == 0x1a && pHeader[7] == 0x0a) {
-		return IF_PNG;
-	} else if (pHeader[0] == 'G' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == '8' &&
-		(pHeader[4] == '7' || pHeader[4] == '9') && pHeader[5] == 'a') {
-		return IF_GIF;
-	} else if (pHeader[0] == 'R' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == 'F' &&
-		pHeader[8] == 'W' && pHeader[9] == 'E' && pHeader[10] == 'B' && pHeader[11] == 'P') {
-		return IF_WEBP;
-	} else if ((pHeader[0] == 0xff && pHeader[1] == 0x0a) ||
-		memcmp(pHeader, "\x00\x00\x00\x0cJXL\x20\x0d\x0a\x87\x0a", 12) == 0) {
-		return IF_JXL;
-	} else if (!memcmp(pHeader + 4, "ftyp", 4)) {
-		// https://github.com/strukturag/libheif/issues/83
-		// https://github.com/strukturag/libheif/blob/ce1e4586b6222588c5afcd60c7ba9caa86bcc58c/libheif/heif.h#L602-L805
+    if (pHeader[0] == 0x42 && pHeader[1] == 0x4d) {
+        return IF_WindowsBMP;
+    } else if (pHeader[0] == 0xff && pHeader[1] == 0xd8) {
+        return IF_JPEG;
+    } else if (pHeader[0] == 0x89 && pHeader[1] == 'P' && pHeader[2] == 'N' && pHeader[3] == 'G' &&
+        pHeader[4] == 0x0d && pHeader[5] == 0x0a && pHeader[6] == 0x1a && pHeader[7] == 0x0a) {
+        return IF_PNG;
+    } else if (pHeader[0] == 'G' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == '8' &&
+        (pHeader[4] == '7' || pHeader[4] == '9') && pHeader[5] == 'a') {
+        return IF_GIF;
+    } else if (pHeader[0] == 'R' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == 'F' &&
+        pHeader[8] == 'W' && pHeader[9] == 'E' && pHeader[10] == 'B' && pHeader[11] == 'P') {
+        return IF_WEBP;
+    } else if ((pHeader[0] == 0xff && pHeader[1] == 0x0a) ||
+        memcmp(pHeader, "\x00\x00\x00\x0cJXL\x20\x0d\x0a\x87\x0a", 12) == 0) {
+        return IF_JXL;
+    } else if (!memcmp(pHeader + 4, "ftyp", 4)) {
+        // https://github.com/strukturag/libheif/issues/83
+        // https://github.com/strukturag/libheif/blob/ce1e4586b6222588c5afcd60c7ba9caa86bcc58c/libheif/heif.h#L602-L805
 
-		// AV1: avif, avis
-		if (!memcmp(pHeader + 8, "avi", 3))
-			return IF_AVIF;
-		// H265: heic, heix, hevc, hevx, heim, heis, hevm, hevs
-		if (!memcmp(pHeader + 8, "hei", 3) || !memcmp(pHeader + 8, "hev", 3))
-			return IF_HEIF;
-	} else if (pHeader[0] == 'q' && pHeader[1] == 'o' && pHeader[2] == 'i' && pHeader[3] == 'f') {
-		return IF_QOI;
-	} else if (pHeader[0] == '8' && pHeader[1] == 'B' && pHeader[2] == 'P' && pHeader[3] == 'S') {
-		return IF_PSD;
-	} else if (pHeader[0] == 'P' && pHeader[1] == 'K' && pHeader[2] == 0x03 && pHeader[3] == 0x04) {
-		return IF_ZIP;
-	}
+        // AV1: avif, avis
+        if (!memcmp(pHeader + 8, "avi", 3))
+            return IF_AVIF;
+        // H265: heic, heix, hevc, hevx, heim, heis, hevm, hevs
+        if (!memcmp(pHeader + 8, "hei", 3) || !memcmp(pHeader + 8, "hev", 3))
+            return IF_HEIF;
+    } else if (pHeader[0] == 'q' && pHeader[1] == 'o' && pHeader[2] == 'i' && pHeader[3] == 'f') {
+        return IF_QOI;
+    } else if (pHeader[0] == '8' && pHeader[1] == 'B' && pHeader[2] == 'P' && pHeader[3] == 'S') {
+        return IF_PSD;
+    } else if (pHeader[0] == 'P' && pHeader[1] == 'K' && pHeader[2] == 0x03 && pHeader[3] == 0x04) {
+        return IF_ZIP;
+    }
 
-	// default fallback if no matches based on magic bytes
-	EImageFormat eImageFormat = Helpers::GetImageFormat(sFileName);
+    // default fallback if no matches based on magic bytes
+    EImageFormat eImageFormat = Helpers::GetImageFormat(sFileName);
 
-	if (eImageFormat != IF_Unknown) {
-		return eImageFormat;
-	} else if (!memcmp(pHeader + 4, "ftyp", 4)) {
-		// Unspecified encoding (possibly AVIF or HEIF): mif1, mif2, msf1, miaf, 1pic
-		return IF_AVIF;
-	} else if (!memcmp(pHeader, "II*\0", 4) || !memcmp(pHeader, "MM\0*", 4)) {
-		// Must be checked after file extension to avoid classifying RAW as TIFF
-		// A few RAW image formats use TIFF as the container
-		// ex: CR2 - http://lclevy.free.fr/cr2/#key_info
-		// ex: DNG - https://www.adobe.com/creativecloud/file-types/image/raw/dng-file.html#dng
-		return IF_TIFF;
-	} else if (pHeader[0] == 0x00 && pHeader[1] == 0x00 && pHeader[2] == 0x01 && pHeader[3] == 0x00) {
-		return IF_ICO;
-	}
-	return IF_Unknown;
+    if (eImageFormat != IF_Unknown) {
+        return eImageFormat;
+    } else if (!memcmp(pHeader + 4, "ftyp", 4)) {
+        // Unspecified encoding (possibly AVIF or HEIF): mif1, mif2, msf1, miaf, 1pic
+        return IF_AVIF;
+    } else if (!memcmp(pHeader, "II*\0", 4) || !memcmp(pHeader, "MM\0*", 4)) {
+        // Must be checked after file extension to avoid classifying RAW as TIFF
+        // A few RAW image formats use TIFF as the container
+        // ex: CR2 - http://lclevy.free.fr/cr2/#key_info
+        // ex: DNG - https://www.adobe.com/creativecloud/file-types/image/raw/dng-file.html#dng
+        return IF_TIFF;
+    } else if (pHeader[0] == 0x00 && pHeader[1] == 0x00 && pHeader[2] == 0x01 && pHeader[3] == 0x00) {
+        return IF_ICO;
+    }
+    return IF_Unknown;
 }
 
 // opens the file, reads up to 16 header bytes, and determines the image format
 static EImageFormat GetImageFormat(LPCTSTR sFileName) {
-	FILE *fptr;
-	if ((fptr = _tfopen(sFileName, _T("rb"))) == NULL) {
-		return IF_Unknown;
-	}
-	unsigned char header[16] = { 0 };
-	int nSize = (int)fread((void*)header, 1, 16, fptr);
-	fclose(fptr);
-	if (nSize < 2) {
-		return IF_Unknown;
-	}
+    FILE *fptr;
+    if ((fptr = _tfopen(sFileName, _T("rb"))) == NULL) {
+        return IF_Unknown;
+    }
+    unsigned char header[16] = { 0 };
+    int nSize = (int)fread((void*)header, 1, 16, fptr);
+    fclose(fptr);
+    if (nSize < 2) {
+        return IF_Unknown;
+    }
 
-	return GetImageFormatInMemory(header, sFileName);
+    return GetImageFormatInMemory(header, sFileName);
 }
 
 static EImageFormat GetBitmapFormat(Gdiplus::Bitmap * pBitmap) {
-	GUID guid{ 0 };
-	pBitmap->GetRawFormat(&guid);
-	if (guid == Gdiplus::ImageFormatBMP) {
-		return IF_WindowsBMP;
-	} else if (guid == Gdiplus::ImageFormatPNG) {
-		return IF_PNG;
-	} else if (guid == Gdiplus::ImageFormatGIF) {
-		return IF_GIF;
-	} else if (guid == Gdiplus::ImageFormatTIFF) {
-		return IF_TIFF;
-	} else if (guid == Gdiplus::ImageFormatJPEG || guid == Gdiplus::ImageFormatEXIF) {
-		return IF_JPEG;
-	} else {
-		return IF_Unknown;
-	}
+    GUID guid{ 0 };
+    pBitmap->GetRawFormat(&guid);
+    if (guid == Gdiplus::ImageFormatBMP) {
+        return IF_WindowsBMP;
+    } else if (guid == Gdiplus::ImageFormatPNG) {
+        return IF_PNG;
+    } else if (guid == Gdiplus::ImageFormatGIF) {
+        return IF_GIF;
+    } else if (guid == Gdiplus::ImageFormatTIFF) {
+        return IF_TIFF;
+    } else if (guid == Gdiplus::ImageFormatJPEG || guid == Gdiplus::ImageFormatEXIF) {
+        return IF_JPEG;
+    } else {
+        return IF_Unknown;
+    }
 }
 
 static CJPEGImage* ConvertGDIPlusBitmapToJPEGImage(Gdiplus::Bitmap* pBitmap, int nFrameIndex, void* pEXIFData, 
-	__int64 nJPEGHash, bool &isOutOfMemory, bool &isAnimatedGIF, Helpers::ETransparencyMode nTransparencyMode) {
+    __int64 nJPEGHash, bool &isOutOfMemory, bool &isAnimatedGIF, Helpers::ETransparencyMode nTransparencyMode) {
 
-	isOutOfMemory = false;
-	isAnimatedGIF = false;
-	if (pBitmap == NULL) {
-		return NULL;
-	}
-	Gdiplus::Status lastStatus = pBitmap->GetLastStatus();
-	if (lastStatus != Gdiplus::Ok) {
-		isOutOfMemory = lastStatus == Gdiplus::OutOfMemory;
-		return NULL;
-	}
+    isOutOfMemory = false;
+    isAnimatedGIF = false;
+    if (pBitmap == NULL) {
+        return NULL;
+    }
+    Gdiplus::Status lastStatus = pBitmap->GetLastStatus();
+    if (lastStatus != Gdiplus::Ok) {
+        isOutOfMemory = lastStatus == Gdiplus::OutOfMemory;
+        return NULL;
+    }
 
-	if (pBitmap->GetWidth() > MAX_IMAGE_DIMENSION || pBitmap->GetHeight() > MAX_IMAGE_DIMENSION)
-	{
-		return NULL;
-	}
-	if ((double)pBitmap->GetWidth() * pBitmap->GetHeight() > MAX_IMAGE_PIXELS)
-	{
-		isOutOfMemory = true;
-		return NULL;
-	}
+    if (pBitmap->GetWidth() > MAX_IMAGE_DIMENSION || pBitmap->GetHeight() > MAX_IMAGE_DIMENSION)
+    {
+        return NULL;
+    }
+    if ((double)pBitmap->GetWidth() * pBitmap->GetHeight() > MAX_IMAGE_PIXELS)
+    {
+        isOutOfMemory = true;
+        return NULL;
+    }
 
-	EImageFormat eImageFormat = GetBitmapFormat(pBitmap);
+    EImageFormat eImageFormat = GetBitmapFormat(pBitmap);
 
-	// Handle multiframe images.
-	// Note that only the first frame dimension is looked at, it is unclear if GDI+ anyway supports image formats with more dimensions
-	UINT nDimensions = pBitmap->GetFrameDimensionsCount();
-	GUID* pDimensionIDs = new GUID[nDimensions];
-	pBitmap->GetFrameDimensionsList(pDimensionIDs, nDimensions);
-	int nFrameCount = (nDimensions == 0) ? 1 : pBitmap->GetFrameCount(&pDimensionIDs[0]);
+    // Handle multiframe images.
+    // Note that only the first frame dimension is looked at, it is unclear if GDI+ anyway supports image formats with more dimensions
+    UINT nDimensions = pBitmap->GetFrameDimensionsCount();
+    GUID* pDimensionIDs = new GUID[nDimensions];
+    pBitmap->GetFrameDimensionsList(pDimensionIDs, nDimensions);
+    int nFrameCount = (nDimensions == 0) ? 1 : pBitmap->GetFrameCount(&pDimensionIDs[0]);
     nFrameIndex = std::clamp(nFrameIndex, 0, nFrameCount - 1);
-	int nFrameTimeMs = 100;
-	if (nFrameCount > 1) {
-		isAnimatedGIF = eImageFormat == IF_GIF;
-		int nTagFrameDelaySize = pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
-		if (nTagFrameDelaySize > 0) {
-			PropertyItem* pPropertyItem = (PropertyItem*)new char[nTagFrameDelaySize];
-			if (pBitmap->GetPropertyItem(PropertyTagFrameDelay, nTagFrameDelaySize, pPropertyItem) == Gdiplus::Ok) {
-				nFrameTimeMs = ((long*)pPropertyItem->value)[nFrameIndex] * 10;
-			}
-			delete[] pPropertyItem;
-		}
-		GUID pageGuid = (eImageFormat == IF_TIFF) ? FrameDimensionPage : FrameDimensionTime;
-		pBitmap->SelectActiveFrame(&pageGuid, nFrameIndex);
-	}
-	delete[] pDimensionIDs;
+    int nFrameTimeMs = 100;
+    if (nFrameCount > 1) {
+        isAnimatedGIF = eImageFormat == IF_GIF;
+        int nTagFrameDelaySize = pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
+        if (nTagFrameDelaySize > 0) {
+            PropertyItem* pPropertyItem = (PropertyItem*)new char[nTagFrameDelaySize];
+            if (pBitmap->GetPropertyItem(PropertyTagFrameDelay, nTagFrameDelaySize, pPropertyItem) == Gdiplus::Ok) {
+                nFrameTimeMs = ((long*)pPropertyItem->value)[nFrameIndex] * 10;
+            }
+            delete[] pPropertyItem;
+        }
+        GUID pageGuid = (eImageFormat == IF_TIFF) ? FrameDimensionPage : FrameDimensionTime;
+        pBitmap->SelectActiveFrame(&pageGuid, nFrameIndex);
+    }
+    delete[] pDimensionIDs;
 
-	// If there is an alpha channel in the original file we must blit the image onto a background color offscreen
-	// bitmap first to achieve proper rendering.
-	CJPEGImage* pJPEGImage = NULL;
-	Gdiplus::PixelFormat pixelFormat = pBitmap->GetPixelFormat();
-	bool bHasAlphaChannel = (pixelFormat & (PixelFormatAlpha | PixelFormatPAlpha));
-	Gdiplus::Bitmap* pBmTarget = NULL;
-	Gdiplus::Graphics* pBmGraphics = NULL;
+    // If there is an alpha channel in the original file we must blit the image onto a background color offscreen
+    // bitmap first to achieve proper rendering.
+    CJPEGImage* pJPEGImage = NULL;
+    Gdiplus::PixelFormat pixelFormat = pBitmap->GetPixelFormat();
+    bool bHasAlphaChannel = (pixelFormat & (PixelFormatAlpha | PixelFormatPAlpha));
+    Gdiplus::Bitmap* pBmTarget = NULL;
+    Gdiplus::Graphics* pBmGraphics = NULL;
 
-	Gdiplus::Rect bmRect(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight());
-	Gdiplus::BitmapData bmData;
-	lastStatus = pBitmap->LockBits(&bmRect, Gdiplus::ImageLockModeRead, PixelFormat32bppRGB, &bmData);
-	if (lastStatus == Gdiplus::Ok) {
-		assert(bmData.PixelFormat == PixelFormat32bppRGB);
-		void* pDIB = CBasicProcessing::ConvertGdiplus32bppRGB(bmRect.Width, bmRect.Height, bmData.Stride, bmData.Scan0, !bHasAlphaChannel);
-		if (bHasAlphaChannel == true)
-			Helpers::BlendAlpha((uint32*)pDIB, bmRect.Width, bmRect.Height, nTransparencyMode);
-		if (pDIB != NULL) {
-			pJPEGImage = new CJPEGImage(bmRect.Width, bmRect.Height, pDIB, pEXIFData, 4, nJPEGHash, eImageFormat,
-				eImageFormat == IF_GIF && nFrameCount > 1, nFrameIndex, nFrameCount, nFrameTimeMs);
-		}
-		pBitmap->UnlockBits(&bmData);
-	} else if (lastStatus == Gdiplus::ValueOverflow) {
-		isOutOfMemory = true;
-	}
+    Gdiplus::Rect bmRect(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight());
+    Gdiplus::BitmapData bmData;
+    lastStatus = pBitmap->LockBits(&bmRect, Gdiplus::ImageLockModeRead, PixelFormat32bppRGB, &bmData);
+    if (lastStatus == Gdiplus::Ok) {
+        assert(bmData.PixelFormat == PixelFormat32bppRGB);
+        void* pDIB = CBasicProcessing::ConvertGdiplus32bppRGB(bmRect.Width, bmRect.Height, bmData.Stride, bmData.Scan0, !bHasAlphaChannel);
+        if (bHasAlphaChannel == true)
+            Helpers::BlendAlpha((uint32*)pDIB, bmRect.Width, bmRect.Height, nTransparencyMode);
+        if (pDIB != NULL) {
+            pJPEGImage = new CJPEGImage(bmRect.Width, bmRect.Height, pDIB, pEXIFData, 4, nJPEGHash, eImageFormat,
+                eImageFormat == IF_GIF && nFrameCount > 1, nFrameIndex, nFrameCount, nFrameTimeMs);
+        }
+        pBitmap->UnlockBits(&bmData);
+    } else if (lastStatus == Gdiplus::ValueOverflow) {
+        isOutOfMemory = true;
+    }
 
-	if (pBmGraphics != NULL && pBmTarget != NULL) {
-		delete pBmGraphics;
-		delete pBmTarget;
-	}
+    if (pBmGraphics != NULL && pBmTarget != NULL) {
+        delete pBmGraphics;
+        delete pBmTarget;
+    }
 
-	pBitmap->GetLastStatus(); // reset status
+    pBitmap->GetLastStatus(); // reset status
 
-	return pJPEGImage;
+    return pJPEGImage;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -220,49 +220,49 @@ static CJPEGImage* ConvertGDIPlusBitmapToJPEGImage(Gdiplus::Bitmap* pBitmap, int
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 CImageLoadThread::CImageLoadThread(void) : CWorkThread(true) {
-	m_pLastBitmap = NULL;
+    m_pLastBitmap = NULL;
 }
 
 CImageLoadThread::~CImageLoadThread(void) {
-	DeleteCachedGDIBitmap();
-	DeleteCachedWebpDecoder();
-	DeleteCachedPngDecoder();
-	DeleteCachedJxlDecoder();
-	DeleteCachedAvifDecoder();
-	DeleteCachedZip();
+    DeleteCachedGDIBitmap();
+    DeleteCachedWebpDecoder();
+    DeleteCachedPngDecoder();
+    DeleteCachedJxlDecoder();
+    DeleteCachedAvifDecoder();
+    DeleteCachedZip();
 }
 
 int CImageLoadThread::AsyncLoad(LPCTSTR strFileName, int nFrameIndex, const CProcessParams & processParams, HWND targetWnd, HANDLE eventFinished) {
-	CRequest* pRequest = new CRequest(strFileName, nFrameIndex, targetWnd, processParams, eventFinished);
+    CRequest* pRequest = new CRequest(strFileName, nFrameIndex, targetWnd, processParams, eventFinished);
 
-	ProcessAsync(pRequest);
+    ProcessAsync(pRequest);
 
-	return pRequest->RequestHandle;
+    return pRequest->RequestHandle;
 }
 
 CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
-	Helpers::CAutoCriticalSection criticalSection(m_csList);
-	CJPEGImage* imageFound = NULL;
-	bool bFailedMemory = false;
-	bool bFailedException = false;
-	std::list<CRequestBase*>::iterator iter;
-	for (iter = m_requestList.begin( ); iter != m_requestList.end( ); iter++ ) {
-		CRequest* pRequest = (CRequest*)(*iter);
-		if (pRequest->Processed && pRequest->Deleted == false && pRequest->RequestHandle == nHandle) {
-			imageFound = pRequest->Image;
-			bFailedMemory = pRequest->OutOfMemory;
-			bFailedException = pRequest->ExceptionError;
-			// only mark as deleted
-			pRequest->Deleted = true;
-			break;
-		}
-	}
-	return CImageData(imageFound, bFailedMemory, bFailedException);
+    Helpers::CAutoCriticalSection criticalSection(m_csList);
+    CJPEGImage* imageFound = NULL;
+    bool bFailedMemory = false;
+    bool bFailedException = false;
+    std::list<CRequestBase*>::iterator iter;
+    for (iter = m_requestList.begin( ); iter != m_requestList.end( ); iter++ ) {
+        CRequest* pRequest = (CRequest*)(*iter);
+        if (pRequest->Processed && pRequest->Deleted == false && pRequest->RequestHandle == nHandle) {
+            imageFound = pRequest->Image;
+            bFailedMemory = pRequest->OutOfMemory;
+            bFailedException = pRequest->ExceptionError;
+            // only mark as deleted
+            pRequest->Deleted = true;
+            break;
+        }
+    }
+    return CImageData(imageFound, bFailedMemory, bFailedException);
 }
 
 void CImageLoadThread::ReleaseFile(LPCTSTR strFileName) {
-	CReleaseFileRequest* pRequest = new CReleaseFileRequest(strFileName);
-	ProcessAndWait(pRequest);
+    CReleaseFileRequest* pRequest = new CReleaseFileRequest(strFileName);
+    ProcessAndWait(pRequest);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -271,154 +271,154 @@ void CImageLoadThread::ReleaseFile(LPCTSTR strFileName) {
 
 // Called on the processing thread
 void CImageLoadThread::ProcessRequest(CRequestBase& request) {
-	if (request.Type == CReleaseFileRequest::ReleaseFileRequest) {
-		CReleaseFileRequest& rq = (CReleaseFileRequest&)request;
-		if (rq.FileName == m_sLastFileName) {
-			DeleteCachedGDIBitmap();
-		}
-		if (rq.FileName == m_sLastWebpFileName) {
-			DeleteCachedWebpDecoder();
-		}
-		if (rq.FileName == m_sLastPngFileName) {
-			DeleteCachedPngDecoder();
-		}
-		if (rq.FileName == m_sLastJxlFileName) {
-			DeleteCachedJxlDecoder();
-		}
-		if (rq.FileName == m_sLastAvifFileName) {
-			DeleteCachedAvifDecoder();
-		}
-		return;
-	}
+    if (request.Type == CReleaseFileRequest::ReleaseFileRequest) {
+        CReleaseFileRequest& rq = (CReleaseFileRequest&)request;
+        if (rq.FileName == m_sLastFileName) {
+            DeleteCachedGDIBitmap();
+        }
+        if (rq.FileName == m_sLastWebpFileName) {
+            DeleteCachedWebpDecoder();
+        }
+        if (rq.FileName == m_sLastPngFileName) {
+            DeleteCachedPngDecoder();
+        }
+        if (rq.FileName == m_sLastJxlFileName) {
+            DeleteCachedJxlDecoder();
+        }
+        if (rq.FileName == m_sLastAvifFileName) {
+            DeleteCachedAvifDecoder();
+        }
+        return;
+    }
 
-	CRequest& rq = (CRequest&)request;
-	double dStartTime = Helpers::GetExactTickCount(); 
-	// Get image format and read the image
-	switch (GetImageFormat(rq.FileName)) {
-		case IF_JPEG :
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadJPEGRequest(&rq);
-			break;
-		case IF_WindowsBMP :
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadBMPRequest(&rq);
-			break;
-		case IF_TGA :
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadTGARequest(&rq);
-			break;
-		case IF_WEBP:
-			DeleteCachedGDIBitmap();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadWEBPRequest(&rq);
-			break;
-		case IF_PNG:
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadPNGRequest(&rq);
-			break;
+    CRequest& rq = (CRequest&)request;
+    double dStartTime = Helpers::GetExactTickCount(); 
+    // Get image format and read the image
+    switch (GetImageFormat(rq.FileName)) {
+        case IF_JPEG :
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadJPEGRequest(&rq);
+            break;
+        case IF_WindowsBMP :
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadBMPRequest(&rq);
+            break;
+        case IF_TGA :
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadTGARequest(&rq);
+            break;
+        case IF_WEBP:
+            DeleteCachedGDIBitmap();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadWEBPRequest(&rq);
+            break;
+        case IF_PNG:
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadPNGRequest(&rq);
+            break;
 #ifndef WINXP
-		case IF_JXL:
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadJXLRequest(&rq);
-			break;
-		case IF_AVIF:
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedZip();
-			ProcessReadAVIFRequest(&rq);
-			break;
-		case IF_HEIF:
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadHEIFRequest(&rq);
-			break;
-		case IF_PSD:
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadPSDRequest(&rq);
-			break;
+        case IF_JXL:
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadJXLRequest(&rq);
+            break;
+        case IF_AVIF:
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedZip();
+            ProcessReadAVIFRequest(&rq);
+            break;
+        case IF_HEIF:
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadHEIFRequest(&rq);
+            break;
+        case IF_PSD:
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadPSDRequest(&rq);
+            break;
 #endif
-		case IF_QOI:
-			DeleteCachedGDIBitmap();
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			DeleteCachedZip();
-			ProcessReadQOIRequest(&rq);
-			break;
-		case IF_ZIP:
-			// ProcessReadZipRequest decides internally which cached decoders to drop.
-			// This is neccessary since only *it* knows which type of file inside the ZIP it actually is going to display next.
-			ProcessReadZipRequest(&rq);
-			break;
-		default:
-			// try with GDI+
-			DeleteCachedWebpDecoder();
-			DeleteCachedPngDecoder();
-			DeleteCachedJxlDecoder();
-			DeleteCachedAvifDecoder();
-			ProcessReadGDIPlusRequest(&rq);
-			break;
-	}
-	// then process the image if read was successful
-	if (rq.Image != NULL) {
-		rq.Image->SetLoadTickCount(Helpers::GetExactTickCount() - dStartTime); 
-		if (!ProcessImageAfterLoad(&rq)) {
-			delete rq.Image;
-			rq.Image = NULL;
-			rq.OutOfMemory = true;
-		}
-	}
+        case IF_QOI:
+            DeleteCachedGDIBitmap();
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            DeleteCachedZip();
+            ProcessReadQOIRequest(&rq);
+            break;
+        case IF_ZIP:
+            // ProcessReadZipRequest decides internally which cached decoders to drop.
+            // This is neccessary since only *it* knows which type of file inside the ZIP it actually is going to display next.
+            ProcessReadZipRequest(&rq);
+            break;
+        default:
+            // try with GDI+
+            DeleteCachedWebpDecoder();
+            DeleteCachedPngDecoder();
+            DeleteCachedJxlDecoder();
+            DeleteCachedAvifDecoder();
+            ProcessReadGDIPlusRequest(&rq);
+            break;
+    }
+    // then process the image if read was successful
+    if (rq.Image != NULL) {
+        rq.Image->SetLoadTickCount(Helpers::GetExactTickCount() - dStartTime); 
+        if (!ProcessImageAfterLoad(&rq)) {
+            delete rq.Image;
+            rq.Image = NULL;
+            rq.OutOfMemory = true;
+        }
+    }
 }
 
 // Called on the processing thread
 void CImageLoadThread::AfterFinishProcess(CRequestBase& request) {
-	if (request.Type == CReleaseFileRequest::ReleaseFileRequest) {
-		return;
-	}
+    if (request.Type == CReleaseFileRequest::ReleaseFileRequest) {
+        return;
+    }
 
-	CRequest& rq = (CRequest&)request;
-	if (rq.TargetWnd != NULL) {
-		// post message to window that request has been processed
-		::PostMessage(rq.TargetWnd, WM_IMAGE_LOAD_COMPLETED, 0, rq.RequestHandle);
-	}
+    CRequest& rq = (CRequest&)request;
+    if (rq.TargetWnd != NULL) {
+        // post message to window that request has been processed
+        ::PostMessage(rq.TargetWnd, WM_IMAGE_LOAD_COMPLETED, 0, rq.RequestHandle);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,658 +426,658 @@ void CImageLoadThread::AfterFinishProcess(CRequestBase& request) {
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 static void LimitOffsets(CPoint& offsets, CSize clippingSize, const CSize & imageSize) {
-	int nMaxOffsetX = (imageSize.cx - clippingSize.cx)/2;
+    int nMaxOffsetX = (imageSize.cx - clippingSize.cx)/2;
     nMaxOffsetX = std::max(0, nMaxOffsetX);
-	int nMaxOffsetY = (imageSize.cy - clippingSize.cy)/2;
+    int nMaxOffsetY = (imageSize.cy - clippingSize.cy)/2;
     nMaxOffsetY = std::max(0, nMaxOffsetY);
     offsets.x = std::max<LONG>(-nMaxOffsetX, std::min<LONG>(+nMaxOffsetX, offsets.x));
     offsets.y = std::max<LONG>(-nMaxOffsetY, std::min<LONG>(+nMaxOffsetY, offsets.y));
 }
 
 void CImageLoadThread::DeleteCachedGDIBitmap() {
-	if (m_pLastBitmap != NULL) {
-		delete m_pLastBitmap;
-	}
-	m_pLastBitmap = NULL;
-	m_sLastFileName.Empty();
+    if (m_pLastBitmap != NULL) {
+        delete m_pLastBitmap;
+    }
+    m_pLastBitmap = NULL;
+    m_sLastFileName.Empty();
 }
 
 void CImageLoadThread::DeleteCachedWebpDecoder() {
-	WebpReaderWriter::DeleteCache();
-	m_sLastWebpFileName.Empty();
+    WebpReaderWriter::DeleteCache();
+    m_sLastWebpFileName.Empty();
 }
 
 void CImageLoadThread::DeleteCachedPngDecoder() {
 #ifndef WINXP
-	PngReader::DeleteCache();
-	m_sLastPngFileName.Empty();
+    PngReader::DeleteCache();
+    m_sLastPngFileName.Empty();
 #endif
 }
 
 void CImageLoadThread::DeleteCachedJxlDecoder() {
 #ifndef WINXP
-	JxlReader::DeleteCache();
-	m_sLastJxlFileName.Empty();
+    JxlReader::DeleteCache();
+    m_sLastJxlFileName.Empty();
 #endif
 }
 
 void CImageLoadThread::DeleteCachedAvifDecoder() {
 #ifndef WINXP
-	// prevent crashing when libavif/dav1d fail or missing
-	UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
-	try {
-		AvifReader::DeleteCache();
-	} catch (...) {}
-	SetErrorMode(nPrevErrorMode);
-	m_sLastAvifFileName.Empty();
+    // prevent crashing when libavif/dav1d fail or missing
+    UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
+    try {
+        AvifReader::DeleteCache();
+    } catch (...) {}
+    SetErrorMode(nPrevErrorMode);
+    m_sLastAvifFileName.Empty();
 #endif
 }
 
 void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
-	HANDLE hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
-		return;
-	}
+    HANDLE hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return;
+    }
 
-	HGLOBAL hFileBuffer = NULL;
-	void* pBuffer = NULL;
-	try {
-		// Don't read too huge files
-		long long nFileSize = Helpers::GetFileSize(hFile);
-		if (nFileSize > MAX_JPEG_FILE_SIZE) {
-			request->OutOfMemory = true;
-			::CloseHandle(hFile);
-			return;
-		}
-		hFileBuffer  = ::GlobalAlloc(GMEM_MOVEABLE, nFileSize);
-		pBuffer = (hFileBuffer == NULL) ? NULL : ::GlobalLock(hFileBuffer);
-		if (pBuffer == NULL) {
-			if (hFileBuffer) ::GlobalFree(hFileBuffer);
-			request->OutOfMemory = true;
-			::CloseHandle(hFile);
-			return;
-		}
-		unsigned int nNumBytesRead = 0;
-		if (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD) &nNumBytesRead, NULL) && nNumBytesRead == nFileSize) {
-			bool bUseGDIPlus = CSettingsProvider::This().ForceGDIPlus();
-			if (bUseGDIPlus) {
-				IStream* pStream = NULL;
-				if (::CreateStreamOnHGlobal(hFileBuffer, FALSE, &pStream) == S_OK) {
-					Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream, CSettingsProvider::This().UseEmbeddedColorProfiles());
-					bool isOutOfMemory, isAnimatedGIF;
-					request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, 0, Helpers::FindEXIFBlock(pBuffer, nFileSize),
-						Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
-					request->OutOfMemory = request->Image == NULL && isOutOfMemory;
-					if (request->Image != NULL) {
-						request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
-					}
-					pStream->Release();
-					delete pBitmap;
-				} else {
-					request->OutOfMemory = true;
-				}
-			}
-			if (!bUseGDIPlus || request->OutOfMemory) {
-				int nWidth, nHeight, nBPP;
-				TJSAMP eChromoSubSampling;
-				bool bOutOfMemory;
-				// int nTicks = ::GetTickCount();
+    HGLOBAL hFileBuffer = NULL;
+    void* pBuffer = NULL;
+    try {
+        // Don't read too huge files
+        long long nFileSize = Helpers::GetFileSize(hFile);
+        if (nFileSize > MAX_JPEG_FILE_SIZE) {
+            request->OutOfMemory = true;
+            ::CloseHandle(hFile);
+            return;
+        }
+        hFileBuffer  = ::GlobalAlloc(GMEM_MOVEABLE, nFileSize);
+        pBuffer = (hFileBuffer == NULL) ? NULL : ::GlobalLock(hFileBuffer);
+        if (pBuffer == NULL) {
+            if (hFileBuffer) ::GlobalFree(hFileBuffer);
+            request->OutOfMemory = true;
+            ::CloseHandle(hFile);
+            return;
+        }
+        unsigned int nNumBytesRead = 0;
+        if (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD) &nNumBytesRead, NULL) && nNumBytesRead == nFileSize) {
+            bool bUseGDIPlus = CSettingsProvider::This().ForceGDIPlus();
+            if (bUseGDIPlus) {
+                IStream* pStream = NULL;
+                if (::CreateStreamOnHGlobal(hFileBuffer, FALSE, &pStream) == S_OK) {
+                    Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream, CSettingsProvider::This().UseEmbeddedColorProfiles());
+                    bool isOutOfMemory, isAnimatedGIF;
+                    request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, 0, Helpers::FindEXIFBlock(pBuffer, nFileSize),
+                        Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
+                    request->OutOfMemory = request->Image == NULL && isOutOfMemory;
+                    if (request->Image != NULL) {
+                        request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
+                    }
+                    pStream->Release();
+                    delete pBitmap;
+                } else {
+                    request->OutOfMemory = true;
+                }
+            }
+            if (!bUseGDIPlus || request->OutOfMemory) {
+                int nWidth, nHeight, nBPP;
+                TJSAMP eChromoSubSampling;
+                bool bOutOfMemory;
+                // int nTicks = ::GetTickCount();
 
-				void* pPixelData = TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bOutOfMemory, pBuffer, nFileSize);
-				
-				/*
-				TCHAR buffer[20];
-				_stprintf_s(buffer, 20, _T("%d"), ::GetTickCount() - nTicks);
-				::MessageBox(NULL, CString(_T("Elapsed ticks: ")) + buffer, _T("Time"), MB_OK);
-				*/
+                void* pPixelData = TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bOutOfMemory, pBuffer, nFileSize);
+                
+                /*
+                TCHAR buffer[20];
+                _stprintf_s(buffer, 20, _T("%d"), ::GetTickCount() - nTicks);
+                ::MessageBox(NULL, CString(_T("Elapsed ticks: ")) + buffer, _T("Time"), MB_OK);
+                */
 
-				// Color and b/w JPEG is supported
-				if (pPixelData != NULL && (nBPP == 3 || nBPP == 1)) {
-					request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, 
-						Helpers::FindEXIFBlock(pBuffer, nFileSize), nBPP, 
-						Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), IF_JPEG, false, 0, 1, 0);
-					request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
-					request->Image->SetJPEGChromoSampling(eChromoSubSampling);
-				} else if (bOutOfMemory) {
-					request->OutOfMemory = true;
-				} else {
-					// failed, try GDI+
-					delete[] pPixelData;
-					ProcessReadGDIPlusRequest(request);
-				}
-			}
-		}
-	} catch (...) {
-		delete request->Image;
-		request->Image = NULL;
-		request->ExceptionError = true;
-	}
-	::CloseHandle(hFile);
-	if (pBuffer) ::GlobalUnlock(hFileBuffer);
-	if (hFileBuffer) ::GlobalFree(hFileBuffer);
+                // Color and b/w JPEG is supported
+                if (pPixelData != NULL && (nBPP == 3 || nBPP == 1)) {
+                    request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, 
+                        Helpers::FindEXIFBlock(pBuffer, nFileSize), nBPP, 
+                        Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), IF_JPEG, false, 0, 1, 0);
+                    request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
+                    request->Image->SetJPEGChromoSampling(eChromoSubSampling);
+                } else if (bOutOfMemory) {
+                    request->OutOfMemory = true;
+                } else {
+                    // failed, try GDI+
+                    delete[] pPixelData;
+                    ProcessReadGDIPlusRequest(request);
+                }
+            }
+        }
+    } catch (...) {
+        delete request->Image;
+        request->Image = NULL;
+        request->ExceptionError = true;
+    }
+    ::CloseHandle(hFile);
+    if (pBuffer) ::GlobalUnlock(hFileBuffer);
+    if (hFileBuffer) ::GlobalFree(hFileBuffer);
 }
 
 
 void CImageLoadThread::ProcessReadBMPRequest(CRequest * request) {
-	bool bOutOfMemory;
-	request->Image = CReaderBMP::ReadBmpImage(request->FileName, bOutOfMemory);
-	if (bOutOfMemory) {
-		request->OutOfMemory = true;
-	} else if (request->Image == NULL) {
-		// probably one of the bitmap formats that can not be read directly, try with GDI+
-		ProcessReadGDIPlusRequest(request);
-	}
+    bool bOutOfMemory;
+    request->Image = CReaderBMP::ReadBmpImage(request->FileName, bOutOfMemory);
+    if (bOutOfMemory) {
+        request->OutOfMemory = true;
+    } else if (request->Image == NULL) {
+        // probably one of the bitmap formats that can not be read directly, try with GDI+
+        ProcessReadGDIPlusRequest(request);
+    }
 }
 
 void CImageLoadThread::ProcessReadTGARequest(CRequest * request) {
-	bool bOutOfMemory;
-	request->Image = CReaderTGA::ReadTgaImage(request->FileName, request->ProcessParams.TransparencyMode, bOutOfMemory);
-	if (bOutOfMemory) {
-		request->OutOfMemory = true;
-	}
+    bool bOutOfMemory;
+    request->Image = CReaderTGA::ReadTgaImage(request->FileName, request->ProcessParams.TransparencyMode, bOutOfMemory);
+    if (bOutOfMemory) {
+        request->OutOfMemory = true;
+    }
 }
 
 void CImageLoadThread::ProcessReadWEBPRequest(CRequest * request) {
-	bool bUseCachedDecoder = false;
-	const wchar_t* sFileName;
-	sFileName = (const wchar_t*)request->FileName;
-	if (sFileName != m_sLastWebpFileName) {
-		DeleteCachedWebpDecoder();
-	}
-	else {
-		bUseCachedDecoder = true;
-	}
+    bool bUseCachedDecoder = false;
+    const wchar_t* sFileName;
+    sFileName = (const wchar_t*)request->FileName;
+    if (sFileName != m_sLastWebpFileName) {
+        DeleteCachedWebpDecoder();
+    }
+    else {
+        bUseCachedDecoder = true;
+    }
 
-	HANDLE hFile;
-	if (!bUseCachedDecoder) {
-		hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-		if (hFile == INVALID_HANDLE_VALUE) {
-			return;
-		}
-	}
-	char* pBuffer = NULL;
-	try {
-		long long nFileSize = 0;
-		unsigned int nNumBytesRead = 0;
-		if (!bUseCachedDecoder) {
-			// Don't read too huge files
-			nFileSize = Helpers::GetFileSize(hFile);
-			if (nFileSize > MAX_WEBP_FILE_SIZE) {
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
+    HANDLE hFile;
+    if (!bUseCachedDecoder) {
+        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            return;
+        }
+    }
+    char* pBuffer = NULL;
+    try {
+        long long nFileSize = 0;
+        unsigned int nNumBytesRead = 0;
+        if (!bUseCachedDecoder) {
+            // Don't read too huge files
+            nFileSize = Helpers::GetFileSize(hFile);
+            if (nFileSize > MAX_WEBP_FILE_SIZE) {
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
 
-			pBuffer = new(std::nothrow) char[nFileSize];
-			if (pBuffer == NULL) {
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
-		}
-		if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
-			int nWidth, nHeight;
-			bool bHasAnimation = bUseCachedDecoder;
-			int nFrameCount = 1;
-			int nFrameTimeMs = 0;
-			int nBPP;
-			void* pEXIFData = NULL;
-			uint8* pPixelData = (uint8*)WebpReaderWriter::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-			if (pPixelData && nBPP == 4) {
-				// Multiply alpha value into each AABBGGRR pixel
-				Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+            pBuffer = new(std::nothrow) char[nFileSize];
+            if (pBuffer == NULL) {
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
+        }
+        if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
+            int nWidth, nHeight;
+            bool bHasAnimation = bUseCachedDecoder;
+            int nFrameCount = 1;
+            int nFrameTimeMs = 0;
+            int nBPP;
+            void* pEXIFData = NULL;
+            uint8* pPixelData = (uint8*)WebpReaderWriter::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+            if (pPixelData && nBPP == 4) {
+                // Multiply alpha value into each AABBGGRR pixel
+                Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
 
-				if (bHasAnimation) {
-					m_sLastWebpFileName = sFileName;
-				}
-				request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_WEBP, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-				free(pEXIFData);
-			}
-			else {
-				delete[] pPixelData;
-				DeleteCachedWebpDecoder();
-			}
-		}
-	} catch (...) {
-		delete request->Image;
-		request->Image = NULL;
-	}
-	if (!bUseCachedDecoder) {
-		::CloseHandle(hFile);
-		delete[] pBuffer;
-	}
+                if (bHasAnimation) {
+                    m_sLastWebpFileName = sFileName;
+                }
+                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_WEBP, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
+                free(pEXIFData);
+            }
+            else {
+                delete[] pPixelData;
+                DeleteCachedWebpDecoder();
+            }
+        }
+    } catch (...) {
+        delete request->Image;
+        request->Image = NULL;
+    }
+    if (!bUseCachedDecoder) {
+        ::CloseHandle(hFile);
+        delete[] pBuffer;
+    }
 }
 
 #ifndef WINXP
 void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
-	bool bUseCachedDecoder = false;
-	const wchar_t* sFileName;
-	sFileName = (const wchar_t*)request->FileName;
-	if (sFileName != m_sLastPngFileName) {
-		DeleteCachedPngDecoder();
-	}
-	else {
-		bUseCachedDecoder = true;
-	}
+    bool bUseCachedDecoder = false;
+    const wchar_t* sFileName;
+    sFileName = (const wchar_t*)request->FileName;
+    if (sFileName != m_sLastPngFileName) {
+        DeleteCachedPngDecoder();
+    }
+    else {
+        bUseCachedDecoder = true;
+    }
 
-	HANDLE hFile;
-	if (!bUseCachedDecoder) {
-		hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-		if (hFile == INVALID_HANDLE_VALUE) {
-			return;
-		}
-	}
-	HGLOBAL hFileBuffer = NULL;
-	void* pBuffer = NULL;
-	try {
-		long long nFileSize;
-		unsigned int nNumBytesRead = 0;
-		if (!bUseCachedDecoder) {
-			// Don't read too huge files
-			nFileSize = Helpers::GetFileSize(hFile);
-			if (nFileSize > MAX_PNG_FILE_SIZE) {
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
-			hFileBuffer = ::GlobalAlloc(GMEM_MOVEABLE, nFileSize);
-			pBuffer = (hFileBuffer == NULL) ? NULL : ::GlobalLock(hFileBuffer);
-			if (pBuffer == NULL) {
-				if (hFileBuffer) ::GlobalFree(hFileBuffer);
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
-		} else {
-			nFileSize = 0; // to avoid compiler warnings, not used
-		}
-		if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
-			int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-			bool bHasAnimation;
-			uint8* pPixelData = NULL;
-			void* pEXIFData = NULL;
+    HANDLE hFile;
+    if (!bUseCachedDecoder) {
+        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            return;
+        }
+    }
+    HGLOBAL hFileBuffer = NULL;
+    void* pBuffer = NULL;
+    try {
+        long long nFileSize;
+        unsigned int nNumBytesRead = 0;
+        if (!bUseCachedDecoder) {
+            // Don't read too huge files
+            nFileSize = Helpers::GetFileSize(hFile);
+            if (nFileSize > MAX_PNG_FILE_SIZE) {
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
+            hFileBuffer = ::GlobalAlloc(GMEM_MOVEABLE, nFileSize);
+            pBuffer = (hFileBuffer == NULL) ? NULL : ::GlobalLock(hFileBuffer);
+            if (pBuffer == NULL) {
+                if (hFileBuffer) ::GlobalFree(hFileBuffer);
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
+        } else {
+            nFileSize = 0; // to avoid compiler warnings, not used
+        }
+        if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
+            int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+            bool bHasAnimation;
+            uint8* pPixelData = NULL;
+            void* pEXIFData = NULL;
 
 #ifndef WINXP
-			// If UseEmbeddedColorProfiles is true and the image isn't animated, we should use GDI+ for better color management
-			bool bUseGDIPlus = CSettingsProvider::This().ForceGDIPlus() || CSettingsProvider::This().UseEmbeddedColorProfiles();
-			if (bUseCachedDecoder || !bUseGDIPlus || PngReader::MustUseLibpng(pBuffer, nFileSize))
-				pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+            // If UseEmbeddedColorProfiles is true and the image isn't animated, we should use GDI+ for better color management
+            bool bUseGDIPlus = CSettingsProvider::This().ForceGDIPlus() || CSettingsProvider::This().UseEmbeddedColorProfiles();
+            if (bUseCachedDecoder || !bUseGDIPlus || PngReader::MustUseLibpng(pBuffer, nFileSize))
+                pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
 #endif
 
-			if (pPixelData != NULL) {
-				if (bHasAnimation)
-					m_sLastPngFileName = sFileName;
-				// Multiply alpha value into each AABBGGRR pixel
-				Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-				request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-			} else {
-				DeleteCachedPngDecoder();
-				
-				IStream* pStream = NULL;
-				if (::CreateStreamOnHGlobal(hFileBuffer, FALSE, &pStream) == S_OK) {
-					Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream, CSettingsProvider::This().UseEmbeddedColorProfiles());
-					bool isOutOfMemory, isAnimatedGIF;
-					pEXIFData = PngReader::GetEXIFBlock(pBuffer, nFileSize);
-					request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, 0, pEXIFData, 0, isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
-					request->OutOfMemory = request->Image == NULL && isOutOfMemory;
-					pStream->Release();
-					delete pBitmap;
-				} else {
-					request->OutOfMemory = true;
-				}
-			}
-			free(pEXIFData);
-		}
-	}
-	catch (...) {
-		delete request->Image;
-		request->Image = NULL;
-		request->ExceptionError = true;
-	}
-	if (!bUseCachedDecoder) {
-		::CloseHandle(hFile);
-		if (pBuffer) ::GlobalUnlock(hFileBuffer);
-		if (hFileBuffer) ::GlobalFree(hFileBuffer);
-	}
+            if (pPixelData != NULL) {
+                if (bHasAnimation)
+                    m_sLastPngFileName = sFileName;
+                // Multiply alpha value into each AABBGGRR pixel
+                Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
+            } else {
+                DeleteCachedPngDecoder();
+                
+                IStream* pStream = NULL;
+                if (::CreateStreamOnHGlobal(hFileBuffer, FALSE, &pStream) == S_OK) {
+                    Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream, CSettingsProvider::This().UseEmbeddedColorProfiles());
+                    bool isOutOfMemory, isAnimatedGIF;
+                    pEXIFData = PngReader::GetEXIFBlock(pBuffer, nFileSize);
+                    request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, 0, pEXIFData, 0, isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
+                    request->OutOfMemory = request->Image == NULL && isOutOfMemory;
+                    pStream->Release();
+                    delete pBitmap;
+                } else {
+                    request->OutOfMemory = true;
+                }
+            }
+            free(pEXIFData);
+        }
+    }
+    catch (...) {
+        delete request->Image;
+        request->Image = NULL;
+        request->ExceptionError = true;
+    }
+    if (!bUseCachedDecoder) {
+        ::CloseHandle(hFile);
+        if (pBuffer) ::GlobalUnlock(hFileBuffer);
+        if (hFileBuffer) ::GlobalFree(hFileBuffer);
+    }
 }
 #endif
 
 void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
-	bool bUseCachedDecoder = false;
-	const wchar_t* sFileName;
-	sFileName = (const wchar_t*)request->FileName;
+    bool bUseCachedDecoder = false;
+    const wchar_t* sFileName;
+    sFileName = (const wchar_t*)request->FileName;
 
 
-	if (sFileName != m_sLastJxlFileName) {
-		DeleteCachedJxlDecoder();
-	} else {
-		bUseCachedDecoder = true;
-	}
-	
-	HANDLE hFile;
-	if (!bUseCachedDecoder) {
-		hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-		if (hFile == INVALID_HANDLE_VALUE) {
-			return;
-		}
-	}
-	char* pBuffer = NULL;
-	UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
-	try {
-		long long nFileSize = 0;
-		unsigned int nNumBytesRead = 0;
-		if (!bUseCachedDecoder) {
-			// Don't read too huge files
-			nFileSize = Helpers::GetFileSize(hFile);
-			if (nFileSize > MAX_JXL_FILE_SIZE) {
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
+    if (sFileName != m_sLastJxlFileName) {
+        DeleteCachedJxlDecoder();
+    } else {
+        bUseCachedDecoder = true;
+    }
+    
+    HANDLE hFile;
+    if (!bUseCachedDecoder) {
+        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            return;
+        }
+    }
+    char* pBuffer = NULL;
+    UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
+    try {
+        long long nFileSize = 0;
+        unsigned int nNumBytesRead = 0;
+        if (!bUseCachedDecoder) {
+            // Don't read too huge files
+            nFileSize = Helpers::GetFileSize(hFile);
+            if (nFileSize > MAX_JXL_FILE_SIZE) {
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
 
-			pBuffer = new(std::nothrow) char[nFileSize];
-			if (pBuffer == NULL) {
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
-		}
-		if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
-			int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-			bool bHasAnimation;
-			void* pEXIFData = NULL;
-			uint8* pPixelData = (uint8*)JxlReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-			if (pPixelData != NULL) {
-				if (bHasAnimation) {
-					m_sLastJxlFileName = sFileName;
-					}
-				// Multiply alpha value into each AABBGGRR pixel
-				Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-				request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_JXL, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-				free(pEXIFData);
-			} else {
-				DeleteCachedJxlDecoder();
-			}
-		}
-	}
-	catch (...) {
-		delete request->Image;
-		request->Image = NULL;
-		request->ExceptionError = true;
-	}
-	SetErrorMode(nPrevErrorMode);
-	if (!bUseCachedDecoder) {
-		::CloseHandle(hFile);
-		// pBuffer is held as a shared resource within JxlReader's static cache.data. 
-		// Calling delete[] here would result in a dangling pointer reference when the next frame
-		// of an animated JXL is requested, or a double-free error during free(cache.data)
-		// inside DeleteCachedJxlDecoder(). 
-		// Memory deallocation is centralized within DeleteCachedJxlDecoder().
-		// delete[] pBuffer;
-	}
+            pBuffer = new(std::nothrow) char[nFileSize];
+            if (pBuffer == NULL) {
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
+        }
+        if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
+            int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+            bool bHasAnimation;
+            void* pEXIFData = NULL;
+            uint8* pPixelData = (uint8*)JxlReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+            if (pPixelData != NULL) {
+                if (bHasAnimation) {
+                    m_sLastJxlFileName = sFileName;
+                    }
+                // Multiply alpha value into each AABBGGRR pixel
+                Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_JXL, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
+                free(pEXIFData);
+            } else {
+                DeleteCachedJxlDecoder();
+            }
+        }
+    }
+    catch (...) {
+        delete request->Image;
+        request->Image = NULL;
+        request->ExceptionError = true;
+    }
+    SetErrorMode(nPrevErrorMode);
+    if (!bUseCachedDecoder) {
+        ::CloseHandle(hFile);
+        // pBuffer is held as a shared resource within JxlReader's static cache.data. 
+        // Calling delete[] here would result in a dangling pointer reference when the next frame
+        // of an animated JXL is requested, or a double-free error during free(cache.data)
+        // inside DeleteCachedJxlDecoder(). 
+        // Memory deallocation is centralized within DeleteCachedJxlDecoder().
+        // delete[] pBuffer;
+    }
 }
 
 #ifndef WINXP
 void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
-	bool bSuccess = false;
-	bool bUseCachedDecoder = false;
-	const wchar_t* sFileName;
-	sFileName = (const wchar_t*)request->FileName;
-	if (sFileName != m_sLastAvifFileName) {
-		DeleteCachedAvifDecoder();
-	} else {
-		bUseCachedDecoder = true;
-	}
+    bool bSuccess = false;
+    bool bUseCachedDecoder = false;
+    const wchar_t* sFileName;
+    sFileName = (const wchar_t*)request->FileName;
+    if (sFileName != m_sLastAvifFileName) {
+        DeleteCachedAvifDecoder();
+    } else {
+        bUseCachedDecoder = true;
+    }
 
-	HANDLE hFile;
-	if (!bUseCachedDecoder) {
-		hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-		if (hFile == INVALID_HANDLE_VALUE) {
-			return;
-		}
-	}
-	char* pBuffer = NULL;
-	UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
-	try {
-		long long nFileSize = 0;
-		unsigned int nNumBytesRead = 0;
-		if (!bUseCachedDecoder) {
-			// Don't read too huge files
-			nFileSize = Helpers::GetFileSize(hFile);
-			if (nFileSize > MAX_HEIF_FILE_SIZE) {
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
+    HANDLE hFile;
+    if (!bUseCachedDecoder) {
+        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            return;
+        }
+    }
+    char* pBuffer = NULL;
+    UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
+    try {
+        long long nFileSize = 0;
+        unsigned int nNumBytesRead = 0;
+        if (!bUseCachedDecoder) {
+            // Don't read too huge files
+            nFileSize = Helpers::GetFileSize(hFile);
+            if (nFileSize > MAX_HEIF_FILE_SIZE) {
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
 
-			pBuffer = new(std::nothrow) char[nFileSize];
-			if (pBuffer == NULL) {
-				request->OutOfMemory = true;
-				::CloseHandle(hFile);
-				return;
-			}
-		}
-		if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
-			int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-			bool bHasAnimation;
-			void* pEXIFData = NULL;
-			uint8* pPixelData = (uint8*)AvifReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, request->FrameIndex, 
-				nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-			if (pPixelData != NULL) {
-				if (bHasAnimation)
-					m_sLastAvifFileName = sFileName;
-				// Multiply alpha value into each AABBGGRR pixel
-				Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-				request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_AVIF, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-				free(pEXIFData);
-				bSuccess = true;
-			} else {
-				DeleteCachedAvifDecoder();
-			}
-		}
-	}
-	catch (...) {
-		delete request->Image;
-		request->Image = NULL;
-		request->ExceptionError = true;
-	}
-	SetErrorMode(nPrevErrorMode);
-	if (!bUseCachedDecoder) {
-		::CloseHandle(hFile);
-		delete[] pBuffer;
-	}
-	if (!bSuccess)
-		return ProcessReadHEIFRequest(request);
+            pBuffer = new(std::nothrow) char[nFileSize];
+            if (pBuffer == NULL) {
+                request->OutOfMemory = true;
+                ::CloseHandle(hFile);
+                return;
+            }
+        }
+        if (bUseCachedDecoder || (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize)) {
+            int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+            bool bHasAnimation;
+            void* pEXIFData = NULL;
+            uint8* pPixelData = (uint8*)AvifReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, request->FrameIndex, 
+                nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+            if (pPixelData != NULL) {
+                if (bHasAnimation)
+                    m_sLastAvifFileName = sFileName;
+                // Multiply alpha value into each AABBGGRR pixel
+                Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_AVIF, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
+                free(pEXIFData);
+                bSuccess = true;
+            } else {
+                DeleteCachedAvifDecoder();
+            }
+        }
+    }
+    catch (...) {
+        delete request->Image;
+        request->Image = NULL;
+        request->ExceptionError = true;
+    }
+    SetErrorMode(nPrevErrorMode);
+    if (!bUseCachedDecoder) {
+        ::CloseHandle(hFile);
+        delete[] pBuffer;
+    }
+    if (!bSuccess)
+        return ProcessReadHEIFRequest(request);
 }
 #endif
 
 #ifndef WINXP
 void CImageLoadThread::ProcessReadHEIFRequest(CRequest* request) {
-	HANDLE hFile;
-	hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
-		return;
-	}
-	char* pBuffer = NULL;
-	UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
-	try {
-		unsigned int nNumBytesRead = 0;
-		// Don't read too huge files
-		long long nFileSize = Helpers::GetFileSize(hFile);
-		if (nFileSize > MAX_HEIF_FILE_SIZE) {
-			request->OutOfMemory = true;
-			::CloseHandle(hFile);
-			return;
-		}
+    HANDLE hFile;
+    hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    char* pBuffer = NULL;
+    UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
+    try {
+        unsigned int nNumBytesRead = 0;
+        // Don't read too huge files
+        long long nFileSize = Helpers::GetFileSize(hFile);
+        if (nFileSize > MAX_HEIF_FILE_SIZE) {
+            request->OutOfMemory = true;
+            ::CloseHandle(hFile);
+            return;
+        }
 
-		pBuffer = new(std::nothrow) char[nFileSize];
-		if (pBuffer == NULL) {
-			request->OutOfMemory = true;
-			::CloseHandle(hFile);
-			return;
-		}
-		if (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize) {
-			int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-			nFrameCount = 1;
-			nFrameTimeMs = 0;
-			void* pEXIFData = NULL;
-			uint8* pPixelData = (uint8*)HeifReader::ReadImage(nWidth, nHeight, nBPP, nFrameCount, pEXIFData, request->OutOfMemory, request->FrameIndex, pBuffer, nFileSize);
-			if (pPixelData != NULL) {
-				// Multiply alpha value into each AABBGGRR pixel
-				Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-				request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_HEIF, false, request->FrameIndex, nFrameCount, nFrameTimeMs);
-				free(pEXIFData);
-			}
-		}
-	} catch(heif::Error he) {
-		// invalid image
-		delete request->Image;
-		request->Image = NULL;
-	} catch (...) {
-		delete request->Image;
-		request->Image = NULL;
-		request->ExceptionError = true;
-	}
-	SetErrorMode(nPrevErrorMode);
-	::CloseHandle(hFile);
-	delete[] pBuffer;
+        pBuffer = new(std::nothrow) char[nFileSize];
+        if (pBuffer == NULL) {
+            request->OutOfMemory = true;
+            ::CloseHandle(hFile);
+            return;
+        }
+        if (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize) {
+            int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+            nFrameCount = 1;
+            nFrameTimeMs = 0;
+            void* pEXIFData = NULL;
+            uint8* pPixelData = (uint8*)HeifReader::ReadImage(nWidth, nHeight, nBPP, nFrameCount, pEXIFData, request->OutOfMemory, request->FrameIndex, pBuffer, nFileSize);
+            if (pPixelData != NULL) {
+                // Multiply alpha value into each AABBGGRR pixel
+                Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_HEIF, false, request->FrameIndex, nFrameCount, nFrameTimeMs);
+                free(pEXIFData);
+            }
+        }
+    } catch(heif::Error he) {
+        // invalid image
+        delete request->Image;
+        request->Image = NULL;
+    } catch (...) {
+        delete request->Image;
+        request->Image = NULL;
+        request->ExceptionError = true;
+    }
+    SetErrorMode(nPrevErrorMode);
+    ::CloseHandle(hFile);
+    delete[] pBuffer;
 }
 
 void CImageLoadThread::ProcessReadPSDRequest(CRequest* request) {
-	request->Image = PsdReader::ReadImage(request->FileName, request->ProcessParams.TransparencyMode, request->OutOfMemory);
-	if (request->Image == NULL && !request->OutOfMemory) {
-		request->Image = PsdReader::ReadThumb(request->FileName, request->OutOfMemory);
-	}
+    request->Image = PsdReader::ReadImage(request->FileName, request->ProcessParams.TransparencyMode, request->OutOfMemory);
+    if (request->Image == NULL && !request->OutOfMemory) {
+        request->Image = PsdReader::ReadThumb(request->FileName, request->OutOfMemory);
+    }
 }
 
 #endif
 
 void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
-	HANDLE hFile;
-	hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-	if (hFile == INVALID_HANDLE_VALUE) {
-		return;
-	}
-	char* pBuffer = NULL;
-	try {
-		unsigned int nNumBytesRead = 0;
-		// Don't read too huge files
-		long long nFileSize = Helpers::GetFileSize(hFile);
-		if (nFileSize > MAX_PNG_FILE_SIZE) {
-			request->OutOfMemory = true;
-			::CloseHandle(hFile);
-			return;
-		}
+    HANDLE hFile;
+    hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    char* pBuffer = NULL;
+    try {
+        unsigned int nNumBytesRead = 0;
+        // Don't read too huge files
+        long long nFileSize = Helpers::GetFileSize(hFile);
+        if (nFileSize > MAX_PNG_FILE_SIZE) {
+            request->OutOfMemory = true;
+            ::CloseHandle(hFile);
+            return;
+        }
 
-		pBuffer = new(std::nothrow) char[nFileSize];
-		if (pBuffer == NULL) {
-			request->OutOfMemory = true;
-			::CloseHandle(hFile);
-			return;
-		}
-		if (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize) {
-			int nWidth, nHeight, nBPP;
-			void* pPixelData = QoiReaderWriter::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer, nFileSize);
-			if (pPixelData != NULL) {
-				if (nBPP == 4) {
-					// Multiply alpha value into each AABBGGRR pixel
-					Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-				}
-				request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, NULL, nBPP, 0, IF_QOI, false, 0, 1, 0);
-			}
-		}
-	} catch (...) {
-		delete request->Image;
-		request->Image = NULL;
-		request->ExceptionError = true;
-	}
-	::CloseHandle(hFile);
-	delete[] pBuffer;
+        pBuffer = new(std::nothrow) char[nFileSize];
+        if (pBuffer == NULL) {
+            request->OutOfMemory = true;
+            ::CloseHandle(hFile);
+            return;
+        }
+        if (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD)&nNumBytesRead, NULL) && nNumBytesRead == nFileSize) {
+            int nWidth, nHeight, nBPP;
+            void* pPixelData = QoiReaderWriter::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer, nFileSize);
+            if (pPixelData != NULL) {
+                if (nBPP == 4) {
+                    // Multiply alpha value into each AABBGGRR pixel
+                    Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                }
+                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, NULL, nBPP, 0, IF_QOI, false, 0, 1, 0);
+            }
+        }
+    } catch (...) {
+        delete request->Image;
+        request->Image = NULL;
+        request->ExceptionError = true;
+    }
+    ::CloseHandle(hFile);
+    delete[] pBuffer;
 }
 
 void CImageLoadThread::ProcessReadGDIPlusRequest(CRequest * request) {
-	const wchar_t* sFileName;
-	sFileName = (const wchar_t*)request->FileName;
+    const wchar_t* sFileName;
+    sFileName = (const wchar_t*)request->FileName;
 
-	Gdiplus::Bitmap* pBitmap = NULL;
-	if (sFileName == m_sLastFileName) {
-		pBitmap = m_pLastBitmap;
-	} else {
-		DeleteCachedGDIBitmap();
-		m_pLastBitmap = pBitmap = new Gdiplus::Bitmap(sFileName, CSettingsProvider::This().UseEmbeddedColorProfiles());
-		m_sLastFileName = sFileName;
-	}
-	bool isOutOfMemory, isAnimatedGIF;
-	request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, request->FrameIndex, NULL, 0, isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
-	request->OutOfMemory = request->Image == NULL && isOutOfMemory;
-	if (!isAnimatedGIF) {
-		DeleteCachedGDIBitmap();
-	}
+    Gdiplus::Bitmap* pBitmap = NULL;
+    if (sFileName == m_sLastFileName) {
+        pBitmap = m_pLastBitmap;
+    } else {
+        DeleteCachedGDIBitmap();
+        m_pLastBitmap = pBitmap = new Gdiplus::Bitmap(sFileName, CSettingsProvider::This().UseEmbeddedColorProfiles());
+        m_sLastFileName = sFileName;
+    }
+    bool isOutOfMemory, isAnimatedGIF;
+    request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, request->FrameIndex, NULL, 0, isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
+    request->OutOfMemory = request->Image == NULL && isOutOfMemory;
+    if (!isAnimatedGIF) {
+        DeleteCachedGDIBitmap();
+    }
 }
 
 static unsigned char* alloc(size_t sizeInBytes) {
-	return new(std::nothrow) unsigned char[sizeInBytes];
+    return new(std::nothrow) unsigned char[sizeInBytes];
 }
 
 static void dealloc(unsigned char* buffer) {
-	delete[] buffer;
+    delete[] buffer;
 }
 
 bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
-	// set process parameters depending on filename
-	request->Image->SetFileDependentProcessParams(request->FileName, &(request->ProcessParams));
+    // set process parameters depending on filename
+    request->Image->SetFileDependentProcessParams(request->FileName, &(request->ProcessParams));
 
-	// First do rotation, this maybe modifies the width and height
-	if (!request->Image->VerifyRotation(CRotationParams(request->ProcessParams.RotationParams, request->ProcessParams.RotationParams.Rotation + request->ProcessParams.UserRotation))) {
-		return false;
-	}
+    // First do rotation, this maybe modifies the width and height
+    if (!request->Image->VerifyRotation(CRotationParams(request->ProcessParams.RotationParams, request->ProcessParams.RotationParams.Rotation + request->ProcessParams.UserRotation))) {
+        return false;
+    }
 
-	// Do nothing (except rotation) if processing after load turned off
-	if (GetProcessingFlag(request->ProcessParams.ProcFlags, PFLAG_NoProcessingAfterLoad)) {
-		return true;
-	}
+    // Do nothing (except rotation) if processing after load turned off
+    if (GetProcessingFlag(request->ProcessParams.ProcFlags, PFLAG_NoProcessingAfterLoad)) {
+        return true;
+    }
 
-	int nWidth = request->Image->OrigWidth();
-	int nHeight = request->Image->OrigHeight();
+    int nWidth = request->Image->OrigWidth();
+    int nHeight = request->Image->OrigHeight();
 
-	double dZoom = request->ProcessParams.Zoom;
-	CSize newSize;
-	if (dZoom < 0.0) {
-		newSize = Helpers::GetImageRect(nWidth, nHeight, 
-			request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight, request->ProcessParams.AutoZoomMode, dZoom);
-	} else {
-		newSize = CSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
-	}
+    double dZoom = request->ProcessParams.Zoom;
+    CSize newSize;
+    if (dZoom < 0.0) {
+        newSize = Helpers::GetImageRect(nWidth, nHeight, 
+            request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight, request->ProcessParams.AutoZoomMode, dZoom);
+    } else {
+        newSize = CSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
+    }
 
     newSize.cx = std::max<LONG>(1, std::min<LONG>(65535, newSize.cx));
     newSize.cy = std::max<LONG>(1, std::min<LONG>(65535, newSize.cy)); // max size must not be bigger than this after zoom
 
-	// clip to target rectangle
+    // clip to target rectangle
     CSize clippedSize(std::min<LONG>(request->ProcessParams.TargetWidth, newSize.cx),
         std::min<LONG>(request->ProcessParams.TargetHeight, newSize.cy));
 
-	LimitOffsets(request->ProcessParams.Offsets, CSize(request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight), newSize);
+    LimitOffsets(request->ProcessParams.Offsets, CSize(request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight), newSize);
 
-	// this will process the image and cache the processed DIB in the CJPEGImage instance
-	CPoint offsetInImage = request->Image->ConvertOffset(newSize, clippedSize, request->ProcessParams.Offsets);
-	return NULL != request->Image->GetDIB(newSize, clippedSize, offsetInImage,
-		request->ProcessParams.ImageProcParams, request->ProcessParams.ProcFlags);
+    // this will process the image and cache the processed DIB in the CJPEGImage instance
+    CPoint offsetInImage = request->Image->ConvertOffset(newSize, clippedSize, request->ProcessParams.Offsets);
+    return NULL != request->Image->GetDIB(newSize, clippedSize, offsetInImage,
+        request->ProcessParams.ImageProcParams, request->ProcessParams.ProcFlags);
 }
 
 
 // #################################################
 
 ZipEntry::ZipEntry(const char* a_pchName, unsigned int a_index, unsigned long long a_size) :
-	name(a_pchName),
-	index(a_index),
-	size(a_size)
+    name(a_pchName),
+    index(a_index),
+    size(a_size)
 {
 }
 
 ZipEntry::ZipEntry(bit7z::tstring a_name, unsigned int a_index, unsigned long long a_size) :
-	name(a_name.c_str()),
-	index(a_index),
-	size(a_size)
+    name(a_name.c_str()),
+    index(a_index),
+    size(a_size)
 {
 }
 
@@ -1086,381 +1086,381 @@ ZipEntry::ZipEntry(bit7z::tstring a_name, unsigned int a_index, unsigned long lo
 #define EXTRA_MANGA_PARAMS IF_ZIP, bMultipleFiles, request->FrameIndex, m_nZipCount, DEF_MANGA_FRAME_TIME_MS
 
 void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
-	bool bSuccess = false;
-	bool bIsSameArchive = false;
-	bool bMultipleFiles = false;
-	const wchar_t* sFileName;
-	int nArchiveItemIndex = request->FrameIndex;	// For archives, we treat request->FrameIndex as the index of the file in the archive to display
-	int nFrameIndexFixed = 0;
-	sFileName = (const wchar_t*)request->FileName;
+    bool bSuccess = false;
+    bool bIsSameArchive = false;
+    bool bMultipleFiles = false;
+    const wchar_t* sFileName;
+    int nArchiveItemIndex = request->FrameIndex;    // For archives, we treat request->FrameIndex as the index of the file in the archive to display
+    int nFrameIndexFixed = 0;
+    sFileName = (const wchar_t*)request->FileName;
 
 /*
 Note on "request->FrameIndex":
-	- These readers take FrameIndex as an argument and are able to return specific frames without stepping through them one by one:
-		AvifReader::ReadImage()
-		HeifReader::ReadImage() 
-	  In ZIP-Mode, we feed them "nFrameIndexFixed = 0" so no animations will be available within archives.
-	
-	- These readers deliver consecutive frames of animation when calling them repeatedly for the same image:
-		PngReader::ReadImage()
-		WebpReaderWriter::ReadImage()
-		JxlReader::ReadImage() 
-	
-	- These readers take it as an argument but do nothing with it and internally just hand it over to CJPEGImage():
-		CReaderBMP::ReadBmpImage()
-		RawReader::ReadImage()
+    - These readers take FrameIndex as an argument and are able to return specific frames without stepping through them one by one:
+        AvifReader::ReadImage()
+        HeifReader::ReadImage() 
+      In ZIP-Mode, we feed them "nFrameIndexFixed = 0" so no animations will be available within archives.
+    
+    - These readers deliver consecutive frames of animation when calling them repeatedly for the same image:
+        PngReader::ReadImage()
+        WebpReaderWriter::ReadImage()
+        JxlReader::ReadImage() 
+    
+    - These readers take it as an argument but do nothing with it and internally just hand it over to CJPEGImage():
+        CReaderBMP::ReadBmpImage()
+        RawReader::ReadImage()
 */
 
 
-	if (sFileName == m_sLastZipFileName) {
-		if (m_nZipCount <= 0)
-			return; //abort as no valid image entries in archive; all marked as non-image
+    if (sFileName == m_sLastZipFileName) {
+        if (m_nZipCount <= 0)
+            return; //abort as no valid image entries in archive; all marked as non-image
 
-		bIsSameArchive = true;
-		if (nArchiveItemIndex >= m_nZipCount)
-			nArchiveItemIndex = m_nZipCount - 1;
-		if (nArchiveItemIndex < 0)
-			nArchiveItemIndex = 0;
-		request->FrameIndex = nArchiveItemIndex;
-		bMultipleFiles = m_nZipCount > 1;
+        bIsSameArchive = true;
+        if (nArchiveItemIndex >= m_nZipCount)
+            nArchiveItemIndex = m_nZipCount - 1;
+        if (nArchiveItemIndex < 0)
+            nArchiveItemIndex = 0;
+        request->FrameIndex = nArchiveItemIndex;
+        bMultipleFiles = m_nZipCount > 1;
 
-	}
-	else {
-		// New ZIP. Delete all cached decoders.
-		DeleteCachedGDIBitmap();
-		DeleteCachedWebpDecoder();
-		DeleteCachedPngDecoder();
-		DeleteCachedJxlDecoder();
-		DeleteCachedAvifDecoder();
-		DeleteCachedZip();
+    }
+    else {
+        // New ZIP. Delete all cached decoders.
+        DeleteCachedGDIBitmap();
+        DeleteCachedWebpDecoder();
+        DeleteCachedPngDecoder();
+        DeleteCachedJxlDecoder();
+        DeleteCachedAvifDecoder();
+        DeleteCachedZip();
 
-	}
+    }
 
     QStringView str(sFileName);
     bool use7z = !(str.endsWith(u".cbz", Qt::CaseInsensitive) ||
                    str.endsWith(u".zip", Qt::CaseInsensitive));
 
-	int bufFilenameLen = request->FileName.GetLength() + 1;
-	char* bufFilename = new char[bufFilenameLen];
-	wcstombs(bufFilename, request->FileName.GetString(), bufFilenameLen);
-	struct zip_t* zip = NULL;
-	BitArchiveReader* zip7 = NULL;
+    int bufFilenameLen = request->FileName.GetLength() + 1;
+    char* bufFilename = new char[bufFilenameLen];
+    wcstombs(bufFilename, request->FileName.GetString(), bufFilenameLen);
+    struct zip_t* zip = NULL;
+    BitArchiveReader* zip7 = NULL;
 
-	if (!bIsSameArchive) {
-		if (use7z) {
-			try {
-				Bit7zLibrary lib{ "7z.dll" };
-				zip7 = new BitArchiveReader(lib, bufFilename, BitFormat::Auto);
+    if (!bIsSameArchive) {
+        if (use7z) {
+            try {
+                Bit7zLibrary lib{ "7z.dll" };
+                zip7 = new BitArchiveReader(lib, bufFilename, BitFormat::Auto);
 
-				for (const auto& item : *zip7) {
-					if (!item.isDir()) {
-						zipEntries.push_back(ZipEntry(item.name(), item.index(), item.size()));
-					}
-				}
-				delete zip7;
-				zip7 = NULL; //somehow later extract will fail unless reopened, so delete here, reopen later
-				m_nZipCount = zipEntries.size();
-			}
-			catch (const BitException& ex) {
-				delete zip7;
-				zip7 = NULL;
-				delete[] bufFilename;
-				return;
-			}
-		}
-		else {
-			zip = zip_open(bufFilename, 0, 'r');
-			int n = zip_entries_total(zip);
-			for (int i = 0; i < n; ++i) {
-				zip_entry_openbyindex(zip, i);
-				if (!zip_entry_isdir(zip)) {
-					zipEntries.push_back(ZipEntry(zip_entry_name(zip), i, zip_entry_size(zip)));
-				}
-				zip_entry_close(zip);
-			}
-			m_nZipCount = zipEntries.size(); //adjust count to valid one only
-		}
-		
-		
-		if (m_nZipCount < 0) {
-			if (zip) {
-				zip_close(zip);
-				zip = NULL;
-			} else if (zip7) {
-				delete zip7;
-				zip7 = NULL;
-			}
-			delete[] bufFilename;
-			return;
-		}
-		
-		if (m_nZipCount > 1) {
-			bMultipleFiles = true;
-			m_sLastZipFileName = sFileName;
-		}
-		
-		if (nArchiveItemIndex >= m_nZipCount)
-			nArchiveItemIndex = m_nZipCount - 1;
+                for (const auto& item : *zip7) {
+                    if (!item.isDir()) {
+                        zipEntries.push_back(ZipEntry(item.name(), item.index(), item.size()));
+                    }
+                }
+                delete zip7;
+                zip7 = NULL; //somehow later extract will fail unless reopened, so delete here, reopen later
+                m_nZipCount = zipEntries.size();
+            }
+            catch (const BitException& ex) {
+                delete zip7;
+                zip7 = NULL;
+                delete[] bufFilename;
+                return;
+            }
+        }
+        else {
+            zip = zip_open(bufFilename, 0, 'r');
+            int n = zip_entries_total(zip);
+            for (int i = 0; i < n; ++i) {
+                zip_entry_openbyindex(zip, i);
+                if (!zip_entry_isdir(zip)) {
+                    zipEntries.push_back(ZipEntry(zip_entry_name(zip), i, zip_entry_size(zip)));
+                }
+                zip_entry_close(zip);
+            }
+            m_nZipCount = zipEntries.size(); //adjust count to valid one only
+        }
+        
+        
+        if (m_nZipCount < 0) {
+            if (zip) {
+                zip_close(zip);
+                zip = NULL;
+            } else if (zip7) {
+                delete zip7;
+                zip7 = NULL;
+            }
+            delete[] bufFilename;
+            return;
+        }
+        
+        if (m_nZipCount > 1) {
+            bMultipleFiles = true;
+            m_sLastZipFileName = sFileName;
+        }
+        
+        if (nArchiveItemIndex >= m_nZipCount)
+            nArchiveItemIndex = m_nZipCount - 1;
 
-		if (nArchiveItemIndex < 0)
-			nArchiveItemIndex = 0;
-	}
+        if (nArchiveItemIndex < 0)
+            nArchiveItemIndex = 0;
+    }
 
-	bool bZipBufferHandedOver = false;
-	char* pBuffer = NULL;
-	do {
-		try {
-			ZipEntry z = zipEntries.at(nArchiveItemIndex);
-			CString& name = z.name;
-			uint64_t nFileSize = z.size;
-			
-		
-			if (use7z) {
-				try {
-					//const tstring name = ConvertLPCWSTRToString(entryName); //not needed, as can access by index
-					pBuffer = new(std::nothrow) char[nFileSize];
-					//somehow, has to reopen, else extract fails!
-					Bit7zLibrary lib{ "7z.dll" };
-					zip7 = new BitArchiveReader(lib, bufFilename, BitFormat::Auto);
-					zip7->extractTo((byte_t*)pBuffer, nFileSize, z.index);
-					delete zip7;
-					zip7 = NULL;
-				}
-				catch (const BitException& ex) {
-					delete zip7;
-					zip7 = NULL;
-					delete[] bufFilename;
-					return;
-				}
-			}
-			else {
-				if (!zip) {
-					zip = zip_open(bufFilename, 0, 'r');
-				}
-				
-				zip_entry_openbyindex(zip, z.index);
-				{
-					pBuffer = new(std::nothrow) char[nFileSize];
-					zip_entry_noallocread(zip, (void*)pBuffer, nFileSize);
-				}
-				zip_entry_close(zip);
-				zip_close(zip);
-				zip = NULL;
-			}
+    bool bZipBufferHandedOver = false;
+    char* pBuffer = NULL;
+    do {
+        try {
+            ZipEntry z = zipEntries.at(nArchiveItemIndex);
+            CString& name = z.name;
+            uint64_t nFileSize = z.size;
+            
+        
+            if (use7z) {
+                try {
+                    //const tstring name = ConvertLPCWSTRToString(entryName); //not needed, as can access by index
+                    pBuffer = new(std::nothrow) char[nFileSize];
+                    //somehow, has to reopen, else extract fails!
+                    Bit7zLibrary lib{ "7z.dll" };
+                    zip7 = new BitArchiveReader(lib, bufFilename, BitFormat::Auto);
+                    zip7->extractTo((byte_t*)pBuffer, nFileSize, z.index);
+                    delete zip7;
+                    zip7 = NULL;
+                }
+                catch (const BitException& ex) {
+                    delete zip7;
+                    zip7 = NULL;
+                    delete[] bufFilename;
+                    return;
+                }
+            }
+            else {
+                if (!zip) {
+                    zip = zip_open(bufFilename, 0, 'r');
+                }
+                
+                zip_entry_openbyindex(zip, z.index);
+                {
+                    pBuffer = new(std::nothrow) char[nFileSize];
+                    zip_entry_noallocread(zip, (void*)pBuffer, nFileSize);
+                }
+                zip_entry_close(zip);
+                zip_close(zip);
+                zip = NULL;
+            }
 
-			unsigned char header[16] = { 0 };
-			memcpy(header, pBuffer, (size_t)std::min<uint64_t>(16, nFileSize));
+            unsigned char header[16] = { 0 };
+            memcpy(header, pBuffer, (size_t)std::min<uint64_t>(16, nFileSize));
 
-			switch (GetImageFormatInMemory(header, z.name)) {
-				case IF_JXL:
-					{
-						int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-						bool bHasAnimation = false;
-						void* pEXIFData = NULL;
-						uint8* pPixelData = (uint8*)JxlReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-						if (pPixelData != NULL) {
-							if (bHasAnimation) {
-								bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-								m_sLastJxlFileName = sFileName;
-							}
+            switch (GetImageFormatInMemory(header, z.name)) {
+                case IF_JXL:
+                    {
+                        int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+                        bool bHasAnimation = false;
+                        void* pEXIFData = NULL;
+                        uint8* pPixelData = (uint8*)JxlReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+                        if (pPixelData != NULL) {
+                            if (bHasAnimation) {
+                                bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
+                                m_sLastJxlFileName = sFileName;
+                            }
 
-							// Multiply alpha value into each AABBGGRR pixel
-							Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-							request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_JXL, EXTRA_MANGA_PARAMS);
-							free(pEXIFData);
-							if (request->Image) bSuccess = true;
-						}
-					}
-					break;
-				case IF_JPEG :
-					{
-						int nWidth, nHeight, nBPP;
-						TJSAMP eChromoSubSampling;
-						bool bOutOfMemory;
+                            // Multiply alpha value into each AABBGGRR pixel
+                            Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_JXL, EXTRA_MANGA_PARAMS);
+                            free(pEXIFData);
+                            if (request->Image) bSuccess = true;
+                        }
+                    }
+                    break;
+                case IF_JPEG :
+                    {
+                        int nWidth, nHeight, nBPP;
+                        TJSAMP eChromoSubSampling;
+                        bool bOutOfMemory;
 
-						void* pPixelData = TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bOutOfMemory, pBuffer, nFileSize);
+                        void* pPixelData = TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bOutOfMemory, pBuffer, nFileSize);
 
-						// Color and b/w JPEG is supported
-						if (pPixelData != NULL && (nBPP == 3 || nBPP == 1)) {
-							request->Image = new CJPEGImage(nWidth, nHeight, pPixelData,
-								Helpers::FindEXIFBlock(pBuffer, nFileSize), nBPP,
-								Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), IF_JPEG, EXTRA_MANGA_PARAMS);
-							request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
-							request->Image->SetJPEGChromoSampling(eChromoSubSampling);
-							if (request->Image) bSuccess = true;
-						}
-						else if (bOutOfMemory) {
-							request->OutOfMemory = true;
-						}
-					}
-					break;
-				case IF_PNG:
-					{
-						if (nFileSize > MAX_PNG_FILE_SIZE) {
-							request->OutOfMemory = true;
-							delete[] pBuffer;
-							delete[] bufFilename;
-							return;
-						}
-						int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-						bool bHasAnimation;
-						void* pEXIFData = NULL;
-						uint8* pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-						if (pPixelData != NULL) {
-							if (bHasAnimation) {
-								bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-								m_sLastPngFileName = sFileName;
-							}
-							// Multiply alpha value into each AABBGGRR pixel
-							Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-							request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, EXTRA_MANGA_PARAMS);
-							free(pEXIFData);
-							if (request->Image) bSuccess = true;
-						}
-					}
-					break;
-				case IF_WEBP:
-					{
-						int nWidth, nHeight;
-						bool bHasAnimation;
-						int nFrameCount = 1;
-						int nFrameTimeMs = 0;
-						int nBPP;
-						void* pEXIFData = NULL;
-						uint8* pPixelData = (uint8*)WebpReaderWriter::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-						if (pPixelData && nBPP == 4) {
-							if (bHasAnimation) {
-								bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-								m_sLastWebpFileName = sFileName;
-							}
-							// Multiply alpha value into each AABBGGRR pixel
-							Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-							request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_WEBP, EXTRA_MANGA_PARAMS);
-							free(pEXIFData);
-							if (request->Image) bSuccess = true;
-						}
-						else {
-							delete[] pPixelData;
-						}
-					}
-					break;
-				case IF_QOI:
-					{
-						int nWidth, nHeight, nBPP;
-						void* pPixelData = QoiReaderWriter::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer, nFileSize);
-						if (pPixelData != NULL) {
-							if (nBPP == 4) {
-								// Multiply alpha value into each AABBGGRR pixel
-								Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-							}
-							request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, NULL, nBPP, 0, IF_QOI, EXTRA_MANGA_PARAMS);
-							if (request->Image) bSuccess = true;
-						}
-					}
-					break;
-				case IF_WindowsBMP :
-					{
-						bool bOutOfMemory;
-						request->Image = CReaderBMP::ReadBmpImage(pBuffer, nFileSize, bOutOfMemory, EXTRA_MANGA_PARAMS);
-						if (request->Image) bSuccess = true;
-						if (bOutOfMemory) {
-							request->OutOfMemory = true;
-						}
-					}
-					break;
-				case IF_AVIF:
-					{
-						int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-						bool bHasAnimation;
-						void* pEXIFData = NULL;
-						uint8* pPixelData = (uint8*)AvifReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameIndexFixed, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-						if (pPixelData != NULL) {
-							if (bHasAnimation) {
-								bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-								m_sLastAvifFileName = sFileName;
-							}
-							// Multiply alpha value into each AABBGGRR pixel
-							Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
-							request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_AVIF, EXTRA_MANGA_PARAMS);
-							free(pEXIFData);
-							if (request->Image) bSuccess = true;
-						} else {
-							DeleteCachedAvifDecoder();
-						}
-					}
-					break;
-				case IF_HEIF:
-					{
-						try
-						{
-							int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
-							nFrameCount = 1;
-							nFrameTimeMs = 0;
-							void* pEXIFData = NULL;
-							uint8* pPixelData = (uint8*)HeifReader::ReadImage(nWidth, nHeight, nBPP, nFrameCount, pEXIFData, request->OutOfMemory, nFrameIndexFixed, pBuffer, nFileSize);
-							if (pPixelData != NULL) {
-								// Multiply alpha value into each AABBGGRR pixel
-								Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                        // Color and b/w JPEG is supported
+                        if (pPixelData != NULL && (nBPP == 3 || nBPP == 1)) {
+                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData,
+                                Helpers::FindEXIFBlock(pBuffer, nFileSize), nBPP,
+                                Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), IF_JPEG, EXTRA_MANGA_PARAMS);
+                            request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
+                            request->Image->SetJPEGChromoSampling(eChromoSubSampling);
+                            if (request->Image) bSuccess = true;
+                        }
+                        else if (bOutOfMemory) {
+                            request->OutOfMemory = true;
+                        }
+                    }
+                    break;
+                case IF_PNG:
+                    {
+                        if (nFileSize > MAX_PNG_FILE_SIZE) {
+                            request->OutOfMemory = true;
+                            delete[] pBuffer;
+                            delete[] bufFilename;
+                            return;
+                        }
+                        int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+                        bool bHasAnimation;
+                        void* pEXIFData = NULL;
+                        uint8* pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+                        if (pPixelData != NULL) {
+                            if (bHasAnimation) {
+                                bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
+                                m_sLastPngFileName = sFileName;
+                            }
+                            // Multiply alpha value into each AABBGGRR pixel
+                            Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, EXTRA_MANGA_PARAMS);
+                            free(pEXIFData);
+                            if (request->Image) bSuccess = true;
+                        }
+                    }
+                    break;
+                case IF_WEBP:
+                    {
+                        int nWidth, nHeight;
+                        bool bHasAnimation;
+                        int nFrameCount = 1;
+                        int nFrameTimeMs = 0;
+                        int nBPP;
+                        void* pEXIFData = NULL;
+                        uint8* pPixelData = (uint8*)WebpReaderWriter::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+                        if (pPixelData && nBPP == 4) {
+                            if (bHasAnimation) {
+                                bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
+                                m_sLastWebpFileName = sFileName;
+                            }
+                            // Multiply alpha value into each AABBGGRR pixel
+                            Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_WEBP, EXTRA_MANGA_PARAMS);
+                            free(pEXIFData);
+                            if (request->Image) bSuccess = true;
+                        }
+                        else {
+                            delete[] pPixelData;
+                        }
+                    }
+                    break;
+                case IF_QOI:
+                    {
+                        int nWidth, nHeight, nBPP;
+                        void* pPixelData = QoiReaderWriter::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer, nFileSize);
+                        if (pPixelData != NULL) {
+                            if (nBPP == 4) {
+                                // Multiply alpha value into each AABBGGRR pixel
+                                Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                            }
+                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, NULL, nBPP, 0, IF_QOI, EXTRA_MANGA_PARAMS);
+                            if (request->Image) bSuccess = true;
+                        }
+                    }
+                    break;
+                case IF_WindowsBMP :
+                    {
+                        bool bOutOfMemory;
+                        request->Image = CReaderBMP::ReadBmpImage(pBuffer, nFileSize, bOutOfMemory, EXTRA_MANGA_PARAMS);
+                        if (request->Image) bSuccess = true;
+                        if (bOutOfMemory) {
+                            request->OutOfMemory = true;
+                        }
+                    }
+                    break;
+                case IF_AVIF:
+                    {
+                        int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+                        bool bHasAnimation;
+                        void* pEXIFData = NULL;
+                        uint8* pPixelData = (uint8*)AvifReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameIndexFixed, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
+                        if (pPixelData != NULL) {
+                            if (bHasAnimation) {
+                                bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
+                                m_sLastAvifFileName = sFileName;
+                            }
+                            // Multiply alpha value into each AABBGGRR pixel
+                            Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_AVIF, EXTRA_MANGA_PARAMS);
+                            free(pEXIFData);
+                            if (request->Image) bSuccess = true;
+                        } else {
+                            DeleteCachedAvifDecoder();
+                        }
+                    }
+                    break;
+                case IF_HEIF:
+                    {
+                        try
+                        {
+                            int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
+                            nFrameCount = 1;
+                            nFrameTimeMs = 0;
+                            void* pEXIFData = NULL;
+                            uint8* pPixelData = (uint8*)HeifReader::ReadImage(nWidth, nHeight, nBPP, nFrameCount, pEXIFData, request->OutOfMemory, nFrameIndexFixed, pBuffer, nFileSize);
+                            if (pPixelData != NULL) {
+                                // Multiply alpha value into each AABBGGRR pixel
+                                Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
 
-								request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_HEIF, EXTRA_MANGA_PARAMS);
-								free(pEXIFData);
-								if (request->Image) {
-									bSuccess = true;
-								} else {
-								}
-							} else {
-							}
-						}
-						catch (heif::Error he) {
-							// invalid image
-							delete request->Image;
-							request->Image = NULL;
-						}
-					}
-					break;
-				default:
-					//unable to do as API reads from file and not buffer
-					break;
-			}
-		}
-		catch (...) {
-			delete request->Image;
-			request->Image = NULL;
-			request->ExceptionError = true;
-		}
+                                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_HEIF, EXTRA_MANGA_PARAMS);
+                                free(pEXIFData);
+                                if (request->Image) {
+                                    bSuccess = true;
+                                } else {
+                                }
+                            } else {
+                            }
+                        }
+                        catch (heif::Error he) {
+                            // invalid image
+                            delete request->Image;
+                            request->Image = NULL;
+                        }
+                    }
+                    break;
+                default:
+                    //unable to do as API reads from file and not buffer
+                    break;
+            }
+        }
+        catch (...) {
+            delete request->Image;
+            request->Image = NULL;
+            request->ExceptionError = true;
+        }
 
-		if (zip != NULL)
-			zip_close(zip);
+        if (zip != NULL)
+            zip_close(zip);
 
 
-		if (!bZipBufferHandedOver) {
-			if (pBuffer) {
-				delete[] pBuffer;
-				pBuffer = NULL;
-			}
-		}
+        if (!bZipBufferHandedOver) {
+            if (pBuffer) {
+                delete[] pBuffer;
+                pBuffer = NULL;
+            }
+        }
 
-		if (!bSuccess) {
-			//erase non-image entry
-			ZipEntry z = zipEntries.at(nArchiveItemIndex);
-			CString& name = z.name;
-			uint64_t nFileSize = z.size;
-			
-		
-			zipEntries.erase(zipEntries.begin() + nArchiveItemIndex);
-			if ((--m_nZipCount <= 0) || (nArchiveItemIndex >= m_nZipCount)) {
-				break; //abort
-			}
-			//continue: try next file in archive
-		}
-	} while (!bSuccess);
-	
-	delete[] bufFilename;
+        if (!bSuccess) {
+            //erase non-image entry
+            ZipEntry z = zipEntries.at(nArchiveItemIndex);
+            CString& name = z.name;
+            uint64_t nFileSize = z.size;
+            
+        
+            zipEntries.erase(zipEntries.begin() + nArchiveItemIndex);
+            if ((--m_nZipCount <= 0) || (nArchiveItemIndex >= m_nZipCount)) {
+                break; //abort
+            }
+            //continue: try next file in archive
+        }
+    } while (!bSuccess);
+    
+    delete[] bufFilename;
 }
 
 void CImageLoadThread::DeleteCachedZip()
 {
-	m_sLastZipFileName.Empty();
-	m_nZipCount = 0;
-	zipEntries.clear();
+    m_sLastZipFileName.Empty();
+    m_nZipCount = 0;
+    zipEntries.clear();
 }
