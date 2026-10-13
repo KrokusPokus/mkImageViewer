@@ -56,46 +56,4 @@ enum EImageFormat {
     IF_Unknown
 };
 
-// Horizontal trapezoid
-/*
- (x1s, y1)----------(x1e, y1)
-    \                 /
-     \               /
-    (x2s, y2)-----(x2e, y2)
-*/
-class CTrapezoid {
-public:
-    int x1s;
-    int x1e;
-    int y1;
-    int x2s;
-    int x2e;
-    int y2;
-
-    CTrapezoid() {
-        x1s = x1e = x2s = x2e = y1 = y2 = 0;
-    }
-
-    // Horizontal trapezoid with vertices (x1s, y1), (x1e, y1), (x2s, y2), (x2e, y2)
-    CTrapezoid(int x1s, int x1e, int y1, int x2s, int x2e, int y2) {
-        this->x1s = std::min<int>(x1s, x1e);
-        this->x1e = std::max<int>(x1s, x1e);
-        this->y1 = std::min<int>(y1, y2);
-        this->x2s = std::min<int>(x2s, x2e);
-        this->x2e = std::max<int>(x2s, x2e);
-        this->y2 = std::max<int>(y1, y2);
-    }
-
-    bool operator ==(const CTrapezoid& other) const {
-        return x1s == other.x1s && x1e == other.x1e && x2s == other.x2s && x2e == other.x2e && y1 == other.y1 && y2 == other.y2;
-    }
-
-    bool operator !=(const CTrapezoid& other) const {
-        return !(*this == other);
-    }
-
-    int Width() const { return std::max<int>(x1e - x1s, x2e - x2s); }
-    int Height() const { return y2 - y1; }
-};
-
 #endif // IMAGEPROCESSINGTYPES_H

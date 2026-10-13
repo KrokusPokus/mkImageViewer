@@ -157,17 +157,6 @@ public:
     static void* PointSampleWithRotation(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize, 
         CSize sourceSize, double dRotation, const void* pPixels, int nChannels, COLORREF backColor);
 
-    // Resample 32 or 24 bpp BGR(A) image using point sampling (i.e. no interpolation) and map to trapezoid.
-    // Notice that the A channel is kept unchanged for 32 bpp images.
-    // Notice that the returned image is always 32 bpp!
-    // fullTargetTrapezoid: Trapezoid, height must be fullTargetSize.cy.
-    // fullTargetOffset: Offset in fullTargetSize image, before mapping to trapezoid
-    // backColor: Color to fill areas in transformed target image that are outside of source image. The A value is ignored and set to 0xFF.
-    // See PointSample() for other parameters
-    // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
-    static void* PointSampleTrapezoid(CSize fullTargetSize, const CTrapezoid& fullTargetTrapezoid, CPoint fullTargetOffset, CSize clippedTargetSize, 
-        CSize sourceSize, const void* pPixels, int nChannels, COLORREF backColor);
-
     // High quality downsampling of 32 or 24 bpp BGR(A) image to target size, using a set of down-sampling kernels that
     // do some sharpening during down-sampling if desired. 
     // Notice that the A channel is not processed and set to fixed value 0xFF.
