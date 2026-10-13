@@ -44,7 +44,6 @@ public:
         POS_Previous,
         POS_Current,
         POS_Clipboard,
-        POS_Toggle,
         POS_AwayFromCurrent,
 //        POS_Next_Folder,
 //        POS_Previous_Folder,

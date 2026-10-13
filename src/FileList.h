@@ -102,7 +102,7 @@ public:
     //const FILETIME* CurrentModificationTime() const;
 
     // Get the n-next file, does not change the internal state
-    LPCTSTR PeekNextPrev(int nIndex, bool bForward, bool bToggle);
+    LPCTSTR PeekNextPrev(int nIndex, bool bForward);
 
     // Number of files in file list (for current directory)
     //int Size() const { return (int)m_fileList.size(); }
@@ -122,15 +122,6 @@ public:
 
     // Gets current navigation mode
     Helpers::ENavigationMode GetNavigationMode() const { return sm_eMode; }
-
-    // Marks the current file for toggling between this file and the current file
-    void MarkCurrentFile();
-
-    // Returns if there is a file marked for toggling
-    bool FileMarkedForToggle();
-
-    // Toggle between marked and current file
-    void ToggleBetweenMarkedAndCurrentFile();
 
     // Sets a checkpoint on the current image
     void SetCheckpoint() { m_iterCheckPoint = m_iter; }
@@ -154,7 +145,6 @@ public:
     void DeleteHistory(bool onlyForward = false);
 
 /*GF*/    bool IsEndpoint();    // Check if at the beginning or end of the file list. Used by custom function SaveBookmark()
-/*GF*/    LPCTSTR GetFileMarkedForToggle();
 
 private:
     static Helpers::ENavigationMode sm_eMode;
@@ -172,10 +162,6 @@ private:
     std::list<CFileDesc>::iterator m_iter; // current position in m_fileList
     std::list<CFileDesc>::iterator m_iterStart; // start of iteration in m_fileList
     std::list<CFileDesc>::iterator m_iterCheckPoint;
-
-    CString m_sMarkedFile;
-    CString m_sMarkedFileCurrent;
-    int m_nMarkedIndexShow;
 
     CDirectoryWatcher & m_directoryWatcher;
 

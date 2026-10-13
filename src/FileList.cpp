@@ -196,7 +196,6 @@ CFileList::CFileList(const CString & sInitialFile, CDirectoryWatcher & directory
         bImageFile = true;
     }
     m_bIsSlideShowList = !bIsDirectory && !bImageFile && TryReadingSlideShowList(sInitialFile);
-    m_nMarkedIndexShow = -1;
 
     m_directoryWatcher.SetCurrentDirectory(m_sDirectory);
 
@@ -299,7 +298,6 @@ void CFileList::ModificationTimeChanged() {
 */
 
 CFileList* CFileList::Next() {
-    m_nMarkedIndexShow = -1;
     if (m_fileList.size() > 0) {
         std::list<CFileDesc>::iterator iterTemp = m_iter;
         if (iterTemp == m_fileList.end())
@@ -339,7 +337,6 @@ CFileList* CFileList::Next() {
 }
 
 CFileList* CFileList::Prev() {
-    m_nMarkedIndexShow = -1;
     if (m_iter == m_iterStart) {
         if (sm_eMode == Helpers::NM_LoopDirectory) {
             if (!m_bWrapAroundFolder) {
@@ -367,19 +364,17 @@ CFileList* CFileList::Prev() {
 }
 
 void CFileList::First() {
-    m_nMarkedIndexShow = -1;
     m_iter = m_iterStart = m_fileList.begin();
 }
 
 void CFileList::Last() {
-    m_nMarkedIndexShow = -1;
     MoveIterToLast();
     m_iterStart = m_fileList.begin();
 }
 
 CFileList* CFileList::AwayFromCurrent() {
     LPCTSTR sCurrentFile = Current();
-    LPCTSTR sNextFile = PeekNextPrev(1, true, false);
+    LPCTSTR sNextFile = PeekNextPrev(1, true);
     if (sCurrentFile == NULL || sNextFile == NULL || _tcscmp(sCurrentFile, sNextFile) == 0) {
         CFileList* pFileList = Prev();
         if (Current() != NULL && sCurrentFile != NULL && _tcscmp(sCurrentFile, Current()) == 0) {
@@ -442,21 +437,17 @@ const FILETIME* CFileList::CurrentModificationTime() const {
 }
 */
 
-LPCTSTR CFileList::PeekNextPrev(int nIndex, bool bForward, bool bToggle) {
-    if (bToggle) {
-        return (m_nMarkedIndexShow == 0) ? m_sMarkedFile : m_sMarkedFileCurrent;
-    } else {
-        std::list<CFileDesc>::iterator thisIter = m_iter;
-        LPCTSTR sFileName;
-        if (nIndex != 0) {
-            CFileList* pFL = bForward ? Next() : Prev();
-            sFileName = pFL->PeekNextPrev(nIndex-1, bForward, bToggle);
-        } else {
-            sFileName = Current();
-        }
-        m_iter = thisIter;
-        return sFileName;
-    }
+LPCTSTR CFileList::PeekNextPrev(int nIndex, bool bForward) {
+	std::list<CFileDesc>::iterator thisIter = m_iter;
+	LPCTSTR sFileName;
+	if (nIndex != 0) {
+		CFileList* pFL = bForward ? Next() : Prev();
+		sFileName = pFL->PeekNextPrev(nIndex-1, bForward);
+	} else {
+		sFileName = Current();
+	}
+	m_iter = thisIter;
+	return sFileName;
 }
 
 void CFileList::SetSorting(Helpers::ESorting eSorting, bool sortAscending) {
@@ -486,41 +477,6 @@ void CFileList::SetNavigationMode(Helpers::ENavigationMode eMode) {
     DeleteHistory();
     m_nLevel = 0;
     m_iterStart = m_bWrapAroundFolder ? m_iter : m_fileList.begin();
-}
-
-void CFileList::MarkCurrentFile() {
-    LPCTSTR sCurrent = Current();
-    if (::GetFileAttributes(sCurrent) != INVALID_FILE_ATTRIBUTES) {
-        m_sMarkedFile = CString(sCurrent);
-        m_sMarkedFileCurrent = CString();
-        m_nMarkedIndexShow = -1;
-    }
-}
-
-bool CFileList::FileMarkedForToggle() {
-    return !m_sMarkedFile.IsEmpty();
-}
-
-void CFileList::ToggleBetweenMarkedAndCurrentFile() {
-    if (m_nMarkedIndexShow == -1) {
-        m_nMarkedIndexShow = 0;
-    }
-    LPCTSTR sNewFile = (m_nMarkedIndexShow == 0) ? m_sMarkedFile : m_sMarkedFileCurrent;
-    if (sNewFile[0] == 0) {
-        return;
-    }
-    if (m_nMarkedIndexShow == 0) {
-        m_sMarkedFileCurrent = Current();
-    }
-
-    m_sInitialFile = sNewFile;
-    int nPos = m_sInitialFile.ReverseFind(_T('\\'));
-    m_sDirectory = (nPos > 0) ? m_sInitialFile.Left(nPos) : CString(); // the backslash is stripped away!
-
-    DeleteHistory();
-    Reload(m_sInitialFile);
-
-    m_nMarkedIndexShow = (m_nMarkedIndexShow + 1) & 1;
 }
 
 bool CFileList::CanOpenCurrentFileForReading() const
@@ -966,8 +922,6 @@ bool CFileList::TryReadingSlideShowList(const CString & sSlideShowFile) {
 
 // Used by custom SaveBookmark()
 bool CFileList::IsEndpoint() {
-    m_nMarkedIndexShow = -1;
-
     if (m_iter == m_fileList.begin())
         return true;
 
@@ -981,12 +935,4 @@ bool CFileList::IsEndpoint() {
     }
 
     return false;
-}
-
-// Used by JPEGProvider to keep buffer for marked toggle file alive
-LPCTSTR CFileList::GetFileMarkedForToggle() {
-    if (!m_sMarkedFile.IsEmpty())
-        return  (LPCTSTR)m_sMarkedFile;
-
-    return NULL;
 }

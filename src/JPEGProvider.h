@@ -2,6 +2,7 @@
 #define JPEGPROVIDER_H
 
 #include <list>
+#include <string>
 
 class CJPEGImage;
 class CImageLoadThread;
@@ -17,8 +18,7 @@ public:
     enum EReadAheadDirection {
         NONE, // Do not create a read-ahead request
         FORWARD,
-        BACKWARD,
-        TOGGLE // toggle between two images
+        BACKWARD
     };
 
     // handlerWnd: Window to send the asynchronous message when an image has finished loading (WM_IMAGE_LOAD_COMPLETED)
@@ -124,13 +124,11 @@ private:
     CImageRequest* StartNewRequest(LPCTSTR sFileName, int nFrameIndex, const CProcessParams & processParams);
     void StartNewRequestBundle(CFileList* pFileList, EReadAheadDirection eDirection, const CProcessParams & processParams, int nNumRequests, CImageRequest* pLastReadyRequest);
     CImageRequest* FindRequest(LPCTSTR strFileName, int nFrameIndex);
-    void DeactivateOldestRequests();
+    //void DeactivateOldestRequests();
     std::list<CJPEGProvider::CImageRequest*>::iterator DeleteElementAt(std::list<CImageRequest*>::iterator iteratorAt); // also deletes the request and the image in the request
     void DeleteElement(CImageRequest* pRequest);
     bool IsDestructivelyProcessed(CJPEGImage* pImage);
-
-/*GF*/    void SetAllRequestsInactive(CFileList* pFileList);
+    void SetAllRequestsInactive();
 };
-
 
 #endif // JPEGPROVIDER_H

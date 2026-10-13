@@ -1637,18 +1637,6 @@ LRESULT CMainDlg::OnCancel(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOO
 void CMainDlg::ExecuteCommand(int nCommand) {
     CSettingsProvider& sp = CSettingsProvider::This();
     switch (nCommand) {
-        case IDM_TOGGLE:
-            if (m_pFileList->FileMarkedForToggle()) {
-                SetToast(_T("Toggling"));
-                GotoImage(POS_Toggle);
-            }
-            break;
-        case IDM_MARK_FOR_TOGGLE:
-            if (m_pFileList->Current() != NULL && m_pCurrentImage != NULL && !m_pCurrentImage->IsClipboardImage()) {
-                SetToast(_T("Image Marked for Toggle"));
-                m_pFileList->MarkCurrentFile();
-            }
-            break;
         case IDM_MINIMIZE:
             this->ShowWindow(SW_MINIMIZE);
             break;
@@ -2931,10 +2919,6 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                 bNoWrapAroundEdgeFrame = false; // previous image at edge is not a wraparound
                 break;
             }
-        case POS_Toggle:
-            m_pFileList->ToggleBetweenMarkedAndCurrentFile();
-            eDirection = CJPEGProvider::TOGGLE;
-            break;
         case POS_Current:
             if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
                 nFrameIndex = m_pCurrentImage->FrameIndex();

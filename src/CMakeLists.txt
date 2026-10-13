@@ -55,43 +55,42 @@ set(CMAKE_AUTORCC ON)
 # Quelldateien definieren
 set(SOURCES
     ApplyFilterAVX.cpp
-    AVIFWrapper.cpp
     BasicProcessing.cpp
     Clipboard.cpp
     DirectoryWatcher.cpp
-
     EXIFReader.cpp
     FileList.cpp
-    HEIFWrapper.cpp
     Helpers.cpp
     HelpersGUI.cpp
     HistogramCorr.cpp
     ICCProfileTransform.cpp
     ImageLoadThread.cpp
     JPEGImage.cpp
-
     JPEGProvider.cpp
     main.cpp
-    JXLWrapper.cpp
     KeyMap.cpp
     LocalDensityCorr.cpp
     MainDlg.cpp
     MultiMonitorSupport.cpp
     NLS.cpp
     ParameterDB.cpp
-    PNGWrapper.cpp
     ProcessingThreadPool.cpp
-    PSDWrapper.cpp
-    QOIWrapper.cpp
     ReaderBMP.cpp
     ReaderTGA.cpp
     ResizeFilter.cpp
     SettingsProvider.cpp
     stdafx.cpp
-    TJPEGWrapper.cpp
-
-    WEBPWrapper.cpp
     WorkThread.cpp
+	
+    wrapperAVIF.cpp
+	wrapperHEIF.cpp
+    wrapperJXL.cpp
+    wrapperPNG.cpp
+    wrapperPSD.cpp
+    wrapperQOI.cpp
+    wrapperTJPEG.cpp
+    wrapperWEBP.cpp
+	
     XMMImage.cpp
     zip/zip.c
     JPEGView.rc

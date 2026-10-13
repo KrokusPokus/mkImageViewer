@@ -289,8 +289,6 @@
 #define IDM_ABOUT            12900        // :KeyMap: show about box
 #define IDM_EXIT            13000        // :KeyMap: exit JPEGView application
 #define IDM_HELP            14000
-#define IDM_TOGGLE            14100        // :KeyMap: toggle between marked image and current image
-#define IDM_MARK_FOR_TOGGLE            14101        // :KeyMap: mark current image for toggling
 #define IDM_COLOR_CORRECTION_INC    14200        // :KeyMap: increase color correction amount
 #define IDM_COLOR_CORRECTION_DEC    14201        // :KeyMap: decrease color correction amount
 #define IDM_TOGGLE_TRANSPARENCY        14202        // :KeyMap: toggle transparency mode
