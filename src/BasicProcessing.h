@@ -205,20 +205,6 @@ public:
     // The returned image has size 'rect'.
     static int16* GaussFilter16bpp1Channel(CSize fullSize, CPoint offset, CSize rect, double dRadius, const int16* pPixels);
 
-    // Apply unsharp masking to the given source 32 or 24 bpp BGR(A) image and store result in pTargetPixels.
-    // Notice that the A channel is not processed and set to fixed value 0xFF.
-    // fullSize: Size of source image, target image and grayscale images (all must have the same size)
-    // offset, rect: Part of the source image to apply unsharp masking to. The area outside is not touched (also not copied to target image).
-    // dAmount, dThreshold: Unsharp masking parameters
-    // pGrayImage: Grayscale image, one channel, 16 bpp
-    // pSmoothedGrayImage: Smoothed grayscale image (having a Gauss kernel applied), one channel, 16 bpp
-    // pSourcePixels: Source image
-    // pTargetPixels: Target image, can be same pointer as pSourcePixels
-    // nChannels: Number of channels (3 or 4) of source and target image
-    // Returns pTargetPixels.
-    static void* UnsharpMask(CSize fullSize, CPoint offset, CSize rect, double dAmount, double dThreshold, 
-        const int16* pGrayImage, const int16* pSmoothedGrayImage, const void* pSourcePixels, void* pTargetPixels, int nChannels);
-
 private:
     CBasicProcessing(void);
 };

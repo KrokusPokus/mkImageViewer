@@ -2,7 +2,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 
-#include "resource.h"
 #include <QFileInfo>
 #include <QMessageBox>
 #include <regex>        // used in regex matching language tags like [en], [de]

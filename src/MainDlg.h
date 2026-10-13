@@ -1,6 +1,7 @@
 #ifndef MAINDLG_H
 #define MAINDLG_H
 
+#include "resource.h"
 #include "MessageDef.h"
 #include "ProcessParams.h"
 #include "Helpers.h"
@@ -8,20 +9,6 @@
 class CFileList;
 class CJPEGProvider;
 class CJPEGImage;
-class CButtonCtrl;
-class CTextCtrl;
-class CPanel;
-class CPanelMgr;
-class CEXIFDisplayCtl;
-class CImageProcPanelCtl;
-class CNavigationPanelCtl;
-class CRotationPanelCtl;
-class CTiltCorrectionPanelCtl;
-class CUnsharpMaskPanelCtl;
-class CWndButtonPanelCtl;
-class CInfoButtonPanelCtl;
-class CZoomNavigatorCtl;
-class CCropCtl;
 class CKeyMap;
 class CDirectoryWatcher;
 

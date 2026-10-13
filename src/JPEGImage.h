@@ -58,7 +58,7 @@ public:
     void* GetDIB(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
         const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
         bool bNotUsed;
-        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, NULL, 0.0, false, bNotUsed);
+        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, 0.0, false, bNotUsed);
     }
 
     // Gets resampled and processed DIB image (up or downsampled), also including a low quality rotation.
@@ -67,7 +67,7 @@ public:
     void* GetDIBRotated(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
         const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags, double dRotation, bool bShowGrid) {
         bool bNotUsed;
-        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, NULL, dRotation, bShowGrid, bNotUsed);
+        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, dRotation, bShowGrid, bNotUsed);
     }
 
     // Operations on original pixels of the image
@@ -267,9 +267,6 @@ public:
     void SetLoadTickCount(double tc) { m_dLoadTickCount = tc; }
     double GetLoadTickCount() { return m_dLoadTickCount; }
 
-    // Debug: Unsharp mask time of image in ms
-    double GetUnsharpMaskTickCount() { return m_dUnsharpMaskTickCount; }
-
 private:
 
     // used internally for re-sampling type
@@ -326,8 +323,6 @@ private:
     // Image processing parameters and flags during last call to GetDIB()
     CImageProcessingParams m_imageProcParams;
     EProcessingFlags m_eProcFlags;
-    CUnsharpMaskParams m_unsharpMaskParams;
-    bool m_bUnsharpMaskParamsValid;
 
     // Initial image processing parameters and flags, as set with SetFileDependentProcessParams()
     CImageProcessingParams m_imageProcParamsInitial;
@@ -359,7 +354,6 @@ private:
 
     double m_dLastOpTickCount;
     double m_dLoadTickCount;
-    double m_dUnsharpMaskTickCount;
 
     // stuff needed to perform LUT and LDC processing
     uint8* m_pLUTAllChannels; // for global contrast and brightness correction
@@ -370,13 +364,11 @@ private:
     float m_fColorCorrectionFactors[6];
     float m_fColorCorrectionFactorsNull[6];
 
-    // Internal GetDIB() implementation combining unsharp mask and (low quality) rotation with GetDIB().
-    // pUnsharpMaskParams can be null if not used.
+    // Internal GetDIB() implementation with (low quality) rotation with GetDIB().
     // bUsingOriginalDIB is output parameter and contains if the cached DIB could be used and no processing has been done
     // When dRotation is not 0.0, PFLAG_HighQualityResampling must not be set
     void* GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
                          const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-                         const CUnsharpMaskParams * pUnsharpMaskParams, 
                          double dRotation, bool bShowGrid, bool& bParametersChanged);
 
     // Resample when panning was done, using existing data in DIBs. Old clipping rectangle is given in oldClippingRect
@@ -390,9 +382,6 @@ private:
 
     // Resize to given target size. Returns resampled DIB. Used when resizing original pixels.
     void* InternalResize(void* pixels, int channels, EResizeFilter filter, CSize targetSize, CSize sourceSize);
-
-    // Apply the given unsharp mask to m_pDIBPixels (can be null to not apply an unsharp mask, then NULL is returned)
-    void* ApplyUnsharpMask(const CUnsharpMaskParams * pUnsharpMaskParams, bool bNoChangesLDCandLUT);
 
     // pCachedTargetDIB is a pointer at the caller side holding the old processed DIB.
     // Returns a pointer to DIB to be used (either pCachedTargetDIB or pSourceDIB)
@@ -432,7 +421,7 @@ private:
     // Sets the m_bIsDestructivelyProcessed flag to true and resets rotation
     void MarkAsDestructivelyProcessed();
 
-    // Called when the original pixels have changed (rotate, crop, unsharp mask), all cached pixel data gets invalid
+    // Called when the original pixels have changed (rotate, crop), all cached pixel data gets invalid
     void InvalidateAllCachedPixelData();
 
     // Create histogram of the processed DIB (in original size) using the given image processing parameters

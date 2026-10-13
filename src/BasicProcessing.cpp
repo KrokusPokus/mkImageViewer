@@ -43,12 +43,6 @@ static void* ApplyLDC32bpp_Core(CSize fullTargetSize, CPoint fullTargetOffset, C
     CSize ldcMapSize, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap,
     float fBlackPt, float fWhitePt, float fBlackPtSteepness, uint32* pTarget);
 
-static int16* GaussFilter16bpp1Channel_Core(CSize fullSize, CPoint offset, CSize rect, int nTargetWidth, double dRadius,
-    const int16* pSourcePixels, int16* pTargetPixels);
-
-static void* UnsharpMask_Core(CSize fullSize, CPoint offset, CSize rect, double dAmount, const int16* pThresholdLUT,
-    const int16* pGrayImage, const int16* pSmoothedGrayImage, const void* pSourcePixels, void* pTargetPixels, int nChannels);
-
 static void* RotateHQ_Core(CPoint targetOffset, CSize targetSize, double dRotation, CSize sourceSize,
     const void* pSourcePixels, void* pTargetPixels, int nChannels, COLORREF backColor);
 
@@ -146,57 +140,6 @@ public:
     float BlackPt;
     float WhitePt;
     float BlackPtSteepness;
-};
-
-class CRequestGauss : public CProcessingRequest {
-public:
-    CRequestGauss(const int16* pSourcePixels, CSize fullSize, CPoint offset, CSize rect, double dRadius, int16* pTargetPixels)
-        : CProcessingRequest(pSourcePixels, fullSize, pTargetPixels, rect, offset, rect) {
-        Radius = dRadius;
-    }
-
-    virtual bool ProcessStrip(int offsetY, int sizeY) {
-        return NULL != GaussFilter16bpp1Channel_Core(SourceSize,
-            CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
-            CSize(FullTargetSize.cx, sizeY),
-            FullTargetSize.cy,
-            Radius,
-            (int16*)SourcePixels,
-            (int16*)TargetPixels + offsetY);
-    }
-
-    double Radius;
-};
-
-class CRequestUnsharpMask : public CProcessingRequest {
-public:
-    CRequestUnsharpMask(const void* pSourcePixels, CSize fullSize, CPoint offset, CSize rect, double dAmount, double dThreshold,
-        const int16* pThresholdLUT, const int16* pGrayImage, const int16* pSmoothedGrayImage, void* pTargetPixels, int nChannels)
-        : CProcessingRequest(pSourcePixels, fullSize, pTargetPixels, rect, offset, rect) {
-        Amount = dAmount;
-        Threshold = dThreshold;
-        ThresholdLUT = pThresholdLUT;
-        GrayImage = pGrayImage;
-        SmoothedGrayImage = pSmoothedGrayImage;
-        Channels = nChannels;
-    }
-
-    virtual bool ProcessStrip(int offsetY, int sizeY) {
-        return NULL != UnsharpMask_Core(SourceSize,
-            CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
-            CSize(FullTargetSize.cx, sizeY),
-            Amount,
-            ThresholdLUT, GrayImage, SmoothedGrayImage,
-            SourcePixels, TargetPixels,
-            Channels);
-    }
-
-    double Amount;
-    double Threshold;
-    const int16* ThresholdLUT;
-    const int16* GrayImage;
-    const int16* SmoothedGrayImage;
-    int Channels;
 };
 
 class CRequestRotate : public CProcessingRequest {
@@ -1253,45 +1196,6 @@ static void ApplyFilter1C16bpp(int nSourceWidth, int nTargetWidth,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-// Gauss filter (C++ implementation)
-/////////////////////////////////////////////////////////////////////////////////////////////
-
-int16* GaussFilter16bpp1Channel_Core(CSize fullSize, CPoint offset, CSize rect, int nTargetWidth, double dRadius, 
-                                                      const int16* pSourcePixels, int16* pTargetPixels) {
-    CGaussFilter filterX(fullSize.cx, dRadius);
-    ApplyFilter1C16bpp(fullSize.cx, nTargetWidth, offset.x, offset.y, rect.cx, rect.cy, filterX.GetFilterKernels(), pSourcePixels, pTargetPixels);
-    return pTargetPixels;
-}
-
-int16* CBasicProcessing::GaussFilter16bpp1Channel(CSize fullSize, CPoint offset, CSize rect, double dRadius, const int16* pPixels) {
-    if (pPixels == NULL) {
-        return NULL;
-    }
-
-    // Gauss filter x-direction
-    CProcessingThreadPool& threadPool = CProcessingThreadPool::This();
-    int16* pIntermediate = new(std::nothrow) int16[rect.cx * rect.cy];
-    if (pIntermediate == NULL) return NULL;
-    CRequestGauss requestX(pPixels, fullSize, offset, rect, dRadius, pIntermediate);
-    if (!threadPool.Process(&requestX)) {
-        delete[] pIntermediate;
-        return NULL;
-    }
-
-    // Gauss filter y-direction
-    int16* pTargetPixels = new(std::nothrow) int16[rect.cx * rect.cy];
-    if (pTargetPixels == NULL) {
-        delete[] pIntermediate;
-        return NULL;
-    }
-    CRequestGauss requestY(pIntermediate, CSize(rect.cy, rect.cx), CPoint(0, 0), CSize(rect.cy, rect.cx), dRadius, pTargetPixels);
-    bool bSuccess = threadPool.Process(&requestY);
-    delete[] pIntermediate;
-
-    return bSuccess ? pTargetPixels : NULL;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
 // High quality upsampling (C++ implementation)
 // Used with generic CPUs where no SIMD extensions are available.
 // This will NOT use linear color space! (it would need INT64 or FLOAT!)
@@ -2092,95 +1996,4 @@ void* CBasicProcessing::SampleUp_HQ_SIMD(CSize fullTargetSize, CPoint fullTarget
     bool bSuccess = threadPool.Process(&request);
 
     return bSuccess ? pTarget : NULL;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-// Unsharp mask
-/////////////////////////////////////////////////////////////////////////////////////////////
-
-// dX must be between 0 and 1, return value is in [0, dMaxPos]
-static double TransferFunc(double dX, double dThreshold, double dMaxPos) {
-    if (dX < dThreshold) {
-        double dXScaled = dX / dThreshold;
-        return dXScaled * dXScaled * dX;
-    } else if (dX < dMaxPos) {
-        return dX;
-    } else {
-        return (dX * dMaxPos - dMaxPos) / (dMaxPos - 1);
-    }
-}
-
-// Calculates a threshold LUT for sharpening, nNumEntriesPerSide*2 entries.
-static int16* CalculateThresholdLUT(int nNumEntriesPerSide, double dThreshold8bit, int16* & pLUTCenter) {
-    int16* pLUT = new int16[nNumEntriesPerSide*2];
-    const double dMin = -1.0 * (1 << 14); // Minimal value of LUT
-    const double dMax =  0.6 * (1 << 14); // Maximal value of LUT
-    const double cdPosXMaxValue = 0.2; // x-position where minimal respective maximal value is reached (normalized to 0, 1)
-    double dThreshold = dThreshold8bit / 255.0;
-    if (dThreshold > cdPosXMaxValue) dThreshold = cdPosXMaxValue;
-    double dNormFac = 1.0 / (double)nNumEntriesPerSide;
-    for (int nIndex = 0; nIndex < nNumEntriesPerSide*2; nIndex++) {
-        if (nIndex <= nNumEntriesPerSide) {
-            double dXNorm = (nNumEntriesPerSide - nIndex) * dNormFac; // goes 1 -> 0
-            pLUT[nIndex] = (int)(dMin * TransferFunc(dXNorm, dThreshold, cdPosXMaxValue) - 0.5);
-        } else {
-            double dXNorm = (nIndex - nNumEntriesPerSide) * dNormFac; // goes 0 -> 1
-            pLUT[nIndex] = (int)(dMax * TransferFunc(dXNorm, dThreshold, cdPosXMaxValue) + 0.5);
-        }
-    }
-    pLUTCenter = &(pLUT[nNumEntriesPerSide]);
-    return pLUT;
-}
-
-void* UnsharpMask_Core(CSize fullSize, CPoint offset, CSize rect, double dAmount, const int16* pThresholdLUT,
-                                         const int16* pGrayImage, const int16* pSmoothedGrayImage, const void* pSourcePixels, void* pTargetPixels, int nChannels) {
-    int nDIBLineLen = Helpers::DoPadding(fullSize.cx * nChannels, 4);
-    int nAmount = (int)(dAmount * (1 << 12) + 0.5);
-
-    for (int j = 0; j < rect.cy; j++) {
-        int nStartOffsetGray = offset.x + (offset.y + j) * fullSize.cx;
-        const int16* pGrayPtr = pGrayImage + nStartOffsetGray;
-        const int16* pSmoothPtr = pSmoothedGrayImage + nStartOffsetGray;
-
-        int nStartOffsetDIB = offset.x * nChannels + (offset.y + j)* nDIBLineLen;
-        uint8* pTargetPixelLine = (uint8*)pTargetPixels + nStartOffsetDIB;
-        uint8* pSourcePixelLine = (uint8*)pSourcePixels + nStartOffsetDIB;
-
-        for (int i = 0; i < rect.cx; i++) {
-            int nDiff = pThresholdLUT[(*pGrayPtr++ - *pSmoothPtr++) >> 4]; // Note: LUT contains 2^11 entries, subtraction of two 14 bit values can be 15 bit
-            int nSharpen = (nDiff * nAmount) >> 18; // nAmount 12 bit, nDiff 14 bit, shift back to 8 bit
-            int nBlue = pSourcePixelLine[0];
-            nBlue = nBlue + ((nSharpen * nBlue) >> 8);
-            int nGreen = pSourcePixelLine[1];
-            nGreen = nGreen + ((nSharpen * nGreen) >> 8);
-            int nRed = pSourcePixelLine[2];
-            nRed = nRed + ((nSharpen * nRed) >> 8);
-            pTargetPixelLine[0] = std::min(255, std::max(0, nBlue));
-            pTargetPixelLine[1] = std::min(255, std::max(0, nGreen));
-            pTargetPixelLine[2] = std::min(255, std::max(0, nRed));
-            if (nChannels == 4) {
-                pTargetPixelLine[3] = 0xFF;
-            }
-            pSourcePixelLine += nChannels;
-            pTargetPixelLine += nChannels;
-        }
-    }
-
-    return pTargetPixels;
-}
-
-void* CBasicProcessing::UnsharpMask(CSize fullSize, CPoint offset, CSize rect, double dAmount, double dThreshold, 
-                                    const int16* pGrayImage, const int16* pSmoothedGrayImage, const void* pSourcePixels, void* pTargetPixels, int nChannels) {
-    if (pSourcePixels == NULL || pTargetPixels == NULL || pGrayImage == NULL || pSmoothedGrayImage == NULL) {
-        return NULL;
-    }
-    int16* pThresholdLUT;
-    int16* pThresholdLUTBase = CalculateThresholdLUT(1024, dThreshold, pThresholdLUT);
-
-    CProcessingThreadPool& threadPool = CProcessingThreadPool::This();
-    CRequestUnsharpMask request(pSourcePixels, fullSize, offset, rect, dAmount, dThreshold, pThresholdLUT, pGrayImage, pSmoothedGrayImage, pTargetPixels, nChannels);
-    bool bSuccess = threadPool.Process(&request);
-
-    delete[] pThresholdLUTBase;
-    return bSuccess ? pTargetPixels : NULL;
 }
