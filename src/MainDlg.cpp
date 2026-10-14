@@ -1668,8 +1668,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 this->Invalidate(FALSE);
                 }
 
-            if (m_pCurrentImage != NULL)
-                GotoImage(POS_Current);
+            ReloadImage(false);
             break;
         case IDM_COPY:
             if (m_pCurrentImage != NULL) {
@@ -2831,6 +2830,11 @@ void CMainDlg::GotoImage(EImagePosition ePos) {
 }
 
 void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
+
+//* Debugging */	TCHAR debugtext[1024];
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1"), ePos, nFlags);
+//* Debugging */	::OutputDebugStringW(debugtext);
+
     // Timer handling for slideshows
     if (ePos == POS_Next || ePos == POS_NextSlideShow) {
         if (m_nCurrentTimeout > 0) {
@@ -2838,10 +2842,17 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         }
         StopAnimation();
         m_customAnimationFrameTime = 1000;
+
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1a: (ePos == POS_Next || ePos == POS_NextSlideShow)"), ePos, nFlags);
+//* Debugging */	::OutputDebugStringW(debugtext);
+
     } else if (ePos != POS_NextFrame) {
         StopMovieMode();
         StopAnimation();
         m_customAnimationFrameTime = 1000;
+
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1b: (ePos != POS_NextFrame)"), ePos, nFlags);
+//* Debugging */	::OutputDebugStringW(debugtext);
     }
 
     // solving a specific "edge" case, pun intended
@@ -2859,6 +2870,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     CFileList* pOldFileList = m_pFileList;
     int nOldFrameIndex = (m_pCurrentImage == NULL) ? 0 : m_pCurrentImage->FrameIndex();
     CJPEGProvider::EReadAheadDirection eDirection = CJPEGProvider::FORWARD;
+
     switch (ePos) {
         case POS_First:
             if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
@@ -2952,21 +2964,15 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
             break;
     }
 
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex);
+//* Debugging */	::OutputDebugStringW(debugtext);
+
     if (bCheckIfSameImage && (m_pFileList == pOldFileList && (nOldFrameIndex == nFrameIndex || bNoWrapAroundEdgeFrame) && !m_pFileList->ChangedSinceCheckpoint())) {
         if (m_bMovieMode && m_bAutoExit) {
             CleanupAndTerminate();
         } else {
-/* [GF] Disabled since distracting
-            if (CSettingsProvider::This().FlashWindowAlert()) {
-                // Flash window to notify user
-                FlashWindow(TRUE);  // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-flashwindow
-            }
-
-            if (CSettingsProvider::This().BeepSoundAlert()) {
-                // Use the system's default beep sound
-                MessageBeep(0xFFFFFFFF);  // https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messagebeep
-            }
-*/
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4b  bCheckIfSameImage=%d  bNoWrapAroundEdgeFrame=%d  m_pFileList->ChangedSinceCheckpoint()=%d"), ePos, nFlags, bCheckIfSameImage, bNoWrapAroundEdgeFrame, m_pFileList->ChangedSinceCheckpoint());
+//* Debugging */	::OutputDebugStringW(debugtext);
             return; // not placed on a new image, don't do anything
         }
     }
@@ -2997,9 +3003,14 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     if (nFlags & KEEP_PARAMETERS) {
         procParams.ProcFlags = SetProcessingFlag(procParams.ProcFlags, PFLAG_KeepParams, true);
     }
+
+
     if (ePos == POS_Clipboard) {
         m_nLastLoadError = HelpersGUI::FileLoad_PasteFromClipboardFailed;
     } else {
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage()->RequestImage()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
+//* Debugging */	::OutputDebugStringW(debugtext);
+
         LPCTSTR pRawFileName = m_pFileList->Current();
         std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
 
@@ -3013,9 +3024,16 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
         m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
     }
+
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
+//* Debugging */	::OutputDebugStringW(debugtext);
+
     double minimalDisplayTime = CSettingsProvider::This().MinimalDisplayTime();
     bool bSynchronize = (nFlags & KEEP_PARAMETERS) == 0;
     AfterNewImageLoaded(bSynchronize, false, minimalDisplayTime > 0, ePos == POS_Previous);
+
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos7  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
+//* Debugging */	::OutputDebugStringW(debugtext);
 
     // If current image is animated, start playback
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
@@ -3041,11 +3059,17 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         AdjustWindowToImage(false);
     }
 
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos8  m_offsets.x=%d  m_offsets.y=%d"), ePos, nFlags, m_offsets.x, m_offsets.y);
+//* Debugging */	::OutputDebugStringW(debugtext);
+
     if (((nFlags & NO_UPDATE_WINDOW) == 0) && !(ePos == POS_NextSlideShow && UseSlideShowTransitionEffect())) {
         this->Invalidate(FALSE);
         // this will force to wait until really redrawn, preventing to process images but do not show them
         this->UpdateWindow();
     }
+
+//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage() after UpdateWindow()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
+//* Debugging */	::OutputDebugStringW(debugtext);
 
     // remove key messages accumulated so far
     if (!(nFlags & NO_REMOVE_KEY_MSG)) {
