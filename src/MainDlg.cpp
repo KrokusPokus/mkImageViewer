@@ -404,11 +404,22 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
     
     // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
     m_pJPEGProvider = new CJPEGProvider(m_hWnd, NUM_THREADS, nReadAheadBuffers);
-    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList, CJPEGProvider::FORWARD,
-        m_pFileList->Current(), nFrameIndex, CreateProcessParams(!m_bFullScreenMode), m_bOutOfMemoryLastImage, m_bExceptionErrorLastImage);
+
+    LPCTSTR pRawFileName = m_pFileList->Current();
+    std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
+
+    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+                                                    CJPEGProvider::FORWARD,
+                                                    strFileName,
+                                                    nFrameIndex,
+                                                    CreateProcessParams(!m_bFullScreenMode),
+                                                    m_bOutOfMemoryLastImage,
+                                                    m_bExceptionErrorLastImage);
+
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
     }
+
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
     CheckIfApplyAutoFitWndToImage(true);
     AfterNewImageLoaded(true, true, false); // synchronize to per image parameters
@@ -2756,9 +2767,18 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
     InitParametersForNewImage();
     m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
     m_pJPEGProvider->ClearAllRequests();
-    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList, CJPEGProvider::FORWARD,
-        m_pFileList->Current(), nFrameIndex, CreateProcessParams(!m_bFullScreenMode && (bAfterStartup || IsAdjustWindowToImage())),
-        m_bOutOfMemoryLastImage, m_bExceptionErrorLastImage);
+
+    LPCTSTR pRawFileName = m_pFileList->Current();
+    std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
+
+    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+                                                    CJPEGProvider::FORWARD,
+                                                    strFileName,
+                                                    nFrameIndex,
+                                                    CreateProcessParams(!m_bFullScreenMode && (bAfterStartup || IsAdjustWindowToImage())),
+                                                    m_bOutOfMemoryLastImage,
+                                                    m_bExceptionErrorLastImage);
+
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
     if (bAfterStartup) CheckIfApplyAutoFitWndToImage(false);
     AfterNewImageLoaded(true, false, false);
@@ -2980,9 +3000,17 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     if (ePos == POS_Clipboard) {
         m_nLastLoadError = HelpersGUI::FileLoad_PasteFromClipboardFailed;
     } else {
-        m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList, (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,  
-            m_pFileList->Current(), nFrameIndex, procParams,
-            m_bOutOfMemoryLastImage, m_bExceptionErrorLastImage);
+        LPCTSTR pRawFileName = m_pFileList->Current();
+        std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
+
+        m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+                                                        (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
+                                                        strFileName,
+                                                        nFrameIndex,
+                                                        procParams,
+                                                        m_bOutOfMemoryLastImage,
+                                                        m_bExceptionErrorLastImage);
+
         m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
     }
     double minimalDisplayTime = CSettingsProvider::This().MinimalDisplayTime();

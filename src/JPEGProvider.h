@@ -31,7 +31,7 @@ public:
     // Parameters
     // pFileList: List of files, required for read-ahead. If NULL, no read-ahead will be done.
     // eDirection: Read-ahead direction.
-    // strFileName: File name (with path) of the image to load and process. Typically pFileList->Current().
+    // sFileName: File name (with path) of the image to load and process. Typically pFileList->Current().
     // nFrameIndex: Index of frame for multiframe images, zero otherwise.
     // processParams: Parameters for processing the image.
     // Return value
@@ -42,7 +42,7 @@ public:
     // When the requested image is already cached, it is returned immediately. Otherwise the method
     // blocks until the image is ready. If not specified otherwise, a read-ahead request for the next image is
     // created automatically so that the next image will be ready immediately when requested in the future.
-    CJPEGImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, LPCTSTR strFileName, int nFrameIndex,
+    CJPEGImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const std::wstring& sFileName, int nFrameIndex,
         const CProcessParams & processParams, bool& bOutOfMemory, bool& bExceptionError);
 
     // Notifies that the specified image is no longer used and its memory can be freed.
@@ -64,7 +64,13 @@ public:
     bool FreeAllPossibleMemory();
 
     // Tells the provider that a file has been renamed externally so that pending requests to read this file can be updated.
-    void FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName);
+	// Used by the internal rename capability inside ImageProcPanel:
+	//     CString sCurFileName(sCurrentFileName);
+	//     m_pMainDlg->GetFileList()->FileHasRenamed(sCurFileName, sNewFileName);
+	//     m_pMainDlg->GetJPEGProvider()->FileHasRenamed(sCurFileName, sNewFileName);
+	/*
+    void FileHasRenamed(const std::wstring& oldFileName, const std::wstring& newFileName);
+	*/
 
     // Must be called by the message handler window (see constructor) when the WM_IMAGE_LOAD_COMPLETED
     // message was received.
@@ -73,7 +79,7 @@ public:
 private:
     // stores a request for loading and processing a JPEG image
     struct CImageRequest {
-        CString FileName; // file name with path of image
+        std::wstring FileName; // file name with path of image
         int FrameIndex; // zero based frame index for multiframe images
         CJPEGImage* Image; // loaded image
         bool Ready; // true if the request has finished loading and the image is ready (if NULL, loading failed)
@@ -120,11 +126,10 @@ private:
     void GetLoadedImageFromWorkThread(CImageRequest* pRequest);
     CImageLoadThread* SearchThreadForNewRequest(void);
     void RemoveUnusedImages(bool bRemoveAlsoReadAhead);
-    CImageRequest* StartRequestAndWaitUntilReady(LPCTSTR sFileName, int nFrameIndex, const CProcessParams & processParams);
-    CImageRequest* StartNewRequest(LPCTSTR sFileName, int nFrameIndex, const CProcessParams & processParams);
+    CImageRequest* StartRequestAndWaitUntilReady(const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams);
+    CImageRequest* StartNewRequest(const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams);
     void StartNewRequestBundle(CFileList* pFileList, EReadAheadDirection eDirection, const CProcessParams & processParams, int nNumRequests, CImageRequest* pLastReadyRequest);
-    CImageRequest* FindRequest(LPCTSTR strFileName, int nFrameIndex);
-    //void DeactivateOldestRequests();
+    CImageRequest* FindRequest(const std::wstring& sFileName, int nFrameIndex);
     std::list<CJPEGProvider::CImageRequest*>::iterator DeleteElementAt(std::list<CImageRequest*>::iterator iteratorAt); // also deletes the request and the image in the request
     void DeleteElement(CImageRequest* pRequest);
     bool IsDestructivelyProcessed(CJPEGImage* pImage);

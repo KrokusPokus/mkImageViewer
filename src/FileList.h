@@ -68,7 +68,13 @@ public:
     void Reload(LPCTSTR sFileName = NULL, bool clearForwardHistory = true);
 
     // Tells the file list that a file has been renamed externally
-    //void FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName);
+	// Used by the internal rename capability inside ImageProcPanel:
+	//     CString sCurFileName(sCurrentFileName);
+	//     m_pMainDlg->GetFileList()->FileHasRenamed(sCurFileName, sNewFileName);
+	//     m_pMainDlg->GetJPEGProvider()->FileHasRenamed(sCurFileName, sNewFileName);
+	/*
+    void FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName);
+	*/
 
     // Tells that the modification date of the current file has changed
     //void ModificationTimeChanged();

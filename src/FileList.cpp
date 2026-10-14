@@ -267,6 +267,11 @@ bool CFileList::CurrentFileExists() const {
     return false;
 }
 
+// Tells the file list that a file has been renamed externally
+// Used by the internal rename capability inside ImageProcPanel:
+//     CString sCurFileName(sCurrentFileName);
+//     m_pMainDlg->GetFileList()->FileHasRenamed(sCurFileName, sNewFileName);
+//     m_pMainDlg->GetJPEGProvider()->FileHasRenamed(sCurFileName, sNewFileName);
 /*
 void CFileList::FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName) {
     if (_tcsicmp(sOldFileName, m_sInitialFile) == 0) {
