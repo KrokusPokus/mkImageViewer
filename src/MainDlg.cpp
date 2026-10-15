@@ -234,8 +234,6 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
     m_bIsAnimationPlaying = false;
     m_nLastAnimationOffset = 0;
     m_nExpectedNextAnimationTickCount = 0;
-    m_bUseLosslessWEBP = false;
-    m_isBeforeFileSelected = true;
     m_dLastImageDisplayTime = 0.0;
     m_isUserFitToScreen = false;
     m_autoZoomFitToScreen = Helpers::ZM_FillScreen;
@@ -459,7 +457,6 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
     }
 
     m_bLockPaint = false;
-    m_isBeforeFileSelected = m_sStartupFile.IsEmpty();
 
     if (m_nAutoStartSlideShow > 0) {
         StartMovieMode(1.0 / m_nAutoStartSlideShow);
@@ -482,16 +479,8 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         return 0;
     }
 
-    // On first paint show 'Open File' dialog if no file passed on command line
-    if (s_bFirst) {
-        s_bFirst = false;
-        if (m_sStartupFile.IsEmpty()) {
-            m_isBeforeFileSelected = false;
-        }
-    }
-
-/*GF*/    if (m_DynDwmFlush)
-/*GF*/        m_DynDwmFlush();    // Wait for vsync
+/*GF*/ if (m_DynDwmFlush)
+/*GF*/     m_DynDwmFlush();    // Waits for vsync
 
     CPaintDC dc(m_hWnd);
     m_dRealizedZoom = 1.0;
@@ -792,12 +781,7 @@ void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const CRect& clientRect,
     dc.SetTextColor(CSettingsProvider::This().ColorGUI());
     if (m_sStartupFile.IsEmpty() && m_pCurrentImage == NULL) {
         CRect rectText(0, clientRect.Height()/2 - HelpersGUI::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
-        if (m_isBeforeFileSelected) {
-            dc.DrawText(CNLS::GetString(_T("Select file to display in 'File Open' dialog")), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
-        } else {
-            dc.DrawText(CString(CNLS::GetString(_T("No image loaded!"))) + _T("\n\n") + CNLS::GetString(_T("Right mouse button: Context menu")) + _T("\nCtrl-O: ") + CNLS::GetString(_T("Open new image or slideshow file")) + _T("\n\n") +
-                CNLS::GetString(_T("Press ESC to exit...")), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
-       }
+        dc.DrawText(CString(CNLS::GetString(_T("No image loaded!"))) + _T("\n\n")  + CNLS::GetString(_T("Press ESC to exit...")), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
     } else if (pCurrentImage == NULL) {
         CString sFileName;
         if (m_nLastLoadError == HelpersGUI::FileLoad_SlideShowListInvalid) {

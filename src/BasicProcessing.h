@@ -98,17 +98,6 @@ public:
     // Notice that the A channel is not processed and set to fixed value 0xFF.
     static void* ApplySaturationAnd3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT);
 
-    // Dim out a rectangle in the given 32 bpp BGRA DIB.
-    // Notice that dimming is done by modifying the BGR values, the A channel is set to fixed value 0xFF.
-    // fDimValue is the value to multiply with the B, G and R values (between 0.0 and 1.0)
-    // The method is inplace and changes the input DIB
-    static void DimRectangle32bpp(int nWidth, int nHeight, void* pDIBPixels, CRect rect, float fDimValue);
-
-    // Fills a rectangle in the 32 bpp BGRA DIB with the given color
-    // The method is inplace and changes the input DIB. Clipping of rect against DIB size is done.
-    // The A value in 'color' is ignored and set to fixed value 0xFF.
-    static void FillRectangle32bpp(int nWidth, int nHeight, void* pDIBPixels, CRect rect, COLORREF color);
-
     // The following methods take into account that the original image with size (w, h) - denoted as 'sourceSize' -
     // is zoomed by a factor x, thus resulting in a (virtual) image size of (w * x, h * x) - denoted as 'fullTargetSize'.
     // Actually displayed is only a part of this virtual image, using a cropping rectangle with top, left

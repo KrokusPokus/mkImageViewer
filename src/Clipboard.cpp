@@ -68,9 +68,7 @@ void CClipboard::CopyImageToClipboard(HWND hWnd, CJPEGImage * pImage, LPCTSTR fi
         return;
     }
 
-    pImage->EnableDimming(false);
     DoCopy(hWnd, pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), fileName);
-    pImage->EnableDimming(true);
 }
 
 void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams,
@@ -89,19 +87,15 @@ void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const 
     clipRect.right = std::min<LONG>(pImage->OrigWidth(), clipRect.right);
     clipRect.bottom = std::min<LONG>(pImage->OrigHeight(), clipRect.bottom);
 
-    pImage->EnableDimming(false);
     void* pDIB = pImage->GetDIB(pImage->OrigSize(), clipRect.Size(), clipRect.TopLeft(), procParams, eFlags);
     DoCopy(hWnd, clipRect.Width(), clipRect.Height(), pDIB, fileName);
-    pImage->EnableDimming(true);
 }
 
 void CClipboard::CopyPathToClipboard(HWND hWnd, CJPEGImage* pImage, LPCTSTR fileName) {
     if (pImage == NULL || pImage->DIBPixelsLastProcessed(true) == NULL) {
         return;
     }
-    pImage->EnableDimming(false);
     DoCopyFileNameText(hWnd, fileName);
-    pImage->EnableDimming(true);
 }
 
 void CClipboard::CutFileToClipboard(HWND hWnd, LPCTSTR fileName) {

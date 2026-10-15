@@ -58,16 +58,7 @@ public:
     void* GetDIB(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
         const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
         bool bNotUsed;
-        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, 0.0, false, bNotUsed);
-    }
-
-    // Gets resampled and processed DIB image (up or downsampled), also including a low quality rotation.
-    // The rotation angle is specified in radians.
-    // PFLAG_HighQualityResampling must not be set when calling this method 
-    void* GetDIBRotated(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
-        const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags, double dRotation, bool bShowGrid) {
-        bool bNotUsed;
-        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, dRotation, bShowGrid, bNotUsed);
+        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, bNotUsed);
     }
 
     // Operations on original pixels of the image
@@ -153,9 +144,6 @@ public:
     // Gets the DIB last processed. If none, the last used parameters are taken to generate the DIB - if bGenerateDIBIfNeeded is true 
     void* DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded);
 
-    // Gets the DIB pixels of the last processed thumbnail image, NULL if none or invalid
-    void* DIBPixelsLastThumbnail() { return (m_pThumbnail == NULL) ? NULL : m_pThumbnail->DIBPixelsLastProcessed(false); }
-
     // Gets the image processing flags as set as default (may varies from file to file)
     EProcessingFlags GetInitialProcessFlags() const { return m_eProcFlagsInitial; }
 
@@ -192,9 +180,6 @@ public:
     // Input are the global defaults for the processing parameters, output (in pParams) are the
     // processing parameters for this file (maybe different from the global ones)
     void SetFileDependentProcessParams(LPCTSTR sFileName, CProcessParams* pParams);
-
-    // Disable/enable dimming with the set dim rects (default is enabled)
-    void EnableDimming(bool bEnable);
 
     // Gets if the image was found in parameter DB
     bool IsInParamDB() const { return m_bInParamDB; }
@@ -294,14 +279,6 @@ private:
     int m_nNumberOfFrames;
     int m_nFrameTimeMs;
 
-    // cached thumbnail image, created on first request
-    CJPEGImage* m_pThumbnail;
-
-    // thumbnail image for histogram of the processed image
-    // this thumbnail is needed because not the whole image is processed, only the visible section,
-    // however the histogram must be calculated over the whole processed image
-    CJPEGImage* m_pHistogramThumbnail;
-
     // Thumbnail related stuff
     bool m_bIsThumbnailImage;
     CHistogram* m_pCachedProcessedHistogram;
@@ -312,10 +289,6 @@ private:
     void* m_pDIBPixelsLUTProcessed;
     void* m_pDIBPixels;
     void* m_pLastDIB; // one of the pointers above
-
-    // Cached gray and smoothed gray image for unsharp masking
-    int16* m_pGrayImage;
-    int16* m_pSmoothGrayImage;
 
     // Image processing parameters and flags during last call to GetDIB()
     CImageProcessingParams m_imageProcParams;
@@ -339,15 +312,10 @@ private:
     CSize m_FullTargetSize; 
     CSize m_ClippingSize; // this is the size of the DIB
     CPoint m_TargetOffset;
-    double m_dRotationLQ; // low quality rotation angle (radians)
 
     bool m_bInParamDB; // true if image found in param DB
     bool m_bHasZoomStoredInParamDB; // true if image in param DB and entry contains zoom and offset values
     bool m_bFirstReprocessing; // true if never reprocessed before, some optimizations may be not done initially
-    CDimRect* m_pDimRects;
-    int m_nNumDimRects;
-    bool m_bEnableDimming;
-    bool m_bShowGrid;
 
     double m_dLastOpTickCount;
     double m_dLoadTickCount;
@@ -363,10 +331,9 @@ private:
 
     // Internal GetDIB() implementation with (low quality) rotation with GetDIB().
     // bUsingOriginalDIB is output parameter and contains if the cached DIB could be used and no processing has been done
-    // When dRotation is not 0.0, PFLAG_HighQualityResampling must not be set
     void* GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
                          const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-                         double dRotation, bool bShowGrid, bool& bParametersChanged);
+                         bool& bParametersChanged);
 
     // Resample when panning was done, using existing data in DIBs. Old clipping rectangle is given in oldClippingRect
     void ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, CSize fullTargetSize, 
@@ -374,8 +341,8 @@ private:
         EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, double dRotation, EResizeType eResizeType);
 
     // Resample to given target size. Returns resampled DIB
-    void* Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, 
-        EProcessingFlags eProcFlags, double dSharpen, double dRotation, EResizeType eResizeType);
+    void* Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
+        EProcessingFlags eProcFlags, double dSharpen, EResizeType eResizeType);
 
     // Resize to given target size. Returns resampled DIB. Used when resizing original pixels.
     void* InternalResize(void* pixels, int channels, EResizeFilter filter, CSize targetSize, CSize sourceSize);
@@ -423,8 +390,6 @@ private:
 
     // Create histogram of the processed DIB (in original size) using the given image processing parameters
     const CHistogram* GetHistogramOfProcessedDIB(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags);
-
-    void DrawGridLines(void * pDIB, const CSize& dibSize);
 };
 
 

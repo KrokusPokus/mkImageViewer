@@ -253,8 +253,6 @@ private:
     Helpers::ETransitionEffect m_eTransitionEffect;
     int m_nTransitionTime;
     DWORD m_nLastSlideShowImageTickCount;
-    bool m_bUseLosslessWEBP;
-    bool m_isBeforeFileSelected;
     double m_dLastImageDisplayTime;
     Helpers::ETransparencyMode m_eTransparencyMode; //for transparent background
     bool m_bUseEmbeddedColorProfiles;

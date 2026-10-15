@@ -451,52 +451,6 @@ void* CBasicProcessing::ApplyLDC32bpp(CSize fullTargetSize, CPoint fullTargetOff
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-// Dimming of part of image and drawing of rectangles
-/////////////////////////////////////////////////////////////////////////////////////////////
-
-void CBasicProcessing::DimRectangle32bpp(int nWidth, int nHeight, void* pDIBPixels, CRect rect, float fDimValue) {
-    CRect rectTarget;
-    rectTarget.IntersectRect(CRect(0, 0, nWidth, nHeight), rect);
-    if (pDIBPixels == NULL || rectTarget.IsRectEmpty()) {
-        return;
-    }
-    uint8 alphaLUT[256];
-    int nFactor = (int)(fDimValue*65536 + 0.5f);
-    for (int a = 0; a < 256; a++) {
-        alphaLUT[a] = a*nFactor >> 16;
-    }
-
-    uint32* pSrc = (uint32*) pDIBPixels + rectTarget.top*nWidth + rectTarget.left;
-    for (int j = 0; j < rectTarget.Height(); j++) {
-        uint32* pLine = pSrc;
-        for (int i = 0; i < rectTarget.Width(); i++) {
-            uint32 nPixel = *pLine;
-            *pLine++ = alphaLUT[nPixel & 0xFF] + 256*alphaLUT[(nPixel >> 8) & 0xFF] + 65536*alphaLUT[(nPixel >> 16) & 0xFF] + ALPHA_OPAQUE;
-        }
-        pSrc += nWidth;
-    }
-}
-
-void CBasicProcessing::FillRectangle32bpp(int nWidth, int nHeight, void* pDIBPixels, CRect rect, COLORREF color) {
-    CRect rectTarget;
-    rectTarget.IntersectRect(CRect(0, 0, nWidth, nHeight), rect);
-    if (pDIBPixels == NULL || rectTarget.IsRectEmpty()) {
-        return;
-    }
-
-    color = color | ALPHA_OPAQUE;
-    uint32* pSrc = (uint32*) pDIBPixels + rectTarget.top*nWidth + rectTarget.left;
-    for (int j = 0; j < rectTarget.Height(); j++) {
-        uint32* pLine = pSrc;
-        for (int i = 0; i < rectTarget.Width(); i++) {
-            //uint32 nPixel = *pLine;
-            *pLine++ = color;
-        }
-        pSrc += nWidth;
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
 // Conversion and rotation methods
 /////////////////////////////////////////////////////////////////////////////////////////////
 
