@@ -1,10 +1,14 @@
 #ifndef MAINDLG_H
 #define MAINDLG_H
 
+#include <QHash>
+#include <QString>
+
 #include "resource.h"
 #include "MessageDef.h"
 #include "ProcessParams.h"
 #include "Helpers.h"
+
 
 class CFileList;
 class CJPEGProvider;
@@ -337,6 +341,12 @@ private:
     void ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting);
     
     int m_customAnimationFrameTime;
+
+    struct IconResult {
+        HICON hBig = nullptr;
+        HICON hSmall = nullptr;
+    };
+    inline static QHash<QString, IconResult> s_iconCache; // Klassenweiter Cache pro Datei-Endung
 };
 
 

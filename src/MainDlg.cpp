@@ -279,6 +279,16 @@ CMainDlg::~CMainDlg() {
     delete m_pImageProcParamsKept;
     delete m_pKeyMap;
 
+    for (auto it = s_iconCache.begin(); it != s_iconCache.end(); ++it) {
+        if (it->hBig != nullptr) {
+            ::DestroyIcon(it->hBig);
+        }
+        if (it->hSmall != nullptr) {
+            ::DestroyIcon(it->hSmall);
+        }
+    }
+    s_iconCache.clear();
+
 // DWM api is used for vsync in smooth scrolling implementation
     if (m_hmodDwmapi) {
         FreeLibrary(m_hmodDwmapi);
@@ -526,9 +536,11 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, m_offsets);
 
         void* pDIBData;
-        pDIBData = m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, 
-            *m_pImageProcParams, 
-            CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, false, m_bLandscapeMode));
+        pDIBData = m_pCurrentImage->GetDIB(newSize,
+                                           clippedSize,
+                                           offsetsInImage,
+                                           *m_pImageProcParams,
+                                           CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, false, m_bLandscapeMode));
 
         // Paint the DIB
         if (pDIBData != NULL) {
@@ -536,6 +548,8 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
             CPoint ptDIBStart = HelpersGUI::DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, m_DIBOffsets);
         }
         if (m_bZoomMode) m_offsets = unlimitedOffsets;
+
+        UINT timeNow = Helpers::GetTimeMs();
 
         if (m_bShowInfo) {
             CSettingsProvider& sp = CSettingsProvider::This();
@@ -2817,7 +2831,6 @@ void CMainDlg::GotoImage(EImagePosition ePos) {
 }
 
 void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
-
 //* Debugging */	TCHAR debugtext[1024];
 //* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1"), ePos, nFlags);
 //* Debugging */	::OutputDebugStringW(debugtext);
@@ -2997,7 +3010,6 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
 	LPCTSTR pRawFileName = m_pFileList->Current();
 	std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
-
 	m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
 													(ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
 													strFileName,
@@ -3008,12 +3020,12 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
 	m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
 
-
 //* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
 //* Debugging */	::OutputDebugStringW(debugtext);
 
     double minimalDisplayTime = CSettingsProvider::This().MinimalDisplayTime();
     bool bSynchronize = (nFlags & KEEP_PARAMETERS) == 0;
+
     AfterNewImageLoaded(bSynchronize, false, minimalDisplayTime > 0, ePos == POS_Previous);
 
 //* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos7  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
@@ -3464,10 +3476,12 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool n
         bool bLastWasInParamDB = m_bCurrentImageInParamDB;
         m_bCurrentImageInParamDB = false;
         m_bCurrentImageIsSpecialProcessing = false;
+
         if (m_pCurrentImage != NULL) {
             m_dCurrentInitialLightenShadows = m_pCurrentImage->GetInitialProcessParams().LightenShadows;
             m_bCurrentImageInParamDB = m_pCurrentImage->IsInParamDB();
             m_bCurrentImageIsSpecialProcessing = m_pCurrentImage->GetLightenShadowFactor() != 1.0f;
+
             if (!m_bKeepParams) {
                 // [GF] Do not restore these to how they were when the image was loaded before. If the user has intentionally changed these settings since that time, the current settings should be respected.
                 //m_bHQResampling = GetProcessingFlag(m_pCurrentImage->GetInitialProcessFlags(), PFLAG_HighQualityResampling);
@@ -3493,6 +3507,7 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool n
             if (m_bKeepParams) {
                 m_nRotation = m_pCurrentImage->GetInitialRotation() + m_nUserRotation;
             }
+
             // [GF] Adjust m_offsets for BookMode
             if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
                 if (bMoveBack == false)
@@ -3503,6 +3518,7 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool n
                 m_offsets_custom = m_offsets;
             }
         }
+
         if (!bAfterStartup && !m_bIsAnimationPlaying && !noAdjustWindow) {
             AdjustWindowToImage(false);
         }
@@ -3704,15 +3720,16 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     static TCHAR s_PrevFileExt[MAX_PATH];
     static TCHAR s_PrevTitleText[MAX_PATH];
 
-    bool bShowFullPathInTitle  = CSettingsProvider::This().ShowFullPathInTitle();
+    bool bShowFullPathInTitle = CSettingsProvider::This().ShowFullPathInTitle();
     LPCTSTR sCurrentFileName = CurrentFileName(!bShowFullPathInTitle);
+
     if (sCurrentFileName == NULL || m_pCurrentImage == NULL) {
-        if ((lstrcmpi(_T(JPEGVIEW_TITLE),s_PrevTitleText) != 0) || (bForce == true)) {
-            _stprintf_s(s_PrevTitleText, MAX_PATH, _T("%s"),_T(JPEGVIEW_TITLE));
+        if ((lstrcmpi(_T(JPEGVIEW_TITLE), s_PrevTitleText) != 0) || (bForce == true)) {
+            _stprintf_s(s_PrevTitleText, MAX_PATH, _T("%s"), _T(JPEGVIEW_TITLE));
             this->SetWindowText(_T(JPEGVIEW_TITLE));
         }
     } else {
-        CString sWindowText =  sCurrentFileName;
+        CString sWindowText = sCurrentFileName;
         sWindowText += GetMultiframeIndex(m_pCurrentImage);
         if (CSettingsProvider::This().ShowEXIFDateInTitle()) {
             CEXIFReader* pEXIF = m_pCurrentImage->GetEXIFReader();
@@ -3722,71 +3739,82 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
         }
         sWindowText += " - " + CString(JPEGVIEW_TITLE);
 
-        if (lstrcmpi(sWindowText,s_PrevTitleText) != 0) {
+        if (lstrcmpi(sWindowText, s_PrevTitleText) != 0) {
             _tcscpy_s(s_PrevTitleText, MAX_PATH, sWindowText);
             this->SetWindowText(sWindowText);
         }
     }
 
-// [GF] Update title bar icon
+    // Update title bar icon
     if (CSettingsProvider::This().TitleBarUseFileIcon()) {
-        HICON hIconBigPrevious = NULL;
-        HICON hIconSmallPrevious = NULL;
-        HICON hIconBig = NULL;
-        HICON hIconSmall = NULL;
-        SHFILEINFO shfi;
-        
-        if (sCurrentFileName == NULL || m_pCurrentImage == NULL) {
-            hIconBig = (HICON)::LoadImage(::GetModuleHandle(0),MAKEINTRESOURCE(IDR_MAINFRAME),IMAGE_ICON,::GetSystemMetrics(SM_CXICON),::GetSystemMetrics(SM_CYICON),LR_VGACOLOR);
-            if (hIconBig != NULL) {
-                hIconBigPrevious = (HICON)::SendMessage(CMainDlg::m_hWnd,WM_SETICON,ICON_BIG,(LPARAM)hIconBig);
-                if (hIconBigPrevious != NULL)
-                    DestroyIcon(hIconBigPrevious);
-            }
+        LPCTSTR sCurrentFilePath = CurrentFileName(false);
+        QString cacheKey = "__default__";
+        TCHAR currentCheckExt[MAX_PATH];
 
-
-            hIconSmall = (HICON)::LoadImage(::GetModuleHandle(0),MAKEINTRESOURCE(IDR_MAINFRAME),IMAGE_ICON,::GetSystemMetrics(SM_CXSMICON),::GetSystemMetrics(SM_CYSMICON),LR_VGACOLOR);
-            if (hIconSmall != NULL) {
-                hIconSmallPrevious = (HICON)::SendMessage(CMainDlg::m_hWnd,WM_SETICON,ICON_SMALL,(LPARAM)hIconSmall);
-                if (hIconSmallPrevious != NULL)
-                    DestroyIcon(hIconSmallPrevious);
-            }
+        if (sCurrentFileName == NULL || m_pCurrentImage == NULL || sCurrentFilePath == NULL) {
+            _tcscpy_s(currentCheckExt, MAX_PATH, _T("__default__"));
+            cacheKey = "__default__";
         } else {
-            LPCTSTR sCurrentFilePath = CurrentFileName(false);
-            TCHAR *pExt = NULL;                                // TCHAR = WCHAR on unicode
-            pExt = PathFindExtension(sCurrentFilePath);        // input: PTSTR, output: PTSTR
-    
-            if ((lstrcmpi(pExt,s_PrevFileExt) != 0) || (bForce == true)) {
-                if (*pExt != '\0') {
-                    wsprintf(s_PrevFileExt, _T("%s"),pExt);
-    
-                    if (SHGetFileInfo(sCurrentFilePath,0,&shfi,sizeof(SHFILEINFO),SHGFI_ICON))
-                        hIconBig = shfi.hIcon;
-                    
-                    if (SHGetFileInfo(sCurrentFilePath,0,&shfi,sizeof(SHFILEINFO),SHGFI_ICON|SHGFI_SMALLICON))
-                        hIconSmall = shfi.hIcon;
+            LPCTSTR pExt = PathFindExtension(sCurrentFilePath);
+            if (*pExt != '\0') {
+                _tcscpy_s(currentCheckExt, MAX_PATH, pExt);
+                cacheKey = QString::fromWCharArray(pExt).toLower();
+            } else {
+                _tcscpy_s(currentCheckExt, MAX_PATH, _T(""));
+                cacheKey = "__default__";
+            }
+        }
+
+        if ((lstrcmpi(currentCheckExt, s_PrevFileExt) != 0) || (bForce == true)) {
+            _tcscpy_s(s_PrevFileExt, MAX_PATH, currentCheckExt);
+
+            HICON hBig = nullptr;
+            HICON hSmall = nullptr;
+            if (s_iconCache.contains(cacheKey)) {
+                hBig = s_iconCache[cacheKey].hBig;
+                hSmall = s_iconCache[cacheKey].hSmall;
+            } else {
+                /* Debugging */ UINT timeStart = Helpers::GetTimeMs();
+
+                IconResult result;
+                std::wstring wExt = cacheKey.toStdWString();
+
+                if (cacheKey == "__default__") {
+                    HINSTANCE hInst = ::GetModuleHandle(0);
+                    int cxIcon = ::GetSystemMetrics(SM_CXICON);
+                    int cyIcon = ::GetSystemMetrics(SM_CYICON);
+                    int cxSmIcon = ::GetSystemMetrics(SM_CXSMICON);
+                    int cySmIcon = ::GetSystemMetrics(SM_CYSMICON);
+
+                    result.hBig = (HICON)::LoadImage(hInst, MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, cxIcon, cyIcon, LR_VGACOLOR);
+                    result.hSmall = (HICON)::LoadImage(hInst, MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, cxSmIcon, cySmIcon, LR_VGACOLOR);
                 } else {
-                    *s_PrevFileExt = '\0';
+                    SHFILEINFO shfi;
+                    if (SHGetFileInfo(wExt.c_str(), FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_USEFILEATTRIBUTES)) {
+                        result.hBig = shfi.hIcon;
+                    }
+                    if (SHGetFileInfo(wExt.c_str(), FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES)) {
+                        result.hSmall = shfi.hIcon;
+                    }
                 }
-    
-                if (hIconBig == NULL)
-                    hIconBig = (HICON)::LoadImage(::GetModuleHandle(0),MAKEINTRESOURCE(IDR_MAINFRAME),IMAGE_ICON,::GetSystemMetrics(SM_CXICON),::GetSystemMetrics(SM_CYICON),LR_VGACOLOR);
-    
-                if (hIconBig != NULL) {
-                    hIconBigPrevious = (HICON)::SendMessage(CMainDlg::m_hWnd,WM_SETICON,ICON_BIG,(LPARAM)hIconBig);
-                    if ((hIconBigPrevious != NULL) && (hIconBigPrevious != hIconBig))
-                        DestroyIcon(hIconBigPrevious);
+
+                if (result.hBig != nullptr || result.hSmall != nullptr) {
+                    s_iconCache[cacheKey] = result;
+                    hBig = result.hBig;
+                    hSmall = result.hSmall;
                 }
-    
-    
-                if (hIconSmall == NULL)
-                    hIconSmall = (HICON)::LoadImage(::GetModuleHandle(0),MAKEINTRESOURCE(IDR_MAINFRAME),IMAGE_ICON,::GetSystemMetrics(SM_CXSMICON),::GetSystemMetrics(SM_CYSMICON),LR_VGACOLOR);
-    
-                if (hIconSmall != NULL) {
-                    hIconSmallPrevious = (HICON)::SendMessage(CMainDlg::m_hWnd,WM_SETICON,ICON_SMALL,(LPARAM)hIconSmall);
-                    if ((hIconSmallPrevious != NULL) && (hIconSmallPrevious != hIconSmall))
-                        DestroyIcon(hIconSmallPrevious);
-                }
+
+                /* Debugging */TCHAR debugtext[1024];
+                /* Debugging */swprintf(debugtext, 1024, TEXT("async icon loading for '%s' took %d ms"), wExt.c_str(), Helpers::GetTimeMs() - timeStart);
+                /* Debugging */::OutputDebugStringW(debugtext);
+            }
+
+            if (hBig != NULL) {
+                ::SendMessage(m_hWnd, WM_SETICON, ICON_BIG, (LPARAM)hBig);
+            }
+
+            if (hSmall != NULL) {
+                ::SendMessage(m_hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hSmall);
             }
         }
     }

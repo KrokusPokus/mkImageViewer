@@ -82,10 +82,10 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
     // Search if we have the requested image already present or in progress
     CImageRequest* pRequest = FindRequest(sFileName, nFrameIndex);
     bool bWasOutOfMemory = false;
-//* Debugging */	TCHAR debugtext[1024];
+/* Debugging */	TCHAR debugtext[1024];
     if (pRequest == nullptr) {
-//* Debugging */	swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() -> StartNewRequest() Frame %d  of  %s"), nFrameIndex, sFileName.c_str());
-//* Debugging */	::OutputDebugStringW(debugtext);
+/* Debugging */	swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() -> StartNewRequest() Frame %d  of  %s"), nFrameIndex, sFileName.c_str());
+/* Debugging */	::OutputDebugStringW(debugtext);
         // no request pending for this file, add to request queue and start async
         pRequest = StartNewRequest(sFileName, nFrameIndex, processParams);
         // wait with read ahead when direction changed - maybe user just wants to re-see last image
@@ -94,18 +94,18 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
             StartNewRequestBundle(pFileList, eDirection, processParams, m_nNumThread - 1, pRequest);
         }
     }
-//* Debugging */	else {
-//* Debugging */		swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() Retrieving existing request: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
-//* Debugging */		::OutputDebugStringW(debugtext);
-//* Debugging */	}
+/* Debugging */	else {
+/* Debugging */		swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() Retrieving existing request: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
+/* Debugging */		::OutputDebugStringW(debugtext);
+/* Debugging */	}
 
     // wait for request if not yet ready
     if (!pRequest->Ready) {
 #ifndef NDEBUG
         std::wcerr << L"Waiting for request: " << pRequest->FileName << L"\n";
 #endif
-//* Debugging */	swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() waiting for image to finish loading from disk: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
-//* Debugging */	::OutputDebugStringW(debugtext);
+/* Debugging */	swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() waiting for image to finish loading from disk: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
+/* Debugging */	::OutputDebugStringW(debugtext);
         ::WaitForSingleObject(pRequest->EventFinished, INFINITE);
         GetLoadedImageFromWorkThread(pRequest);
     } else {
@@ -120,8 +120,8 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
 #ifndef NDEBUG
         std::wcerr << L"Found in cache: " << pRequest->FileName << L"\n";
 #endif
-//* Debugging */	swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() found in cache: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
-//* Debugging */	::OutputDebugStringW(debugtext);
+/* Debugging */	swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() found in cache: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
+/* Debugging */	::OutputDebugStringW(debugtext);
     }
 
     // set before removing unused images!
@@ -369,6 +369,10 @@ void CJPEGProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirect
 }
 
 CJPEGProvider::CImageRequest* CJPEGProvider::StartNewRequest(const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams) {
+/* Debugging */	TCHAR debugtext[1024];
+/* Debugging */	swprintf(debugtext, 1024, TEXT("StartNewRequest(%s, %d)"), sFileName.c_str(), nFrameIndex);
+/* Debugging */	::OutputDebugStringW(debugtext);
+
     CImageRequest* pRequest = new CImageRequest(sFileName.c_str(), nFrameIndex);
 #ifndef NDEBUG
     std::wcerr << L"Start new request: " << pRequest->FileName << L"\n";
