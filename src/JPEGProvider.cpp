@@ -173,11 +173,14 @@ void CJPEGProvider::NotifyNotUsed(CJPEGImage* pImage) {
 
 void CJPEGProvider::ClearAllRequests() {
     for (auto iter = m_requestList.begin(); iter != m_requestList.end(); ) {
-        if (ClearRequest((*iter)->Image)) {
-            // Since ClearRequest modifies the list, we continue iteration from the beginning
-            iter = m_requestList.begin();
-        } else {
+        CImageRequest* pRequest = *iter;
+        if (pRequest->InUse) {
+            if (!pRequest->Ready) {
+                pRequest->Deleted = true; // Markieren für späteres Löschen nach Abschluss
+            }
             ++iter;
+        } else {
+            iter = DeleteElementAt(iter);
         }
     }
 }
@@ -211,6 +214,7 @@ void CJPEGProvider::FileHasRenamed(const std::wstring& oldFileName, const std::w
 }
 */
 
+// Only called from the main GUI when navigating away from an image
 bool CJPEGProvider::ClearRequest(CJPEGImage* pImage, bool releaseLockedFile) {
     if (pImage == nullptr) {
         return false;
@@ -219,7 +223,9 @@ bool CJPEGProvider::ClearRequest(CJPEGImage* pImage, bool releaseLockedFile) {
     std::list<CImageRequest*>::iterator iter;
     for (iter = m_requestList.begin( ); iter != m_requestList.end( ); iter++ ) {
         if ((*iter)->Image == pImage) {
-            if (releaseLockedFile) m_pWorkThreads[0]->ReleaseFile((*iter)->FileName.c_str());
+            if (releaseLockedFile) {
+                m_pWorkThreads[0]->ReleaseFile((*iter)->FileName.c_str());
+            }
             // images that are not ready cannot be removed yet
             if ((*iter)->Ready) {
                 DeleteElementAt(iter);
@@ -235,12 +241,15 @@ bool CJPEGProvider::ClearRequest(CJPEGImage* pImage, bool releaseLockedFile) {
 }
 
 void CJPEGProvider::OnImageLoadCompleted(int nHandle) {
-    for (CImageRequest* request : m_requestList) {
+    for (auto iter = m_requestList.begin(); iter != m_requestList.end(); ++iter) {
+        CImageRequest* request = *iter;
         if (request->Handle == nHandle) {
             GetLoadedImageFromWorkThread(request);
+
+            // KORREKTUR: Wenn der Request während des Ladens zum Löschen markiert wurde,
+            // wird er jetzt beim Abschluss direkt sauber aufgeräumt.
             if (request->Deleted) {
-                // this request was deleted, delete image now
-                ClearRequest(request->Image);
+                DeleteElementAt(iter);
             }
             break;
         }
@@ -263,6 +272,7 @@ CJPEGProvider::CImageRequest* CJPEGProvider::FindRequest(const std::wstring& sFi
 //* Debugging */	swprintf(debugtext, 1024, TEXT("FindRequest(%s, %d) Ready=%d  ExceptionError=%d  OutOfMemory=%d"), sFileName.c_str(), nFrameIndex, (*iter)->Ready, (*iter)->ExceptionError, (*iter)->OutOfMemory);
 //* Debugging */	::OutputDebugStringW(debugtext);
 
+            // If request is ready, but no image could be loaded, purge from cache so we can try reloading
             if ((*iter)->Ready && (*iter)->Image == nullptr) {
 
 //* Debugging */	swprintf(debugtext, 1024, TEXT("FindRequest will delete iter for %s"), (*iter)->FileName.c_str());
@@ -385,16 +395,12 @@ void CJPEGProvider::GetLoadedImageFromWorkThread(CImageRequest* pRequest) {
 }
 
 CImageLoadThread* CJPEGProvider::SearchThreadForNewRequest(void) {
-    int nSmallestHandle = INT_MAX;
-    CImageLoadThread* pBestOccupiedThread = nullptr;
+    // Any thread without a request in flight?
     for (int i = 0; i < m_nNumThread; i++) {
         bool bFree = true;
         CImageLoadThread* pThisThread = m_pWorkThreads[i];
+
         for (CImageRequest* request : m_requestList) {
-            if (request->Handle < nSmallestHandle && request->HandlingThread != nullptr) {
-                nSmallestHandle = request->Handle;
-                pBestOccupiedThread = request->HandlingThread;
-            }
             if (request->HandlingThread == pThisThread) {
                 bFree = false;
                 break;
@@ -404,8 +410,19 @@ CImageLoadThread* CJPEGProvider::SearchThreadForNewRequest(void) {
             return pThisThread;
         }
     }
+
     // all threads are occupied, return thread working on smallest handle (will finish earliest)
-    return (pBestOccupiedThread == nullptr) ? m_pWorkThreads[0] : pBestOccupiedThread;
+    int nSmallestHandle = INT_MAX;
+    CImageLoadThread* pOldestThread = nullptr;
+
+    for (CImageRequest* request : m_requestList) {
+        if (request->HandlingThread != nullptr && request->Handle < nSmallestHandle) {
+            nSmallestHandle = request->Handle;
+            pOldestThread = request->HandlingThread;
+        }
+    }
+
+    return (pOldestThread == nullptr) ? m_pWorkThreads[0] : pOldestThread;
 }
 
 void CJPEGProvider::RemoveUnusedImages(bool bRemoveAlsoActiveRequests) {

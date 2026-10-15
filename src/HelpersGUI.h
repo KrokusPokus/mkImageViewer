@@ -9,13 +9,12 @@ class CKeyMap;
 
 namespace HelpersGUI {
 
-    // Errors that occur during loading a file or pasting from clipboard
+    // Errors that occur during loading a file
     enum EFileLoadError {
         FileLoad_Ok = 0,
-        FileLoad_PasteFromClipboardFailed = 1,
-        FileLoad_LoadError = 2,
-        FileLoad_SlideShowListInvalid = 3,
-        FileLoad_NoFilesInDirectory = 4,
+        FileLoad_LoadError = 1,
+        FileLoad_SlideShowListInvalid = 2,
+        FileLoad_NoFilesInDirectory = 3,
 
         // these can be combined with other error codes, so make sure they work with bit arithmetic
         FileLoad_OutOfMemory = 65536,

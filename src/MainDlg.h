@@ -30,7 +30,6 @@ public:
         POS_NextFrame,
         POS_Previous,
         POS_Current,
-        POS_Clipboard,
         POS_AwayFromCurrent,
 //        POS_Next_Folder,
 //        POS_Previous_Folder,

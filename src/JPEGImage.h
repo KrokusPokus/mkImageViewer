@@ -244,9 +244,6 @@ public:
     // Defaults to 100ms for frame times <=10, to match behavior of web browsers
     int FrameTimeMs() const { return m_nFrameTimeMs <= 10 ? 100 : m_nFrameTimeMs; }
 
-    // Gets if this image was created by pasting from clipboard
-    bool IsClipboardImage() const { return m_eImageFormat == IF_CLIPBOARD; }
-
     // Gets if the rotation is given by EXIF data
     bool IsRotationByEXIF() const { return m_bRotationByEXIF; }
 

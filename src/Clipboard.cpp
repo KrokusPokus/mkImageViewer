@@ -69,7 +69,7 @@ void CClipboard::CopyImageToClipboard(HWND hWnd, CJPEGImage * pImage, LPCTSTR fi
     }
 
     pImage->EnableDimming(false);
-    DoCopy(hWnd, pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), pImage->IsClipboardImage() ? NULL : fileName);
+    DoCopy(hWnd, pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), fileName);
     pImage->EnableDimming(true);
 }
 
@@ -91,7 +91,7 @@ void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const 
 
     pImage->EnableDimming(false);
     void* pDIB = pImage->GetDIB(pImage->OrigSize(), clipRect.Size(), clipRect.TopLeft(), procParams, eFlags);
-    DoCopy(hWnd, clipRect.Width(), clipRect.Height(), pDIB, pImage->IsClipboardImage() ? NULL : fileName);
+    DoCopy(hWnd, clipRect.Width(), clipRect.Height(), pDIB, fileName);
     pImage->EnableDimming(true);
 }
 

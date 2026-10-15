@@ -49,7 +49,6 @@ enum EImageFormat {
     IF_QOI,
     IF_PSD,
     IF_ICO,
-    IF_CLIPBOARD,
     IF_JPEG_Embedded, // JPEG embedded in another file, e.g. camera raw
     IF_TGA,
     IF_ZIP,

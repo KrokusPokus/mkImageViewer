@@ -361,9 +361,6 @@ namespace HelpersGUI {
         buff[0] = 0;
         CRect rectText(0, clientRect.Height()/2 - HelpersGUI::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
         switch (nFileLoadError) {
-            case FileLoad_PasteFromClipboardFailed:
-                _tcsncpy_s(buff, BUF_LEN, CNLS::GetString(_T("Pasting image from clipboard failed!")), BUF_LEN);
-                break;
             case FileLoad_LoadError:
                 _stprintf_s(buff, BUF_LEN, CNLS::GetString(_T("The file '%s' could not be read!")), sFailedFileName);
                 break;

@@ -563,9 +563,6 @@ void CJPEGImage::RestoreInitialParameters(LPCTSTR sFileName, const CImageProcess
 }
 
 void CJPEGImage::GetFileParams(LPCTSTR sFileName, EProcessingFlags& eFlags, CImageProcessingParams& params) const {
-    if (IsClipboardImage()) {
-        return;
-    }
     CParameterDBEntry* dbEntry = CParameterDB::This().FindEntry(GetPixelHash());
     if (m_bInParamDB) {
         CRotationParams notUsed(0);

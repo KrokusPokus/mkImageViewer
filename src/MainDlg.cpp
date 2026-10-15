@@ -781,8 +781,7 @@ void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const CRect& clientRect,
         if (m_isBeforeFileSelected) {
             dc.DrawText(CNLS::GetString(_T("Select file to display in 'File Open' dialog")), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
         } else {
-            dc.DrawText(CString(CNLS::GetString(_T("No image loaded!"))) + _T("\n\n") + CNLS::GetString(_T("Right mouse button: Context menu")) + _T("\nCtrl-V: ") +
-                CNLS::GetString(_T("Paste from clipboard")) + _T("\nCtrl-O: ") + CNLS::GetString(_T("Open new image or slideshow file")) + _T("\n\n") +
+            dc.DrawText(CString(CNLS::GetString(_T("No image loaded!"))) + _T("\n\n") + CNLS::GetString(_T("Right mouse button: Context menu")) + _T("\nCtrl-O: ") + CNLS::GetString(_T("Open new image or slideshow file")) + _T("\n\n") +
                 CNLS::GetString(_T("Press ESC to exit...")), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
        }
     } else if (pCurrentImage == NULL) {
@@ -1243,7 +1242,7 @@ LRESULT CMainDlg::OnImageLoadCompleted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM 
 }
 
 LRESULT CMainDlg::OnDisplayedFileChangedOnDisk(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    if (CSettingsProvider::This().ReloadWhenDisplayedImageChanged() && m_pCurrentImage != NULL && !m_pCurrentImage->IsClipboardImage() &&
+    if (CSettingsProvider::This().ReloadWhenDisplayedImageChanged() && m_pCurrentImage != NULL &&
         m_pFileList != NULL && m_pFileList->CanOpenCurrentFileForReading()) {
         ExecuteCommand(IDM_RELOAD);
     }
@@ -1589,9 +1588,6 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
     if (CSettingsProvider::This().StoreToEXEPath()) ::EnableMenuItem(hMenu, IDM_UPDATE_USER_CONFIG, MF_BYCOMMAND | MF_GRAYED);
     if (!CSettingsProvider::This().AllowEditGlobalSettings()) ::EnableMenuItem(hMenu, IDM_EDIT_GLOBAL_CONFIG, MF_BYCOMMAND | MF_GRAYED);
 
-    bool bCanPaste = ::IsClipboardFormatAvailable(CF_DIB);
-    if (!bCanPaste) ::EnableMenuItem(hMenuTrackPopup, IDM_PASTE, MF_BYCOMMAND | MF_GRAYED);
-
     if (m_pCurrentImage == NULL) {
         ::EnableMenuItem(hMenuTrackPopup, IDM_RELOAD_FULL, MF_BYCOMMAND | MF_GRAYED);
         //::EnableMenuItem(hMenuTrackPopup, IDM_EXPLORE, MF_BYCOMMAND | MF_GRAYED);  // can still show path to an image which could not be loaded.  If file doesn't exist, nothing happens anyways
@@ -1601,10 +1597,6 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
         ::EnableMenuItem(hMenuTrackPopup, SUBMENU_POS_ZOOM, MF_BYPOSITION  | MF_GRAYED);
         ::EnableMenuItem(hMenuTrackPopup, SUBMENU_POS_TRANSFORM, MF_BYPOSITION  | MF_GRAYED);
     } else {
-        if (m_pCurrentImage->IsClipboardImage()) {
-            ::EnableMenuItem(hMenuTrackPopup, IDM_EXPLORE, MF_BYCOMMAND | MF_GRAYED);  // cannot explore clipboard image
-            ::EnableMenuItem(hMenuTrackPopup, IDM_COPY_PATH, MF_BYCOMMAND | MF_GRAYED);
-        }
         int windowsVersion = Helpers::GetWindowsVersion();
     }
 
@@ -1651,11 +1643,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             this->ShowWindow(SW_MINIMIZE);
             break;
         case IDM_EXPLORE:
-            if (m_pCurrentImage != NULL && m_pCurrentImage->IsClipboardImage()) {
-                // don't try to "Explore" path if clipboard image
-                break;
-            }
-            // otherwise, allowed even for invalid file loads
             ExploreFile();
             break;
         case IDM_RELOAD:
@@ -1682,18 +1669,18 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             }
             break;
         case IDM_COPY_PATH:
-            if (m_pCurrentImage != NULL && !m_pCurrentImage->IsClipboardImage()) {
+            if (m_pCurrentImage != NULL) {
                 CClipboard::CopyPathToClipboard(this->m_hWnd, m_pCurrentImage, m_pFileList->Current());
             }
             break;
         case IDM_CUT_FILE:
-            if (m_pCurrentImage != NULL && !m_pCurrentImage->IsClipboardImage()) {
+            if (m_pCurrentImage != NULL) {
                 CClipboard::CutFileToClipboard(this->m_hWnd, m_pFileList->Current());
             }
             break;
         case IDM_DELETE_FILE:
             MouseOn();
-            if (m_pCurrentImage != NULL && m_pFileList != NULL && !m_pCurrentImage->IsClipboardImage() && sp.AllowFileDeletion()) {
+            if (m_pCurrentImage != NULL && m_pFileList != NULL && sp.AllowFileDeletion()) {
                 LPCTSTR pRawFileName = CurrentFileName(false);
                 if (pRawFileName == nullptr || pRawFileName[0] == _T('\0')) {
                     break;
@@ -2956,9 +2943,6 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
             }
             bCheckIfSameImage = false; // do something even when not moving iterator on filelist
             break;
-        case POS_Clipboard:
-            bCheckIfSameImage = false; // do something even when not moving iterator on filelist
-            break;
         case POS_AwayFromCurrent:
             m_pFileList = m_pFileList->AwayFromCurrent();
             break;
@@ -2977,7 +2961,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         }
     }
 
-    if (ePos != POS_Current && ePos != POS_NextFrame && ePos != POS_Clipboard && ePos != POS_AwayFromCurrent) {
+    if (ePos != POS_Current && ePos != POS_NextFrame && ePos != POS_AwayFromCurrent) {
         MouseOff();
     }
 
@@ -2988,8 +2972,11 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     } else {
         InitParametersForNewImage();
     }
+
     m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
+    // Clear from cache only for POS_Current POS_AwayFromCurrent, which are involved in reloading on file/directory changes and deletion.
     if (ePos == POS_Current || ePos == POS_AwayFromCurrent) {
+        // When (ePos == POS_AwayFromCurrent), it will additionally releaseLockedFile in m_pWorkThreads
         m_pJPEGProvider->ClearRequest(m_pCurrentImage, ePos == POS_AwayFromCurrent);
     }
     m_pCurrentImage = NULL;
@@ -3005,25 +2992,22 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     }
 
 
-    if (ePos == POS_Clipboard) {
-        m_nLastLoadError = HelpersGUI::FileLoad_PasteFromClipboardFailed;
-    } else {
 //* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage()->RequestImage()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
 //* Debugging */	::OutputDebugStringW(debugtext);
 
-        LPCTSTR pRawFileName = m_pFileList->Current();
-        std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
+	LPCTSTR pRawFileName = m_pFileList->Current();
+	std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
 
-        m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
-                                                        (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
-                                                        strFileName,
-                                                        nFrameIndex,
-                                                        procParams,
-                                                        m_bOutOfMemoryLastImage,
-                                                        m_bExceptionErrorLastImage);
+	m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+													(ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
+													strFileName,
+													nFrameIndex,
+													procParams,
+													m_bOutOfMemoryLastImage,
+													m_bExceptionErrorLastImage);
 
-        m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
-    }
+	m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
+
 
 //* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
 //* Debugging */	::OutputDebugStringW(debugtext);
@@ -3628,10 +3612,6 @@ bool CMainDlg::ImageToScreen(float & fX, float & fY) {
 /// <param name="bFileTitle">If true, returns only the filename part.  If false, returns complete filepath</param>
 /// <returns>Returns the filename either just the title or full filepath</returns>
 LPCTSTR CMainDlg::CurrentFileName(bool bFileTitle) {
-    if (m_pCurrentImage != NULL && m_pCurrentImage->IsClipboardImage()) {
-        return CNLS::GetString(_T("Clipboard Image"));
-    }
-
     if (m_pFileList != NULL) {
         return bFileTitle ? m_pFileList->CurrentFileTitle() : m_pFileList->Current();
     } else {
