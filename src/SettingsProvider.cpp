@@ -1,34 +1,25 @@
 #include "SettingsProvider.h"
-#include "NLS.h"
-#include <float.h>
-#include <shlobj.h>
-#include <algorithm>
-#include <thread>    // Needed for std::thread::hardware_concurrency()
 
-static const TCHAR* DEFAULT_INI_FILE_NAME = _T("JPEGView.ini");
-static const TCHAR* SECTION_NAME = _T("JPEGView");
+//#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+#include <QStandardPaths>
+#include <QSettings>
+#include <QStringTokenizer>
+
+#include <thread>    // Needed for std::thread::hardware_concurrency()
+#include <algorithm>
+
+static const char* DEFAULT_INI_FILE_NAME = "JPEGView.ini";
+static const char* SECTION_NAME = "JPEGView";
 
 static float COLOR_CORR_DEFAULT_FACTORS[6] = {0.2f, 0.1f, 0.3f, 0.3f, 0.3f, 0.15f};
 
-CSettingsProvider* CSettingsProvider::sm_instance;
-
-static CString ParseCommandLineForIniName(LPCTSTR sCommandLine) {
-    if (sCommandLine == NULL) {
-        return CString();
-    }
-    LPCTSTR iniFile = Helpers::stristr(sCommandLine, _T("/ini"));
-    if (iniFile == NULL) {
-        return CString();
-    }
-    iniFile = iniFile + _tcslen(_T("/ini")) + 1;
-    LPCTSTR posSpace = _tcschr(iniFile, _T(' '));
-    CString iniFileName = (posSpace == NULL) ? CString(iniFile) : CString(iniFile, (int)(posSpace - iniFile));
-    return iniFileName;
-}
+std::unique_ptr<CSettingsProvider> CSettingsProvider::sm_instance = nullptr;
 
 CSettingsProvider& CSettingsProvider::This() {
-    if (sm_instance == NULL) {
-        sm_instance = new CSettingsProvider();
+    if (!sm_instance) {
+        sm_instance.reset(new CSettingsProvider());
     }
     return *sm_instance;
 }
@@ -37,383 +28,342 @@ float* CSettingsProvider::ColorCorrectionAmounts() {
     return (m_fColorCorrections[0] < 0) ? COLOR_CORR_DEFAULT_FACTORS : m_fColorCorrections;
 }
 
-CSettingsProvider::CSettingsProvider(void) {
+CSettingsProvider::CSettingsProvider() {
     // parse command line to find the process startup path
-    LPTSTR pCmdLine = ::GetCommandLine();
-    LPTSTR pStart = pCmdLine;
-    bool bQuot = false;
-    if (pCmdLine[0] == _T('"')) {
-        pStart++;
-        bQuot = true;
-    }
-    LPTSTR pEnd = pStart;
-    int nLastIdx = -1;
-    int nIdx = 0;
-    while (((bQuot && *pEnd != _T('"')) || (!bQuot && *pEnd != _T(' '))) && *pEnd != 0) {
-        if (*pEnd == _T('\\')) {
-            nLastIdx = nIdx;
-        }
-        pEnd++;
-        nIdx++;
-    }
+    // win32 variant
+    wchar_t pathBuffer[MAX_PATH];
+    ::GetModuleFileNameW(NULL, pathBuffer, MAX_PATH);
+    QString exeFilePath = QString::fromWCharArray(pathBuffer);
 
-    if (nIdx > 0 && nLastIdx > 0) {
-        m_sEXEPath = CString(pStart, nLastIdx+1);
-    } else {
-        m_sEXEPath = _T(".\\");
+    QFileInfo exeInfo(exeFilePath);
+    m_sEXEPath = exeInfo.absolutePath();
+    if (!m_sEXEPath.endsWith('/') && !m_sEXEPath.endsWith('\\')) {
+        m_sEXEPath += '/';
     }
+    /*
+    // Qt variant
+    m_sEXEPath = QCoreApplication::applicationDirPath();
+    if (!m_sEXEPath.endsWith('/') && !m_sEXEPath.endsWith('\\')) {
+        m_sEXEPath += '/';
+    }
+    */
 
     // Check if a custom INI file name is specified on the command line
     m_sIniFileTitle = DEFAULT_INI_FILE_NAME;
-    CString customIniFileName = ParseCommandLineForIniName(pEnd);
-    if (!customIniFileName.IsEmpty() && customIniFileName.FindOneOf(_T("/\\")) == -1)
-    {
-        if (customIniFileName.GetLength() < 4 || customIniFileName.Right(4) != _T(".ini"))
-            customIniFileName = customIniFileName + _T(".ini");
-        m_sIniFileTitle = customIniFileName;
-    }
 
     // Global INI file (at EXE location)
     m_sIniNameGlobal = m_sEXEPath + m_sIniFileTitle; // use current dir as startup path
-    if (!customIniFileName.IsEmpty() && ::GetFileAttributes(m_sIniNameGlobal) == INVALID_FILE_ATTRIBUTES)
-        m_sIniNameGlobal = m_sEXEPath + DEFAULT_INI_FILE_NAME;
 
     // Read if the user INI file shall be used
-    m_bUserINIExists = false;
-    m_pIniGlobalSectionBuffer = NULL;
-    m_pIniUserSectionBuffer = NULL;
-    m_pGlobalKeys = NULL;
-    m_pUserKeys = NULL;
     m_sIniNameUser = m_sIniNameGlobal;
-    m_bStoreToEXEPath = GetBool(_T("StoreToEXEPath"), false);
+    m_bStoreToEXEPath = GetBool("StoreToEXEPath", false);
 
     if (!m_bStoreToEXEPath) {
         // User INI file
-        m_sIniNameUser = CString(Helpers::JPEGViewAppDataPath()) + m_sIniFileTitle;
-        m_bUserINIExists = (::GetFileAttributes(m_sIniNameUser) != INVALID_FILE_ATTRIBUTES);
+        QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        if (!appDataPath.endsWith('/') && !appDataPath.endsWith('\\')) {
+            appDataPath += '/';
+        }
+        m_sIniNameUser = appDataPath + m_sIniFileTitle;
+        m_bUserINIExists = QFileInfo::exists(m_sIniNameUser);
     } else {
-        Helpers::SetJPEGViewAppDataPath(m_sEXEPath);
+        Helpers::SetJPEGViewAppDataPath(reinterpret_cast<LPCTSTR>(m_sEXEPath.utf16()));
     }
 
-    // Get "My documents" path
-    CString sMyDocumentsFolder;
-    LPTSTR lpFolderBuffer = sMyDocumentsFolder.GetBuffer(MAX_PATH);
-    ::SHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, SHGFP_TYPE_CURRENT, lpFolderBuffer);
-    sMyDocumentsFolder.ReleaseBuffer();
-
-    // Get "My pictures" path
-    CString sMyPicturesFolder;
-    LPTSTR lpPicturesBuffer = sMyPicturesFolder.GetBuffer(MAX_PATH);
-    ::SHGetFolderPath(NULL, CSIDL_MYPICTURES, NULL, SHGFP_TYPE_CURRENT, lpPicturesBuffer);
-    sMyPicturesFolder.ReleaseBuffer();
+    /*
+    qDebug() << "m_sEXEPath:" << m_sEXEPath;
+    qDebug() << "m_sIniFileTitle:" << m_sIniFileTitle;
+    qDebug() << "m_sIniNameGlobal:" << m_sIniNameGlobal;
+    qDebug() << "m_sIniNameUser:" << m_sIniNameUser;
+    qDebug() << "m_bStoreToEXEPath:" << m_bStoreToEXEPath;
+    qDebug() << "m_bUserINIExists:" << m_bUserINIExists;
+    */
 
     // Read settings that can be written with SaveSettings()
     ReadWriteableINISettings();
 
-    m_bAutoFullScreen = GetString(_T("ShowFullScreen"), _T("")).CompareNoCase(_T("auto")) == 0;
-    m_bShowFullScreen = m_bAutoFullScreen ? true : GetBool(_T("ShowFullScreen"), true);
-    m_bShowFullPathInTitle = GetBool(_T("ShowFilePathInTitle"), false);
+    m_bAutoFullScreen = GetString("ShowFullScreen", "").compare("auto", Qt::CaseInsensitive) == 0;
+    m_bShowFullScreen = m_bAutoFullScreen ? true : GetBool("ShowFullScreen", true);
+    m_bShowFullPathInTitle = GetBool("ShowFilePathInTitle", false);
 
-    CString sCPU = GetString(_T("CPUType"), _T("AutoDetect"));
-    if (sCPU.CompareNoCase(_T("Generic")) == 0) {
+    QString sCPU = GetString("CPUType", "AutoDetect");
+    if (sCPU.compare("Generic", Qt::CaseInsensitive) == 0) {
         m_eCPUAlgorithm = Helpers::CPU_Generic;
-    }
-    else if (sCPU.CompareNoCase(_T("MMX")) == 0) {
+    } else if (sCPU.compare("MMX", Qt::CaseInsensitive) == 0) {
         m_eCPUAlgorithm = Helpers::CPU_MMX;
-    }
-    else if (sCPU.CompareNoCase(_T("SSE")) == 0) {
+    } else if (sCPU.compare("SSE", Qt::CaseInsensitive) == 0) {
         m_eCPUAlgorithm = Helpers::CPU_SSE;
-    }
-    else if (sCPU.CompareNoCase(_T("AVX2")) == 0) {
+    } else if (sCPU.compare("AVX2", Qt::CaseInsensitive) == 0) {
         m_eCPUAlgorithm = Helpers::CPU_AVX2;
-    }
-    else {
+    } else {
         m_eCPUAlgorithm = Helpers::ProbeCPU();
     }
 
-
-    m_nNumCores = GetInt(_T("CPUCoresUsed"), 0, 0, 128);
+    m_nNumCores = GetInt("CPUCoresUsed", 0, 0, 128);
     if (m_nNumCores == 0) {
-        m_nNumCores = std::thread::hardware_concurrency();
-        if (m_nNumCores < 1) {
-            m_nNumCores = 1;
-        } else if (m_nNumCores > 8) {
-            m_nNumCores = 8;
-        }
+        m_nNumCores = static_cast<int>(std::thread::hardware_concurrency());
+        m_nNumCores = std::clamp(m_nNumCores, 1, 8);
         // Limiting to 8 cores, since benchmarks suggest performance improvements start to flatline around that point.
         // Performance can even become worse: 16 threads on 16 thread CPU performing worse than running just 14 threads. Or 8 threads, for that matter.
         // People can still try to use more cores by specifying a non-zero number for "CPUCoresUsed",
         // but I advise to do some benchmarking in this case to make sure you aren't actually shooting yourself in the foot.        
     }
 
-
-    CString sDownSampling = GetString(_T("DownSamplingFilter"), _T("Catrom"));
-    if (sDownSampling.CompareNoCase(_T("None")) == 0) {
+    QString sDownSampling = GetString("DownSamplingFilter", "Catrom");
+    if (sDownSampling.compare("None", Qt::CaseInsensitive) == 0) {
         m_eDownsamplingFilter = Filter_Downsampling_None;
-    }
-    else if (sDownSampling.CompareNoCase(_T("Hermite")) == 0) {
+    } else if (sDownSampling.compare("Hermite", Qt::CaseInsensitive) == 0) {
         m_eDownsamplingFilter = Filter_Downsampling_Hermite;
-    }
-    else if (sDownSampling.CompareNoCase(_T("Mitchell")) == 0) {
+    } else if (sDownSampling.compare("Mitchell", Qt::CaseInsensitive) == 0) {
         m_eDownsamplingFilter = Filter_Downsampling_Mitchell;
-    }
-    else if (sDownSampling.CompareNoCase(_T("Catrom")) == 0) {
+    } else if (sDownSampling.compare("Catrom", Qt::CaseInsensitive) == 0) {
         m_eDownsamplingFilter = Filter_Downsampling_Catrom;
-    }
-    else if (sDownSampling.CompareNoCase(_T("Lanczos2")) == 0) {
+    } else if (sDownSampling.compare("Lanczos2", Qt::CaseInsensitive) == 0) {
         m_eDownsamplingFilter = Filter_Downsampling_Lanczos2;
-    }
-    else {
+    } else {
         m_eDownsamplingFilter = Filter_Downsampling_Catrom;
     }
 
-
-    CString sSingleInstanceMode = GetString(_T("SingleInstance"), _T("PerFolder"));
-    if (sSingleInstanceMode.CompareNoCase(_T("Never")) == 0) {
+    QString sSingleInstanceMode = GetString("SingleInstance", "PerFolder");
+    if (sSingleInstanceMode.compare("Never", Qt::CaseInsensitive) == 0) {
         m_eSingleInstanceMode = Helpers::SI_Never;
-    } else if (sSingleInstanceMode.CompareNoCase(_T("PerFolder")) == 0) {
+    } else if (sSingleInstanceMode.compare("PerFolder", Qt::CaseInsensitive) == 0) {
         m_eSingleInstanceMode = Helpers::SI_PerFolder;
-    } else if (sSingleInstanceMode.CompareNoCase(_T("Always")) == 0) {
+    } else if (sSingleInstanceMode.compare("Always", Qt::CaseInsensitive) == 0) {
         m_eSingleInstanceMode = Helpers::SI_Always;
     } else {
         m_eSingleInstanceMode = Helpers::SI_PerFolder;
     }
 
-
-    CString sTransparencyMode = GetString(_T("TransparencyMode"), _T("Checkerboard"));
-    if (sTransparencyMode.CompareNoCase(_T("Blend")) == 0) {
+    QString sTransparencyMode = GetString("TransparencyMode", "Checkerboard");
+    if (sTransparencyMode.compare("Blend", Qt::CaseInsensitive) == 0) {
         m_eTransparencyMode = Helpers::TP_BLEND;
-    } else if (sTransparencyMode.CompareNoCase(_T("Checkerboard")) == 0) {
+    } else if (sTransparencyMode.compare("Checkerboard", Qt::CaseInsensitive) == 0) {
         m_eTransparencyMode = Helpers::TP_CHECKERBOARD;
-    } else if (sTransparencyMode.CompareNoCase(_T("BlendInverse")) == 0) {
+    } else if (sTransparencyMode.compare("BlendInverse", Qt::CaseInsensitive) == 0) {
         m_eTransparencyMode = Helpers::TP_BLEND_INVERSE;
     } else {
         m_eTransparencyMode = Helpers::TP_CHECKERBOARD;
     }
 
+    m_bNavigateMouseWheel = GetBool("NavigateWithMouseWheel", false);
+    m_dMouseWheelZoomSpeed = GetDouble("MouseWheelZoomSpeed", 1.0, 0.1, 10.0);
 
-    m_bNavigateMouseWheel = GetBool(_T("NavigateWithMouseWheel"), false);
-    m_dMouseWheelZoomSpeed = GetDouble(_T("MouseWheelZoomSpeed"), 1.0, 0.1, 10);
-
-    CString sDeleteConfirmation = GetString(_T("DeleteConfirmation"), _T("OnlyWhenNoRecycleBin"));
-    if (sDeleteConfirmation.CompareNoCase(_T("OnlyWhenNoRecycleBin")) == 0) {
+    QString sDeleteConfirmation = GetString("DeleteConfirmation", "OnlyWhenNoRecycleBin");
+    if (sDeleteConfirmation.compare("OnlyWhenNoRecycleBin", Qt::CaseInsensitive) == 0) {
         m_eDeleteConfirmation = Helpers::DC_OnlyWhenNoRecycleBin;
-    }
-    else if (sDeleteConfirmation.CompareNoCase(_T("Never")) == 0) {
+    } else if (sDeleteConfirmation.compare("Never", Qt::CaseInsensitive) == 0) {
         m_eDeleteConfirmation = Helpers::DC_Never;
-    }
-    else {
+    } else {
         m_eDeleteConfirmation = Helpers::DC_Always;
     }
 
-    m_nMaxSlideShowFileListSize = GetInt(_T("MaxSlideShowFileListSizeKB"), 200, 100, 10000);
-    m_nSlideShowEffectTimeMs = GetInt(_T("SlideShowEffectTime"), 200, 100, 5000);
-    m_bSingleFullScreenInstance = GetBool(_T("SingleFullScreenInstance"), true);
-    m_bWrapAroundFolder = GetBool(_T("WrapAroundFolder"), true);
-    m_bWindowBorderlessOnStartup = GetBool(_T("WindowBorderlessOnStartup"), false);
-    m_bWindowAlwaysOnTopOnStartup = GetBool(_T("WindowAlwaysOnTopOnStartup"), false);
-    m_zoomPauseFactor = GetInt(_T("ZoomPausePercent"), 100, 0, 6553500) / 100.0;  // can't have a % larger than the MAX_IMAGE_DIMENSION %, and convert to a scale factor (double/double division) only once
-    m_bExchangeXButtons = GetBool(_T("ExchangeXButtons"), true);
-    m_bAutoRotateEXIF = GetBool(_T("AutoRotateEXIF"), true);
-    m_bUseEmbeddedColorProfiles = GetBool(_T("UseEmbeddedColorProfiles"), false);
-    m_nDisplayMonitor = GetInt(_T("DisplayMonitor"), -1, -1, 16);
-    m_dAutoContrastAmount = GetDouble(_T("AutoContrastCorrectionAmount"), 0.5, 0.0, 1.0);
-    m_dAutoBrightnessAmount = GetDouble(_T("AutoBrightnessCorrectionAmount"), 0.2, 0.0, 1.0);
-    m_defaultWindowRect = GetRect(_T("DefaultWindowRect"), CRect(0, 0, 0, 0));
-    m_stickyWindowRect = GetRect(_T("StickyWindowRect"), CRect(0, 0, 0, 0));
+    m_nMaxSlideShowFileListSize = GetInt("MaxSlideShowFileListSizeKB", 200, 100, 10000);
+    m_nSlideShowEffectTimeMs = GetInt("SlideShowEffectTime", 200, 100, 5000);
+    m_bSingleFullScreenInstance = GetBool("SingleFullScreenInstance", true);
+    m_bWrapAroundFolder = GetBool("WrapAroundFolder", true);
+    m_bWindowBorderlessOnStartup = GetBool("WindowBorderlessOnStartup", false);
+    m_bWindowAlwaysOnTopOnStartup = GetBool("WindowAlwaysOnTopOnStartup", false);
+    m_zoomPauseFactor = GetInt("ZoomPausePercent", 100, 0, 6553500) / 100.0;  // can't have a % larger than the MAX_IMAGE_DIMENSION %, and convert to a scale factor (double/double division) only once
+    m_bExchangeXButtons = GetBool("ExchangeXButtons", true);
+    m_bAutoRotateEXIF = GetBool("AutoRotateEXIF", true);
+    m_bUseEmbeddedColorProfiles = GetBool("UseEmbeddedColorProfiles", false);
+    m_nDisplayMonitor = GetInt("DisplayMonitor", -1, -1, 16);
+    m_dAutoContrastAmount = GetDouble("AutoContrastCorrectionAmount", 0.5, 0.0, 1.0);
+    m_dAutoBrightnessAmount = GetDouble("AutoBrightnessCorrectionAmount", 0.2, 0.0, 1.0);
+
+    m_defaultWindowRect = GetRect("DefaultWindowRect", QRect(0, 0, 0, 0));
+    m_stickyWindowRect = GetRect("StickyWindowRect", QRect(0, 0, 0, 0));
     m_bDefaultMaximized = false;
     m_bDefaultWndToImage = false;
     m_bStickyWindowSize = false;
     m_bExplicitWindowRect = false;
-    if (m_defaultWindowRect.IsRectEmpty()) {
-        CString sAuto = GetString(_T("DefaultWindowRect"), _T(""));
-        if (sAuto.CompareNoCase(_T("max")) == 0) {
+
+    if (m_defaultWindowRect.isEmpty()) {
+        QString sAuto = GetString("DefaultWindowRect", "");
+        if (sAuto.compare("max", Qt::CaseInsensitive) == 0) {
             m_bDefaultMaximized = true;
-        }
-        else if (sAuto.CompareNoCase(_T("image")) == 0) {
+        } else if (sAuto.compare("image", Qt::CaseInsensitive) == 0) {
             m_bDefaultWndToImage = true;
-        }
-        else if (sAuto.CompareNoCase(_T("sticky")) == 0) {
+        } else if (sAuto.compare("sticky", Qt::CaseInsensitive) == 0) {
             m_bStickyWindowSize = true;
-            m_bExplicitWindowRect = !m_stickyWindowRect.IsRectEmpty();
+            m_bExplicitWindowRect = !m_stickyWindowRect.isEmpty();
         }
-    }
-    else {
+    } else {
         m_bExplicitWindowRect = true;
     }
 
-    m_colorBackground = GetColor(_T("BackgroundColor"), 0);
-    m_colorGUI = GetColor(_T("GUIColor"), RGB(243, 242, 231));
-    m_colorTransparency = GetColor(_T("TransparencyColor"), m_colorBackground);
+    m_colorBackground = GetColor("BackgroundColor", QColor(0, 0, 0));
+    m_colorGUI = GetColor("GUIColor", QColor(243, 242, 231));
+    m_colorTransparency = GetColor("TransparencyColor", m_colorBackground);
 
-    m_defaultGUIFont = GetString(_T("DefaultGUIFont"), _T("Default"));
-    m_zoomFactorFont = GetString(_T("ZoomFactorFont"), _T("Default"));
+    m_defaultGUIFont = GetString("DefaultGUIFont", "Default");
+    m_zoomFactorFont = GetString("ZoomFactorFont", "Default");
 
-    m_bReloadWhenDisplayedImageChanged = GetBool(_T("ReloadWhenDisplayedImageChanged"), true);
+    m_bReloadWhenDisplayedImageChanged = GetBool("ReloadWhenDisplayedImageChanged", true);
 
-    m_sIniEditor = GetString(_T("IniEditor"), _T("notepad"));
-    if (m_sIniEditor.CompareNoCase(_T("notepad")) == 0) {
+    m_sIniEditor = GetString("IniEditor", "notepad");
+    if (m_sIniEditor.compare("notepad", Qt::CaseInsensitive) == 0) {
         m_eIniEditor = Helpers::INI_Notepad;
-    }
-    else if (m_sIniEditor.CompareNoCase(_T("system")) == 0) {
+    } else if (m_sIniEditor.compare("system", Qt::CaseInsensitive) == 0) {
         m_eIniEditor = Helpers::INI_System;
-    }
-    else {
+    } else {
         m_eIniEditor = Helpers::INI_Custom;
     }
 
-    m_minimalWindowSize = GetSize(_T("MinimalWindowSize"), CSize(320, 240));
+    m_minimalWindowSize = GetSize("MinimalWindowSize", QSize(320, 240));
 
-    m_sLanguage = GetString(_T("Language"), _T("auto"));
+    m_sLanguage = GetString("Language", "auto");
 
-    CString sColorCorrections = GetString(_T("ColorCorrection"), _T(""));
-    if (sColorCorrections.GetLength() > 0 &&
-        _stscanf(sColorCorrections, _T("R: %f G: %f B: %f C: %f M: %f Y: %f"), 
-        &m_fColorCorrections[0], &m_fColorCorrections[1], &m_fColorCorrections[2],
-        &m_fColorCorrections[3], &m_fColorCorrections[4], &m_fColorCorrections[5]) == 6) {
-        for (int i = 0; i < 6; i++) {
-            m_fColorCorrections[i] = std::min(1.0f, std::max(0.0f, m_fColorCorrections[i]));
-        }
-    } else {
-        for (int i = 0; i < 6; i++) {
-            m_fColorCorrections[i] = -1;
+    // Pure Qt-basiertes Parsing für ColorCorrections
+    QString sColorCorrections = GetString("ColorCorrection", "");
+    std::fill(std::begin(m_fColorCorrections), std::end(m_fColorCorrections), -1.0f);
+    if (!sColorCorrections.isEmpty()) {
+        // Erwartetes Format: "R: 0.2 G: 0.1 B: 0.3 C: 0.3 M: 0.3 Y: 0.15"
+        const auto parts = sColorCorrections.split(' ', Qt::SkipEmptyParts);
+        if (parts.size() == 12) {
+            bool ok = true;
+            float values[6];
+            for (int i = 0; i < 6; ++i) {
+                values[i] = parts[i * 2 + 1].toFloat(&ok);
+                if (!ok) break;
+            }
+            if (ok) {
+                for (int i = 0; i < 6; ++i) {
+                    m_fColorCorrections[i] = std::clamp(values[i], 0.0f, 1.0f);
+                }
+            }
         }
     }
 
 // -------------------------------------------------------------------------------------------
 // [GF] Custom non-writable ini settings of this mod
 
-    m_bBookModeLaunchFullscreen = GetBool(_T("BookModeLaunchFullscreen"), true);
-    m_bSmoothPanning = GetBool(_T("SmoothPanning"), true);
-    m_bSmartPanningKeys = GetBool(_T("SmartPanningKeys"), true);
-    m_bTitleBarUseFileIcon = GetBool(_T("TitleBarUseFileIcon"), true);
+    m_bBookModeLaunchFullscreen = GetBool("BookModeLaunchFullscreen", true);
+    m_bSmoothPanning = GetBool("SmoothPanning", true);
+    m_bSmartPanningKeys = GetBool("SmartPanningKeys", true);
+    m_bTitleBarUseFileIcon = GetBool("TitleBarUseFileIcon", true);
 
     // Distance in file list for which decoded images will be kept in cache to speed up access.
     // The default of 2 means: Two pages forward + two pages backward.
-    m_nCacheRange = GetInt(_T("CacheRange"), 2, 0, 8);
-
+    m_nCacheRange = GetInt("CacheRange", 2, 0, 8);
 }
 
 void CSettingsProvider::ReadWriteableINISettings() {
-    m_dContrast = GetDouble(_T("Contrast"), 0.0, -0.5, 0.5);
-    m_dGamma = GetDouble(_T("Gamma"), 1.0, 0.1, 10.0);
-    m_dSaturation = GetDouble(_T("Saturation"), 1.0, 0.0, 2.0);
-    m_bAutoContrastCorrection = GetBool(_T("AutoContrastCorrection"), false);
+    m_dContrast = GetDouble("Contrast", 0.0, -0.5, 0.5);
+    m_dGamma = GetDouble("Gamma", 1.0, 0.1, 10.0);
+    m_dSaturation = GetDouble("Saturation", 1.0, 0.0, 2.0);
+    m_bAutoContrastCorrection = GetBool("AutoContrastCorrection", false);
 
-    CString sNavigation = GetString(_T("FolderNavigation"), _T("LoopFolder"));
-    if (sNavigation.CompareNoCase(_T("LoopSameFolderLevel")) == 0) {
+    QString sNavigation = GetString("FolderNavigation", "LoopFolder");
+    if (sNavigation.compare("LoopSameFolderLevel", Qt::CaseInsensitive) == 0) {
         m_eNavigation = Helpers::NM_LoopSameDirectoryLevel;
-    }
-    else if (sNavigation.CompareNoCase(_T("LoopSubFolders")) == 0) {
+    } else if (sNavigation.compare("LoopSubFolders", Qt::CaseInsensitive) == 0) {
         m_eNavigation = Helpers::NM_LoopSubDirectories;
-    }
-    else {
+    } else {
         m_eNavigation = Helpers::NM_LoopDirectory;
     }
-    CString sSorting = GetString(_T("FileDisplayOrder"), _T("LastModDate"));
-    if (sSorting.CompareNoCase(_T("CreationDate")) == 0) {
+
+    QString sSorting = GetString("FileDisplayOrder", "LastModDate");
+    if (sSorting.compare("CreationDate", Qt::CaseInsensitive) == 0) {
         m_eSorting = Helpers::FS_CreationTime;
-    }
-    else if (sSorting.CompareNoCase(_T("FileName")) == 0) {
+    } else if (sSorting.compare("FileName", Qt::CaseInsensitive) == 0) {
         m_eSorting = Helpers::FS_FileName;
-    }
-    else if (sSorting.CompareNoCase(_T("Random")) == 0) {
+    } else if (sSorting.compare("Random", Qt::CaseInsensitive) == 0) {
         m_eSorting = Helpers::FS_Random;
-    }
-    else if (sSorting.CompareNoCase(_T("FileSize")) == 0) {
+    } else if (sSorting.compare("FileSize", Qt::CaseInsensitive) == 0) {
         m_eSorting = Helpers::FS_FileSize;
-    }
-    else {
+    } else {
         m_eSorting = Helpers::FS_LastModTime;
     }
-    m_bIsSortedAscending = GetBool(_T("FileSortAscending"), true);
-    m_eAutoZoomMode = GetAutoZoomMode(_T("AutoZoomMode"), Helpers::ZM_FitToScreenNoZoom);
-    m_eAutoZoomModeFullscreen = GetAutoZoomMode(_T("AutoZoomModeFullscreen"), m_eAutoZoomMode);
 
-    m_bHQRS = GetBool(_T("HighQualityResampling"), true);
-    m_bKeepParams = GetBool(_T("KeepParameters"), false);
-    m_eSlideShowTransitionEffect = Helpers::ConvertTransitionEffectFromString(GetString(_T("SlideShowTransitionEffect"), _T("")));
+    m_bIsSortedAscending = GetBool("FileSortAscending", true);
+    m_eAutoZoomMode = GetAutoZoomMode("AutoZoomMode", Helpers::ZM_FitToScreenNoZoom);
+    m_eAutoZoomModeFullscreen = GetAutoZoomMode("AutoZoomModeFullscreen", m_eAutoZoomMode);
+
+    m_bHQRS = GetBool("HighQualityResampling", true);
+    m_bKeepParams = GetBool("KeepParameters", false);
+    m_eSlideShowTransitionEffect = ConvertTransitionEffectFromString(GetString("SlideShowTransitionEffect", ""));
 
 // -------------------------------------------------------------------------------------------
 // [GF] Custom writable ini settings of this mod
 
-    m_nBookModePageHeight = GetInt(_T("BookModePageHeight"), 122, 100, 1000);
+    m_nBookModePageHeight = GetInt("BookModePageHeight", 122, 100, 1000);
 
 // -------------------------------------------------------------------------------------------
 }
 
 void CSettingsProvider::SaveCustomSettings() {
     MakeSureUserINIExists();
-
-    WriteInt(_T("BookModePageHeight"), m_nBookModePageHeight);
-
+    WriteInt("BookModePageHeight", m_nBookModePageHeight);
     m_bUserINIExists = true;
 }
 
 void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams, 
                                      EProcessingFlags eProcFlags,
-                                     Helpers::ENavigationMode eNavigationMode, Helpers::ESorting eFileSorting, bool isSortedAscending,
-                                     Helpers::EAutoZoomMode eAutoZoomMode, Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
+                                     Helpers::ENavigationMode eNavigationMode, 
+                                     Helpers::ESorting eFileSorting, 
+                                     bool isSortedAscending,
+                                     Helpers::EAutoZoomMode eAutoZoomMode, 
+                                     Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
                                      Helpers::ETransitionEffect eSlideShowTransitionEffect) {
     MakeSureUserINIExists();
 
-    WriteDouble(_T("Contrast"), procParams.Contrast);
-    WriteDouble(_T("Gamma"), procParams.Gamma);
-    WriteDouble(_T("Saturation"), procParams.Saturation);
-    WriteBool(_T("AutoContrastCorrection"), GetProcessingFlag(eProcFlags, PFLAG_AutoContrast));
+    WriteDouble("Contrast", procParams.Contrast);
+    WriteDouble("Gamma", procParams.Gamma);
+    WriteDouble("Saturation", procParams.Saturation);
+    WriteBool("AutoContrastCorrection", GetProcessingFlag(eProcFlags, PFLAG_AutoContrast));
 
-    LPCTSTR sNavigation = _T("LoopFolder");
+    QString sNavigation = "LoopFolder";
     if (eNavigationMode == Helpers::NM_LoopSameDirectoryLevel) {
-        sNavigation = _T("LoopSameFolderLevel");
+        sNavigation = "LoopSameFolderLevel";
+    } else if (eNavigationMode == Helpers::NM_LoopSubDirectories) {
+        sNavigation = "LoopSubFolders";
     }
-    else if (eNavigationMode == Helpers::NM_LoopSubDirectories) {
-        sNavigation = _T("LoopSubFolders");
-    }
-    WriteString(_T("FolderNavigation"), sNavigation);
+    WriteString("FolderNavigation", sNavigation);
 
-    LPCTSTR sSorting = _T("FileName");
+    QString sSorting = "FileName";
     if (eFileSorting == Helpers::FS_CreationTime) {
-        sSorting = _T("CreationDate");
+        sSorting = "CreationDate";
     } else if (eFileSorting == Helpers::FS_LastModTime) {
-        sSorting = _T("LastModDate");
+        sSorting = "LastModDate";
     } else if (eFileSorting == Helpers::FS_Random) {
-        sSorting = _T("Random");
+        sSorting = "Random";
     } else if (eFileSorting == Helpers::FS_FileSize) {
-        sSorting = _T("FileSize");
+        sSorting = "FileSize";
     }
-    WriteString(_T("FileDisplayOrder"), sSorting);
+    WriteString("FileDisplayOrder", sSorting);
 
-    WriteBool(_T("FileSortAscending"), isSortedAscending);
+    WriteBool("FileSortAscending", isSortedAscending);
 
-    WriteString(_T("AutoZoomMode"), GetAutoZoomModeString(eAutoZoomMode));
-    WriteString(_T("AutoZoomModeFullscreen"), GetAutoZoomModeString(eAutoZoomModeFullScreen));
+    WriteString("AutoZoomMode", GetAutoZoomModeString(eAutoZoomMode));
+    WriteString("AutoZoomModeFullscreen", GetAutoZoomModeString(eAutoZoomModeFullScreen));
 
-    WriteBool(_T("HighQualityResampling"), GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling));
-    WriteBool(_T("KeepParameters"), GetProcessingFlag(eProcFlags, PFLAG_KeepParams));
+    WriteBool("HighQualityResampling", GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling));
+    WriteBool("KeepParameters", GetProcessingFlag(eProcFlags, PFLAG_KeepParams));
 
-    WriteString(_T("SlideShowTransitionEffect"), Helpers::ConvertTransitionEffectToString(eSlideShowTransitionEffect));
+    WriteString("SlideShowTransitionEffect", ConvertTransitionEffectToString(eSlideShowTransitionEffect));
 
     m_bUserINIExists = true;
     ReadWriteableINISettings();
 }
 
 void CSettingsProvider::SaveStickyWindowRect(CRect rect) {
-    if (rect != m_stickyWindowRect && !rect.IsRectEmpty()) {
-        const int BUFF_SIZE = 64;
-        TCHAR buff[BUFF_SIZE];
-        _sntprintf(buff, BUFF_SIZE, _T("%d %d %d %d"), rect.left, rect.top, rect.right, rect.bottom);
+    if (ToCRect(m_stickyWindowRect) != rect && !rect.IsRectEmpty()) {
+        QString sRect = QString("%1 %2 %3 %4")
+                            .arg(rect.left)
+                            .arg(rect.top)
+                            .arg(rect.right)
+                            .arg(rect.bottom);
 
         MakeSureUserINIExists();
-
-        WriteString(_T("StickyWindowRect"), buff);
-
+        WriteString("StickyWindowRect", sRect);
         m_bUserINIExists = true;
     }
 }
 
-bool CSettingsProvider::ExistsUserINI() {
-    LPCTSTR sINIFileName = GetUserINIFileName();
-    return ::GetFileAttributes(sINIFileName) != INVALID_FILE_ATTRIBUTES;
+bool CSettingsProvider::ExistsUserINI() const {
+    return QFileInfo::exists(m_sIniNameUser);
 }
 
 void CSettingsProvider::CopyUserINIFromTemplate() {
@@ -421,9 +371,9 @@ void CSettingsProvider::CopyUserINIFromTemplate() {
         return; // no user INI file
     }
 
-    LPCTSTR sINIFileName = GetUserINIFileName();
-    ::CreateDirectory(Helpers::JPEGViewAppDataPath(), NULL);
-    ::CopyFile(GetINITemplateName(), sINIFileName, TRUE);
+    QFileInfo userFile(m_sIniNameUser);
+    QDir().mkpath(userFile.absolutePath());
+    QFile::copy(GetINITemplateName(), m_sIniNameUser);
 }
 
 void CSettingsProvider::MakeSureUserINIExists() {
@@ -432,226 +382,220 @@ void CSettingsProvider::MakeSureUserINIExists() {
     }
 
     // Create JPEGView appdata directory and copy INI file if it does not exist
-    ::CreateDirectory(Helpers::JPEGViewAppDataPath(), NULL);
-    if (::GetFileAttributes(m_sIniNameUser) == INVALID_FILE_ATTRIBUTES) {
-        ::CopyFile(GetINITemplateName(), m_sIniNameUser, TRUE);
+    QFileInfo userFile(m_sIniNameUser);
+    QDir().mkpath(userFile.absolutePath());
+    if (!QFileInfo::exists(m_sIniNameUser)) {
+        QFile::copy(GetINITemplateName(), m_sIniNameUser);
     }
 }
 
-CString CSettingsProvider::GetINITemplateName() {
-    CString defaultGlobalIniName = m_sEXEPath + DEFAULT_INI_FILE_NAME;
-    CString localizedTemplate = CNLS::GetLocalizedFileName(defaultGlobalIniName, _T(""), _T("tpl"), Language());
-    if (::GetFileAttributes(localizedTemplate) != INVALID_FILE_ATTRIBUTES) {
-        return localizedTemplate;
-    }
-    return defaultGlobalIniName + _T(".tpl");
+QString CSettingsProvider::GetINITemplateName() const {
+    return m_sEXEPath + DEFAULT_INI_FILE_NAME + ".tpl";
 }
 
-LPCTSTR CSettingsProvider::ReadUserIniString(LPCTSTR key) {
-    return ReadIniString(key, m_sIniNameUser, m_pUserKeys, m_pIniUserSectionBuffer);
-}
-
-LPCTSTR CSettingsProvider::ReadGlobalIniString(LPCTSTR key) {
-    return ReadIniString(key, m_sIniNameGlobal, m_pGlobalKeys, m_pIniGlobalSectionBuffer);
-}
-
-LPCTSTR CSettingsProvider::ReadIniString(LPCTSTR key, LPCTSTR fileName, IniHashMap*& keyMap, TCHAR*& pBuffer) {
-    if (key == NULL) {
-        return NULL;
-    }
-
-    if (keyMap == NULL) {
-        keyMap = new IniHashMap();
-        ReadIniFile(fileName, keyMap, pBuffer);
-    }
-
-    auto iter = keyMap->find(std::wstring(key));
-    if (iter == keyMap->end()) {
-        return NULL; // Nicht gefunden
-    }
-    else {
-        return iter->second.c_str();
-    }
-}
-
-void CSettingsProvider::ReadIniFile(LPCTSTR fileName, IniHashMap* keyMap, TCHAR*& pBuffer) {
-    int bufferSize = 1024 * 2;
-
-    pBuffer = NULL;
-    int actualSize;
-    do {
-        delete[] pBuffer;
-        bufferSize = bufferSize * 2;
-        pBuffer = new TCHAR[bufferSize];
-        actualSize = ::GetPrivateProfileSection(SECTION_NAME, pBuffer, bufferSize, fileName);
-    } while (actualSize == bufferSize - 2);
-
-    LPTSTR current = pBuffer;
-    while (*current != 0) {
-        while (*current != 0 && _istspace(*current)) current++;
-        LPCTSTR key = current;
-        while (*current != 0 && !_istspace(*current) && *current != _T('=')) current++;
-        LPCTSTR value = current;
-        if (*current != 0) {
-            *current++ = 0;
-            while (*current != 0 && _istspace(*current)) current++;
-            value = current;
+QString CSettingsProvider::GetString(const QString& sKey, const QString& sDefault) const {
+    if (m_bUserINIExists && QFileInfo::exists(m_sIniNameUser)) {
+        QSettings userSettings(m_sIniNameUser, QSettings::IniFormat);
+        userSettings.beginGroup(SECTION_NAME);
+        if (userSettings.contains(sKey)) {
+            return userSettings.value(sKey).toString();
         }
-        if (*key != 0) {
-            (*keyMap)[std::wstring(key)] = std::wstring(value); // Automatische Konvertierung von LPCTSTR in std::wstring
-        }
-        current += _tcslen(value) + 1;
+        userSettings.endGroup();
     }
+
+    if (QFileInfo::exists(m_sIniNameGlobal)) {
+        QSettings globalSettings(m_sIniNameGlobal, QSettings::IniFormat);
+        globalSettings.beginGroup(SECTION_NAME);
+        if (globalSettings.contains(sKey)) {
+            return globalSettings.value(sKey).toString();
+        }
+        globalSettings.endGroup();
+    }
+
+    return sDefault;
 }
 
-CString CSettingsProvider::GetString(LPCTSTR sKey, LPCTSTR sDefault) {
-    if (m_bUserINIExists) {
-        // try first user path
-        LPCTSTR value = ReadUserIniString(sKey);
-        if (value != NULL) {
-            return CString(value);
-        }
-    }
-    // finally global path if not found in user path
-    LPCTSTR value = ReadGlobalIniString(sKey);
-    if (value == NULL) {
-        return CString(sDefault);
-    }
-    return CString(value);
-}
-
-int CSettingsProvider::GetInt(LPCTSTR sKey, int nDefault, int nMin, int nMax) {
-    CString s = GetString(sKey, _T(""));
-    if (s.IsEmpty()) {
+int CSettingsProvider::GetInt(const QString& sKey, int nDefault, int nMin, int nMax) const {
+    QString s = GetString(sKey, "");
+    if (s.isEmpty()) {
         return nDefault;
     }
-    int nValue = (int)_wtof((LPCTSTR)s);
-    return std::min(nMax, std::max(nMin, nValue));
+    bool ok = false;
+    int nValue = s.toInt(&ok);
+    if (!ok) return nDefault;
+    return std::clamp(nValue, nMin, nMax);
 }
 
-double CSettingsProvider::GetDouble(LPCTSTR sKey, double dDefault, double dMin, double dMax) {
-    CString s = GetString(sKey, _T(""));
-    if (s.IsEmpty()) {
+double CSettingsProvider::GetDouble(const QString& sKey, double dDefault, double dMin, double dMax) const {
+    QString s = GetString(sKey, "");
+    if (s.isEmpty()) {
         return dDefault;
     }
-    double dValue = _wtof((LPCTSTR)s);
-    return std::min(dMax, std::max(dMin, dValue));
+    bool ok = false;
+    double dValue = s.toDouble(&ok);
+    if (!ok) return dDefault;
+    return std::clamp(dValue, dMin, dMax);
 }
 
-bool CSettingsProvider::GetBool(LPCTSTR sKey, bool bDefault) {
-    CString s = GetString(sKey, _T(""));
-    if (s.IsEmpty()) {
+bool CSettingsProvider::GetBool(const QString& sKey, bool bDefault) const {
+    QString s = GetString(sKey, "");
+    if (s.isEmpty()) {
         return bDefault;
     }
-    if (s.CompareNoCase(_T("true")) == 0) {
+    if (s.compare("true", Qt::CaseInsensitive) == 0) {
         return true;
-    } else if (s.CompareNoCase(_T("false")) == 0) {
+    } else if (s.compare("false", Qt::CaseInsensitive) == 0) {
         return false;
-    } else {
-        return bDefault;
     }
+    return bDefault;
 }
 
-CRect CSettingsProvider::GetRect(LPCTSTR sKey, const CRect& defaultRect) {
-    CString s = GetString(sKey, _T(""));
-    if (s.IsEmpty()) {
+QRect CSettingsProvider::GetRect(const QString& sKey, const QRect& defaultRect) const {
+    QString s = GetString(sKey, "");
+    if (s.isEmpty()) {
         return defaultRect;
     }
-    int nLeft, nTop, nRight, nBottom;
-    if (_stscanf((LPCTSTR)s, _T(" %d %d %d %d "), &nLeft, &nTop, &nRight, &nBottom) == 4) {
-        CRect newRect = CRect(nLeft, nTop, nRight, nBottom);
-        newRect.NormalizeRect();
-        return newRect;
-    } else {
-        return defaultRect;
+
+    // Liest z.B. "302 93 1412 950" sauber ein
+    const auto tokens = s.split(' ', Qt::SkipEmptyParts);
+    if (tokens.size() == 4) {
+        bool ok1, ok2, ok3, ok4;
+        int left = tokens[0].toInt(&ok1);
+        int top = tokens[1].toInt(&ok2);
+        int right = tokens[2].toInt(&ok3);
+        int bottom = tokens[3].toInt(&ok4);
+        if (ok1 && ok2 && ok3 && ok4) {
+            return QRect(QPoint(left, top), QPoint(right, bottom)).normalized();
+        }
     }
+    return defaultRect;
 }
 
-CSize CSettingsProvider::GetSize(LPCTSTR sKey, const CSize& defaultSize) {
-    CString s = GetString(sKey, _T(""));
-    if (s.IsEmpty()) {
+QSize CSettingsProvider::GetSize(const QString& sKey, const QSize& defaultSize) const {
+    QString s = GetString(sKey, "");
+    if (s.isEmpty()) {
         return defaultSize;
     }
-    int nWidth, nHeight;
-    if (_stscanf((LPCTSTR)s, _T(" %d %d "), &nWidth, &nHeight) == 2) {
-        nWidth = std::max(1, nWidth);
-        nHeight = std::max(1, nHeight);
-        return CSize(nWidth, nHeight);
-    } else {
-        return defaultSize;
+
+    // Liest z.B. "320 240" sauber ein
+    const auto tokens = s.split(' ', Qt::SkipEmptyParts);
+    if (tokens.size() == 2) {
+        bool ok1, ok2;
+        int w = tokens[0].toInt(&ok1);
+        int h = tokens[1].toInt(&ok2);
+        if (ok1 && ok2) {
+            return QSize(std::max(1, w), std::max(1, h));
+        }
     }
+    return defaultSize;
 }
 
-COLORREF CSettingsProvider::GetColor(LPCTSTR sKey, COLORREF defaultColor) {
-    int nRed, nGreen, nBlue;
-    CString sColor = GetString(sKey, _T(""));
-    if (sColor.IsEmpty()) {
+QColor CSettingsProvider::GetColor(const QString& sKey, const QColor& defaultColor) const {
+    QString sColor = GetString(sKey, "");
+    if (sColor.isEmpty()) {
         return defaultColor;
     }
-    if (_stscanf(sColor, _T(" %d %d %d"), &nRed, &nGreen, &nBlue) == 3) {
-        return RGB(nRed, nGreen, nBlue);
-    } else {
-        return defaultColor;
+
+    // Liest z.B. "0 0 0" oder "243 242 231" sauber ein
+    const auto tokens = sColor.split(' ', Qt::SkipEmptyParts);
+    if (tokens.size() == 3) {
+        bool ok1, ok2, ok3;
+        int r = tokens[0].toInt(&ok1);
+        int g = tokens[1].toInt(&ok2);
+        int b = tokens[2].toInt(&ok3);
+        if (ok1 && ok2 && ok3) {
+            return QColor(r, g, b);
+        }
     }
+    return defaultColor;
 }
 
-Helpers::EAutoZoomMode CSettingsProvider::GetAutoZoomMode(LPCTSTR sKey, Helpers::EAutoZoomMode defaultZoomMode) {
-    CString sAutoZoomMode = GetString(sKey, _T("FitNoZoom"));
-    if (sAutoZoomMode.CompareNoCase(_T("Fit")) == 0) {
+Helpers::EAutoZoomMode CSettingsProvider::GetAutoZoomMode(const QString& sKey, Helpers::EAutoZoomMode defaultZoomMode) const {
+    QString sAutoZoomMode = GetString(sKey, "FitNoZoom");
+    if (sAutoZoomMode.compare("Fit", Qt::CaseInsensitive) == 0) {
         return Helpers::ZM_FitToScreen;
-    }
-    else if (sAutoZoomMode.CompareNoCase(_T("Fill")) == 0) {
+    } else if (sAutoZoomMode.compare("Fill", Qt::CaseInsensitive) == 0) {
         return Helpers::ZM_FillScreen;
-    }
-    else if (sAutoZoomMode.CompareNoCase(_T("FillNoZoom")) == 0) {
+    } else if (sAutoZoomMode.compare("FillNoZoom", Qt::CaseInsensitive) == 0) {
         return Helpers::ZM_FillScreenNoZoom;
     }
-    else {
-        return defaultZoomMode;
+    return defaultZoomMode;
+}
+
+QString CSettingsProvider::GetAutoZoomModeString(Helpers::EAutoZoomMode autoZoomMode) const {
+    switch (autoZoomMode) {
+        case Helpers::ZM_FillScreen:       return "Fill";
+        case Helpers::ZM_FitToScreen:      return "Fit";
+        case Helpers::ZM_FillScreenNoZoom: return "FillNoZoom";
+        case Helpers::ZM_None:             return "None";
+        case Helpers::ZM_BookMode:         return "BookMode";
+        default:                           return "FitNoZoom";
     }
 }
 
-LPCTSTR CSettingsProvider::GetAutoZoomModeString(Helpers::EAutoZoomMode autoZoomMode) {
-    if (autoZoomMode == Helpers::ZM_FillScreen) {
-        return _T("Fill");
+void CSettingsProvider::WriteString(const QString& sKey, const QString& sString) {
+    QSettings settings(m_sIniNameUser, QSettings::IniFormat);
+    settings.beginGroup(SECTION_NAME);
+    if (settings.value(sKey).toString() != sString) {
+        settings.setValue(sKey, sString);
     }
-    else if (autoZoomMode == Helpers::ZM_FitToScreen) {
-        return _T("Fit");
-    }
-    else if (autoZoomMode == Helpers::ZM_FillScreenNoZoom) {
-        return _T("FillNoZoom");
-    }
-    else if (autoZoomMode == Helpers::ZM_None) {
-        return _T("None");
-    }
-    else if (autoZoomMode == Helpers::ZM_BookMode) {
-        return _T("BookMode");
-    }
-    return _T("FitNoZoom");
+    settings.endGroup();
 }
 
-void CSettingsProvider::WriteString(LPCTSTR sKey, LPCTSTR sString) {
-    TCHAR sValueOld[1024];
-    sValueOld[1023] = 0;
-    ::GetPrivateProfileString(SECTION_NAME, sKey, _T(""), sValueOld, 1023, m_sIniNameUser);
-
-    if ((sValueOld[0] == 0) || (lstrcmp(sValueOld,sString) != 0)) {
-        ::WritePrivateProfileString(SECTION_NAME, sKey, sString, m_sIniNameUser);
-        }
+void CSettingsProvider::WriteDouble(const QString& sKey, double dValue) {
+    WriteString(sKey, QString::number(dValue, 'f', 2));
 }
 
-void CSettingsProvider::WriteDouble(LPCTSTR sKey, double dValue) {
-    TCHAR buff[32];
-    _stprintf_s(buff, 32, _T("%.2f"), dValue);
-    WriteString(sKey, buff);
+void CSettingsProvider::WriteBool(const QString& sKey, bool bValue) {
+    WriteString(sKey, bValue ? "true" : "false");
 }
 
-void CSettingsProvider::WriteBool(LPCTSTR sKey, bool bValue) {
-    WriteString(sKey, bValue ? _T("true") : _T("false"));
+void CSettingsProvider::WriteInt(const QString& sKey, int nValue) {
+    WriteString(sKey, QString::number(nValue));
 }
 
-void CSettingsProvider::WriteInt(LPCTSTR sKey, int nValue) {
-    TCHAR buff[32];
-    _stprintf_s(buff, 32, _T("%d"), nValue);
-    WriteString(sKey, buff);
+Helpers::ETransitionEffect CSettingsProvider::ConvertTransitionEffectFromString(QStringView str) {
+    if (str.isEmpty()) {
+        return Helpers::TE_None;
+    }
+
+    // Statische Map für schnelle O(1)-Zuordnung (Case-Insensitive)
+    static const QHash<QString, Helpers::ETransitionEffect> effectMap = {
+        { "blend",    Helpers::TE_Blend },
+        { "sliderl",  Helpers::TE_SlideRL },
+        { "slidelr",  Helpers::TE_SlideLR },
+        { "slidetb",  Helpers::TE_SlideTB },
+        { "slidebt",  Helpers::TE_SlideBT },
+        { "rollrl",   Helpers::TE_RollRL },
+        { "rolllr",   Helpers::TE_RollLR },
+        { "rolltb",   Helpers::TE_RollTB },
+        { "rollbt",   Helpers::TE_RollBT },
+        { "scrollrl", Helpers::TE_ScrollRL },
+        { "scrolllr", Helpers::TE_ScrollLR },
+        { "scrolltb", Helpers::TE_ScrollTB },
+        { "scrollbt", Helpers::TE_ScrollBT }
+    };
+
+    return effectMap.value(str.toString().toLower(), Helpers::TE_None);
+}
+
+QString CSettingsProvider::ConvertTransitionEffectToString(Helpers::ETransitionEffect effect) {
+    static const QMap<Helpers::ETransitionEffect, QString> stringMap = {
+        { Helpers::TE_None,     "None" },
+        { Helpers::TE_Blend,    "Blend" },
+        { Helpers::TE_SlideRL,  "SlideRL" },
+        { Helpers::TE_SlideLR,  "SlideLR" },
+        { Helpers::TE_SlideTB,  "SlideTB" },
+        { Helpers::TE_SlideBT,  "SlideBT" },
+        { Helpers::TE_RollRL,   "RollRL" },
+        { Helpers::TE_RollLR,   "RollLR" },
+        { Helpers::TE_RollTB,   "RollTB" },
+        { Helpers::TE_RollBT,   "RollBT" },
+        { Helpers::TE_ScrollRL, "ScrollRL" },
+        { Helpers::TE_ScrollLR, "ScrollLR" },
+        { Helpers::TE_ScrollTB, "ScrollTB" },
+        { Helpers::TE_ScrollBT, "ScrollBT" }
+    };
+
+    return stringMap.value(effect, "None");
 }

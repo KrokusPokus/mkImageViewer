@@ -1,16 +1,8 @@
-// JPEGView.cpp : main entry point for JPEGView.exe
-
 #include <locale.h>
 #include <gdiplus.h>
 #include "resource.h"
 #include "MainDlg.h"
 #include "SettingsProvider.h"
-
-#ifdef DEBUG
-#include <dbghelp.h>
-#endif
-
-// _CrtDumpMemoryLeaks
 
 CAppModule _Module;
 
@@ -83,123 +75,9 @@ static CString ParseCommandLineForStartupFile(LPCTSTR sCommandLine) {
     return sStartupFile;
 }
 
-static int ParseCommandLineForAutostart(LPCTSTR sCommandLine) {
-    LPCTSTR sAutoStart = Helpers::stristr(sCommandLine, _T("/slideshow"));
-    if (sAutoStart == NULL) {
-        return 0;
-    }
-    int interval = _ttoi(sAutoStart + _tcslen(_T("/slideshow")));
-    return (interval == 0) ? 5 : interval;
-}
-
-static bool ParseCommandLineForFullScreen(LPCTSTR sCommandLine) {
-    return Helpers::stristr(sCommandLine, _T("/fullscreen")) != NULL;
-}
-
-static bool ParseCommandLineForAutoExit(LPCTSTR sCommandLine) {
-    return Helpers::stristr(sCommandLine, _T("/autoexit")) != NULL;
-}
-
-static int ParseCommandLineForDisplayMonitor(LPCTSTR sCommandLine) {
-    LPCTSTR sMonitor = Helpers::stristr(sCommandLine, _T("/monitor"));
-    if (sMonitor == NULL) {
-        return -1;
-    }
-    return _ttoi(sMonitor + _tcslen(_T("/monitor")));
-}
-
-static Helpers::ESorting ParseCommandLineForSorting(LPCTSTR sCommandLine) {
-    LPCTSTR sSorting = Helpers::stristr(sCommandLine, _T("/order"));
-    if (sSorting == NULL) {
-        return Helpers::FS_Undefined;
-    }
-    LPCTSTR sSortingMode = sSorting + _tcslen(_T("/order"));
-    if (sSortingMode[0] != 0) {
-        return 
-            (_totupper(sSortingMode[1]) == _T('M')) ? Helpers::FS_LastModTime :
-            (_totupper(sSortingMode[1]) == _T('C')) ? Helpers::FS_CreationTime :
-            (_totupper(sSortingMode[1]) == _T('N')) ? Helpers::FS_FileName :
-            (_totupper(sSortingMode[1]) == _T('Z')) ? Helpers::FS_Random :
-            (_totupper(sSortingMode[1]) == _T('S')) ? Helpers::FS_FileSize : Helpers::FS_Undefined;
-    }
-    return Helpers::FS_Undefined; 
-}
-
-static Helpers::ETransitionEffect ParseCommandLineForSlideShowEffect(LPCTSTR sCommandLine) {
-    LPCTSTR sEffect = Helpers::stristr(sCommandLine, _T("/effect"));
-    if (sEffect == NULL) {
-        return (Helpers::ETransitionEffect)(-1);
-    }
-    sEffect = sEffect + _tcslen(_T("/effect")) + 1;
-    LPCTSTR posSpace = _tcschr(sEffect, _T(' '));
-    CString effect = (posSpace == NULL) ? CString(sEffect) : CString(sEffect, (int)(posSpace - sEffect));
-    return Helpers::ConvertTransitionEffectFromString(effect);
-}
-
-static int ParseCommandLineForTransitionTime(LPCTSTR sCommandLine) {
-    LPCTSTR sTransitionTime = Helpers::stristr(sCommandLine, _T("/transitiontime"));
-    if (sTransitionTime == NULL) {
-        return 0;
-    }
-    return std::max(100, std::min(5000, _ttoi(sTransitionTime + _tcslen(_T("/transitiontime")))));
-}
-
-#ifdef DEBUG
-static CRITICAL_SECTION s_lock;
-
-static BOOL GenerateDump(EXCEPTION_POINTERS* pExceptionPointers)
-{
-    WCHAR* szAppName = L"JPEGView";
-    DWORD dwBufferSize = MAX_PATH;
-    HANDLE hDumpFile;
-    SYSTEMTIME stLocalTime;
-    MINIDUMP_EXCEPTION_INFORMATION ExpParam;
-
-    GetLocalTime(&stLocalTime);
-
-    CString fileName;
-    fileName.Format(_T("%s\\%s-%04d%02d%02d-%02d%02d%02d-%ld-%ld.dmp"),
-        Helpers::JPEGViewAppDataPath(), szAppName,
-        stLocalTime.wYear, stLocalTime.wMonth, stLocalTime.wDay,
-        stLocalTime.wHour, stLocalTime.wMinute, stLocalTime.wSecond,
-        GetCurrentProcessId(), GetCurrentThreadId());
-
-    hDumpFile = ::CreateFile(fileName, GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
-
-    ExpParam.ThreadId = GetCurrentThreadId();
-    ExpParam.ExceptionPointers = pExceptionPointers;
-    ExpParam.ClientPointers = TRUE;
-
-    return ::MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
-        hDumpFile, MiniDumpWithDataSegs, &ExpParam, NULL, NULL);
-}
-
-static LONG WINAPI CrashHandler(EXCEPTION_POINTERS * pExceptionInfo)
-{
-    ::EnterCriticalSection(&s_lock);
-    if (GenerateDump(pExceptionInfo))
-    {
-        ::MessageBox(NULL, CString(_T("Unhandled exception\nMinidump file written to:\n")) + Helpers::JPEGViewAppDataPath(), _T("Unhandled exception"), MB_OK);
-    }
-    else
-    {
-        ::MessageBox(NULL, _T("Unhandled exception\nError writing minidump file"), _T("Error writing minidump"), MB_OK);
-    }
-    ::LeaveCriticalSection(&s_lock);
-    return EXCEPTION_EXECUTE_HANDLER;
-}
-#endif
-
 int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lpstrCmdLine, int /*nCmdShow*/)
 {
     HRESULT hRes = ::CoInitialize(NULL);
-
-#ifdef DEBUG
-    ::InitializeCriticalSection(&s_lock);
-
-    ::SetUnhandledExceptionFilter(CrashHandler);
-#endif
 
     // use the locale from the operating system, however for numeric input/output always use 'C' locale
     // with the OS locale the INI file can not be read correctly (due to the different decimal point characters)
@@ -217,13 +95,6 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
     ATLASSERT(SUCCEEDED(hRes));
 
     CString sStartupFile = ParseCommandLineForStartupFile(lpstrCmdLine);
-    int nAutostartSlideShow = (sStartupFile.GetLength() == 0) ? 0 : ParseCommandLineForAutostart(lpstrCmdLine);
-    bool bForceFullScreen = ParseCommandLineForFullScreen(lpstrCmdLine);
-    bool bAutoExit = ParseCommandLineForAutoExit(lpstrCmdLine);
-    Helpers::ESorting eSorting = ParseCommandLineForSorting(lpstrCmdLine);
-    Helpers::ETransitionEffect eTransitionEffect = ParseCommandLineForSlideShowEffect(lpstrCmdLine);
-    int nTransitionTime = ParseCommandLineForTransitionTime(lpstrCmdLine);
-    int nDisplayMonitor = ParseCommandLineForDisplayMonitor(lpstrCmdLine);
 
     // Searches for other instances and asks them if *they* want to handle our startup file in our place. If not, we do it.
     HANDLE hMutex = ::CreateMutex(NULL, FALSE, _T("JPVMtX2869"));
@@ -239,9 +110,7 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
         ULONG_PTR gdiplusToken;
         Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-        CMainDlg dlgMain(bForceFullScreen);
-
-        dlgMain.SetStartupInfo(sStartupFile, nAutostartSlideShow, eSorting, eTransitionEffect, nTransitionTime, bAutoExit, nDisplayMonitor);
+        CMainDlg dlgMain(sStartupFile);
 
         try {
             nRet = (int)dlgMain.DoModal();

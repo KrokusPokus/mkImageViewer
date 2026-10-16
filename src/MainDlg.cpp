@@ -102,7 +102,9 @@ typedef const char* (__cdecl* pwine_get_version)(void);
 // Public
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-CMainDlg::CMainDlg(bool bForceFullScreen) {
+CMainDlg::CMainDlg(LPCTSTR sStartupFile) {
+    m_sStartupFile = sStartupFile;
+
     CSettingsProvider& sp = CSettingsProvider::This();
 
     CResizeFilterCache::This(); // Access before multiple threads are created
@@ -170,7 +172,7 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
     m_nCapturedX = m_nCapturedY = 0;
     m_nMouseX = m_nMouseY = 0;
     m_bAutoFitWndToImage = sp.DefaultWndToImage();
-    m_bFullScreenMode = bForceFullScreen || (sp.ShowFullScreen() && !sp.AutoFullScreen());
+    m_bFullScreenMode = (sp.ShowFullScreen() && !sp.AutoFullScreen());
     m_bLockPaint = true;
     m_nCurrentTimeout = 0;
     m_startMouse.x = m_startMouse.y = -1;
@@ -245,15 +247,6 @@ CMainDlg::~CMainDlg() {
     if (m_hmodDwmapi) {
         FreeLibrary(m_hmodDwmapi);
     }
-}
-
-void CMainDlg::SetStartupInfo(LPCTSTR sStartupFile, int nAutostartSlideShow, Helpers::ESorting eSorting, Helpers::ETransitionEffect eEffect, 
-    int nTransitionTime, bool bAutoExit, int nDisplayMonitor) { 
-    m_sStartupFile = sStartupFile; m_nAutoStartSlideShow = nAutostartSlideShow; m_eForcedSorting = eSorting;
-    m_bAutoExit = bAutoExit;
-    if ((int)eEffect >= 0) m_eTransitionEffect = eEffect;
-    if (nTransitionTime > 0) m_nTransitionTime = nTransitionTime;
-    if (nDisplayMonitor >= 0) CSettingsProvider::This().SetMonitorOverride(nDisplayMonitor);
 }
 
 LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {

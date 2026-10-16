@@ -41,7 +41,7 @@ public:
         POS_PreviousFile
     };
 
-    CMainDlg(bool bForceFullScreen);
+    CMainDlg(LPCTSTR sStartupFile);
     ~CMainDlg();
 
     BEGIN_MSG_MAP(CMainDlg)
@@ -122,10 +122,6 @@ public:
     LRESULT OnLoadFileAsynch(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/);
     LRESULT OnClose(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/);
 /*GF*/    LRESULT OnRefreshView(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/);
-
-    // Called by main()
-    void SetStartupInfo(LPCTSTR sStartupFile, int nAutostartSlideShow, Helpers::ESorting eSorting, Helpers::ETransitionEffect eEffect, 
-        int nTransitionTime, bool bAutoExit, int nDisplayMonitor);
 
     // Called by the different controller classes
     bool IsFullScreenMode() { return m_bFullScreenMode; }

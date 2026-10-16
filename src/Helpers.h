@@ -207,12 +207,6 @@ namespace Helpers {
     // The window size equals the client area size plus this border size
     CSize GetTotalBorderSize();
 
-    // Converts the transition effect from string (as in INI or command line parameter) to enum
-    ETransitionEffect ConvertTransitionEffectFromString(LPCTSTR str);
-
-    // Inverse of ConvertTransitionEffectFromString
-    LPCTSTR ConvertTransitionEffectToString(ETransitionEffect effect);
-
     // Tests if the CPU supports AVX2, SSE, MMX(2)
     CPUType ProbeCPU(void);
 
