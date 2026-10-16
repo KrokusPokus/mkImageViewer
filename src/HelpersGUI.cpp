@@ -62,7 +62,7 @@ namespace HelpersGUI {
 
     HFONT DefaultGUIFont = NULL;
     HFONT SystemFont = NULL;
-    HFONT DefaultFileNameFont = NULL;
+    HFONT DefaultZoomFactorFont = NULL;
 
     int ScaleWithDPI(int value)
     {
@@ -85,13 +85,13 @@ namespace HelpersGUI {
         ::SelectObject(dc, SystemFont);
     }
 
-    void SelectDefaultFileNameFont(HDC dc) {
-        if (DefaultFileNameFont == NULL) {
-            DefaultFileNameFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().FileNameFont());
-            if (DefaultFileNameFont == NULL)
-                DefaultFileNameFont = CreateFontFromINIDescription(dc, _T("\"Arial\" 10.0 bold"));
+    void SelectDefaultZoomFactorFont(HDC dc) {
+        if (DefaultZoomFactorFont == NULL) {
+            DefaultZoomFactorFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().ZoomFactorFont());
+            if (DefaultZoomFactorFont == NULL)
+                DefaultZoomFactorFont = CreateFontFromINIDescription(dc, _T("\"Arial\" 10.0 bold"));
         }
-        ::SelectObject(dc, DefaultFileNameFont);
+        ::SelectObject(dc, DefaultZoomFactorFont);
     }
 
     void TranslateMenuStrings(HMENU hMenu, CKeyMap* pKeyMap) {
@@ -214,9 +214,7 @@ namespace HelpersGUI {
 
     CString GetINIFileSaveConfirmationText(const CImageProcessingParams& procParams, 
         EProcessingFlags eProcFlags, Helpers::ENavigationMode eNavigationMode, Helpers::ESorting eFileSorting, bool isSortedAscending,
-        Helpers::EAutoZoomMode eAutoZoomMode,
-        bool bShowNavPanel, bool bShowFileName, bool bShowFileInfo,
-        Helpers::ETransitionEffect eSlideShowTransitionEffect) {
+        Helpers::EAutoZoomMode eAutoZoomMode, Helpers::ETransitionEffect eSlideShowTransitionEffect) {
 
         const int BUFF_SIZE = 256;
         TCHAR buff[BUFF_SIZE];
@@ -228,24 +226,7 @@ namespace HelpersGUI {
         sText += buff;
         _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Saturation"))) + _T(": %.2f\n"), procParams.Saturation);
         sText += buff;
-        _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Sharpen"))) + _T(": %.2f\n"), procParams.Sharpen);
-        sText += buff;
-        _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Cyan-Red"))) + _T(": %.2f\n"), procParams.CyanRed);
-        sText += buff;
-        _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Magenta-Green"))) + _T(": %.2f\n"), procParams.MagentaGreen);
-        sText += buff;
-        _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Yellow-Blue"))) + _T(": %.2f\n"), procParams.YellowBlue);
-        sText += buff;
-        if (GetProcessingFlag(eProcFlags, PFLAG_LDC)) {
-            _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Lighten Shadows"))) + _T(": %.2f\n"), procParams.LightenShadows);
-            sText += buff;
-            _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Darken Highlights"))) + _T(": %.2f\n"), procParams.DarkenHighlights);
-            sText += buff;
-            _stprintf_s(buff, BUFF_SIZE, CString(CNLS::GetString(_T("Deep Shadows"))) + _T(": %.2f\n"), procParams.LightenShadowSteepness);
-            sText += buff;
-        }
         AddFlagText(sText, CNLS::GetString(_T("Auto contrast and color correction")) + CString(_T(": ")), GetProcessingFlag(eProcFlags, PFLAG_AutoContrast));
-        AddFlagText(sText, CNLS::GetString(_T("Local density correction")) + CString(_T(": ")), GetProcessingFlag(eProcFlags, PFLAG_LDC));
         AddFlagText(sText, CNLS::GetString(_T("High quality resampling")) + CString(_T(": ")), GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling));
         AddFlagText(sText, CNLS::GetString(_T("Keep parameters")) + CString(_T(": ")), GetProcessingFlag(eProcFlags, PFLAG_KeepParams));
         sText += CNLS::GetString(_T("Navigation")); sText += _T(": ");
@@ -292,11 +273,6 @@ namespace HelpersGUI {
         }
 
         sText += _T("\n");
-        sText += CNLS::GetString(_T("Show navigation panel")); sText += _T(": ");
-        sText += bShowNavPanel ? CNLS::GetString(_T("yes")) : CNLS::GetString(_T("no"));
-        sText += _T("\n");
-        AddFlagText(sText, CString(CNLS::GetString(_T("Show filename"))) + _T(": "), bShowFileName);
-        AddFlagText(sText, CString(CNLS::GetString(_T("Show picture info (EXIF)"))) + _T(": "), bShowFileInfo);
         
         sText += CNLS::GetString(_T("Slideshow")); sText += _T(" > ");
         sText += CNLS::GetString(_T("Transition Effect")); sText += _T(": ");

@@ -71,13 +71,11 @@ void CClipboard::CopyImageToClipboard(HWND hWnd, CJPEGImage * pImage, LPCTSTR fi
     DoCopy(hWnd, pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), fileName);
 }
 
-void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams,
-                                          EProcessingFlags eFlags, LPCTSTR fileName) {
+void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, LPCTSTR fileName) {
     CopyFullImageToClipboard(hWnd, pImage, procParams, eFlags, CRect(0, 0, pImage->OrigWidth(), pImage->OrigHeight()), fileName);
 }
 
-void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams,
-                                          EProcessingFlags eFlags, CRect clipRect, LPCTSTR fileName) {
+void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, CRect clipRect, LPCTSTR fileName) {
     if (pImage == NULL) {
         return;
     }

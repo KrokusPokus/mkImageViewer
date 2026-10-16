@@ -14,12 +14,10 @@
 #include "MultiMonitorSupport.h"
 #include "HistogramCorr.h"
 #include "Clipboard.h"
-#include "ParameterDB.h"
 #include "NLS.h"
 #include "HelpersGUI.h"
 #include "TimerEventIDs.h"
 #include "ResizeFilter.h"
-#include "EXIFReader.h"
 #include "ProcessingThreadPool.h"
 #include "KeyMap.h"
 #include "DirectoryWatcher.h"
@@ -31,8 +29,6 @@
 static const int MIN_WND_WIDTH = 320;
 static const int MIN_WND_HEIGHT = 240;
 
-static const double CONTRAST_INC = 0.03; // increment for contrast value
-static const double LDC_INC = 0.1; // increment for LDC (lighten shadows and darken highlights)
 static const int NUM_THREADS = 1; // number of readahead threads to use. Use "1" since the ImageLoaders aren't thread save and JxlReader/PngReaderer/WebpReaderWriter can't do out of order frame access!
 static const int ZOOM_TIMEOUT = 50; // refinement done after this many milliseconds
 static const int ZOOM_TEXT_TIMEOUT = 1000; // zoom label disappears after this many milliseconds
@@ -41,9 +37,11 @@ static const int ZOOM_TEXT_RECT_WIDTH = 70; // zoom label width
 static const int ZOOM_TEXT_RECT_HEIGHT = 25; // zoom label height
 static const int ZOOM_TEXT_RECT_OFFSET_X = 30; // zoom label offset from right border
 static const int ZOOM_TEXT_RECT_OFFSET_Y = 20; // zoom label offset from bottom border
+
 static const int TOAST_TEXT_RECT_OFFSET_X = 30;
 static const int TOAST_TEXT_RECT_OFFSET_Y = 20;
 static const int TOAST_TEXT_RECT_HEIGHT = 60;
+
 static const int PAN_STEP = 48; // number of pixels to pan if pan with cursor keys (SHIFT+up/down/left/right)
 
 static const int NO_REQUEST = 1; // used in GotoImage() method
@@ -64,74 +62,37 @@ static CImageProcessingParams GetDefaultProcessingParams() {
         sp.Contrast(),
         sp.Gamma(),
         sp.Saturation(),
-        sp.Sharpen(),
-        0.0, 0.5,
-        sp.BrightenShadows(),
-        sp.DarkenHighlights(),
-        sp.BrightenShadowsSteepness(),
-        sp.CyanRed(),
-        sp.MagentaGreen(),
-        sp.YellowBlue());
+        0.0, // ColorCorrectionFactor
+        0.5); // ContrastCorrectionFactor
 }
 
 // Gets hardcoded processing parameters, turning off all processing
 static CImageProcessingParams GetNoProcessingParams() {
-    return CImageProcessingParams(0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.25, 0.5, 0.0, 0.0, 0.0); 
+    return CImageProcessingParams(0.0, 1.0, 1.0, 0.0, 0.5); 
 }
 
 // Gets default image processing flags as set in INI file
-static EProcessingFlags GetDefaultProcessingFlags(bool bLandscapeMode) {
+static EProcessingFlags GetDefaultProcessingFlags() {
     CSettingsProvider& sp = CSettingsProvider::This();
     EProcessingFlags eProcFlags = PFLAG_None;
     eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, sp.HighQualityResampling());
     eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrast, sp.AutoContrastCorrection());
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_LDC, sp.LocalDensityCorrection());
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_LandscapeMode, bLandscapeMode);
     return eProcFlags;
 }
 
 // Create processing flags from literal boolean values
-static EProcessingFlags CreateProcessingFlags(bool bHQResampling, bool bAutoContrast, 
-                                              bool bAutoContrastSection, bool bLDC, bool bKeepParams,
-                                              bool bLandscapeMode) {
+static EProcessingFlags CreateProcessingFlags(bool bHQResampling, bool bAutoContrast, bool bKeepParams) {
     EProcessingFlags eProcFlags = PFLAG_None;
     eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, bHQResampling);
     eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrast, bAutoContrast);
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrastSection, bAutoContrastSection);
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_LDC, bLDC);
     eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_KeepParams, bKeepParams);
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_LandscapeMode, bLandscapeMode);
     return eProcFlags;
 }
 
 // Initialize boolean processing values from flag bitfield
-static void InitFromProcessingFlags(EProcessingFlags eFlags, bool& bHQResampling, bool& bAutoContrast, 
-                                    bool& bAutoContrastSection, bool& bLDC, bool& bLandscapeMode) {
+static void InitFromProcessingFlags(EProcessingFlags eFlags, bool& bHQResampling, bool& bAutoContrast) {
     bHQResampling = GetProcessingFlag(eFlags, PFLAG_HighQualityResampling);
     bAutoContrast = GetProcessingFlag(eFlags, PFLAG_AutoContrast);
-    bAutoContrastSection = GetProcessingFlag(eFlags, PFLAG_AutoContrastSection);
-    bLDC = GetProcessingFlag(eFlags, PFLAG_LDC);
-    bLandscapeMode = GetProcessingFlag(eFlags, PFLAG_LandscapeMode);
-}
-
-// Sets the parameters according to the landscape enhancement mode
-static CImageProcessingParams _SetLandscapeModeParams(bool bLandscapeMode, const CImageProcessingParams& params) {
-    if (bLandscapeMode) {
-        return CSettingsProvider::This().LandscapeModeParams(params);
-    } else {
-        return params;
-    }
-}
-
-// Sets the processing flags according to the landscape enhancement mode
-static EProcessingFlags _SetLandscapeModeFlags(EProcessingFlags eFlags) {
-    if (GetProcessingFlag(eFlags, PFLAG_LandscapeMode)) {
-        eFlags = SetProcessingFlag(eFlags, PFLAG_AutoContrast, true);
-        eFlags = SetProcessingFlag(eFlags, PFLAG_LDC, true);
-        return eFlags;
-    } else {
-        return eFlags;
-    }
 }
 
 // Define function pointer type for wine_get_version
@@ -149,9 +110,8 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
     // Read the string table for the requested language if one is present
     CNLS::ReadStringTable(CNLS::GetStringTableFileName(sp.Language()));
 
-    m_bLandscapeMode = sp.LandscapeMode();
     m_pImageProcParams = new CImageProcessingParams(GetDefaultProcessingParams());
-    InitFromProcessingFlags(GetDefaultProcessingFlags(m_bLandscapeMode), m_bHQResampling, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, m_bLandscapeMode);
+    InitFromProcessingFlags(GetDefaultProcessingFlags(), m_bHQResampling, m_bAutoContrast);
 
     // Initialize second parameter set using hard coded values, turning off all corrections
     m_pImageProcParams2 = new CImageProcessingParams(GetNoProcessingParams()); 
@@ -162,11 +122,7 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
     m_dZoomKept = -1;
     m_offsetKept = CPoint(0, 0);
     m_bCurrentImageInParamDB = false;
-    m_bCurrentImageIsSpecialProcessing = false;
-    m_dCurrentInitialLightenShadows = -1;
 
-    m_bDefaultSelectionMode = sp.DefaultSelectionMode();
-    m_bShowFileName = sp.ShowFileName();
     m_bKeepParams = sp.KeepParams();
     m_eAutoZoomModeWindowed = sp.AutoZoomMode();
     m_eAutoZoomModeFullscreen = sp.AutoZoomModeFullscreen();
@@ -176,7 +132,6 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
 
     CHistogramCorr::SetContrastCorrectionStrength((float)sp.AutoContrastAmount());
     CHistogramCorr::SetBrightnessCorrectionStrength((float)sp.AutoBrightnessAmount());
-
 
 
     m_pFileList = NULL;
@@ -234,7 +189,6 @@ CMainDlg::CMainDlg(bool bForceFullScreen) {
     m_bIsAnimationPlaying = false;
     m_nLastAnimationOffset = 0;
     m_nExpectedNextAnimationTickCount = 0;
-    m_dLastImageDisplayTime = 0.0;
     m_isUserFitToScreen = false;
     m_autoZoomFitToScreen = Helpers::ZM_FillScreen;
     m_bWindowBorderless = sp.WindowBorderlessOnStartup();  // unlike AlwaysOnTop, this is set early on initialize as it affects calculations of the window size, position, etc
@@ -430,7 +384,7 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
 
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
     CheckIfApplyAutoFitWndToImage(true);
-    AfterNewImageLoaded(true, true, false); // synchronize to per image parameters
+    AfterNewImageLoaded(true, true); // synchronize to per image parameters
 
     if (!m_bFullScreenMode) {
         // Window mode, set correct window size
@@ -529,7 +483,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                            clippedSize,
                                            offsetsInImage,
                                            *m_pImageProcParams,
-                                           CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, false, m_bLandscapeMode));
+                                           CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, false));
 
         // Paint the DIB
         if (pDIBData != NULL) {
@@ -719,7 +673,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
     // Show current zoom factor
     if (m_bInZooming || m_bShowZoomFactor) {
         dc.SetTextColor(CSettingsProvider::This().ColorGUI());
-        HelpersGUI::SelectDefaultFileNameFont(dc);
+        HelpersGUI::SelectDefaultZoomFactorFont(dc);
         HelpersGUI::DrawTextBordered(dc, formatOutputZoomFactor(m_dZoom).toStdWString().c_str(), GetZoomTextRect(), DT_RIGHT);
     }
 
@@ -1582,9 +1536,6 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
     
     HMENU hMenuAutoZoomMode = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_AUTOZOOMMODE);
     ::CheckMenuItem(hMenuAutoZoomMode, GetAutoZoomMode() * 10 + IDM_AUTO_ZOOM_NONE, MF_CHECKED);
-    
-    if (CSettingsProvider::This().StoreToEXEPath()) ::EnableMenuItem(hMenu, IDM_UPDATE_USER_CONFIG, MF_BYCOMMAND | MF_GRAYED);
-    if (!CSettingsProvider::This().AllowEditGlobalSettings()) ::EnableMenuItem(hMenu, IDM_EDIT_GLOBAL_CONFIG, MF_BYCOMMAND | MF_GRAYED);
 
     if (m_pCurrentImage == NULL) {
         ::EnableMenuItem(hMenuTrackPopup, IDM_RELOAD_FULL, MF_BYCOMMAND | MF_GRAYED);
@@ -1678,7 +1629,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_DELETE_FILE:
             MouseOn();
-            if (m_pCurrentImage != NULL && m_pFileList != NULL && sp.AllowFileDeletion()) {
+            if (m_pCurrentImage != NULL && m_pFileList != NULL) {
                 LPCTSTR pRawFileName = CurrentFileName(false);
                 if (pRawFileName == nullptr || pRawFileName[0] == _T('\0')) {
                     break;
@@ -1896,45 +1847,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 }
             }
             break;
-        case IDM_SAVE_PARAM_DB:
-            if (m_pCurrentImage != NULL && !m_bMovieMode && !m_bKeepParams) {
-                CParameterDBEntry newEntry;
-                EProcessingFlags procFlags = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, false, m_bLDC, false, m_bLandscapeMode);
-                newEntry.InitFromProcessParams(*m_pImageProcParams, procFlags, m_pCurrentImage->IsAnimation() ? CRotationParams(m_nRotation) : CRotationParams(m_pCurrentImage->GetRotationParams(), m_nRotation));
-                if ((m_bUserZoom || m_bUserPan) && !m_pCurrentImage->IsCropped()) {
-                    newEntry.InitGeometricParams(m_pCurrentImage->OrigSize(), m_dZoom, m_offsets, 
-                        m_bAutoFitWndToImage ? CMultiMonitorSupport::GetMonitorRect(m_hWnd).Size() : m_clientRect.Size(), m_bAutoFitWndToImage);
-                }
-                newEntry.SetHash(m_pCurrentImage->GetPixelHash());
-                if (CParameterDB::This().AddEntry(newEntry)) {
-                    // these parameters need to be updated when image is reused from cache
-                    m_pCurrentImage->SetInitialParameters(*m_pImageProcParams, procFlags, m_nRotation, m_dZoom, m_offsets);
-                    m_pCurrentImage->SetIsInParamDB(true);
-                }
-            }
-            break;
-        case IDM_CLEAR_PARAM_DB:
-            if (m_pCurrentImage != NULL && !m_bMovieMode && !m_bKeepParams) {
-                if (CParameterDB::This().DeleteEntry(m_pCurrentImage->GetPixelHash())) {
-                    // restore initial parameters and realize the parameters
-                    EProcessingFlags procFlags = GetDefaultProcessingFlags(m_bLandscapeMode);
-                    m_pCurrentImage->RestoreInitialParameters(m_pFileList->Current(), 
-                        GetDefaultProcessingParams(), procFlags, 0, -1, CPoint(0, 0), CSize(0, 0), CSize(0, 0));
-                    *m_pImageProcParams = GetDefaultProcessingParams();
-                    // Sunset and night shot detection may has changed this
-                    m_pImageProcParams->LightenShadows = m_pCurrentImage->GetInitialProcessParams().LightenShadows;
-                    InitFromProcessingFlags(procFlags, m_bHQResampling, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, m_bLandscapeMode);
-                    m_nRotation = m_pCurrentImage->GetInitialRotation();
-                    m_nUserRotation = 0;
-                    m_dZoom = -1;
-                    m_pCurrentImage->SetIsInParamDB(false);
-                    if (fabs(m_pCurrentImage->GetRotationParams().FreeRotation) > 0.009) {
-                        ReloadImage(false); // free rotation cannot be restored, needs reload
-                    }
-                    this->Invalidate(FALSE);
-                }
-            }
-            break;
         case IDM_ROTATE_90:
         case IDM_ROTATE_270:
             if (m_pCurrentImage != NULL) {
@@ -1957,44 +1869,15 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             }
             break;
         case IDM_AUTO_CORRECTION:
-            m_bAutoContrastSection = false;
             m_bAutoContrast = !m_bAutoContrast;
             SetToast(m_bAutoContrast? _T("Auto Contrast: ON") : _T("Auto Contrast: OFF"));
-            this->Invalidate(FALSE);
-            break;
-        case IDM_AUTO_CORRECTION_SECTION:
-            m_bAutoContrast = true;
-            m_bAutoContrastSection = !m_bAutoContrastSection;
-            SetToast(m_bAutoContrastSection? _T("Auto Contrast (Section): ON") : _T("Auto Contrast (Section): OFF"));
-            this->Invalidate(FALSE);
-            break;
-        case IDM_LANDSCAPE_MODE:
-            m_bLandscapeMode = !m_bLandscapeMode;
-            SetToast(m_bLandscapeMode? _T("Landscape Enhancement: ON") : _T("Landscape Enhancement: OFF"));
-            if (m_bLandscapeMode) {
-                *m_pImageProcParams = _SetLandscapeModeParams(true, *m_pImageProcParams);
-                if (m_pCurrentImage != NULL) {
-                    m_pImageProcParams->LightenShadows *= m_pCurrentImage->GetLightenShadowFactor();
-                }
-                m_bLDC = true;
-                m_bAutoContrast = true;
-            } else {
-                EProcessingFlags eProcFlags = GetDefaultProcessingFlags(false);
-                CImageProcessingParams ipa = GetDefaultProcessingParams();
-                if (m_pCurrentImage != NULL) {
-                    m_pCurrentImage->GetFileParams(m_pFileList->Current(), eProcFlags, ipa);
-                }
-                m_bLDC = GetProcessingFlag(eProcFlags, PFLAG_LDC);
-                m_bAutoContrast = GetProcessingFlag(eProcFlags, PFLAG_AutoContrast);
-                *m_pImageProcParams = ipa;
-            }
             this->Invalidate(FALSE);
             break;
         case IDM_KEEP_PARAMETERS:
             m_bKeepParams = !m_bKeepParams;
             if (m_bKeepParams) {
                 *m_pImageProcParamsKept = *m_pImageProcParams;
-                m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, false, m_bLDC, m_bKeepParams, m_bLandscapeMode);
+                m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
                 m_dZoomKept = (m_bUserZoom || IsAdjustWindowToImage()) ? m_dZoom : -1;
                 m_offsetKept = m_bUserPan ? m_offsets : CPoint(0, 0);
             }
@@ -2228,21 +2111,8 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 AdjustWindowToImage(false);
                 break;
             }
-        case IDM_EDIT_GLOBAL_CONFIG:
         case IDM_EDIT_USER_CONFIG:
-            EditINIFile(nCommand == IDM_EDIT_GLOBAL_CONFIG);
-            break;
-        case IDM_UPDATE_USER_CONFIG:
-            if (::MessageBox(m_hWnd, CString(CNLS::GetString(_T("Update user settings with new settings from settings template file?"))) + _T('\n') +
-                CNLS::GetString(_T("All existing user settings will be preserved.")), _T(JPEGVIEW_TITLE), MB_YESNOCANCEL | MB_ICONQUESTION) == IDYES) {
-                CSettingsProvider::This().UpdateUserSettings();
-            }
-            break;
-        case IDM_BACKUP_PARAMDB:
-            CParameterDB::This().BackupParamDB(m_hWnd);
-            break;
-        case IDM_RESTORE_PARAMDB:
-            CParameterDB::This().RestoreParamDB(m_hWnd);
+            EditINIFile(false);
             break;
         case IDM_EXIT:
             CleanupAndTerminate();
@@ -2765,7 +2635,7 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
 
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
     if (bAfterStartup) CheckIfApplyAutoFitWndToImage(false);
-    AfterNewImageLoaded(true, false, false);
+    AfterNewImageLoaded(true, false);
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
     }
@@ -2815,9 +2685,9 @@ void CMainDlg::GotoImage(EImagePosition ePos) {
 }
 
 void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
-//* Debugging */	TCHAR debugtext[1024];
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1"), ePos, nFlags);
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    TCHAR debugtext[1024];
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1"), ePos, nFlags);
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
     // Timer handling for slideshows
     if (ePos == POS_Next || ePos == POS_NextSlideShow) {
@@ -2827,16 +2697,16 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         StopAnimation();
         m_customAnimationFrameTime = 1000;
 
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1a: (ePos == POS_Next || ePos == POS_NextSlideShow)"), ePos, nFlags);
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1a: (ePos == POS_Next || ePos == POS_NextSlideShow)"), ePos, nFlags);
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
     } else if (ePos != POS_NextFrame) {
         StopMovieMode();
         StopAnimation();
         m_customAnimationFrameTime = 1000;
 
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1b: (ePos != POS_NextFrame)"), ePos, nFlags);
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1b: (ePos != POS_NextFrame)"), ePos, nFlags);
+//* Debugging */    ::OutputDebugStringW(debugtext);
     }
 
     // solving a specific "edge" case, pun intended
@@ -2945,15 +2815,15 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
             break;
     }
 
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex);
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex);
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
     if (bCheckIfSameImage && (m_pFileList == pOldFileList && (nOldFrameIndex == nFrameIndex || bNoWrapAroundEdgeFrame) && !m_pFileList->ChangedSinceCheckpoint())) {
         if (m_bMovieMode && m_bAutoExit) {
             CleanupAndTerminate();
         } else {
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4b  bCheckIfSameImage=%d  bNoWrapAroundEdgeFrame=%d  m_pFileList->ChangedSinceCheckpoint()=%d"), ePos, nFlags, bCheckIfSameImage, bNoWrapAroundEdgeFrame, m_pFileList->ChangedSinceCheckpoint());
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4b  bCheckIfSameImage=%d  bNoWrapAroundEdgeFrame=%d  m_pFileList->ChangedSinceCheckpoint()=%d"), ePos, nFlags, bCheckIfSameImage, bNoWrapAroundEdgeFrame, m_pFileList->ChangedSinceCheckpoint());
+//* Debugging */    ::OutputDebugStringW(debugtext);
             return; // not placed on a new image, don't do anything
         }
     }
@@ -2989,31 +2859,30 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     }
 
 
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage()->RequestImage()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage()->RequestImage()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
-	LPCTSTR pRawFileName = m_pFileList->Current();
-	std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
-	m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
-													(ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
-													strFileName,
-													nFrameIndex,
-													procParams,
-													m_bOutOfMemoryLastImage,
-													m_bExceptionErrorLastImage);
+    LPCTSTR pRawFileName = m_pFileList->Current();
+    std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
+    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+                                                    (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
+                                                    strFileName,
+                                                    nFrameIndex,
+                                                    procParams,
+                                                    m_bOutOfMemoryLastImage,
+                                                    m_bExceptionErrorLastImage);
 
-	m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
+    m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
 
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
-    double minimalDisplayTime = CSettingsProvider::This().MinimalDisplayTime();
     bool bSynchronize = (nFlags & KEEP_PARAMETERS) == 0;
 
-    AfterNewImageLoaded(bSynchronize, false, minimalDisplayTime > 0, ePos == POS_Previous);
+    AfterNewImageLoaded(bSynchronize, false, ePos == POS_Previous);
 
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos7  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos7  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
     // If current image is animated, start playback
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
@@ -3024,23 +2893,8 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         }
     }
 
-    // Sleep if a minimal display time is defined
-    double currentTime = Helpers::GetExactTickCount();
-    if (ePos == POS_Next || ePos == POS_Previous) {
-        double imageTime = currentTime - m_dLastImageDisplayTime;
-        if (minimalDisplayTime > 0 && (imageTime < minimalDisplayTime)) {
-            ::Sleep((int)(minimalDisplayTime - imageTime));
-        }
-    }
-    m_dLastImageDisplayTime = Helpers::GetExactTickCount();
-
-    // Do that now when using a minimal display time, as it has been skipped in AfterNewImageLoaded() to avoid wrong display during the ::Sleep()
-    if (minimalDisplayTime > 0 && bSynchronize && !m_bIsAnimationPlaying) {
-        AdjustWindowToImage(false);
-    }
-
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos8  m_offsets.x=%d  m_offsets.y=%d"), ePos, nFlags, m_offsets.x, m_offsets.y);
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos8  m_offsets.x=%d  m_offsets.y=%d"), ePos, nFlags, m_offsets.x, m_offsets.y);
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
     if (((nFlags & NO_UPDATE_WINDOW) == 0) && !(ePos == POS_NextSlideShow && UseSlideShowTransitionEffect())) {
         this->Invalidate(FALSE);
@@ -3048,8 +2902,8 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         this->UpdateWindow();
     }
 
-//* Debugging */	swprintf(debugtext,1024,TEXT("GotoImage() after UpdateWindow()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
-//* Debugging */	::OutputDebugStringW(debugtext);
+//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage() after UpdateWindow()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
+//* Debugging */    ::OutputDebugStringW(debugtext);
 
     // remove key messages accumulated so far
     if (!(nFlags & NO_REMOVE_KEY_MSG)) {
@@ -3279,13 +3133,8 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
         eAutoZoomMode = Helpers::ZM_FitToScreenNoZoom;
     }
     if (m_bKeepParams) {
-        double dOldLightenShadows = m_pImageProcParamsKept->LightenShadows;
         *m_pImageProcParamsKept = *m_pImageProcParams;
-        // when last image was detected as sunset or nightshot, do not take this value for next image
-        if (m_bCurrentImageIsSpecialProcessing && m_pImageProcParams->LightenShadows == m_dCurrentInitialLightenShadows) {
-            m_pImageProcParamsKept->LightenShadows = dOldLightenShadows;
-        }
-        m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, false, m_bLDC, m_bKeepParams, m_bLandscapeMode);
+        m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
         m_dZoomKept = (m_bUserZoom || IsAdjustWindowToImage()) ? m_dZoom : -1;
         m_offsetKept = m_bUserPan ? m_offsets : CPoint(0, 0);
         if (m_isUserFitToScreen && !IsAdjustWindowToImage()) { eAutoZoomMode = m_autoZoomFitToScreen; }
@@ -3298,16 +3147,16 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
             eAutoZoomMode,
             m_offsetKept,
             m_eTransparencyMode,
-            _SetLandscapeModeParams(m_bLandscapeMode, *m_pImageProcParamsKept), 
-            SetProcessingFlag(_SetLandscapeModeFlags(m_eProcessingFlagsKept), PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
+            *m_pImageProcParamsKept, 
+            SetProcessingFlag(m_eProcessingFlagsKept, PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
     } else {
         m_isUserFitToScreen = false;
         CSettingsProvider& sp = CSettingsProvider::This();
         return CProcessParams(nClientWidth, nClientHeight, 
             CMultiMonitorSupport::GetMonitorRect(m_hWnd).Size(),
             CRotationParams(0), 0, -1, eAutoZoomMode, CPoint(0, 0), m_eTransparencyMode,
-            _SetLandscapeModeParams(m_bLandscapeMode, GetDefaultProcessingParams()),
-            SetProcessingFlag(_SetLandscapeModeFlags(GetDefaultProcessingFlags(m_bLandscapeMode)), PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
+            GetDefaultProcessingParams(),
+            SetProcessingFlag(GetDefaultProcessingFlags(), PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
     }
 }
 
@@ -3321,7 +3170,7 @@ void CMainDlg::ResetParamsToDefault() {
     m_bUserPan = false;
     *m_pImageProcParams = GetDefaultProcessingParams();
     // [GF] Do not reset these back to their INI defaults. If the user has intentionally changed these in the current instance, these values should be respected and used instead.
-    //InitFromProcessingFlags(GetDefaultProcessingFlags(m_bLandscapeMode), m_bHQResampling, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, m_bLandscapeMode);
+    //InitFromProcessingFlags(GetDefaultProcessingFlags(), m_bHQResampling, m_bAutoContrast);
 }
 
 void CMainDlg::StartSlideShowTimer(int nMilliSeconds) {
@@ -3355,14 +3204,11 @@ void CMainDlg::StartMovieMode(double dFPS) {
     if (dFPS > cdFPSMovie) {
         m_bProcFlagsTouched = true;
         m_bHQResampling = false;
-        m_bAutoContrastSection = false;
         m_bAutoContrast = false;
-        m_bLDC = false;
-        m_bLandscapeMode = false;
     }
     m_bMovieMode = true;
     StartSlideShowTimer(Helpers::RoundToInt(1000.0/dFPS));
-    AfterNewImageLoaded(false, false, false);
+    AfterNewImageLoaded(false, false);
     Invalidate(FALSE);
 }
 
@@ -3378,20 +3224,14 @@ void CMainDlg::StopMovieMode() {
             if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_AutoContrast)) {
                 m_bAutoContrast = true;
             }
-            if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_LDC)) {
-                m_bLDC = true;
-            }
             if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_HighQualityResampling)) {
                 m_bHQResampling = true;
-            }
-            if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_LandscapeMode)) {
-                m_bLandscapeMode = true;
             }
         }
         m_bMovieMode = false;
         m_bProcFlagsTouched = false;
         StopSlideShowTimer();
-        AfterNewImageLoaded(false, false, false);
+        AfterNewImageLoaded(false, false);
         this->Invalidate(FALSE);
     }
 }
@@ -3429,7 +3269,6 @@ void CMainDlg::InitParametersForNewImage() {
         m_dZoom = -1;
     }
 
-    m_bAutoContrastSection = false;
     *m_pImageProcParams2 = GetNoProcessingParams();
     m_eProcessingFlags2 = PFLAG_HighQualityResampling;
 
@@ -3439,38 +3278,31 @@ void CMainDlg::InitParametersForNewImage() {
 }
 
 void CMainDlg::ExchangeProcessingParams() {
-    bool bOldAutoContrastSection = m_bAutoContrastSection;
     CImageProcessingParams tempParams = *m_pImageProcParams;
     EProcessingFlags tempFlags = CreateDefaultProcessingFlags();
     *m_pImageProcParams = *m_pImageProcParams2;
-    InitFromProcessingFlags(m_eProcessingFlags2, m_bHQResampling, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, m_bLandscapeMode);
+    InitFromProcessingFlags(m_eProcessingFlags2, m_bHQResampling, m_bAutoContrast);
     *m_pImageProcParams2 = tempParams;
     m_eProcessingFlags2 = tempFlags;
-    m_bAutoContrastSection = bOldAutoContrastSection; // this flag cannot be exchanged this way
     this->Invalidate(FALSE);
 }
 
-void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool noAdjustWindow, bool bMoveBack) {
+void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack) {
     UpdateWindowTitle();
     m_pDirectoryWatcher->SetCurrentFile(CurrentFileName(false));
     if (bSynchronize) {
         // after loading an image, the per image processing parameters must be synchronized with
         // the current processing parameters
-        bool bLastWasSpecialProcessing = m_bCurrentImageIsSpecialProcessing;
         bool bLastWasInParamDB = m_bCurrentImageInParamDB;
         m_bCurrentImageInParamDB = false;
-        m_bCurrentImageIsSpecialProcessing = false;
 
         if (m_pCurrentImage != NULL) {
-            m_dCurrentInitialLightenShadows = m_pCurrentImage->GetInitialProcessParams().LightenShadows;
             m_bCurrentImageInParamDB = m_pCurrentImage->IsInParamDB();
-            m_bCurrentImageIsSpecialProcessing = m_pCurrentImage->GetLightenShadowFactor() != 1.0f;
 
             if (!m_bKeepParams) {
                 // [GF] Do not restore these to how they were when the image was loaded before. If the user has intentionally changed these settings since that time, the current settings should be respected.
                 //m_bHQResampling = GetProcessingFlag(m_pCurrentImage->GetInitialProcessFlags(), PFLAG_HighQualityResampling);
                 //m_bAutoContrast = GetProcessingFlag(m_pCurrentImage->GetInitialProcessFlags(), PFLAG_AutoContrast);
-                //m_bLDC = GetProcessingFlag(m_pCurrentImage->GetInitialProcessFlags(), PFLAG_LDC);
 
                 m_nRotation = m_pCurrentImage->GetInitialRotation();
                 m_dZoom = m_pCurrentImage->GetInititialZoom();
@@ -3481,13 +3313,8 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool n
                 }
 
                 *m_pImageProcParams = m_pCurrentImage->GetInitialProcessParams();
-            } else if (m_bCurrentImageIsSpecialProcessing && m_bKeepParams) {
-                // set this factor, no matter if we keep parameters
-                m_pImageProcParams->LightenShadows = m_pCurrentImage->GetInitialProcessParams().LightenShadows;
-            } else if (bLastWasSpecialProcessing && m_bKeepParams) {
-                // take kept value when last was special processing as the special processing value is not usable
-                m_pImageProcParams->LightenShadows = m_pImageProcParamsKept->LightenShadows;
             }
+
             if (m_bKeepParams) {
                 m_nRotation = m_pCurrentImage->GetInitialRotation() + m_nUserRotation;
             }
@@ -3503,7 +3330,7 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool n
             }
         }
 
-        if (!bAfterStartup && !m_bIsAnimationPlaying && !noAdjustWindow) {
+        if (!bAfterStartup && !m_bIsAnimationPlaying) {
             AdjustWindowToImage(false);
         }
     }
@@ -3556,12 +3383,11 @@ void CMainDlg::SaveParameters() {
 
     EProcessingFlags eFlags = CreateDefaultProcessingFlags(m_bKeepParams);
     CString sText = HelpersGUI::GetINIFileSaveConfirmationText(*m_pImageProcParams, eFlags,
-        m_pFileList->GetNavigationMode(), m_pFileList->GetSorting(), m_pFileList->IsSortedAscending(), GetAutoZoomMode(), false,
-        m_bShowFileName, false, m_eTransitionEffect);
+        m_pFileList->GetNavigationMode(), m_pFileList->GetSorting(), m_pFileList->IsSortedAscending(), GetAutoZoomMode(), m_eTransitionEffect);
 
     if (IDYES == this->MessageBox(sText, CNLS::GetString(_T("Confirm save default parameters")), MB_YESNO | MB_ICONQUESTION)) {
         CSettingsProvider::This().SaveSettings(*m_pImageProcParams, eFlags, m_pFileList->GetNavigationMode(), m_pFileList->GetSorting(), m_pFileList->IsSortedAscending(),
-            m_eAutoZoomModeWindowed, m_eAutoZoomModeFullscreen, false, m_bShowFileName, false, m_eTransitionEffect);
+            m_eAutoZoomModeWindowed, m_eAutoZoomModeFullscreen, m_eTransitionEffect);
     }
 }
 /*
@@ -3715,12 +3541,6 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     } else {
         CString sWindowText = sCurrentFileName;
         sWindowText += GetMultiframeIndex(m_pCurrentImage);
-        if (CSettingsProvider::This().ShowEXIFDateInTitle()) {
-            CEXIFReader* pEXIF = m_pCurrentImage->GetEXIFReader();
-            if (pEXIF != NULL && pEXIF->GetAcquisitionTime().wYear > 1600) {
-                sWindowText += " - " + SystemTimeToString(pEXIF->GetAcquisitionTime());
-            }
-        }
         sWindowText += " - " + CString(JPEGVIEW_TITLE);
 
         if (lstrcmpi(sWindowText, s_PrevTitleText) != 0) {
@@ -3845,7 +3665,7 @@ double CMainDlg::GetZoomMultiplier(CJPEGImage* pImage, const CRect& clientRect) 
 }
 
 EProcessingFlags CMainDlg::CreateDefaultProcessingFlags(bool bKeepParams) {
-    return CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bAutoContrastSection, m_bLDC, bKeepParams, m_bLandscapeMode);
+    return CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, bKeepParams);
 }
 
 bool CMainDlg::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteCommand) {
@@ -4026,10 +3846,8 @@ void CMainDlg::StartAnimation() {
     if (!m_bKeepParametersBeforeAnimation) {
         ExecuteCommand(IDM_KEEP_PARAMETERS);
     }
-    m_bAutoContrastSection = false;
+
     m_bAutoContrast = false;
-    m_bLDC = false;
-    m_bLandscapeMode = false;
     m_bIsAnimationPlaying = true;
     m_nLastSlideShowImageTickCount = ::GetTickCount();
 
@@ -4088,12 +3906,6 @@ void CMainDlg::StopAnimation() {
     }
     if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_AutoContrast)) {
         m_bAutoContrast = true;
-    }
-    if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_LDC)) {
-        m_bLDC = true;
-    }
-    if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_LandscapeMode)) {
-        m_bLandscapeMode = true;
     }
     ::KillTimer(this->m_hWnd, ANIMATION_TIMER_EVENT_ID);
     m_bIsAnimationPlaying = false;

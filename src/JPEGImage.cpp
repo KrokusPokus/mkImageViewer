@@ -1,14 +1,12 @@
 #include "JPEGImage.h"
 #include "BasicProcessing.h"
-#include "XMMImage.h"
+//#include "XMMImage.h"
 #include "Helpers.h"
 #include "SettingsProvider.h"
 #include "HistogramCorr.h"
 #include "LocalDensityCorr.h"
-#include "ParameterDB.h"
 #include "EXIFReader.h"
-#include "RawMetadata.h"
-#include "MaxImageDef.h"
+//#include "MaxImageDef.h"
 #include "libjpeg-turbo\include\turbojpeg.h"
 #include <math.h>
 #include <assert.h>
@@ -57,18 +55,17 @@ static CBasicProcessing::SIMDArchitecture ToSIMDArchitecture(Helpers::CPUType cp
 // Public interface
 ///////////////////////////////////////////////////////////////////////////////////
 
+// Overloaded version without the argument EImageFormat eContainerFormat. It will be set to "IF_Unknown"
+// if (eContainerFormat != IF_Unknown) m_bIsAnimation will be set to "false"
 CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, __int64 nJPEGHash,
-                       EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs,
-                       CLocalDensityCorr* pLDC, bool bIsThumbnailImage, CRawMetadata* pRawMetadata)
+                       EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs)
     : CJPEGImage(nWidth, nHeight, pPixels, pEXIFData, nChannels, nJPEGHash,
-        eImageFormat, IF_Unknown, bIsAnimation, nFrameIndex, nNumberOfFrames, nFrameTimeMs,
-        pLDC, bIsThumbnailImage, pRawMetadata)
+        eImageFormat, IF_Unknown, bIsAnimation, nFrameIndex, nNumberOfFrames, nFrameTimeMs)
 {
 }
 
 CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, __int64 nJPEGHash,
-    EImageFormat eImageFormat, EImageFormat eContainerFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs,
-    CLocalDensityCorr * pLDC, bool bIsThumbnailImage, CRawMetadata * pRawMetadata)
+                    EImageFormat eImageFormat, EImageFormat eContainerFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs)
     : m_rotationParams{ 0 },
     m_fColorCorrectionFactorsNull{ 0 },
     m_eContainerFormat(eContainerFormat)
@@ -97,8 +94,6 @@ CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
         m_pEXIFData = NULL;
         m_pEXIFReader = NULL;
     }
-
-    m_pRawMetadata = pRawMetadata;
 
     m_nPixelHash = nJPEGHash;
     m_eImageFormat = eImageFormat;
@@ -129,7 +124,7 @@ CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_initialOffsets = CPoint(0, 0);
     m_bInParamDB = false;
     m_bHasZoomStoredInParamDB = false;
-    m_bIsThumbnailImage = bIsThumbnailImage;
+    //m_bIsThumbnailImage = bIsThumbnailImage;
     m_pCachedProcessedHistogram = NULL;
 
     m_bCropped = false;
@@ -144,13 +139,12 @@ CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_TargetOffset = CPoint(0, 0);
 
     // Create the LDC object on the image
-    m_pLDC = (pLDC == NULL) ? (new CLocalDensityCorr(*this, true)) : pLDC;
-    m_bLDCOwned = pLDC == NULL;
+    m_pLDC = (new CLocalDensityCorr(*this, true));
+    m_bLDCOwned = true;
     if (nJPEGHash == 0) {
         // Use the decompressed pixel hash in this case
         m_nPixelHash = m_pLDC->GetPixelHash();
     }
-    m_fLightenShadowFactor = (1.0f - m_pLDC->GetHistogram()->IsNightShot())*(1.0f - m_pLDC->IsSunset());
 
     // Initialize to INI value, may be overriden later by parameter DB
     memcpy(m_fColorCorrectionFactors, CSettingsProvider::This().ColorCorrectionAmounts(), sizeof(m_fColorCorrectionFactors));
@@ -178,24 +172,6 @@ CJPEGImage::~CJPEGImage(void) {
     m_pEXIFReader = NULL;
     delete m_pCachedProcessedHistogram;
     m_pCachedProcessedHistogram = NULL;
-    delete m_pRawMetadata;
-    m_pRawMetadata = NULL;
-}
-
-const CHistogram* CJPEGImage::GetHistogramOfProcessedDIB(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
-    assert(m_bIsThumbnailImage);
-    CSize origSize(m_nOrigWidth, m_nOrigHeight);
-    bool bParametersChanged;
-    void* pDIBPixels = GetDIBInternal(origSize, origSize, CPoint(0, 0), imageProcParams, eProcFlags, bParametersChanged);
-    if (bParametersChanged || m_pCachedProcessedHistogram == NULL) {
-        delete m_pCachedProcessedHistogram;
-        m_pCachedProcessedHistogram = NULL;
-        if (pDIBPixels == NULL) {
-            return NULL;
-        }
-        m_pCachedProcessedHistogram = new CHistogram(pDIBPixels, origSize);
-    }
-    return m_pCachedProcessedHistogram;
 }
 
 bool CJPEGImage::RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKeepAspectRatio) {
@@ -263,7 +239,7 @@ void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
 
         if (targetRect.top > 0) {
             CSize clipSize(clippingSize.cx, targetRect.top);
-            void* pTop = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, imageProcParams.Sharpen, eResizeType);
+            void* pTop = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pTop,
@@ -283,7 +259,7 @@ void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
         if (targetRect.bottom < clippingSize.cy) {
             CSize clipSize(clippingSize.cx, clippingSize.cy -  targetRect.bottom);
             CPoint offset(targetOffset.x, targetOffset.y + targetRect.bottom);
-            void* pBottom = Resample(fullTargetSize, clipSize, offset, eProcFlags, imageProcParams.Sharpen, eResizeType);
+            void* pBottom = Resample(fullTargetSize, clipSize, offset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pBottom,
@@ -302,7 +278,7 @@ void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
         }
         if (targetRect.left > 0) {
             CSize clipSize(targetRect.left, clippingSize.cy);
-            void* pLeft = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, imageProcParams.Sharpen, eResizeType);
+            void* pLeft = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pLeft,
@@ -322,7 +298,7 @@ void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
         if (targetRect.right < clippingSize.cx) {
             CSize clipSize(clippingSize.cx -  targetRect.right, clippingSize.cy);
             CPoint offset(targetOffset.x + targetRect.right, targetOffset.y);
-            void* pRight = Resample(fullTargetSize, clipSize, offset, eProcFlags, imageProcParams.Sharpen, eResizeType);
+            void* pRight = Resample(fullTargetSize, clipSize, offset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pRight,
@@ -348,8 +324,7 @@ void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
     delete[] pDIBPixelsLUTProcessed; pDIBPixelsLUTProcessed = NULL;
 }
 
-void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, 
-                          EProcessingFlags eProcFlags, double dSharpen, EResizeType eResizeType) {
+void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType) {
 
     Helpers::CPUType cpu = CSettingsProvider::This().AlgorithmImplementation();
     EFilterType filter = CSettingsProvider::This().DownsamplingFilter();
@@ -363,7 +338,7 @@ void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targ
                     CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, ToSIMDArchitecture(cpu));
             } else {
                 return CBasicProcessing::SampleDown_HQ_SIMD(fullTargetSize, targetOffset, clippingSize,
-                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, dSharpen, filter, ToSIMDArchitecture(cpu));
+                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, filter, ToSIMDArchitecture(cpu));
             }
         } else {
             if (eResizeType == UpSample) {
@@ -371,43 +346,12 @@ void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targ
                     CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels);
             } else {
                 return CBasicProcessing::SampleDown_HQ(fullTargetSize, targetOffset, clippingSize, 
-                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, dSharpen, filter);
+                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, filter);
             }
         }
     } else {
         return CBasicProcessing::PointSample(fullTargetSize, targetOffset, clippingSize,
             CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels);
-    }
-}
-
-void* CJPEGImage::InternalResize(void* pixels, int channels, EResizeFilter filter, CSize targetSize, CSize sourceSize) {
-    EResizeType eResizeType = GetResizeType(targetSize, sourceSize);
-    Helpers::CPUType cpu = CSettingsProvider::This().AlgorithmImplementation();
-
-    if (filter == Resize_PointFilter) {
-        return CBasicProcessing::PointSample(targetSize, CPoint(0, 0), targetSize, sourceSize, pixels, channels);
-    }
-
-//    EFilterType downSamplingFilter = (filter == Resize_NoAliasing) ? Filter_Downsampling_No_Aliasing : Filter_Downsampling_Best_Quality;
-    EFilterType downSamplingFilter = CSettingsProvider::This().DownsamplingFilter();
-    double dSharpen = (filter == Resize_SharpenLow) ? 0.15 : (filter == Resize_SharpenMedium) ? 0.3 : 0.0;
-
-    if (SupportsSIMD(cpu)) {
-        if (eResizeType == UpSample) {
-            return CBasicProcessing::SampleUp_HQ_SIMD(targetSize, CPoint(0, 0), targetSize,
-                sourceSize, pixels, channels, ToSIMDArchitecture(cpu));
-        } else {
-            return CBasicProcessing::SampleDown_HQ_SIMD(targetSize, CPoint(0, 0), targetSize,
-                sourceSize, pixels, channels, dSharpen, downSamplingFilter, ToSIMDArchitecture(cpu));
-        }
-    } else {
-        if (eResizeType == UpSample) {
-            return CBasicProcessing::SampleUp_HQ(targetSize, CPoint(0, 0), targetSize,
-                sourceSize, pixels, channels);
-        } else {
-            return CBasicProcessing::SampleDown_HQ(targetSize, CPoint(0, 0), targetSize,
-                sourceSize, pixels, channels, dSharpen, downSamplingFilter);
-        }
     }
 }
 
@@ -486,7 +430,7 @@ void* CJPEGImage::DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded) {
 void CJPEGImage::VerifyDIBPixelsCreated() {
     if (m_pDIBPixels == NULL) {
         EResizeType eResizeType = GetResizeType(m_FullTargetSize, CSize(m_nOrigWidth, m_nOrigHeight));
-        m_pDIBPixels = Resample(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_eProcFlags, m_imageProcParams.Sharpen, eResizeType);
+        m_pDIBPixels = Resample(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_eProcFlags, eResizeType);
     }
 }
 
@@ -502,64 +446,25 @@ void CJPEGImage::SetInitialParameters(const CImageProcessingParams& imageProcPar
 void CJPEGImage::RestoreInitialParameters(LPCTSTR sFileName, const CImageProcessingParams& imageProcParams, 
                                           EProcessingFlags & procFlags, int nRotation, double dZoom, 
                                           CPoint offsets, CSize targetSize, CSize monitorSize) {
-    // zoom and offsets must be initialized in all cases as they may be not in param DB even when
-    // other parameters are
+    // zoom and offsets must be initialized in all cases as they may not bo in param DB even when other parameters are
     m_dInitialZoom = dZoom;
     m_initialOffsets = offsets;
 
-    CParameterDBEntry* dbEntry = CParameterDB::This().FindEntry(GetPixelHash());
-    m_bInParamDB = dbEntry != NULL;
-    m_bHasZoomStoredInParamDB = m_bInParamDB && dbEntry->HasZoomOffsetStored();
-    bool bKeepParams = ::GetProcessingFlag(procFlags, PFLAG_KeepParams);
-    if (m_bInParamDB && !bKeepParams) {
-        CRotationParams rotationParams(m_nInitialRotation);
-        dbEntry->WriteToProcessParams(m_imageProcParamsInitial, m_eProcFlagsInitial, rotationParams);
-        dbEntry->GetColorCorrectionAmounts(m_fColorCorrectionFactors);
-
-        dbEntry->WriteToGeometricParams(m_dInitialZoom, m_initialOffsets, SizeAfterRotation(CRotationParams(m_rotationParams, m_nInitialRotation)),
-            dbEntry->IsStoredRelativeToScreenSize() ? monitorSize : targetSize);
-    } else {
-        m_nInitialRotation = GetRotationFromEXIF(nRotation);
-        m_eProcFlagsInitial = bKeepParams ? procFlags : GetProcFlagsIncludeExcludeFolders(sFileName, procFlags);
-        procFlags = m_eProcFlagsInitial;
-        m_imageProcParamsInitial = imageProcParams;
-        m_imageProcParamsInitial.LightenShadows *= m_fLightenShadowFactor;
-    }
+    m_nInitialRotation = GetRotationFromEXIF(nRotation);
+    m_eProcFlagsInitial = procFlags;
+    procFlags = m_eProcFlagsInitial;
+    m_imageProcParamsInitial = imageProcParams;
 }
 
 void CJPEGImage::GetFileParams(LPCTSTR sFileName, EProcessingFlags& eFlags, CImageProcessingParams& params) const {
-    CParameterDBEntry* dbEntry = CParameterDB::This().FindEntry(GetPixelHash());
-    if (m_bInParamDB) {
-        CRotationParams notUsed(0);
-        if (!::GetProcessingFlag(eFlags, PFLAG_KeepParams)) {
-            dbEntry->WriteToProcessParams(params, eFlags, notUsed);
-        }
-    } else {
-        params.LightenShadows *= m_fLightenShadowFactor;
-        if (!::GetProcessingFlag(eFlags, PFLAG_KeepParams)) {
-            eFlags = GetProcFlagsIncludeExcludeFolders(sFileName, eFlags);
-        }
-    }
+
 }
 
 void CJPEGImage::SetFileDependentProcessParams(LPCTSTR sFileName, CProcessParams* pParams) {
-    CParameterDBEntry* dbEntry = CParameterDB::This().FindEntry(GetPixelHash());
-    m_bInParamDB = dbEntry != NULL;
-    m_bHasZoomStoredInParamDB = m_bInParamDB && dbEntry->HasZoomOffsetStored();
-    if (m_bInParamDB) {
-        if (!::GetProcessingFlag(pParams->ProcFlags, PFLAG_KeepParams)) {
-            dbEntry->WriteToProcessParams(pParams->ImageProcParams, pParams->ProcFlags, pParams->RotationParams);
-            dbEntry->GetColorCorrectionAmounts(m_fColorCorrectionFactors);
-            dbEntry->WriteToGeometricParams(pParams->Zoom, pParams->Offsets, SizeAfterRotation(pParams->RotationParams),
-                dbEntry->IsStoredRelativeToScreenSize() ? pParams->MonitorSize : CSize(pParams->TargetWidth, pParams->TargetHeight));
-        }
-    } else {
-        pParams->RotationParams.Rotation = GetRotationFromEXIF(pParams->RotationParams.Rotation);
-        pParams->ImageProcParams.LightenShadows *= m_fLightenShadowFactor;
-        if (!::GetProcessingFlag(pParams->ProcFlags, PFLAG_KeepParams)) {
-            pParams->ProcFlags = GetProcFlagsIncludeExcludeFolders(sFileName, pParams->ProcFlags);
-        }
-    }
+    m_bInParamDB = false;
+    m_bHasZoomStoredInParamDB = false;
+
+    pParams->RotationParams.Rotation = GetRotationFromEXIF(pParams->RotationParams.Rotation);
 
     m_nInitialRotation = pParams->RotationParams.Rotation;
     m_dInitialZoom = pParams->Zoom;
@@ -600,9 +505,6 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
 
     // Check if resampling due to change of geometric parameters is needed
     bool bMustResampleGeometry = bTargetSizeChanged || clippingSize != m_ClippingSize || targetOffset != m_TargetOffset;
-	
-    // Check if resampling due to change of processing parameters is needed
-    bool bMustResampleProcessings = fabs(imageProcParams.Sharpen - m_imageProcParams.Sharpen) > 1e-2 && GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling);
 
     EResizeType eResizeType = GetResizeType(fullTargetSize, CSize(m_nOrigWidth, m_nOrigHeight));
 
@@ -616,7 +518,7 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
 
     // Check if only the LUT must be reapplied but no resampling (resampling is much slower than the LUTs)
     void * pDIB = NULL;
-    if (!bMustResampleQuality && !bMustResampleGeometry && !bMustResampleProcessings) {
+    if (!bMustResampleQuality && !bMustResampleGeometry) {
         // no resizing needed (maybe even nothing must be done)
         bool bNoChangesLDCandLUTs = ApplyCorrectionLUTandLDC(imageProcParams, eProcFlags, m_pDIBPixelsLUTProcessed, 
             fullTargetSize, targetOffset, m_pDIBPixels, clippingSize, bMustResampleGeometry, true, false) != NULL;
@@ -636,7 +538,7 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
         bParametersChanged = true;
 
         // If we only pan, we can resample far more efficiently by only calculating the newly visible areas
-        bool bPanningOnly = !m_bFirstReprocessing && !bMustResampleProcessings && !bTargetSizeChanged && !bMustResampleQuality;
+        bool bPanningOnly = !m_bFirstReprocessing && !bTargetSizeChanged && !bMustResampleQuality;
 
         m_bFirstReprocessing = false;
         if (bPanningOnly) {
@@ -649,7 +551,7 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
 
         // both DIBs are NULL, do normal resampling
         if (m_pDIBPixels == NULL && m_pDIBPixelsLUTProcessed == NULL) {
-            m_pDIBPixels = Resample(fullTargetSize, clippingSize, targetOffset, eProcFlags, imageProcParams.Sharpen, eResizeType);
+            m_pDIBPixels = Resample(fullTargetSize, clippingSize, targetOffset, eProcFlags, eResizeType);
         }
 
         // if ResampleWithPan() has preserved this DIB, we can reuse it
@@ -667,18 +569,10 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
         m_dLastOpTickCount = dLastOpTickCount;
     }
 
-    // set these parameters after ApplyCorrectionLUT() - else it cannot be detected that the parameters changed
-    double dOldSharpen = m_imageProcParams.Sharpen;
-    m_imageProcParams = imageProcParams;
-
-    // do not touch sharpen parameter if no resampling done - avoids cumulative error propagation
-    if (!bMustResampleProcessings) {
-        m_imageProcParams.Sharpen = dOldSharpen;
-    }
     m_eProcFlags = eProcFlags;
 
     m_pLastDIB = pDIB;
-	
+    
     return pDIB;
 }
 
@@ -689,38 +583,27 @@ void* CJPEGImage::ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageP
 
     bool bAutoContrast = GetProcessingFlag(eProcFlags, PFLAG_AutoContrast);
     bool bAutoContrastOld = GetProcessingFlag(m_eProcFlags, PFLAG_AutoContrast);
-    bool bAutoContrastSection = GetProcessingFlag(eProcFlags, PFLAG_AutoContrastSection) && bAutoContrast;
-    bool bAutoContrastSectionOld = GetProcessingFlag(m_eProcFlags, PFLAG_AutoContrastSection);
-    bool bLDC = GetProcessingFlag(eProcFlags, PFLAG_LDC);
-    bool bLDCOld = GetProcessingFlag(m_eProcFlags, PFLAG_LDC);
 
     bool bNoContrastAndGammaLUT = fabs(imageProcParams.Contrast) < 1e-4 && fabs(imageProcParams.Gamma - 1) < 1e-4;
     bool bMustUseSaturationLUTs = fabs(imageProcParams.Saturation - 1.0) > 1e-4;
-    bool bNoColorCastCorrection = fabs(imageProcParams.CyanRed) < 1e-4 && fabs(imageProcParams.MagentaGreen) < 1e-4 &&
-        fabs(imageProcParams.YellowBlue) < 1e-4;
-    bool bNoLUTsApplied = bNoContrastAndGammaLUT && bNoColorCastCorrection && !bAutoContrast && !bMustUseSaturationLUTs;
+    bool bNoLUTsApplied = bNoContrastAndGammaLUT && !bAutoContrast && !bMustUseSaturationLUTs;
     bool bContrastOrGammaChanged = fabs(imageProcParams.Contrast - m_imageProcParams.Contrast) > 1e-4 ||
         fabs(imageProcParams.Gamma - m_imageProcParams.Gamma) > 1e-4;
-    bool bColorCastCorrChanged = fabs(imageProcParams.CyanRed - m_imageProcParams.CyanRed) > 1e-4 ||
-        fabs(imageProcParams.MagentaGreen - m_imageProcParams.MagentaGreen) > 1e-4 ||
-        fabs(imageProcParams.YellowBlue - m_imageProcParams.YellowBlue) > 1e-4;
     bool bCorrectionFactorChanged = fabs(imageProcParams.ColorCorrectionFactor-m_imageProcParams.ColorCorrectionFactor) > 1e-4 || 
         fabs(imageProcParams.ContrastCorrectionFactor-m_imageProcParams.ContrastCorrectionFactor) > 1e-4;
     bool bSaturationChanged = fabs(imageProcParams.Saturation - m_imageProcParams.Saturation) > 1e-4;
-    bool bMustReapplyLUTs = bAutoContrast != bAutoContrastOld || bAutoContrastSection != bAutoContrastSectionOld || bLDC != bLDCOld || 
-        bCorrectionFactorChanged || bContrastOrGammaChanged || bColorCastCorrChanged || bSaturationChanged;
-    bool bLDCParametersChanged = fabs(imageProcParams.LightenShadows - m_imageProcParams.LightenShadows) > 1e-4 ||
-        fabs(imageProcParams.DarkenHighlights - m_imageProcParams.DarkenHighlights) > 1e-4 ||
-        fabs(imageProcParams.LightenShadowSteepness - m_imageProcParams.LightenShadowSteepness) > 1e-4 ;
-    bool bMustReapplyLDC = bLDC && (!bLDCOld || bGeometryChanged || bLDCParametersChanged);
-    bool bMustUse3ChannelLUT = bAutoContrast || !bNoColorCastCorrection;
+    bool bMustReapplyLUTs = bAutoContrast != bAutoContrastOld
+                        || bCorrectionFactorChanged
+                        || bContrastOrGammaChanged
+                        || bSaturationChanged;
+    bool bMustUse3ChannelLUT = bAutoContrast;
 
-    bParametersChanged = bMustReapplyLUTs || bMustReapplyLDC;
+    bParametersChanged = bMustReapplyLUTs;
 
-    if (!bMustReapplyLUTs && !bMustReapplyLDC && pCachedTargetDIB != NULL) {
+    if (!bMustReapplyLUTs && pCachedTargetDIB != NULL) {
         // consider special case that nothing is dimmed and no LUT and LDC is applied but
         // processed pixel is here, we do not want to use it - in this case we just continue.
-        if (!(bNoLUTsApplied && !bLDC)) {
+        if (!bNoLUTsApplied) {
             return pCachedTargetDIB;
         }
     }
@@ -743,43 +626,24 @@ void* CJPEGImage::ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageP
     // Calculate LDC if needed
     if (m_pLDC == NULL) {
         m_pLDC = new CLocalDensityCorr(*this, true);
-        bLDCParametersChanged = true;
-    }
-    if (bLDC) {
-        // maybe only partially constructed, we need fully constructed object here
-        m_pLDC->VerifyFullyConstructed();
-    }
-    if (bLDCParametersChanged && m_pLDC->IsMaskAvailable()) {
-        m_pLDC->SetLDCAmount(imageProcParams.LightenShadows, imageProcParams.DarkenHighlights);
     }
 
     // Recalculate special histogram if needed
     const CHistogram* pHistogram = m_pLDC->GetHistogram();
     bool bSpecialHistogram = false;
-    if (bMustUse3ChannelLUT) {
-        if (bAutoContrast && bAutoContrastSection && m_bLDCOwned && (!bAutoContrastSectionOld || bCorrectionFactorChanged || bColorCastCorrChanged)) {
-            pHistogram = new CHistogram(*this, false);
-            bSpecialHistogram = true;
-            delete[] m_pLUTRGB;
-            m_pLUTRGB = NULL;
-        }
-    }
-    if (bMustUse3ChannelLUT && (m_pLUTRGB == NULL || bCorrectionFactorChanged || bColorCastCorrChanged ||
-        bAutoContrast != bAutoContrastOld)) {
+    
+    if (bMustUse3ChannelLUT && (m_pLUTRGB == NULL || bCorrectionFactorChanged || bAutoContrast != bAutoContrastOld)) {
         delete[] m_pLUTRGB;
-        float fColorCastCorrs[3];
-        fColorCastCorrs[0] = (float) imageProcParams.CyanRed;
-        fColorCastCorrs[1] = (float) imageProcParams.MagentaGreen;
-        fColorCastCorrs[2] = (float) imageProcParams.YellowBlue;
         float fColorCorrFactor = bAutoContrast ? (float) imageProcParams.ColorCorrectionFactor : 0.0f;
         float fBrightnessCorrFactor = bAutoContrast ? 1.0f : 0.0f;
         float fContrastCorrFactor = bAutoContrast ? (float) imageProcParams.ContrastCorrectionFactor : 0.0f;
         m_pLUTRGB = CHistogramCorr::CalculateCorrectionLUT(*pHistogram, fColorCorrFactor, fBrightnessCorrFactor,
-            fColorCastCorrs, bAutoContrast ? m_fColorCorrectionFactors : m_fColorCorrectionFactorsNull, fContrastCorrFactor);
+            bAutoContrast ? m_fColorCorrectionFactors : m_fColorCorrectionFactorsNull, fContrastCorrFactor);
     } else if (!bMustUse3ChannelLUT) {
         delete[] m_pLUTRGB;
         m_pLUTRGB = NULL;
     }
+    
     if (bMustUseSaturationLUTs && (m_pSaturationLUTs == NULL || bSaturationChanged)) {
         delete[] m_pSaturationLUTs;
         m_pSaturationLUTs = CBasicProcessing::CreateColorSaturationLUTs(imageProcParams.Saturation);
@@ -794,20 +658,16 @@ void* CJPEGImage::ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageP
         delete pHistogram;
     }
 
-    if (!bNoLUTsApplied || bLDC) {
-        // LUT or/and LDC --> apply correction
+    if (!bNoLUTsApplied) {
+        // LUT --> apply correction
         uint8* pLUT = CHistogramCorr::CombineLUTs(m_pLUTAllChannels, m_pLUTRGB);
-        if (bLDC) {
-            pCachedTargetDIB = CBasicProcessing::ApplyLDC32bpp(fullTargetSize, targetOffset, dibSize, m_pLDC->GetLDCMapSize(),
-                pSourceDIB, bMustUseSaturationLUTs ? m_pSaturationLUTs : NULL, pLUT, m_pLDC->GetLDCMap(),
-                m_pLDC->GetBlackPt(), m_pLDC->GetWhitePt(), (float)imageProcParams.LightenShadowSteepness);
+
+        if (bMustUseSaturationLUTs) {
+            pCachedTargetDIB = CBasicProcessing::ApplySaturationAnd3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, m_pSaturationLUTs, pLUT);
         } else {
-            if (bMustUseSaturationLUTs) {
-                pCachedTargetDIB = CBasicProcessing::ApplySaturationAnd3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, m_pSaturationLUTs, pLUT);
-            } else {
-                pCachedTargetDIB = CBasicProcessing::Apply3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, pLUT);
-            }
+            pCachedTargetDIB = CBasicProcessing::Apply3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, pLUT);
         }
+
         delete[] pLUT;
     } else if (bCanTakeOwnershipOfSourceDIB) {
         // no LUTs, no LDC just take over ownership of source DIB if we are allowed
@@ -831,45 +691,6 @@ bool CJPEGImage::ConvertSrcTo4Channels() {
         return pNewOriginalPixels != NULL;
     }
     return true;
-}
-
-EProcessingFlags CJPEGImage::GetProcFlagsIncludeExcludeFolders(LPCTSTR sFileName, EProcessingFlags procFlags) const {
-    EProcessingFlags eFlags = procFlags;
-    CSettingsProvider& sp = CSettingsProvider::This();
-    LPCTSTR sPatternInclude;
-    LPCTSTR sPatternExclude;
-
-    bool bIncludeACCMatch = Helpers::PatternMatch(sPatternInclude, sFileName, sp.ACCInclude());
-    bool bExcludeACCMatch = Helpers::PatternMatch(sPatternExclude, sFileName, sp.ACCExclude());
-    if (bIncludeACCMatch && bExcludeACCMatch) {
-        // Take more specific pattern if both match
-        int nSpec = Helpers::FindMoreSpecificPattern(sPatternInclude, sPatternExclude);
-        if (nSpec == -1) {
-            bIncludeACCMatch = false; // Exclude is more specific
-        } else {
-            bExcludeACCMatch = false; // Include is more specific (or no difference)
-        }
-    }
-    if (bIncludeACCMatch || bExcludeACCMatch) {
-        eFlags = SetProcessingFlag(eFlags, PFLAG_AutoContrast, bIncludeACCMatch);
-    }
-
-    bool bIncludeLDCMatch = Helpers::PatternMatch(sPatternInclude, sFileName, sp.LDCInclude());
-    bool bExcludeLDCMatch = Helpers::PatternMatch(sPatternExclude, sFileName, sp.LDCExclude());
-    if (bIncludeLDCMatch && bExcludeLDCMatch) {
-        // Take more specific pattern if both match
-        int nSpec = Helpers::FindMoreSpecificPattern(sPatternInclude, sPatternExclude);
-        if (nSpec == -1) {
-            bIncludeLDCMatch = false; // Exclude is more specific
-        } else {
-            bExcludeLDCMatch = false; // Include is more specific (or no difference)
-        }
-    }
-    if (bIncludeLDCMatch || bExcludeLDCMatch) {
-        eFlags = SetProcessingFlag(eFlags, PFLAG_LDC, bIncludeLDCMatch);
-    }
-
-    return eFlags;
 }
 
 CSize CJPEGImage::SizeAfterRotation(const CRotationParams& rotationParams) {
@@ -998,16 +819,6 @@ int CJPEGImage::GetRotationFromEXIF(int nOrigRotation) {
         }
     }
 
-    if (m_pRawMetadata != NULL && CSettingsProvider::This().AutoRotateEXIF()) {
-        // Only rotate by 90 or 270 deg if not already rotated by camera
-        if (m_pRawMetadata->GetWidth() >= m_pRawMetadata->GetHeight()) {
-            int orientation = m_pRawMetadata->GetOrientation();
-            if ((orientation & 4) != 0) {
-                m_bRotationByEXIF = true;
-                return ((orientation & 1) != 0) ? 270 : 90;
-            }
-        }
-    }
     return nOrigRotation;
 }
 

@@ -36,45 +36,6 @@ static void NormalizeFilter(int16* pFilter, int nLen) {
 // Filter kernel evaluation
 //////////////////////////////////////////////////////////////////////////////////////
 
-// dSharpen = 0.07 means no sharpening
-// Piecewise quadratic sinc like filter, support is [-1.5, 1.5], 3 taps
-static inline double EvaluateCore_Narrow(double dX, double dSharpen) {
-    if (dX < -1.5 || dX > 1.5) {
-        return 0.0;
-    }
-    else if (dX < -0.5) {
-        double dTemp = 2 * dX + 2;
-        return -dSharpen*(1 - dTemp*dTemp);
-    }
-    else if (dX < 0.5) {
-        double dTemp = 2 * dX;
-        return 1 - dTemp*dTemp;
-    }
-    else {
-        double dTemp = 2 * dX - 2;
-        return -dSharpen*(1 - dTemp*dTemp);
-    }
-}
-
-// dSharpen = 0.15 means no sharpening
-// Piecewise quadratic sinc like filter, support is [-2.0, 2.0], 3 taps
-static inline double EvaluateCore_BestQuality(double dX, double dSharpen) {
-    if (dX < -2 || dX > 2) {
-        return 0.0;
-    }
-    else if (dX < -1) {
-        double dTemp = 2 * dX + 3;
-        return -dSharpen*(1 - dTemp*dTemp);
-    }
-    else if (dX < 1) {
-        return 1 - dX*dX;
-    }
-    else {
-        double dTemp = 2 * dX - 3;
-        return -dSharpen*(1 - dTemp*dTemp);
-    }
-}
-
 // Cubic Filter Family: Mitchell-Netravali filters (BC-splines)
 
 // Hermite (B=0, C=0)
@@ -140,27 +101,7 @@ static inline double EvaluateCore_Catrom(double dX)
 #define PI_DIV_2 (PI/2)
 #define PI_SQR (PI*PI)
 
-// dSharpen = 1.0 means no sharpening
-// Lanczos filter, support is [-2.0, 2.0]
-static inline double EvaluateCore_NoAliasing(double dX, double dSharpen) {
-    // this is a Lanczos filter
-    if (dX < -2 || dX > 2) {
-        return 0.0;
-    }
-    else if (abs(dX) < 1e-6) {
-        return 1.0;
-    }
-    else if (dX > -1 && dX < 1) {
-        return (2 * sin(PI*dX)*sin(PI_DIV_2*dX)) / (PI_SQR*dX*dX);
-    }
-    else {
-        return dSharpen*(2 * sin(PI*dX)*sin(PI_DIV_2*dX)) / (PI_SQR*dX*dX);
-    }
-}
-
 // 2-lobe Lanczos filter (Equivalent to IM Lanczos2, support is [-2.0, 2.0]
-// For all matters an purposes, this is identical to EvaluateCore_NoAliasing(),
-// but doesn't apply dSharpen.
 static inline double EvaluateCore_Lanczos2(double dX) {
     if (abs(dX) < 1e-6) {
         return 1.0;
@@ -175,19 +116,8 @@ static inline double EvaluateCore_Lanczos2(double dX) {
 
 // Evaluate a filter kernel at position dX. The filter kernel is assumed to have zero solutions at
 // integer values and is centered around zero.
-// dSharpen is a parameter that is used to control scaling of the negative pads of the filter kernel,
-// resulting in increased sharpening effect.
-static double inline EvaluateKernel(double dX, double dSharpen, EFilterType eFilter) {
+static double inline EvaluateKernel(double dX, EFilterType eFilter) {
     switch (eFilter) {
-        case Filter_Downsampling_Best_Quality:
-            return EvaluateCore_BestQuality(dX, dSharpen);
-            break;
-        case Filter_Downsampling_No_Aliasing:
-            return EvaluateCore_NoAliasing(dX, dSharpen);
-            break;
-        case Filter_Downsampling_Narrow:
-            return EvaluateCore_Narrow(dX, dSharpen);
-            break;
         case Filter_Downsampling_Hermite:
             return EvaluateCore_Hermite(dX);
             break;
@@ -209,7 +139,7 @@ static double inline EvaluateKernel(double dX, double dSharpen, EFilterType eFil
 // Evaluation of filter kernel using an integration over the source pixel width.
 // This implements a convolution of a box filter with the filter kernel.
 // Note that dX is given in the source pixel space
-static double EvaluateKernelIntegrated(double dX, EFilterType eFilter, double dMultX, double dSharpen) {
+static double EvaluateKernelIntegrated(double dX, EFilterType eFilter, double dMultX) {
     double dXScaled = dX*dMultX;
 
     // take integral of target function from [dX - 0.5, dX + 0.5]
@@ -218,7 +148,7 @@ static double EvaluateKernelIntegrated(double dX, EFilterType eFilter, double dM
     double dStepX = dMultX*(1.0 / (NUM_STEPS - 1));
     double dSum = 0.0;
     for (int i = 0; i < NUM_STEPS; i++) {
-        dSum += EvaluateKernel(dStartX, dSharpen, eFilter);
+        dSum += EvaluateKernel(dStartX, eFilter);
         dStartX += dStepX;
     }
     return dSum;
@@ -278,7 +208,7 @@ static void GetBicubicFilter(uint16 nFrac, int16* pFilterOut) {
 // Public
 //////////////////////////////////////////////////////////////////////////////////////
 
-CResizeFilter::CResizeFilter(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter, FilterSIMDType filterSIMDType)
+CResizeFilter::CResizeFilter(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType)
     : m_kernels{ 0 },
     m_kernelsXMM{ 0 },
     m_kernelsAVX{ 0 },
@@ -286,7 +216,6 @@ CResizeFilter::CResizeFilter(int nSourceSize, int nTargetSize, double dSharpen, 
 {
     m_nSourceSize = nSourceSize;
     m_nTargetSize = nTargetSize;
-    m_dSharpen = std::min(0.5, std::max(0.0, dSharpen));
     m_eFilter = eFilter;
     m_filterSIMDType = filterSIMDType;
 
@@ -308,10 +237,9 @@ CResizeFilter::~CResizeFilter(void) {
     delete[] m_kernelsAVX.UnalignedMemory;
 }
 
-bool CResizeFilter::ParametersMatch(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter, FilterSIMDType filterSIMDType) {
-    if (nSourceSize == m_nSourceSize && nTargetSize == m_nTargetSize && abs(dSharpen - m_dSharpen) < 1e-6 &&
-        eFilter == m_eFilter && m_filterSIMDType == filterSIMDType) {
-            return true;
+bool CResizeFilter::ParametersMatch(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType) {
+    if (nSourceSize == m_nSourceSize && nTargetSize == m_nTargetSize && eFilter == m_eFilter && m_filterSIMDType == filterSIMDType) {
+        return true;
     } else {
         return false;
     }
@@ -506,31 +434,15 @@ void CResizeFilter::CalculateAVXFilterKernels() {
 }
 
 void CResizeFilter::CalculateFilterParams(EFilterType eFilter) {
-    if (eFilter == Filter_Downsampling_Best_Quality) {
-        int nStdFilterLen = 4;
-        double dFactor = (double)m_nSourceSize/m_nTargetSize;
-        m_dMultX = (dFactor < 2) ? 1.0/(dFactor - 0.5) : 1.0/((dFactor + 1)*0.5);
-        m_nFilterLen = (int)(nStdFilterLen*((dFactor + 1)*0.5) + 0.99);
-        m_nFilterLen = std::min(MAX_FILTER_LEN, m_nFilterLen);
-        m_nFilterOffset = (m_nFilterLen - 1)/2;
-        if (fabs(dFactor - 1) < 0.01) {
-            m_dSharpen = 0.0; // avoid to sharpen when no resizing
-        }
-    } else if ((eFilter == Filter_Downsampling_No_Aliasing) || (eFilter == Filter_Downsampling_Hermite) || (eFilter == Filter_Downsampling_Mitchell) || (eFilter == Filter_Downsampling_Catrom) || (eFilter == Filter_Downsampling_Lanczos2)) {
+    if ((eFilter == Filter_Downsampling_Hermite)
+     || (eFilter == Filter_Downsampling_Mitchell)
+     || (eFilter == Filter_Downsampling_Catrom)
+     || (eFilter == Filter_Downsampling_Lanczos2)) {
         double dFactor = (double)m_nSourceSize/m_nTargetSize;
         m_dMultX = 1.0/dFactor;
         m_nFilterLen = (int) (5*dFactor);
         m_nFilterLen = std::min(MAX_FILTER_LEN, m_nFilterLen);
         m_nFilterOffset = (m_nFilterLen - 1)/2;
-        m_dSharpen = 1 + m_dSharpen*7;
-    } else if (eFilter == Filter_Downsampling_Narrow) {
-        int nStdFilterLen = 4;
-        double dFactor = (double)m_nSourceSize/m_nTargetSize;
-        m_dMultX = 1.0/dFactor;
-        m_nFilterLen = (int)(nStdFilterLen*dFactor + 0.99);
-        m_nFilterLen = std::min(MAX_FILTER_LEN, m_nFilterLen);
-        m_nFilterOffset = (m_nFilterLen - 1)/2;
-        m_dSharpen /= 2;
     } else if (eFilter == Filter_Upsampling_Bicubic) {
         m_dMultX = 1.0;
         m_nFilterLen = 4;
@@ -552,10 +464,10 @@ int16* CResizeFilter::GetFilter(uint16 nFrac, EFilterType eFilter) {
     for (int i = 0; i < m_nFilterLen; i++) {
         if (eFilter == Filter_Upsampling_Bicubic) {
             dFilter[i] = EvaluateCubicFilterKernel(dFrac, i);
-        } else if ((eFilter == Filter_Downsampling_No_Aliasing) || (eFilter == Filter_Downsampling_Hermite) || (eFilter == Filter_Downsampling_Mitchell) || (eFilter == Filter_Downsampling_Catrom) || (eFilter == Filter_Downsampling_Lanczos2)) {
-            dFilter[i] = EvaluateKernel(m_dMultX*(-m_nFilterOffset + i - dFrac), m_dSharpen, eFilter);
+        } else if ((eFilter == Filter_Downsampling_Hermite) || (eFilter == Filter_Downsampling_Mitchell) || (eFilter == Filter_Downsampling_Catrom) || (eFilter == Filter_Downsampling_Lanczos2)) {
+            dFilter[i] = EvaluateKernel(m_dMultX*(-m_nFilterOffset + i - dFrac), eFilter);
         } else {
-            dFilter[i] = EvaluateKernelIntegrated(-m_nFilterOffset + i - dFrac, eFilter, m_dMultX, m_dSharpen);
+            dFilter[i] = EvaluateKernelIntegrated(-m_nFilterOffset + i - dFrac, eFilter, m_dMultX);
         }
         dSum += dFilter[i];
     }
@@ -599,13 +511,13 @@ CResizeFilterCache::~CResizeFilterCache() {
     }
 }
 
-const CResizeFilter& CResizeFilterCache::GetFilter(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter, FilterSIMDType filterSIMDType) {
+const CResizeFilter& CResizeFilterCache::GetFilter(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType) {
     CResizeFilter* pMatchingFilter = NULL;
 
     Helpers::CAutoCriticalSection autoCriticalSection(m_csList);
     std::list<CResizeFilter*>::iterator iter;
     for (iter = m_filterList.begin( ); iter != m_filterList.end( ); iter++ ) {
-        if ((*iter)->ParametersMatch(nSourceSize, nTargetSize, dSharpen, eFilter, filterSIMDType)) {
+        if ((*iter)->ParametersMatch(nSourceSize, nTargetSize, eFilter, filterSIMDType)) {
             pMatchingFilter = *iter;
             break;
         }
@@ -620,7 +532,7 @@ const CResizeFilter& CResizeFilterCache::GetFilter(int nSourceSize, int nTargetS
     }
 
     // no matching filter found, create a new one
-    CResizeFilter* pNewFilter = new CResizeFilter(nSourceSize, nTargetSize, dSharpen, eFilter, filterSIMDType);
+    CResizeFilter* pNewFilter = new CResizeFilter(nSourceSize, nTargetSize, eFilter, filterSIMDType);
     pNewFilter->m_nRefCnt++;
     m_filterList.push_front(pNewFilter);
 

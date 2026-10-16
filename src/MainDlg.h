@@ -196,9 +196,6 @@ private:
     CImageProcessingParams* m_pImageProcParams;
     bool m_bHQResampling;
     bool m_bAutoContrast;
-    bool m_bAutoContrastSection;
-    bool m_bLDC;
-    bool m_bLandscapeMode;
     bool m_bKeepParams;
 
     // used to enable switch between two sets of parameters with CTRL-A
@@ -212,7 +209,6 @@ private:
     CPoint m_offsetKept;
     bool m_bCurrentImageInParamDB;
     bool m_bCurrentImageIsSpecialProcessing;
-    double m_dCurrentInitialLightenShadows;
 
     bool m_bDragging;
     bool m_bDoDragging;
@@ -225,8 +221,6 @@ private:
     CPoint m_DIBOffsets;
     int m_nCapturedX, m_nCapturedY;
     int m_nMouseX, m_nMouseY;
-    bool m_bDefaultSelectionMode;
-    bool m_bShowFileName;
     bool m_bFullScreenMode;
     bool m_bAutoFitWndToImage;
     bool m_bLockPaint;
@@ -253,7 +247,6 @@ private:
     Helpers::ETransitionEffect m_eTransitionEffect;
     int m_nTransitionTime;
     DWORD m_nLastSlideShowImageTickCount;
-    double m_dLastImageDisplayTime;
     Helpers::ETransparencyMode m_eTransparencyMode; //for transparent background
     bool m_bUseEmbeddedColorProfiles;
     bool m_bWindowBorderless;
@@ -275,7 +268,7 @@ private:
     void InitParametersForNewImage();
     void ExchangeProcessingParams();
     void SaveParameters();
-    void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool noAdjustWindow, bool bMoveBack = false);
+    void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
 
     void ToggleMonitor();
     CRect GetZoomTextRect();

@@ -73,7 +73,7 @@ set(SOURCES
     MainDlg.cpp
     MultiMonitorSupport.cpp
     NLS.cpp
-    ParameterDB.cpp
+
     ProcessingThreadPool.cpp
     ReaderBMP.cpp
     ReaderTGA.cpp
@@ -81,16 +81,16 @@ set(SOURCES
     SettingsProvider.cpp
     stdafx.cpp
     WorkThread.cpp
-	
+    
     wrapperAVIF.cpp
-	wrapperHEIF.cpp
+    wrapperHEIF.cpp
     wrapperJXL.cpp
     wrapperPNG.cpp
     wrapperPSD.cpp
     wrapperQOI.cpp
     wrapperTJPEG.cpp
     wrapperWEBP.cpp
-	
+    
     XMMImage.cpp
     zip/zip.c
     JPEGView.rc

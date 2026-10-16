@@ -86,12 +86,6 @@ namespace Helpers {
         DC_Never
     };
 
-    // Units used for measurements (e.g. lengths)
-    enum EMeasureUnits {
-        MU_Metric,
-        MU_English
-    };
-
     // Editor for INI files
     enum EIniEditor {
         INI_Notepad,

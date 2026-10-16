@@ -61,7 +61,7 @@ public:
     // In fColorCastCorrection the order is C/R, M/G, Y/B
     // The returned LUT contains 3 * 256 entries, BBBB...GGGG...RRRR... format
     static uint8* CalculateCorrectionLUT(const CHistogram & histogram, float fColorCorrectionFactor,
-        float fBrightnessCorrectionFactor, const float fColorCastCorrection[3],
+        float fBrightnessCorrectionFactor,
         const float fColorCorrectionStrength[6], float fContrastCorrectionFactor);
 
     // Combine the given two LUTs into a three channel LUT. Result(value) = 3CLUT(1CLUT(value))

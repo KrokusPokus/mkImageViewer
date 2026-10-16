@@ -22,17 +22,7 @@ enum EFilterType {
     Filter_Downsampling_Mitchell,
     Filter_Downsampling_Catrom,
     Filter_Downsampling_Lanczos2,
-    Filter_Downsampling_Best_Quality,  // prefer this filter for sampling down
-    Filter_Downsampling_No_Aliasing, // this is a Lanczos type filter
-    Filter_Downsampling_Narrow, // as Filter_Downsampling_Best_Quality but narrow support
     Filter_Upsampling_Bicubic
-};
-
-enum EResizeFilter {
-    Resize_PointFilter,  // Point sampling
-    Resize_NoAliasing,   // Lanczos filter
-    Resize_SharpenLow,   // 3 tap downsampling filter with some sharpening
-    Resize_SharpenMedium // 3 tap downsampling filter with medium sharpening
 };
 
 // Image formats (can be other than JPEG...)

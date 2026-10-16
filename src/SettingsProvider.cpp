@@ -3,7 +3,7 @@
 #include <float.h>
 #include <shlobj.h>
 #include <algorithm>
-#include <thread>    // [GF] Needed for NumConcurrentThreads()
+#include <thread>    // Needed for std::thread::hardware_concurrency()
 
 static const TCHAR* DEFAULT_INI_FILE_NAME = _T("JPEGView.ini");
 static const TCHAR* SECTION_NAME = _T("JPEGView");
@@ -112,7 +112,6 @@ CSettingsProvider::CSettingsProvider(void) {
 
     m_bAutoFullScreen = GetString(_T("ShowFullScreen"), _T("")).CompareNoCase(_T("auto")) == 0;
     m_bShowFullScreen = m_bAutoFullScreen ? true : GetBool(_T("ShowFullScreen"), true);
-    m_bShowEXIFDateInTitle = GetBool(_T("ShowEXIFDateInTitle"), true);
     m_bShowFullPathInTitle = GetBool(_T("ShowFilePathInTitle"), false);
 
     CString sCPU = GetString(_T("CPUType"), _T("AutoDetect"));
@@ -135,26 +134,21 @@ CSettingsProvider::CSettingsProvider(void) {
 
     m_nNumCores = GetInt(_T("CPUCoresUsed"), 0, 0, 128);
     if (m_nNumCores == 0) {
-        m_nNumCores = NumConcurrentThreads();
+        m_nNumCores = std::thread::hardware_concurrency();
+        if (m_nNumCores < 1) {
+            m_nNumCores = 1;
+        } else if (m_nNumCores > 8) {
+            m_nNumCores = 8;
+        }
         // Limiting to 8 cores, since benchmarks suggest performance improvements start to flatline around that point.
         // Performance can even become worse: 16 threads on 16 thread CPU performing worse than running just 14 threads. Or 8 threads, for that matter.
         // People can still try to use more cores by specifying a non-zero number for "CPUCoresUsed",
         // but I advise to do some benchmarking in this case to make sure you aren't actually shooting yourself in the foot.        
-        if (m_nNumCores > 8) m_nNumCores = 8;
     }
 
 
     CString sDownSampling = GetString(_T("DownSamplingFilter"), _T("Catrom"));
-    if (sDownSampling.CompareNoCase(_T("NoAliasing")) == 0) {
-        m_eDownsamplingFilter = Filter_Downsampling_No_Aliasing;
-    }
-    else if (sDownSampling.CompareNoCase(_T("Narrow")) == 0) {
-        m_eDownsamplingFilter = Filter_Downsampling_Narrow;
-    }
-    else if (sDownSampling.CompareNoCase(_T("BestQuality")) == 0) {
-        m_eDownsamplingFilter = Filter_Downsampling_Best_Quality;
-    }
-    else if (sDownSampling.CompareNoCase(_T("None")) == 0) {
+    if (sDownSampling.CompareNoCase(_T("None")) == 0) {
         m_eDownsamplingFilter = Filter_Downsampling_None;
     }
     else if (sDownSampling.CompareNoCase(_T("Hermite")) == 0) {
@@ -214,22 +208,17 @@ CSettingsProvider::CSettingsProvider(void) {
 
     m_nMaxSlideShowFileListSize = GetInt(_T("MaxSlideShowFileListSizeKB"), 200, 100, 10000);
     m_nSlideShowEffectTimeMs = GetInt(_T("SlideShowEffectTime"), 200, 100, 5000);
-    m_bForceGDIPlus = GetBool(_T("ForceGDIPlus"), false);
     m_bSingleFullScreenInstance = GetBool(_T("SingleFullScreenInstance"), true);
-    m_sFileEndingsRAW = GetString(_T("FileEndingsRAW"), _T("*.pef;*.dng;*.crw;*.nef;*.cr2;*.mrw;*.rw2;*.orf;*.x3f;*.arw;*.kdc;*.nrw;*.dcr;*.sr2;*.raf"));
     m_bWrapAroundFolder = GetBool(_T("WrapAroundFolder"), true);
     m_bWindowBorderlessOnStartup = GetBool(_T("WindowBorderlessOnStartup"), false);
     m_bWindowAlwaysOnTopOnStartup = GetBool(_T("WindowAlwaysOnTopOnStartup"), false);
     m_zoomPauseFactor = GetInt(_T("ZoomPausePercent"), 100, 0, 6553500) / 100.0;  // can't have a % larger than the MAX_IMAGE_DIMENSION %, and convert to a scale factor (double/double division) only once
-    m_bAllowFileDeletion = GetBool(_T("AllowFileDeletion"), true);
     m_bExchangeXButtons = GetBool(_T("ExchangeXButtons"), true);
     m_bAutoRotateEXIF = GetBool(_T("AutoRotateEXIF"), true);
     m_bUseEmbeddedColorProfiles = GetBool(_T("UseEmbeddedColorProfiles"), false);
     m_nDisplayMonitor = GetInt(_T("DisplayMonitor"), -1, -1, 16);
     m_dAutoContrastAmount = GetDouble(_T("AutoContrastCorrectionAmount"), 0.5, 0.0, 1.0);
     m_dAutoBrightnessAmount = GetDouble(_T("AutoBrightnessCorrectionAmount"), 0.2, 0.0, 1.0);
-    m_sLandscapeModeParams = GetString(_T("LandscapeModeParams"), _T("-1 -1 -1 -1 0.5 1.0 0.75 0.4 -1 -1 -1"));
-    m_bLandscapeMode = GetBool(_T("LandscapeMode"), false);
     m_defaultWindowRect = GetRect(_T("DefaultWindowRect"), CRect(0, 0, 0, 0));
     m_stickyWindowRect = GetRect(_T("StickyWindowRect"), CRect(0, 0, 0, 0));
     m_bDefaultMaximized = false;
@@ -258,10 +247,9 @@ CSettingsProvider::CSettingsProvider(void) {
     m_colorTransparency = GetColor(_T("TransparencyColor"), m_colorBackground);
 
     m_defaultGUIFont = GetString(_T("DefaultGUIFont"), _T("Default"));
-    m_fileNameFont = GetString(_T("FileNameFont"), _T("Default"));
+    m_zoomFactorFont = GetString(_T("ZoomFactorFont"), _T("Default"));
 
     m_bReloadWhenDisplayedImageChanged = GetBool(_T("ReloadWhenDisplayedImageChanged"), true);
-    m_bAllowEditGlobalSettings = GetBool(_T("AllowEditGlobalSettings"), false);
 
     m_sIniEditor = GetString(_T("IniEditor"), _T("notepad"));
     if (m_sIniEditor.CompareNoCase(_T("notepad")) == 0) {
@@ -275,21 +263,8 @@ CSettingsProvider::CSettingsProvider(void) {
     }
 
     m_minimalWindowSize = GetSize(_T("MinimalWindowSize"), CSize(320, 240));
-    m_minimalDisplayTime = GetInt(_T("MinimalDisplayTime"), 0, 0, 1000);
 
     m_sLanguage = GetString(_T("Language"), _T("auto"));
-    m_sACCExclude = GetString(_T("ACCExclude"), _T("")); 
-    m_sACCExclude.Replace(_T("%mydocuments%"), sMyDocumentsFolder);
-    m_sACCExclude.Replace(_T("%mypictures%"), sMyPicturesFolder);
-    m_sACCInclude = GetString(_T("ACCInclude"), _T("")); 
-    m_sACCInclude.Replace(_T("%mydocuments%"), sMyDocumentsFolder);
-    m_sACCInclude.Replace(_T("%mypictures%"), sMyPicturesFolder);
-    m_sLDCExclude = GetString(_T("LDCExclude"), _T(""));
-    m_sLDCExclude.Replace(_T("%mydocuments%"), sMyDocumentsFolder);
-    m_sLDCExclude.Replace(_T("%mypictures%"), sMyPicturesFolder);
-    m_sLDCInclude = GetString(_T("LDCInclude"), _T(""));
-    m_sLDCInclude.Replace(_T("%mydocuments%"), sMyDocumentsFolder);
-    m_sLDCInclude.Replace(_T("%mypictures%"), sMyPicturesFolder);
 
     CString sColorCorrections = GetString(_T("ColorCorrection"), _T(""));
     if (sColorCorrections.GetLength() > 0 &&
@@ -319,41 +294,12 @@ CSettingsProvider::CSettingsProvider(void) {
 
 }
 
-CImageProcessingParams CSettingsProvider::LandscapeModeParams(const CImageProcessingParams& templParams) {
-    const float cfUndefined = -1;
-    const int cnParams = 12;
-    float fParams[cnParams];
-    for (int i = 0; i < cnParams; i++) fParams[i] = cfUndefined;
-    _stscanf(m_sLandscapeModeParams, _T("%f %f %f %f %f %f %f %f %f %f %f %f"), &fParams[0], &fParams[1], &fParams[2], 
-        &fParams[3], &fParams[4], &fParams[5], &fParams[6], &fParams[7], &fParams[8], &fParams[9], &fParams[10], &fParams[11]);
-    return CImageProcessingParams(
-        (fParams[0] == cfUndefined) ? templParams.Contrast : fParams[0],
-        (fParams[1] == cfUndefined) ? templParams.Gamma : fParams[1],
-        (fParams[11] == cfUndefined) ? templParams.Saturation : fParams[11],
-        (fParams[2] == cfUndefined) ? templParams.Sharpen : fParams[2],
-        (fParams[3] == cfUndefined) ? templParams.ColorCorrectionFactor : fParams[3],
-        (fParams[4] == cfUndefined) ? templParams.ContrastCorrectionFactor : fParams[4],
-        (fParams[5] == cfUndefined) ? templParams.LightenShadows : fParams[5],
-        (fParams[6] == cfUndefined) ? templParams.DarkenHighlights : fParams[6],
-        (fParams[7] == cfUndefined) ? templParams.LightenShadowSteepness : fParams[7],
-        (fParams[8] == cfUndefined) ? templParams.CyanRed : fParams[8],
-        (fParams[9] == cfUndefined) ? templParams.MagentaGreen : fParams[9],
-        (fParams[10] == cfUndefined) ? templParams.YellowBlue : fParams[10]);
-}
-
 void CSettingsProvider::ReadWriteableINISettings() {
     m_dContrast = GetDouble(_T("Contrast"), 0.0, -0.5, 0.5);
     m_dGamma = GetDouble(_T("Gamma"), 1.0, 0.1, 10.0);
     m_dSaturation = GetDouble(_T("Saturation"), 1.0, 0.0, 2.0);
-    m_dSharpen = GetDouble(_T("Sharpen"), 0.3, 0.0, 0.5);
-    m_dCyanRed = GetDouble(_T("CyanRed"), 0.0, -1.0, 1.0);
-    m_dMagentaGreen = GetDouble(_T("MagentaGreen"), 0.0, -1.0, 1.0);
-    m_dYellowBlue = GetDouble(_T("YellowBlue"), 0.0, -1.0, 1.0);
     m_bAutoContrastCorrection = GetBool(_T("AutoContrastCorrection"), false);
-    m_bLocalDensityCorrection = GetBool(_T("LocalDensityCorrection"), false);
-    m_dBrightenShadows = GetDouble(_T("LDCBrightenShadows"), 0.5, 0.0, 1.0);
-    m_dDarkenHighlights = GetDouble(_T("LDCDarkenHighlights"), 0.25, 0.0, 1.0);
-    m_dBrightenShadowsSteepness = GetDouble(_T("LDCBrightenShadowsSteepness"), 0.5, 0.0, 1.0);
+
     CString sNavigation = GetString(_T("FolderNavigation"), _T("LoopFolder"));
     if (sNavigation.CompareNoCase(_T("LoopSameFolderLevel")) == 0) {
         m_eNavigation = Helpers::NM_LoopSameDirectoryLevel;
@@ -385,8 +331,6 @@ void CSettingsProvider::ReadWriteableINISettings() {
     m_eAutoZoomModeFullscreen = GetAutoZoomMode(_T("AutoZoomModeFullscreen"), m_eAutoZoomMode);
 
     m_bHQRS = GetBool(_T("HighQualityResampling"), true);
-    m_bDefaultSelectionMode = GetBool(_T("DefaultSelectionMode"), true);    // [GF] Note: This values is missing from SaveSettings().
-    m_bShowFileName = GetBool(_T("ShowFileName"), false);
     m_bKeepParams = GetBool(_T("KeepParameters"), false);
     m_eSlideShowTransitionEffect = Helpers::ConvertTransitionEffectFromString(GetString(_T("SlideShowTransitionEffect"), _T("")));
 
@@ -410,24 +354,13 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
                                      EProcessingFlags eProcFlags,
                                      Helpers::ENavigationMode eNavigationMode, Helpers::ESorting eFileSorting, bool isSortedAscending,
                                      Helpers::EAutoZoomMode eAutoZoomMode, Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
-                                     bool bShowNavPanel, bool bShowFileName, bool bShowFileInfo,
                                      Helpers::ETransitionEffect eSlideShowTransitionEffect) {
     MakeSureUserINIExists();
 
     WriteDouble(_T("Contrast"), procParams.Contrast);
     WriteDouble(_T("Gamma"), procParams.Gamma);
     WriteDouble(_T("Saturation"), procParams.Saturation);
-    WriteDouble(_T("Sharpen"), procParams.Sharpen);
-    WriteDouble(_T("CyanRed"), procParams.CyanRed);
-    WriteDouble(_T("MagentaGreen"), procParams.MagentaGreen);
-    WriteDouble(_T("YellowBlue"), procParams.YellowBlue);
     WriteBool(_T("AutoContrastCorrection"), GetProcessingFlag(eProcFlags, PFLAG_AutoContrast));
-    WriteBool(_T("LocalDensityCorrection"), GetProcessingFlag(eProcFlags, PFLAG_LDC));
-    if (GetProcessingFlag(eProcFlags, PFLAG_LDC)) {
-        WriteDouble(_T("LDCBrightenShadows"), procParams.LightenShadows);
-        WriteDouble(_T("LDCDarkenHighlights"), procParams.DarkenHighlights);
-        WriteDouble(_T("LDCBrightenShadowsSteepness"), procParams.LightenShadowSteepness);
-    }
 
     LPCTSTR sNavigation = _T("LoopFolder");
     if (eNavigationMode == Helpers::NM_LoopSameDirectoryLevel) {
@@ -457,7 +390,6 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
 
     WriteBool(_T("HighQualityResampling"), GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling));
     WriteBool(_T("KeepParameters"), GetProcessingFlag(eProcFlags, PFLAG_KeepParams));
-    WriteBool(_T("ShowFileName"), bShowFileName);
 
     WriteString(_T("SlideShowTransitionEffect"), Helpers::ConvertTransitionEffectToString(eSlideShowTransitionEffect));
 
@@ -492,50 +424,6 @@ void CSettingsProvider::CopyUserINIFromTemplate() {
     LPCTSTR sINIFileName = GetUserINIFileName();
     ::CreateDirectory(Helpers::JPEGViewAppDataPath(), NULL);
     ::CopyFile(GetINITemplateName(), sINIFileName, TRUE);
-}
-
-void CSettingsProvider::UpdateUserSettings() {
-    if (m_bStoreToEXEPath) {
-        return; // no user INI file
-    }
-
-    CString sINIFileName = CString(GetUserINIFileName());
-    ::DeleteFile(sINIFileName + _T(".old"));
-    if (!ExistsUserINI()) {
-        CopyUserINIFromTemplate();
-        return;
-    }
-
-    const int BUFFER_LEN = 16000;
-    TCHAR* buffer = new TCHAR[BUFFER_LEN];
-    if (::GetPrivateProfileString(SECTION_NAME, NULL, _T(""), buffer, BUFFER_LEN, sINIFileName) == BUFFER_LEN - 2) {
-        // buffer was too small, maybe INI file corrupt, do not touch
-        delete[] buffer;
-        return;
-    }
-
-    CString newINIFileName = sINIFileName + _T(".new");
-    if (!::CopyFile(GetINITemplateName(), newINIFileName, FALSE)){
-        delete[] buffer;
-        return;
-    }
-
-    TCHAR* currentKey = buffer;
-    while (*currentKey != 0) {
-        CString value = GetString(currentKey, _T(""));
-        if (!::WritePrivateProfileString(SECTION_NAME, currentKey, value, newINIFileName)) {
-            delete[] buffer;
-            return;
-        }
-        // go to next key
-        while (*currentKey != 0) currentKey++;
-        currentKey++;
-    }
-
-    delete[] buffer;
-    if (::MoveFile(sINIFileName, sINIFileName + _T(".old"))) {
-        ::MoveFile(newINIFileName, sINIFileName);
-    }
 }
 
 void CSettingsProvider::MakeSureUserINIExists() {
@@ -766,16 +654,4 @@ void CSettingsProvider::WriteInt(LPCTSTR sKey, int nValue) {
     TCHAR buff[32];
     _stprintf_s(buff, 32, _T("%d"), nValue);
     WriteString(sKey, buff);
-}
-
-// Used to set "m_nNumCores"
-// Needs "#include <thread>"
-int CSettingsProvider::NumConcurrentThreads(void) {
-    //may return 0 when not able to detect
-    int processor_count = std::thread::hardware_concurrency();
-
-    if (processor_count<1)
-        processor_count = 1;
-
-    return processor_count;
 }

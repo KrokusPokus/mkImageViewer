@@ -87,8 +87,7 @@ public:
     };
 
     // Creates a filter for resizing from nSourceSize to nTargetSize 
-    // dSharpen must be in [0..0.5] - it is ignored for upsampling kernels.
-    CResizeFilter(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter, FilterSIMDType filterSIMDType);
+    CResizeFilter(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType);
     ~CResizeFilter();
 
     // Gets a block of kernels for resizing from the source size to the target size.
@@ -112,7 +111,6 @@ private:
     friend class CResizeFilterCache;
 
     int m_nSourceSize, m_nTargetSize;
-    double m_dSharpen;
     EFilterType m_eFilter;
     double m_dMultX;
     int m_nFilterLen;
@@ -129,7 +127,7 @@ private:
     void CalculateAVXFilterKernels();
 
     // Checks if this filter matches the given parameters
-    bool ParametersMatch(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter, FilterSIMDType filterSIMDType);
+    bool ParametersMatch(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType);
 
     void CalculateFilterParams(EFilterType eFilter);
     int16* GetFilter(uint16 nFrac, EFilterType eFilter);
@@ -143,7 +141,7 @@ public:
     static CResizeFilterCache& This();
 
     // Gets filter
-    const CResizeFilter& GetFilter(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter, FilterSIMDType filterSIMDType);
+    const CResizeFilter& GetFilter(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType);
     // Release filter
     void ReleaseFilter(const CResizeFilter& filter);
 
@@ -161,8 +159,8 @@ private:
 // Helper class for accessing filters from filter cache, automatically releasing the filter when object goes out of scope
 class CAutoFilter {
 public:
-    CAutoFilter(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter) 
-        : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, dSharpen, eFilter, FilterSIMDType_None)) {}
+    CAutoFilter(int nSourceSize, int nTargetSize, EFilterType eFilter) 
+        : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, eFilter, FilterSIMDType_None)) {}
     
     const FilterKernelBlock& Kernels() { return m_filter.GetFilterKernels(); }
     
@@ -174,8 +172,8 @@ private:
 // Helper class for accessing filters from filter cache, automatically releasing the filter when object goes out of scope
 class CAutoXMMFilter {
 public:
-    CAutoXMMFilter(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter) 
-        : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, dSharpen, eFilter, FilterSIMDType_SSE)) {}
+    CAutoXMMFilter(int nSourceSize, int nTargetSize, EFilterType eFilter) 
+        : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, eFilter, FilterSIMDType_SSE)) {}
     
     const XMMFilterKernelBlock& Kernels() { return m_filter.GetXMMFilterKernels(); }
     
@@ -187,8 +185,8 @@ private:
 // Helper class for accessing filters from filter cache, automatically releasing the filter when object goes out of scope
 class CAutoAVXFilter {
 public:
-    CAutoAVXFilter(int nSourceSize, int nTargetSize, double dSharpen, EFilterType eFilter)
-        : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, dSharpen, eFilter, FilterSIMDType_AVX)) {}
+    CAutoAVXFilter(int nSourceSize, int nTargetSize, EFilterType eFilter)
+        : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, eFilter, FilterSIMDType_AVX)) {}
 
     const AVXFilterKernelBlock& Kernels() { return m_filter.GetAVXFilterKernels(); }
 

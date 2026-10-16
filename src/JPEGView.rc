@@ -207,9 +207,7 @@ BEGIN
         END
         MENUITEM "Auto Contrast",             IDM_AUTO_CORRECTION
         MENUITEM SEPARATOR
-        MENUITEM "Edit global config file",     IDM_EDIT_GLOBAL_CONFIG
-        MENUITEM "Edit user config file",       IDM_EDIT_USER_CONFIG
-        MENUITEM "Update user config format",     IDM_UPDATE_USER_CONFIG
+        MENUITEM "Edit Settings",       IDM_EDIT_USER_CONFIG
         MENUITEM SEPARATOR
         MENUITEM "Exit\t0xffff",                IDM_EXIT
     END

@@ -24,12 +24,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 static void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pIJLPixels, int nChannels, double dSharpen,
-    EFilterType eFilter, bool bSSE, uint8* pTarget);
+    CSize sourceSize, const void* pIJLPixels, int nChannels, EFilterType eFilter, bool bSSE, uint8* pTarget);
 
 static void* SampleDown_HQ_AVX_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pIJLPixels, int nChannels, double dSharpen,
-    EFilterType eFilter, uint8* pTarget);
+    CSize sourceSize, const void* pIJLPixels, int nChannels, EFilterType eFilter, uint8* pTarget);
 
 static void* SampleUp_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
     CSize sourceSize, const void* pIJLPixels, int nChannels, bool bSSE,
@@ -53,10 +51,9 @@ class CRequestUpDownSampling : public CProcessingRequest {
 public:
     CRequestUpDownSampling(const void* pSourcePixels, CSize sourceSize, void* pTargetPixels,
         CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        int nChannels, double dSharpen, EFilterType eFilter, CBasicProcessing::SIMDArchitecture simd)
+        int nChannels, EFilterType eFilter, CBasicProcessing::SIMDArchitecture simd)
         : CProcessingRequest(pSourcePixels, sourceSize, pTargetPixels, fullTargetSize, fullTargetOffset, clippedTargetSize) {
         Channels = nChannels;
-        Sharpen = dSharpen;
         Filter = eFilter;
         SIMD = simd;
         //StripPadding = (simd == CBasicProcessing::AVX2) ? 16 : 8; // important to set for AVX
@@ -87,7 +84,7 @@ public:
                 CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
                 CSize(ClippedTargetSize.cx, sizeY),
                 SourceSize, SourcePixels,
-                Channels, Sharpen,
+                Channels,
                 Filter,
                 (uint8*)TargetPixels + ClippedTargetSize.cx * 4 * offsetY);
         else
@@ -95,13 +92,12 @@ public:
                 CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
                 CSize(ClippedTargetSize.cx, sizeY),
                 SourceSize, SourcePixels,
-                Channels, Sharpen,
+                Channels,
                 Filter, SIMD == CBasicProcessing::SSE,
                 (uint8*)TargetPixels + ClippedTargetSize.cx * 4 * offsetY);
     }
 
     int Channels;
-    double Sharpen;
     EFilterType Filter;
     CBasicProcessing::SIMDArchitecture SIMD;
 };
@@ -1185,7 +1181,7 @@ void* CBasicProcessing::SampleUp_HQ(CSize fullTargetSize, CPoint fullTargetOffse
     int nStartX = nIncrementX*fullTargetOffset.x;
     int nStartY = nIncrementY*fullTargetOffset.y - 65536*nFirstY;
 
-    CResizeFilter filterX(nSourceWidth, fullTargetSize.cx, 0.0, Filter_Upsampling_Bicubic, FilterSIMDType_None);
+    CResizeFilter filterX(nSourceWidth, fullTargetSize.cx, Filter_Upsampling_Bicubic, FilterSIMDType_None);
     const FilterKernelBlock& kernelsX = filterX.GetFilterKernels();
 
     uint8* pTemp = ApplyFilter(nSourceWidth, nTempTargetHeight, nTempTargetWidth,
@@ -1193,7 +1189,7 @@ void* CBasicProcessing::SampleUp_HQ(CSize fullTargetSize, CPoint fullTargetOffse
         kernelsX, nFilterOffsetX, (const uint8*)pPixels);
     if (pTemp == NULL) return NULL;
 
-    CResizeFilter filterY(nSourceHeight, fullTargetSize.cy, 0.0, Filter_Upsampling_Bicubic, FilterSIMDType_None);
+    CResizeFilter filterY(nSourceHeight, fullTargetSize.cy, Filter_Upsampling_Bicubic, FilterSIMDType_None);
     const FilterKernelBlock& kernelsY = filterY.GetFilterKernels();
 
     uint8* pDIB = ApplyFilter(nTempTargetWidth, nTargetHeight, nTargetWidth,
@@ -1214,7 +1210,7 @@ void* CBasicProcessing::SampleUp_HQ(CSize fullTargetSize, CPoint fullTargetOffse
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void* CBasicProcessing::SampleDown_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, double dSharpen, EFilterType eFilter) {
+    CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter) {
     // Resizing consists of resize in x direction followed by resize in y direction.
     // To simplify implementation, the method performs a 90 degree rotation/flip while resizing,
     // thus enabling to use the same loop on the rows for both resize directions.
@@ -1223,9 +1219,9 @@ void* CBasicProcessing::SampleDown_HQ(CSize fullTargetSize, CPoint fullTargetOff
     if (pPixels == NULL || clippedTargetSize.cx <= 0 || clippedTargetSize.cy <= 0) {
         return NULL;
     }
-    CResizeFilter filterX(sourceSize.cx, fullTargetSize.cx, dSharpen, eFilter, FilterSIMDType_None);
+    CResizeFilter filterX(sourceSize.cx, fullTargetSize.cx, eFilter, FilterSIMDType_None);
     const FilterKernelBlock& kernelsX = filterX.GetFilterKernels();
-    CResizeFilter filterY(sourceSize.cy, fullTargetSize.cy, dSharpen, eFilter, FilterSIMDType_None);
+    CResizeFilter filterY(sourceSize.cy, fullTargetSize.cy, eFilter, FilterSIMDType_None);
     const FilterKernelBlock& kernelsY = filterY.GetFilterKernels();
 
     uint32 nIncrementX = (uint32)(sourceSize.cx << 16)/fullTargetSize.cx + 1;
@@ -1705,12 +1701,11 @@ CXMMImage* ApplyFilter_AVX(int nSourceHeight, int nTargetHeight, int nWidth,
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, double dSharpen,
-    EFilterType eFilter, bool bSSE, uint8* pTarget) {
+                                 CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, bool bSSE, uint8* pTarget) {
 
-    CAutoXMMFilter filterY(sourceSize.cy, fullTargetSize.cy, dSharpen, eFilter);
+    CAutoXMMFilter filterY(sourceSize.cy, fullTargetSize.cy, eFilter);
     const XMMFilterKernelBlock& kernelsY = filterY.Kernels();
-    CAutoXMMFilter filterX(sourceSize.cx, fullTargetSize.cx, dSharpen, eFilter);
+    CAutoXMMFilter filterX(sourceSize.cx, fullTargetSize.cx, eFilter);
     const XMMFilterKernelBlock& kernelsX = filterX.Kernels();
 
     uint32 nIncrementX = (uint32)(sourceSize.cx << 16)/fullTargetSize.cx + 1;
@@ -1763,12 +1758,11 @@ void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, 
 }
 
 void* SampleDown_HQ_AVX_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, double dSharpen,
-    EFilterType eFilter, uint8* pTarget) {
+                             CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, uint8* pTarget) {
 
-    CAutoAVXFilter filterY(sourceSize.cy, fullTargetSize.cy, dSharpen, eFilter);
+    CAutoAVXFilter filterY(sourceSize.cy, fullTargetSize.cy, eFilter);
     const AVXFilterKernelBlock& kernelsY = filterY.Kernels();
-    CAutoAVXFilter filterX(sourceSize.cx, fullTargetSize.cx, dSharpen, eFilter);
+    CAutoAVXFilter filterX(sourceSize.cx, fullTargetSize.cx, eFilter);
     const AVXFilterKernelBlock& kernelsX = filterX.Kernels();
 
     uint32 nIncrementX = (uint32)(sourceSize.cx << 16) / fullTargetSize.cx + 1;
@@ -1841,10 +1835,10 @@ void* SampleUp_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CS
     int nStartX = nIncrementX*fullTargetOffset.x - 65536*nFirstX;
     int nStartY = nIncrementY*fullTargetOffset.y - 65536*nFirstY;
 
-    CAutoXMMFilter filterY(nSourceHeight, fullTargetSize.cy, 0.0, Filter_Upsampling_Bicubic);
+    CAutoXMMFilter filterY(nSourceHeight, fullTargetSize.cy, Filter_Upsampling_Bicubic);
     const XMMFilterKernelBlock& kernelsY = filterY.Kernels();
 
-    CAutoXMMFilter filterX(nSourceWidth, fullTargetSize.cx, 0.0, Filter_Upsampling_Bicubic);
+    CAutoXMMFilter filterX(nSourceWidth, fullTargetSize.cx, Filter_Upsampling_Bicubic);
     const XMMFilterKernelBlock& kernelsX = filterX.Kernels();
 
     // Resize Y
@@ -1890,10 +1884,10 @@ void* SampleUp_HQ_AVX_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize 
     int nStartX = nIncrementX*fullTargetOffset.x - 65536 * nFirstX;
     int nStartY = nIncrementY*fullTargetOffset.y - 65536 * nFirstY;
 
-    CAutoAVXFilter filterY(nSourceHeight, fullTargetSize.cy, 0.0, Filter_Upsampling_Bicubic);
+    CAutoAVXFilter filterY(nSourceHeight, fullTargetSize.cy, Filter_Upsampling_Bicubic);
     const AVXFilterKernelBlock& kernelsY = filterY.Kernels();
 
-    CAutoAVXFilter filterX(nSourceWidth, fullTargetSize.cx, 0.0, Filter_Upsampling_Bicubic);
+    CAutoAVXFilter filterX(nSourceWidth, fullTargetSize.cx, Filter_Upsampling_Bicubic);
     const AVXFilterKernelBlock& kernelsX = filterX.Kernels();
 
     // Resize Y
@@ -1918,18 +1912,19 @@ void* SampleUp_HQ_AVX_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize 
 }
 
 void* CBasicProcessing::SampleDown_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, double dSharpen,
-    EFilterType eFilter, SIMDArchitecture simd) {
+                                           CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, SIMDArchitecture simd) {
+
     if (pPixels == NULL || clippedTargetSize.cx <= 0 || clippedTargetSize.cy <= 0) {
         return NULL;
     }
+    
     int padding = (simd == AVX2) ? 8 : 4;
     uint8* pTarget = new(std::nothrow) uint8[clippedTargetSize.cx * 4 * Helpers::DoPadding(clippedTargetSize.cy, padding)];
     if (pTarget == NULL) return NULL;
     CProcessingThreadPool& threadPool = CProcessingThreadPool::This();
     CRequestUpDownSampling request(pPixels, sourceSize,
         pTarget, fullTargetSize, fullTargetOffset, clippedTargetSize,
-        nChannels, dSharpen, eFilter, simd);
+        nChannels, eFilter, simd);
     bool bSuccess = threadPool.Process(&request);
 
     return bSuccess ? pTarget : NULL;
@@ -1946,7 +1941,7 @@ void* CBasicProcessing::SampleUp_HQ_SIMD(CSize fullTargetSize, CPoint fullTarget
     CProcessingThreadPool& threadPool = CProcessingThreadPool::This();
     CRequestUpDownSampling request(pPixels, sourceSize,
         pTarget, fullTargetSize, fullTargetOffset, clippedTargetSize,
-        nChannels, 0.0, Filter_Upsampling_Bicubic, simd);
+        nChannels, Filter_Upsampling_Bicubic, simd);
     bool bSuccess = threadPool.Process(&request);
 
     return bSuccess ? pTarget : NULL;

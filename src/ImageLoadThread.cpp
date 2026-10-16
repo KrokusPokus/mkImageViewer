@@ -499,52 +499,32 @@ void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
         }
         unsigned int nNumBytesRead = 0;
         if (::ReadFile(hFile, pBuffer, nFileSize, (LPDWORD) &nNumBytesRead, NULL) && nNumBytesRead == nFileSize) {
-            bool bUseGDIPlus = CSettingsProvider::This().ForceGDIPlus();
-            if (bUseGDIPlus) {
-                IStream* pStream = NULL;
-                if (::CreateStreamOnHGlobal(hFileBuffer, FALSE, &pStream) == S_OK) {
-                    Gdiplus::Bitmap* pBitmap = Gdiplus::Bitmap::FromStream(pStream, CSettingsProvider::This().UseEmbeddedColorProfiles());
-                    bool isOutOfMemory, isAnimatedGIF;
-                    request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, 0, Helpers::FindEXIFBlock(pBuffer, nFileSize),
-                        Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
-                    request->OutOfMemory = request->Image == NULL && isOutOfMemory;
-                    if (request->Image != NULL) {
-                        request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
-                    }
-                    pStream->Release();
-                    delete pBitmap;
-                } else {
-                    request->OutOfMemory = true;
-                }
-            }
-            if (!bUseGDIPlus || request->OutOfMemory) {
-                int nWidth, nHeight, nBPP;
-                TJSAMP eChromoSubSampling;
-                bool bOutOfMemory;
-                // int nTicks = ::GetTickCount();
+            int nWidth, nHeight, nBPP;
+            TJSAMP eChromoSubSampling;
+            bool bOutOfMemory;
+            // int nTicks = ::GetTickCount();
 
-                void* pPixelData = TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bOutOfMemory, pBuffer, nFileSize);
-                
-                /*
-                TCHAR buffer[20];
-                _stprintf_s(buffer, 20, _T("%d"), ::GetTickCount() - nTicks);
-                ::MessageBox(NULL, CString(_T("Elapsed ticks: ")) + buffer, _T("Time"), MB_OK);
-                */
+            void* pPixelData = TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bOutOfMemory, pBuffer, nFileSize);
+            
+            /*
+            TCHAR buffer[20];
+            _stprintf_s(buffer, 20, _T("%d"), ::GetTickCount() - nTicks);
+            ::MessageBox(NULL, CString(_T("Elapsed ticks: ")) + buffer, _T("Time"), MB_OK);
+            */
 
-                // Color and b/w JPEG is supported
-                if (pPixelData != NULL && (nBPP == 3 || nBPP == 1)) {
-                    request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, 
-                        Helpers::FindEXIFBlock(pBuffer, nFileSize), nBPP, 
-                        Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), IF_JPEG, false, 0, 1, 0);
-                    request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
-                    request->Image->SetJPEGChromoSampling(eChromoSubSampling);
-                } else if (bOutOfMemory) {
-                    request->OutOfMemory = true;
-                } else {
-                    // failed, try GDI+
-                    delete[] pPixelData;
-                    ProcessReadGDIPlusRequest(request);
-                }
+            // Color and b/w JPEG is supported
+            if (pPixelData != NULL && (nBPP == 3 || nBPP == 1)) {
+                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, 
+                    Helpers::FindEXIFBlock(pBuffer, nFileSize), nBPP, 
+                    Helpers::CalculateJPEGFileHash(pBuffer, nFileSize), IF_JPEG, false, 0, 1, 0);
+                request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer, nFileSize));
+                request->Image->SetJPEGChromoSampling(eChromoSubSampling);
+            } else if (bOutOfMemory) {
+                request->OutOfMemory = true;
+            } else {
+                // failed, try GDI+
+                delete[] pPixelData;
+                ProcessReadGDIPlusRequest(request);
             }
         }
     } catch (...) {
@@ -699,7 +679,7 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
 
 #ifndef WINXP
             // If UseEmbeddedColorProfiles is true and the image isn't animated, we should use GDI+ for better color management
-            bool bUseGDIPlus = CSettingsProvider::This().ForceGDIPlus() || CSettingsProvider::This().UseEmbeddedColorProfiles();
+            bool bUseGDIPlus = CSettingsProvider::This().UseEmbeddedColorProfiles();
             if (bUseCachedDecoder || !bUseGDIPlus || PngReader::MustUseLibpng(pBuffer, nFileSize))
                 pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
 #endif

@@ -223,9 +223,12 @@ static float CalcBWColorCompensation(float fMidPt, float fBlackPt, float fWhiteP
 // CHistogramCorr class
 ///////////////////////////////////////////////////////////////////////////////////
 
-uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram, float fColorCorrectionFactor, float fBrightnessCorrectionFactor,
-                                              const float fColorCastCorrection[3], const float fColorCorrectionStrength[6],
+uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
+                                              float fColorCorrectionFactor,
+                                              float fBrightnessCorrectionFactor,
+                                              const float fColorCorrectionStrength[6],
                                               float fContrastCorrectionFactor) {
+
     const float cCuttingLevel = 0.001f; // black/white point cutting level
     const float cBrightnessCorr = 1.0f; // strength of brightness correction
     const float cLog0dot5 = log10f(0.5f);
@@ -289,9 +292,10 @@ uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram, floa
     } else {
         fCastMult = 2*(fCastFact + 1)*fColorCorrectionFactor + 1;
     }
-    fCorrBlue = fCorrBlue - fCastMult*fCastCorrB + cCastFactor*fColorCastCorrection[2];
-    fCorrGreen = fCorrGreen - fCastMult*fCastCorrG + cCastFactor*fColorCastCorrection[1];
-    fCorrRed = fCorrRed - fCastMult*fCastCorrR + cCastFactor*fColorCastCorrection[0];
+    
+    fCorrBlue = fCorrBlue - fCastMult*fCastCorrB;
+    fCorrGreen = fCorrGreen - fCastMult*fCastCorrG;
+    fCorrRed = fCorrRed - fCastMult*fCastCorrR;
 
     float fMeanGrey = (histogram.GetBMean()*0.1f + histogram.GetGMean()*0.6f + histogram.GetRMean()*0.3f)/255;
     float fBrightnessAdd = (fMeanGrey < 0.5f) ? (0.5f - fMeanGrey)*sm_BrightnessCorrStrength*fBrightnessCorrectionFactor : 0.0f;

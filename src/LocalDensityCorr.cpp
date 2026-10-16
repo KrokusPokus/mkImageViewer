@@ -21,39 +21,6 @@ static void CalculateLDCResponseLUT(uint8* pLUT) {
     }
 }
 
-// Uses the HSV color model to determine if a color is in the typical hue range for sunsets
-static bool IsSunsetPixel(int nR, int nG, int nB) {
-    float fR = nR*(1.0f/255.0f);
-    float fG = nG*(1.0f/255.0f);
-    float fB = nB*(1.0f/255.0f);
-
-    // Calculate HSV value from RGB
-    float minVal = std::min(std::min(fR, fG), fB);
-    float maxVal = std::max(std::max(fR, fG), fB);
-    float fValue = maxVal;
-    float delta = maxVal - minVal;
-    float fSaturation, fHue;
-    if ( maxVal != 0 )
-        fSaturation = delta / maxVal;
-    else {
-        // r = g = b = 0
-        return false;
-    }
-    if (delta == 0)
-        return false;
-    if( fR == maxVal )
-        fHue = ( fG - fB ) / delta;        // between yellow & magenta
-    else if( fG == maxVal )
-        fHue = 2 + ( fB - fR ) / delta;    // between cyan & yellow
-    else
-        fHue = 4 + ( fR - fG ) / delta;    // between magenta & cyan
-    fHue *= 60;                // degrees
-    if (fHue < 0 )
-        fHue += 360;
-    if ((fHue > 350 || fHue < 30) && fValue > 0.2f && fSaturation > 0.1f)
-        return true;
-    return false;
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Public
@@ -71,7 +38,7 @@ CLocalDensityCorr::CLocalDensityCorr(const CJPEGImage & image, bool bFullConstru
     m_nLDCWidth = m_nLDCHeight = -1;
     m_pLDCMap = NULL;
     m_pLDCMapMultiplied = NULL;
-    m_fIsSunset = m_fMiddleGrey = m_fSunsetPixels = -1.0f;
+    m_fMiddleGrey = -1.0f;
 
     // LDC also needs the histogram of the image
     int channelR[256]{ 0 }, channelG[256]{ 0 }, channelB[256]{ 0 };
@@ -173,39 +140,6 @@ CLocalDensityCorr::~CLocalDensityCorr(void) {
     m_pLDCMapMultiplied = NULL;
 }
 
-void* CLocalDensityCorr::GetPSImageAsDIB() {
-    uint32* pDIBStart = new uint32[m_nPSIWidth*m_nPSIHeight];
-    uint32* pDIB = pDIBStart;
-    for (int j = 0; j < m_nPSIHeight; j++) {
-        uint16* pSrc = m_pPointSampledImage + m_nPSIWidth*j*3;
-        for (int i = 0; i < m_nPSIWidth; i++) {
-            *pDIB = (pSrc[m_nPSIWidth*2] << 16) + (pSrc[m_nPSIWidth] << 8) + pSrc[0];
-            pDIB++;
-            pSrc++;
-        }
-    }
-    return pDIBStart;
-}
-
-void CLocalDensityCorr::VerifyFullyConstructed() {
-    if (m_pLDCMap == NULL) {
-        CreateLDCMap();
-    }
-}
-
-const uint8* CLocalDensityCorr::GetLDCMap() {
-    assert(m_pLDCMap != NULL);
-    if (m_pLDCMapMultiplied == NULL) {
-        m_pLDCMapMultiplied = MultiplyMap(0.5, 0.25);
-    }
-    return m_pLDCMapMultiplied; 
-}
-
-void CLocalDensityCorr::SetLDCAmount(double dLightenShadows, double dDarkenHighlights) {
-    assert(m_pLDCMap != NULL);
-    delete[] m_pLDCMapMultiplied;
-    m_pLDCMapMultiplied = MultiplyMap(std::min(1.0, std::max(0.0, dLightenShadows)), std::min(1.0, std::max(0.0, dDarkenHighlights)));
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Private
@@ -219,7 +153,6 @@ void CLocalDensityCorr::CreateLDCMap() {
     CalculateLDCResponseLUT(ldcResponseLUT);
 
     // now subsample the small image by factor 4 in each dimension
-    int nSumSunSetPixels = 0; // number of pixels with hue in sunset range
     m_nLDCWidth = m_nPSIWidth/4;
     m_nLDCHeight = m_nPSIHeight/4;
     uint32* pLDCRowSum = new uint32[m_nLDCHeight*3]; // mean value of each row
@@ -255,9 +188,6 @@ void CLocalDensityCorr::CreateLDCMap() {
             pCurrentRowSum[0] += nValueB;
             pCurrentRowSum[1] += nValueG;
             pCurrentRowSum[2] += nValueR;
-            if (IsSunsetPixel(nValueR, nValueG, nValueB)) {
-                nSumSunSetPixels++;
-            }
 
             // Give blue a bit more weight than normally, else blue is lighted too much
             int nValueGrey = (nValueB*256 + nValueG*512 + nValueR*256) >> 10;
@@ -277,8 +207,6 @@ void CLocalDensityCorr::CreateLDCMap() {
         }
     }
 
-    m_fSunsetPixels = (float)nSumSunSetPixels/(m_nLDCHeight*m_nLDCWidth);
-
     // Check if this could be a sunset picture (LDC brighten shadows must be reduced then)
     if (m_nLDCHeight > 4) {
         int nGreySum = 0;
@@ -290,9 +218,7 @@ void CLocalDensityCorr::CreateLDCMap() {
             nGreySum += (pLDCRowSum[j]*128 + pLDCRowSum[j+1]*640 + pLDCRowSum[j+2]*256) >> 10;
         }
         m_fMiddleGrey = (float)nGreySum/m_nLDCHeight/255.0f;
-        m_fIsSunset = CheckIfSunset(pLDCRowSum, m_nLDCHeight);
     } else {
-        m_fIsSunset = 0.0f;
         m_fMiddleGrey = 0.5f;
     }
     delete[] pLDCRowSum;
@@ -362,45 +288,4 @@ void CLocalDensityCorr::SmoothLDCMask() {
     }
 
     delete[] pNewLDC;
-}
-
-float CLocalDensityCorr::CheckIfSunset(uint32* pRowBGR, int nHeight) {
-    int nStart15 = nHeight/5;
-    uint32* pSrc = pRowBGR + (nHeight-1)*3;
-    int nSign = -1;
-    int nLower = 0, nUpper = 0;
-    int nLR = 0, nLG = 0, nLB = 0;
-    int nUR = 0, nUG = 0, nUB = 0;
-    for (int i = 0; i < nHeight; i++) {
-        uint32 nGrey = (pSrc[0]*128 + pSrc[1]*768 + pSrc[2]*128) >> 10;
-        if (i < nStart15) {
-            nLB += pSrc[0];
-            nLG += pSrc[1];
-            nLR += pSrc[2];
-            nLower += nGrey;
-        } else {
-            nUB += pSrc[0];
-            nUG += pSrc[1];
-            nUR += pSrc[2];
-            nUpper += nGrey;
-        }
-        pSrc += nSign*3;
-    }
-
-    // we now have the values in the lower 1/5 of the image and in the upper 4/5
-    int nNumLower = nStart15;
-    int nNumUpper = nHeight - nStart15;
-    nLower /= nNumLower; nUpper /= nNumUpper;
-    nLR /= nNumLower; nLG /= nNumLower; nLB /= nNumLower;
-    nUR /= nNumUpper; nUG /= nNumUpper; nUB /= nNumUpper;
-
-    // apply some heuristics
-    float fGreyFac = (m_fMiddleGrey > 0.35f) ? 0.0f : 1.0f; // image not too bright
-    float fUL = (nLower == 0) ? 1.0f : (float)nUpper/nLower; // lower part darker than upper part
-    float fFac = (fUL < 1) ? 0.0f : std::min(1.0f, fUL);
-    float fUpperFac = std::min(255, std::max(0, 512 - nUpper*2))/255.0f; // upper part not too bright
-    float fLowerFac = std::min(128, std::max(0, 128 - nLower))/128.0f;  // lower part not too bright
-    float fFacRed = (m_fSunsetPixels > 0.2f) ? 2.0f : (m_fSunsetPixels > 0.05f) ? 1.0f : 0.0f; // sunset colors
-    float fVal = fGreyFac*fFac*fFac*fUpperFac*fLowerFac*fLowerFac*fLowerFac*std::min(1.0f, std::max(0.0f, fFacRed));
-    return std::min(1.0f, fVal*2);
 }

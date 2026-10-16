@@ -6,7 +6,6 @@
 class CHistogram;
 class CLocalDensityCorr;
 class CEXIFReader;
-class CRawMetadata;
 enum TJSAMP;
 
 // Represents a rectangle to dim out in the image
@@ -33,12 +32,13 @@ public:
     // The pLDC object is used internally only for thumbnail image creation to avoid duplication. In all other situations,
     // its value must be NULL.
     // If RAW metadata is specified, ownership of this memory is transferred to this class.
-    CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, 
-        __int64 nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs,
-        CLocalDensityCorr* pLDC = NULL, bool bIsThumbnailImage = false, CRawMetadata* pRawMetadata = NULL);
+
     CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
-        __int64 nJPEGHash, EImageFormat eImageFormat, EImageFormat eContainerFormat = IF_Unknown, bool bIsAnimation = false, int nFrameIndex = 9, int nNumberOfFrames = 1, int nFrameTimeMs = 0,
-        CLocalDensityCorr* pLDC = NULL, bool bIsThumbnailImage = false, CRawMetadata* pRawMetadata = NULL);
+        __int64 nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs);
+
+    CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
+        __int64 nJPEGHash, EImageFormat eImageFormat, EImageFormat eContainerFormat = IF_Unknown, bool bIsAnimation = false, int nFrameIndex = 9, int nNumberOfFrames = 1, int nFrameTimeMs = 0);
+
     ~CJPEGImage(void);
 
     // Gets resampled and processed 32 bpp DIB image (up or downsampled).
@@ -46,7 +46,7 @@ public:
     // fullTargetSize: Full target size of resized image to render (without any clipping to actual clipping size)
     // clippingSize: Sub-rectangle in fullTargetSize to render (the returned DIB has this size)
     // targetOffset: Offset of the clipping rectangle in full target size
-    // imageProcParams: Processing parameters, such as contrast, brightness and sharpen
+    // imageProcParams: Processing parameters, such as contrast and brightness
     // eProcFlags: Processing flags, e.g. apply LDC
     // Return value:
     // The returned DIB is a 32 bpp DIB (BGRA). Note that the returned pointer must not
@@ -191,9 +191,6 @@ public:
     // Gets if zoom and offset values are stored for this image in the parameter DB
     bool HasZoomStoredInParamDB() const { return m_bHasZoomStoredInParamDB; }
 
-    // Gets the factor to lighten shadows based on sunset and nightshot detection
-    float GetLightenShadowFactor() { return m_fLightenShadowFactor; }
-
     // Gets the EXIF data block (including the APP1 marker in the first two bytes) of the image. Returns NULL if none.
     void* GetEXIFData() { return m_pEXIFData; }
 
@@ -236,9 +233,6 @@ public:
     void SetJPEGComment(LPCTSTR sComment) { m_sJPEGComment = CString(sComment); }
     LPCTSTR GetJPEGComment() { return m_sJPEGComment; }
 
-    // Gets the metadata for RAW camera images, NULL if none
-    CRawMetadata* GetRawMetadata() { return m_pRawMetadata; }
-
     // Converts the target offset from 'center of image' based format to pixel coordinate format 
     static CPoint ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset);
 
@@ -262,7 +256,6 @@ private:
     // The data is not modified in all other cases
     void* m_pOrigPixels;
     void* m_pEXIFData;
-    CRawMetadata* m_pRawMetadata;
     int m_nEXIFSize;
     CEXIFReader* m_pEXIFReader;
     CString m_sJPEGComment;
@@ -300,7 +293,6 @@ private:
     int m_nInitialRotation;
     double m_dInitialZoom;
     CPoint m_initialOffsets;
-    float m_fLightenShadowFactor;
 
     bool m_bCropped; // Image has been cropped
     bool m_bIsDestructivelyProcessed; // Original image pixels destructively processed (i.e. cropped or size changed)
@@ -341,11 +333,7 @@ private:
         EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, double dRotation, EResizeType eResizeType);
 
     // Resample to given target size. Returns resampled DIB
-    void* Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
-        EProcessingFlags eProcFlags, double dSharpen, EResizeType eResizeType);
-
-    // Resize to given target size. Returns resampled DIB. Used when resizing original pixels.
-    void* InternalResize(void* pixels, int channels, EResizeFilter filter, CSize targetSize, CSize sourceSize);
+    void* Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType);
 
     // pCachedTargetDIB is a pointer at the caller side holding the old processed DIB.
     // Returns a pointer to DIB to be used (either pCachedTargetDIB or pSourceDIB)
@@ -367,9 +355,6 @@ private:
     // makes sure that the input image (m_pOrigPixels) is a 4 channel BGRA image (converts if necessary)
     bool ConvertSrcTo4Channels();
 
-    // Gets the processing flags according to the inclusion/exclusion list in INI file
-    EProcessingFlags GetProcFlagsIncludeExcludeFolders(LPCTSTR sFileName, EProcessingFlags procFlags) const;
-
     // Return size of original image if the image would be rotated the given amount
     CSize SizeAfterRotation(const CRotationParams& rotationParams);
 
@@ -387,9 +372,6 @@ private:
 
     // Called when the original pixels have changed (rotate, crop), all cached pixel data gets invalid
     void InvalidateAllCachedPixelData();
-
-    // Create histogram of the processed DIB (in original size) using the given image processing parameters
-    const CHistogram* GetHistogramOfProcessedDIB(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags);
 };
 
 

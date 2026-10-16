@@ -146,22 +146,20 @@ public:
     static void* PointSampleWithRotation(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize, 
         CSize sourceSize, double dRotation, const void* pPixels, int nChannels, COLORREF backColor);
 
-    // High quality downsampling of 32 or 24 bpp BGR(A) image to target size, using a set of down-sampling kernels that
-    // do some sharpening during down-sampling if desired. 
+    // High quality downsampling of 32 or 24 bpp BGR(A) image to target size, using a set of down-sampling kernels.
     // Notice that the A channel is not processed and set to fixed value 0xFF.
     // Notice that the returned image is always 32 bpp!
-    // dSharpen: Amount of sharping to apply in [0, 1].
     // eFilter: Filter to apply. Note that the filter type can only be one of the downsampling filter types.
     // See PointSample() for other parameters
     // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
     static void* SampleDown_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        CSize sourceSize, const void* pPixels, int nChannels, double dSharpen, EFilterType eFilter);
+        CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter);
 
     // Same as above, SIMD (AVX2/SSE/MMX) implementation.
     // Notice that the A channel is not processed and set to fixed value 0xFF.
     // Notice that the returned image is always 32 bpp!
     static void* SampleDown_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        CSize sourceSize, const void* pPixels, int nChannels, double dSharpen, EFilterType eFilter, SIMDArchitecture simd);
+        CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, SIMDArchitecture simd);
 
     // High quality upsampling of 32 or 24 bpp BGR(A) image using bicubic interpolation.
     // Notice that the A channel is not processed and set to fixed value 0xFF.

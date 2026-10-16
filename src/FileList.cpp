@@ -128,9 +128,6 @@ void CFileDesc::SetModificationDate(const FILETIME& lastModDate) {
 static const int cnNumEndingsInternal = 20;
 static const TCHAR* csFileEndingsInternal[cnNumEndingsInternal] = {_T("jpg"), _T("jpeg"), _T("jfif"), _T("bmp"), _T("png"),
     _T("tif"), _T("tiff"), _T("gif"), _T("webp"), _T("jxl"), _T("avif"), _T("heif"), _T("heic"), _T("tga"), _T("qoi"), _T("psd"), _T("psb"), _T("ico"), _T("cbz"), _T("cb7") };
-// supported camera RAW formats
-static const TCHAR* csFileEndingsRAW = _T("*.pef;*.dng;*.crw;*.nef;*.cr2;*.mrw;*.rw2;*.orf;*.x3f;*.arw;*.kdc;*.nrw;*.dcr;*.sr2;*.raf");
-
 
 static const int MAX_ENDINGS = 48;
 static int nNumEndings;
@@ -166,8 +163,6 @@ static LPCTSTR* GetSupportedFileEndingList() {
         for (nNumEndings = 0; nNumEndings < cnNumEndingsInternal; nNumEndings++) {
             sFileEndings[nNumEndings] = csFileEndingsInternal[nNumEndings];
         }
-
-        ParseAndAddFileEndings(CSettingsProvider::This().FileEndingsRAW());
     }
     return sFileEndings;
 }
@@ -189,12 +184,6 @@ CFileList::CFileList(const CString & sInitialFile, CDirectoryWatcher & directory
     CString sExtensionInitialFile = (nPos > 0) ? sInitialFile.Right(sInitialFile.GetLength()-nPos-1) : CString();
     sExtensionInitialFile.MakeLower();
     bool bImageFile = !bIsDirectory && IsImageFile(sExtensionInitialFile);
-    if (!bIsDirectory && !bImageFile && !sExtensionInitialFile.IsEmpty() && _tcsstr(csFileEndingsRAW, _T("*.") + sExtensionInitialFile) != NULL) {
-        // initial file is a supported camera raw file but was excluded in INI file - add temporarily to file ending list
-        ParseAndAddFileEndings(_T("*.") + sExtensionInitialFile);
-        CSettingsProvider::This().AddTemporaryRAWFileEnding(sExtensionInitialFile);
-        bImageFile = true;
-    }
     m_bIsSlideShowList = !bIsDirectory && !bImageFile && TryReadingSlideShowList(sInitialFile);
 
     m_directoryWatcher.SetCurrentDirectory(m_sDirectory);
@@ -443,16 +432,16 @@ const FILETIME* CFileList::CurrentModificationTime() const {
 */
 
 LPCTSTR CFileList::PeekNextPrev(int nIndex, bool bForward) {
-	std::list<CFileDesc>::iterator thisIter = m_iter;
-	LPCTSTR sFileName;
-	if (nIndex != 0) {
-		CFileList* pFL = bForward ? Next() : Prev();
-		sFileName = pFL->PeekNextPrev(nIndex-1, bForward);
-	} else {
-		sFileName = Current();
-	}
-	m_iter = thisIter;
-	return sFileName;
+    std::list<CFileDesc>::iterator thisIter = m_iter;
+    LPCTSTR sFileName;
+    if (nIndex != 0) {
+        CFileList* pFL = bForward ? Next() : Prev();
+        sFileName = pFL->PeekNextPrev(nIndex-1, bForward);
+    } else {
+        sFileName = Current();
+    }
+    m_iter = thisIter;
+    return sFileName;
 }
 
 void CFileList::SetSorting(Helpers::ESorting eSorting, bool sortAscending) {
