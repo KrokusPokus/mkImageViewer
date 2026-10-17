@@ -241,9 +241,7 @@ namespace HelpersGUI {
         }
         sText += _T("\n");
         sText += CNLS::GetString(_T("Order files by")); sText += _T(": ");
-        if (eFileSorting == Helpers::FS_CreationTime) {
-            sText += CNLS::GetString(_T("Creation date/time"));
-        } else if (eFileSorting == Helpers::FS_LastModTime) {
+        if (eFileSorting == Helpers::FS_LastModTime) {
             sText += CNLS::GetString(_T("Last modification date/time"));
         }  else if (eFileSorting == Helpers::FS_FileSize) {
             sText += CNLS::GetString(_T("File size"));

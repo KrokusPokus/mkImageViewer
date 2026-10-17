@@ -21,6 +21,7 @@
 #define IDM_STOP_MOVIE        1000
 #define IDM_MINIMIZE        1010        // :KeyMap: minimize window
 #define IDM_EXPLORE            1101        // :KeyMap: open and select file in Explorer
+#define IDM_SETTINGS_DIALOG    1150      // :KeyMap: show settings dialog
 #define IDM_RELOAD            1600        // :KeyMap: reload image
 #define IDM_RELOAD_FULL        1610        // :KeyMap: reload image and file list
 #define IDM_COPY            2000        // :KeyMap: copy image to clipboard in screen size

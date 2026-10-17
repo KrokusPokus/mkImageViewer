@@ -80,7 +80,7 @@ CFileDesc::CFileDesc(const CString & sName, const FILETIME* lastModTime, const F
 }
 
 bool CFileDesc::SortAscending(const CFileDesc& other) const {
-    if (sm_eSorting == Helpers::FS_CreationTime || sm_eSorting == Helpers::FS_LastModTime) {
+    if (sm_eSorting == Helpers::FS_LastModTime) {
         const FILETIME* pTime = (sm_eSorting == Helpers::FS_LastModTime) ? &m_lastModTime : &m_creationTime;
         const FILETIME* pTimeOther = (sm_eSorting == Helpers::FS_LastModTime) ? &(other.m_lastModTime) : &(other.m_creationTime);
         if (pTime->dwHighDateTime < pTimeOther->dwHighDateTime) {

@@ -208,6 +208,7 @@ BEGIN
         MENUITEM "Auto Contrast",             IDM_AUTO_CORRECTION
         MENUITEM SEPARATOR
         MENUITEM "Edit Settings",       IDM_EDIT_USER_CONFIG
+		MENUITEM "Settings Dialog",       IDM_SETTINGS_DIALOG
         MENUITEM SEPARATOR
         MENUITEM "Exit\t0xffff",                IDM_EXIT
     END

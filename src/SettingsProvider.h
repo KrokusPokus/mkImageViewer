@@ -2,7 +2,6 @@
 #define SETTINGSPROVIDER_H
 
 #include "Helpers.h"
-//#include "FileList.h"
 #include "ProcessParams.h"
 
 #include <QString>
@@ -10,6 +9,7 @@
 #include <QSize>
 #include <QColor>
 #include <QSettings>
+#include <QDialog>
 #include <memory>
 
 // Interne Qt-Typen für Kompatibilität mit bestehenden Signaturen bereitstellen/konvertieren
@@ -18,16 +18,118 @@
 using COLORREF = unsigned long;
 #endif
 
+class QTabWidget;
+class QWidget;
+
+// Qt6 Einstellungen-Dialog
+class SettingsDialog : public QDialog {
+    Q_OBJECT
+public:
+    explicit SettingsDialog(QWidget* parent = nullptr);
+
+    // Liest alle Werte aus SettingsProvider in die UI-Steuerelemente
+    void loadFromSettings();
+
+    // Speichert alle Änderungen aus der UI zurück in SettingsProvider und INI
+    void saveToSettings();
+
+private:
+    QTabWidget* m_tabWidget;
+
+    // UI-Controls (Member für den Zugriff beim Speichern/Laden)
+    // Programm & System
+    class QComboBox* m_comboLanguage;
+    class QComboBox* m_comboDeleteConfirmation;
+    class QComboBox* m_comboSingleInstance;
+    class QComboBox* m_comboCpuType;
+    class QSpinBox*  m_spinCpuCores;
+    class QSpinBox*  m_spinCacheRange;
+    class QComboBox* m_comboIniEditor;
+    class QLineEdit* m_editCustomIniEditor;
+    class QCheckBox* m_checkStoreToExe;
+
+    // Fenster & Verhalten
+    class QComboBox* m_comboShowFullScreen;
+    class QCheckBox* m_checkSingleFullScreenInstance;
+    class QComboBox* m_comboDefaultWindowRect;
+    class QSpinBox*  m_spinMinWidth;
+    class QSpinBox*  m_spinMinHeight;
+    class QCheckBox* m_checkWindowBorderless;
+    class QCheckBox* m_checkWindowAlwaysOnTop;
+    class QCheckBox* m_checkShowFilePathInTitle;
+    class QCheckBox* m_checkTitleBarUseFileIcon;
+    class QSpinBox*  m_spinDisplayMonitor;
+
+    // Erscheinungsbild & GUI
+    class QLineEdit* m_editDefaultGuiFont;
+    class QLineEdit* m_editZoomFactorFont;
+    class QPushButton* m_btnBgColor;
+    class QPushButton* m_btnGuiColor;
+    class QPushButton* m_btnTransColor;
+    class QComboBox* m_comboTransparencyMode;
+    QColor m_colorBg;
+    QColor m_colorGui;
+    QColor m_colorTrans;
+
+    // Navigation
+    class QComboBox* m_comboFileDisplayOrder;
+    class QCheckBox* m_checkFileSortAscending;
+    class QComboBox* m_comboFolderNavigation;
+    class QCheckBox* m_checkWrapAroundFolder;
+    class QCheckBox* m_checkNavigateMouseWheel;
+    class QDoubleSpinBox* m_spinMouseWheelZoomSpeed;
+    class QCheckBox* m_checkExchangeXButtons;
+
+    // Bildanzeige & Zoom
+    class QCheckBox* m_checkReloadWhenImageChanged;
+    class QCheckBox* m_checkHighQualityResampling;
+    class QComboBox* m_comboDownSamplingFilter;
+    class QCheckBox* m_checkAutoRotateExif;
+    class QCheckBox* m_checkUseEmbeddedColorProfiles;
+    class QComboBox* m_comboAutoZoomMode;
+    class QComboBox* m_comboAutoZoomModeFullscreen;
+    class QSpinBox*  m_spinZoomPausePercent;
+    class QSpinBox*  m_spinBookModePageHeight;
+    class QCheckBox* m_checkBookModeLaunchFullscreen;
+    class QCheckBox* m_checkSmoothPanning;
+    class QCheckBox* m_checkSmartPanningKeys;
+
+    // Bildkorrektur
+    class QDoubleSpinBox* m_spinContrast;
+    class QDoubleSpinBox* m_spinGamma;
+    class QDoubleSpinBox* m_spinSaturation;
+    class QCheckBox* m_checkAutoContrastCorrection;
+    class QDoubleSpinBox* m_spinAutoContrastAmount;
+    class QDoubleSpinBox* m_spinAutoBrightnessAmount;
+    class QLineEdit* m_editColorCorrection;
+
+    // Diashow
+    class QSpinBox*  m_spinMaxSlideShowFileListSize;
+    class QComboBox* m_comboSlideShowTransitionEffect;
+    class QSpinBox*  m_spinSlideShowEffectTimeMs;
+    class QCheckBox* m_checkKeepParams;
+
+    // Hilfsmethoden zum Erstellen der Tabs
+    QWidget* createProgramTab();
+    QWidget* createWindowTab();
+    QWidget* createGuiTab();
+    QWidget* createNavigationTab();
+    QWidget* createDisplayTab();
+    QWidget* createCorrectionTab();
+    QWidget* createSlideshowTab();
+
+    void pickColor(QColor& target, QPushButton* button);
+    static void updateButtonColor(QPushButton* button, const QColor& color);
+};
+
 // INI settings
-// All settings are first searched in a file name JPEGView.ini located in User/AppData/Roaming/JPEGView
-// If not found there, the setting is searched in JPEGView.ini located in the EXE path of the application
 class CSettingsProvider
 {
 public:
-    // Singleton instance
     static CSettingsProvider& This();
 
-    // The methods correspond to the INI file settings
+    bool ShowSettingsDialog(QWidget* parent = nullptr);
+
     bool AllowSmoothPanning() const { return m_bSmoothPanning; }
     bool AutoContrastCorrection() const { return m_bAutoContrastCorrection; }
     bool AutoFullScreen() const { return m_bAutoFullScreen; }
@@ -116,20 +218,18 @@ public:
                       Helpers::EAutoZoomMode eAutoZoomMode, Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
                       Helpers::ETransitionEffect eSlideShowTransitionEffect);
 
-private:
+    // Lädt alle INI-Einstellungen erneut ein
+    void ReloadAllSettings();
 
+    friend class SettingsDialog;
+
+private:
     static std::unique_ptr<CSettingsProvider> sm_instance;
 
     // Hilfskonvertierungen für ursprüngliche Typen (MFC / Win32 Kompatibilität)
-    static COLORREF ToColorref(const QColor& c) {
-        return RGB(c.red(), c.green(), c.blue());
-    }
-    static CRect ToCRect(const QRect& r) {
-        return CRect(r.left(), r.top(), r.right(), r.bottom());
-    }
-    static CSize ToCSize(const QSize& s) {
-        return CSize(s.width(), s.height());
-    }
+    static COLORREF ToColorref(const QColor& c) { return RGB(c.red(), c.green(), c.blue()); }
+    static CRect ToCRect(const QRect& r) { return CRect(r.left(), r.top(), r.right(), r.bottom()); }
+    static CSize ToCSize(const QSize& s) { return CSize(s.width(), s.height()); }
 
     QString m_sEXEPath;
     QString m_sIniNameGlobal;
@@ -149,6 +249,7 @@ private:
     QString m_sLanguage;
     Helpers::CPUType m_eCPUAlgorithm;
     int m_nNumCores{1};
+    int m_nNumCoresIni{0};
     EFilterType m_eDownsamplingFilter;
     Helpers::ESorting m_eSorting;
     bool m_bIsSortedAscending{true};

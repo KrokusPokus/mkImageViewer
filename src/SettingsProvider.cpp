@@ -1,11 +1,26 @@
 #include "SettingsProvider.h"
 
-//#include <QCoreApplication>
+#include <QApplication>
+#include <QCheckBox>
+#include <QColorDialog>
+#include <QComboBox>
+#include <QDialogButtonBox>
 #include <QDir>
+#include <QDoubleSpinBox>
 #include <QFileInfo>
-#include <QStandardPaths>
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QLocale>
+#include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
-#include <QStringTokenizer>
+#include <QSpinBox>
+#include <QStandardPaths>
+#include <QTabWidget>
+#include <QVBoxLayout>
 
 #include <thread>    // Needed for std::thread::hardware_concurrency()
 #include <algorithm>
@@ -22,6 +37,539 @@ CSettingsProvider& CSettingsProvider::This() {
         sm_instance.reset(new CSettingsProvider());
     }
     return *sm_instance;
+}
+
+bool CSettingsProvider::ShowSettingsDialog(QWidget* parent) {
+    // Prüfen, ob bereits eine QApplication oder QCoreApplication existiert.
+    // Falls nicht, wird sie hier lokal für die Dauer des Dialogs erstellt.
+    int argc = 0;
+    char* argv[] = { nullptr };
+    std::unique_ptr<QApplication> localApp;
+
+    if (!qApp) {
+        localApp = std::make_unique<QApplication>(argc, argv);
+    }
+	
+    SettingsDialog dlg(parent);
+    dlg.loadFromSettings();
+    if (dlg.exec() == QDialog::Accepted) {
+        dlg.saveToSettings();
+        ReloadAllSettings();
+        return true;
+    }
+    return false;
+}
+
+void CSettingsProvider::ReloadAllSettings() {
+    ReadWriteableINISettings();
+}
+
+// ============================================================================
+// SETTINGS DIALOG IMPLEMENTATION
+// ============================================================================
+
+SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
+    setWindowTitle(tr("JPEGView - Einstellungen"));
+    resize(750, 580);
+
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    m_tabWidget = new QTabWidget(this);
+
+    m_tabWidget->addTab(createProgramTab(), tr("Programm && System"));
+    m_tabWidget->addTab(createWindowTab(), tr("Fenster && Verhalten"));
+    m_tabWidget->addTab(createGuiTab(), tr("Erscheinungsbild && GUI"));
+    m_tabWidget->addTab(createNavigationTab(), tr("Datei-Navigation"));
+    m_tabWidget->addTab(createDisplayTab(), tr("Bildanzeige && Zoom"));
+    m_tabWidget->addTab(createCorrectionTab(), tr("Korrektur && Farbe"));
+    m_tabWidget->addTab(createSlideshowTab(), tr("Diashow"));
+
+    mainLayout->addWidget(m_tabWidget);
+
+    QDialogButtonBox* buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    mainLayout->addWidget(buttonBox);
+}
+
+// Helper: Scrollbereich um jeden Tab legen für kleine Bildschirmauflösungen
+static QWidget* makeScrollable(QWidget* content) {
+    QScrollArea* area = new QScrollArea();
+    area->setWidgetResizable(true);
+    area->setFrameShape(QFrame::NoFrame);
+    area->setWidget(content);
+    return area;
+}
+
+// ----------------------------------------------------------------------------
+// TAB 1: Programm & System
+// ----------------------------------------------------------------------------
+QWidget* SettingsDialog::createProgramTab() {
+    QWidget* panel = new QWidget();
+    QFormLayout* layout = new QFormLayout(panel);
+
+    m_comboLanguage = new QComboBox();
+    m_comboLanguage->addItems({"auto", "en", "de", "fr", "es", "it", "ja", "zh"});
+    m_comboLanguage->setToolTip(tr("Sprache der Benutzeroberfläche ('auto' nutzt Systemsprache)."));
+    layout->addRow(tr("Sprache (Language):"), m_comboLanguage);
+
+    m_comboDeleteConfirmation = new QComboBox();
+    m_comboDeleteConfirmation->addItems({"Always", "OnlyWhenNoRecycleBin", "Never"});
+    m_comboDeleteConfirmation->setToolTip(tr("Bestätigungstyp beim Löschen von Dateien."));
+    layout->addRow(tr("Lösch-Bestätigung:"), m_comboDeleteConfirmation);
+
+    m_comboSingleInstance = new QComboBox();
+    m_comboSingleInstance->addItems({"Never", "PerFolder", "Always"});
+    m_comboSingleInstance->setToolTip(tr("Begrenzt parallele JPEGView-Instanzen."));
+    layout->addRow(tr("Einzelne Instanz erzwingen:"), m_comboSingleInstance);
+
+    m_comboCpuType = new QComboBox();
+    m_comboCpuType->addItems({"AutoDetect", "Generic", "MMX", "SSE", "AVX2"});
+    m_comboCpuType->setToolTip(tr("CPU Befehlssatz-Erweiterung auswählen."));
+    layout->addRow(tr("CPU-Typ:"), m_comboCpuType);
+
+    m_spinCpuCores = new QSpinBox();
+    m_spinCpuCores->setRange(0, 128);
+    m_spinCpuCores->setToolTip(tr("Anzahl zu nutzender CPU-Threads (0 = Auto-Erkennung, max 8)."));
+    layout->addRow(tr("CPU-Kerne (0 = Auto):"), m_spinCpuCores);
+
+    m_spinCacheRange = new QSpinBox();
+    m_spinCacheRange->setRange(0, 8);
+    m_spinCacheRange->setToolTip(tr("Cache-Reichweite in der Dateiliste (Seiten vor/zurück)."));
+    layout->addRow(tr("Cache-Reichweite:"), m_spinCacheRange);
+
+    m_comboIniEditor = new QComboBox();
+    m_comboIniEditor->addItems({"notepad", "system", "custom"});
+    m_comboIniEditor->setToolTip(tr("Editor für INI-Dateien."));
+    layout->addRow(tr("INI-Editor:"), m_comboIniEditor);
+
+    m_editCustomIniEditor = new QLineEdit();
+    m_editCustomIniEditor->setPlaceholderText(tr("Pfad zu benutzerdefiniertem Editor..."));
+    layout->addRow(tr("Benutzerdefinierter Editor:"), m_editCustomIniEditor);
+
+    m_checkStoreToExe = new QCheckBox(tr("Einstellungen im EXE-Pfad speichern (StoreToEXEPath)"));
+    m_checkStoreToExe->setToolTip(tr("Aktivieren für USB-Sticks (nicht in 'Program Files' nutzen!)."));
+    layout->addRow(m_checkStoreToExe);
+
+    return makeScrollable(panel);
+}
+
+// ----------------------------------------------------------------------------
+// TAB 2: Fenster & Verhalten
+// ----------------------------------------------------------------------------
+QWidget* SettingsDialog::createWindowTab() {
+    QWidget* panel = new QWidget();
+    QFormLayout* layout = new QFormLayout(panel);
+
+    m_comboShowFullScreen = new QComboBox();
+    m_comboShowFullScreen->addItems({"false", "true", "auto"});
+    m_comboShowFullScreen->setToolTip(tr("Vollbildmodus beim Starten ('auto' wählt modus nach Bildgröße)."));
+    layout->addRow(tr("Start im Vollbild:"), m_comboShowFullScreen);
+
+    m_checkSingleFullScreenInstance = new QCheckBox(tr("Nur eine Vollbild-Instanz erlauben"));
+    layout->addRow(m_checkSingleFullScreenInstance);
+
+    m_comboDefaultWindowRect = new QComboBox();
+    m_comboDefaultWindowRect->addItems({"sticky", "auto", "max", "image"});
+    m_comboDefaultWindowRect->setToolTip(tr("Standardposition und -größe im Fenster-Modus."));
+    layout->addRow(tr("Fenstergröße beim Start:"), m_comboDefaultWindowRect);
+
+    QHBoxLayout* minSizeLayout = new QHBoxLayout();
+    m_spinMinWidth = new QSpinBox();
+    m_spinMinWidth->setRange(100, 3840);
+    m_spinMinHeight = new QSpinBox();
+    m_spinMinHeight->setRange(100, 2160);
+    minSizeLayout->addWidget(new QLabel(tr("Breite:")));
+    minSizeLayout->addWidget(m_spinMinWidth);
+    minSizeLayout->addWidget(new QLabel(tr("Höhe:")));
+    minSizeLayout->addWidget(m_spinMinHeight);
+    layout->addRow(tr("Minimale Fenstergröße:"), minSizeLayout);
+
+    m_checkWindowBorderless = new QCheckBox(tr("Start in rahmenlosem Fenster (Borderless)"));
+    layout->addRow(m_checkWindowBorderless);
+
+    m_checkWindowAlwaysOnTop = new QCheckBox(tr("Start als Immer-im-Vordergrund (Always-On-Top)"));
+    layout->addRow(m_checkWindowAlwaysOnTop);
+
+    m_checkShowFilePathInTitle = new QCheckBox(tr("Vollständigen Dateipfad in Titelleiste anzeigen"));
+    layout->addRow(m_checkShowFilePathInTitle);
+
+    m_checkTitleBarUseFileIcon = new QCheckBox(tr("Dateityp-Icon in der Titelleiste nutzen"));
+    layout->addRow(m_checkTitleBarUseFileIcon);
+
+    m_spinDisplayMonitor = new QSpinBox();
+    m_spinDisplayMonitor->setRange(-1, 16);
+    m_spinDisplayMonitor->setToolTip(tr("-1 = Größte Auflösung, 0 = Primär, 1..n = Monitor Index"));
+    layout->addRow(tr("Start-Monitor Index:"), m_spinDisplayMonitor);
+
+    return makeScrollable(panel);
+}
+
+// ----------------------------------------------------------------------------
+// TAB 3: Erscheinungsbild & GUI
+// ----------------------------------------------------------------------------
+QWidget* SettingsDialog::createGuiTab() {
+    QWidget* panel = new QWidget();
+    QFormLayout* layout = new QFormLayout(panel);
+
+    m_editDefaultGuiFont = new QLineEdit();
+    m_editDefaultGuiFont->setToolTip(tr("Format: \"font name\" fontSize [bold], z.B. \"Arial\" 9.0 bold"));
+    layout->addRow(tr("GUI Schriftart:"), m_editDefaultGuiFont);
+
+    m_editZoomFactorFont = new QLineEdit();
+    layout->addRow(tr("Zoomfaktor Schriftart:"), m_editZoomFactorFont);
+
+    m_btnBgColor = new QPushButton();
+    connect(m_btnBgColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorBg, m_btnBgColor); });
+    layout->addRow(tr("Hintergrundfarbe:"), m_btnBgColor);
+
+    m_btnGuiColor = new QPushButton();
+    connect(m_btnGuiColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorGui, m_btnGuiColor); });
+    layout->addRow(tr("GUI Farbe:"), m_btnGuiColor);
+
+    m_btnTransColor = new QPushButton();
+    connect(m_btnTransColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorTrans, m_btnTransColor); });
+    layout->addRow(tr("Transparenzfarbe:"), m_btnTransColor);
+
+    m_comboTransparencyMode = new QComboBox();
+    m_comboTransparencyMode->addItems({"Checkerboard", "Blend", "BlendInverse"});
+    layout->addRow(tr("Transparenzmodus:"), m_comboTransparencyMode);
+
+    return makeScrollable(panel);
+}
+
+// ----------------------------------------------------------------------------
+// TAB 4: Datei-Navigation
+// ----------------------------------------------------------------------------
+QWidget* SettingsDialog::createNavigationTab() {
+    QWidget* panel = new QWidget();
+    QFormLayout* layout = new QFormLayout(panel);
+
+    m_comboFileDisplayOrder = new QComboBox();
+    m_comboFileDisplayOrder->addItems({"FileName", "LastModDate", "FileSize", "Random"});
+    layout->addRow(tr("Sortierung der Dateien:"), m_comboFileDisplayOrder);
+
+    m_checkFileSortAscending = new QCheckBox(tr("Aufsteigend sortieren (FileSortAscending)"));
+    layout->addRow(m_checkFileSortAscending);
+
+    m_comboFolderNavigation = new QComboBox();
+    m_comboFolderNavigation->addItems({"LoopFolder", "LoopSameFolderLevel", "LoopSubFolders"});
+    layout->addRow(tr("Ordner-Navigation:"), m_comboFolderNavigation);
+
+    m_checkWrapAroundFolder = new QCheckBox(tr("Am Ordnerende zum Anfang springen (WrapAroundFolder)"));
+    layout->addRow(m_checkWrapAroundFolder);
+
+    m_checkNavigateMouseWheel = new QCheckBox(tr("Mausrad zur Ordner-Navigation nutzen"));
+    layout->addRow(m_checkNavigateMouseWheel);
+
+    m_spinMouseWheelZoomSpeed = new QDoubleSpinBox();
+    m_spinMouseWheelZoomSpeed->setRange(0.1, 10.0);
+    m_spinMouseWheelZoomSpeed->setSingleStep(0.1);
+    layout->addRow(tr("Mausrad-Zoom-Geschwindigkeit:"), m_spinMouseWheelZoomSpeed);
+
+    m_checkExchangeXButtons = new QCheckBox(tr("Erweiterte Maustasten umkehren (Vor/Zurück)"));
+    layout->addRow(m_checkExchangeXButtons);
+
+    return makeScrollable(panel);
+}
+
+// ----------------------------------------------------------------------------
+// TAB 5: Bildanzeige & Zoom
+// ----------------------------------------------------------------------------
+QWidget* SettingsDialog::createDisplayTab() {
+    QWidget* panel = new QWidget();
+    QFormLayout* layout = new QFormLayout(panel);
+
+    m_checkReloadWhenImageChanged = new QCheckBox(tr("Bild neu laden wenn es extern geändert wird"));
+    layout->addRow(m_checkReloadWhenImageChanged);
+
+    m_checkHighQualityResampling = new QCheckBox(tr("Hohe Qualität beim Resampling (HQRS)"));
+    layout->addRow(m_checkHighQualityResampling);
+
+    m_comboDownSamplingFilter = new QComboBox();
+    m_comboDownSamplingFilter->addItems({"None", "Hermite", "Mitchell", "Catrom", "Lanczos2"});
+    layout->addRow(tr("Downsampling-Filter:"), m_comboDownSamplingFilter);
+
+    m_checkAutoRotateExif = new QCheckBox(tr("Bilder automatisch nach EXIF drehen"));
+    layout->addRow(m_checkAutoRotateExif);
+
+    m_checkUseEmbeddedColorProfiles = new QCheckBox(tr("Eingebettete ICC-Farbprofile anwenden"));
+    layout->addRow(m_checkUseEmbeddedColorProfiles);
+
+    m_comboAutoZoomMode = new QComboBox();
+    m_comboAutoZoomMode->addItems({"Fit", "FitNoZoom", "Fill", "FillNoZoom", "BookMode", "None"});
+    layout->addRow(tr("Auto-Zoom (Fenstermodus):"), m_comboAutoZoomMode);
+
+    m_comboAutoZoomModeFullscreen = new QComboBox();
+    m_comboAutoZoomModeFullscreen->addItems({"Fit", "FitNoZoom", "Fill", "FillNoZoom", "BookMode", "None"});
+    layout->addRow(tr("Auto-Zoom (Vollbildmodus):"), m_comboAutoZoomModeFullscreen);
+
+    m_spinZoomPausePercent = new QSpinBox();
+    m_spinZoomPausePercent->setRange(0, 10000);
+    m_spinZoomPausePercent->setSuffix(" %");
+    m_spinZoomPausePercent->setToolTip(tr("Pause beim kontinuierlichen Zoomen bei diesem Prozentwert (0 = Deaktivieren)."));
+    layout->addRow(tr("Zoom-Pause bei:"), m_spinZoomPausePercent);
+
+    m_spinBookModePageHeight = new QSpinBox();
+    m_spinBookModePageHeight->setRange(100, 1000);
+    m_spinBookModePageHeight->setSuffix(" %");
+    layout->addRow(tr("Buchmodus Seitenhöhe:"), m_spinBookModePageHeight);
+
+    m_checkBookModeLaunchFullscreen = new QCheckBox(tr("Comic/Buch-Dateien im Vollbild starten"));
+    layout->addRow(m_checkBookModeLaunchFullscreen);
+
+    m_checkSmoothPanning = new QCheckBox(tr("Weiches Schwenken erlauben (SmoothPanning)"));
+    layout->addRow(m_checkSmoothPanning);
+
+    m_checkSmartPanningKeys = new QCheckBox(tr("Pfeiltasten navigieren wenn Schwenken nicht möglich"));
+    layout->addRow(m_checkSmartPanningKeys);
+
+    return makeScrollable(panel);
+}
+
+// ----------------------------------------------------------------------------
+// TAB 6: Korrektur & Farbe
+// ----------------------------------------------------------------------------
+QWidget* SettingsDialog::createCorrectionTab() {
+    QWidget* panel = new QWidget();
+    QFormLayout* layout = new QFormLayout(panel);
+
+    m_spinContrast = new QDoubleSpinBox();
+    m_spinContrast->setRange(-0.5, 0.5);
+    m_spinContrast->setSingleStep(0.05);
+    layout->addRow(tr("Kontrast (-0.5 .. 0.5):"), m_spinContrast);
+
+    m_spinGamma = new QDoubleSpinBox();
+    m_spinGamma->setRange(0.1, 10.0);
+    m_spinGamma->setSingleStep(0.1);
+    layout->addRow(tr("Gamma (0.1 .. 10.0):"), m_spinGamma);
+
+    m_spinSaturation = new QDoubleSpinBox();
+    m_spinSaturation->setRange(0.0, 2.0);
+    m_spinSaturation->setSingleStep(0.1);
+    layout->addRow(tr("Sättigung (0.0 .. 2.0):"), m_spinSaturation);
+
+    m_checkAutoContrastCorrection = new QCheckBox(tr("Automatische Kontrastkorrektur aktivieren"));
+    layout->addRow(m_checkAutoContrastCorrection);
+
+    m_spinAutoContrastAmount = new QDoubleSpinBox();
+    m_spinAutoContrastAmount->setRange(0.0, 1.0);
+    m_spinAutoContrastAmount->setSingleStep(0.05);
+    layout->addRow(tr("Auto-Kontrast Stärke:"), m_spinAutoContrastAmount);
+
+    m_spinAutoBrightnessAmount = new QDoubleSpinBox();
+    m_spinAutoBrightnessAmount->setRange(0.0, 1.0);
+    m_spinAutoBrightnessAmount->setSingleStep(0.05);
+    layout->addRow(tr("Auto-Helligkeit Stärke:"), m_spinAutoBrightnessAmount);
+
+    m_editColorCorrection = new QLineEdit();
+    m_editColorCorrection->setToolTip(tr("Format: R: 0.2 G: 0.1 B: 0.35 C: 0.1 M: 0.3 Y: 0.15"));
+    layout->addRow(tr("Farbkanalkorrektur:"), m_editColorCorrection);
+
+    return makeScrollable(panel);
+}
+
+// ----------------------------------------------------------------------------
+// TAB 7: Diashow
+// ----------------------------------------------------------------------------
+QWidget* SettingsDialog::createSlideshowTab() {
+    QWidget* panel = new QWidget();
+    QFormLayout* layout = new QFormLayout(panel);
+
+    m_spinMaxSlideShowFileListSize = new QSpinBox();
+    m_spinMaxSlideShowFileListSize->setRange(100, 10000);
+    m_spinMaxSlideShowFileListSize->setSuffix(" KB");
+    layout->addRow(tr("Max. Dateilistengröße:"), m_spinMaxSlideShowFileListSize);
+
+    m_comboSlideShowTransitionEffect = new QComboBox();
+    m_comboSlideShowTransitionEffect->addItems({
+        "None", "Blend", "SlideRL", "SlideLR", "SlideTB", "SlideBT",
+        "RollRL", "RollLR", "RollTB", "RollBT", "ScrollRL", "ScrollLR", "ScrollTB", "ScrollBT"
+    });
+    layout->addRow(tr("Übergangseffekt:"), m_comboSlideShowTransitionEffect);
+
+    m_spinSlideShowEffectTimeMs = new QSpinBox();
+    m_spinSlideShowEffectTimeMs->setRange(100, 5000);
+    m_spinSlideShowEffectTimeMs->setSuffix(" ms");
+    layout->addRow(tr("Effektdauer:"), m_spinSlideShowEffectTimeMs);
+
+    m_checkKeepParams = new QCheckBox(tr("Parameter beim Bildwechsel beibehalten (KeepParameters)"));
+    layout->addRow(m_checkKeepParams);
+
+    return makeScrollable(panel);
+}
+
+void SettingsDialog::pickColor(QColor& target, QPushButton* button) {
+    QColor c = QColorDialog::getColor(target, this, tr("Farbe auswählen"));
+    if (c.isValid()) {
+        target = c;
+        updateButtonColor(button, target);
+    }
+}
+
+void SettingsDialog::updateButtonColor(QPushButton* button, const QColor& color) {
+    button->setText(color.name());
+    button->setStyleSheet(QString("background-color: %1; color: %2;")
+    .arg(color.name())
+    .arg((color.lightness() < 128) ? "#FFFFFF" : "#000000"));
+}
+
+void SettingsDialog::loadFromSettings() {
+    CSettingsProvider& settings = CSettingsProvider::This();
+
+    // Tab 1
+    m_comboLanguage->setCurrentText(settings.m_sLanguage);
+    m_comboDeleteConfirmation->setCurrentIndex(static_cast<int>(settings.m_eDeleteConfirmation));
+    m_comboSingleInstance->setCurrentIndex(static_cast<int>(settings.m_eSingleInstanceMode));
+    m_spinCpuCores->setValue(settings.m_nNumCoresIni);
+    m_spinCacheRange->setValue(settings.m_nCacheRange);
+    m_comboIniEditor->setCurrentIndex(static_cast<int>(settings.m_eIniEditor));
+    m_editCustomIniEditor->setText(settings.m_sIniEditor);
+    m_checkStoreToExe->setChecked(settings.m_bStoreToEXEPath);
+
+    // Tab 2
+    m_comboShowFullScreen->setCurrentText(settings.m_bAutoFullScreen ? "auto" : (settings.m_bShowFullScreen ? "true" : "false"));
+    m_checkSingleFullScreenInstance->setChecked(settings.m_bSingleFullScreenInstance);
+    m_spinMinWidth->setValue(settings.m_minimalWindowSize.width());
+    m_spinMinHeight->setValue(settings.m_minimalWindowSize.height());
+    m_checkWindowBorderless->setChecked(settings.m_bWindowBorderlessOnStartup);
+    m_checkWindowAlwaysOnTop->setChecked(settings.m_bWindowAlwaysOnTopOnStartup);
+    m_checkShowFilePathInTitle->setChecked(settings.m_bShowFullPathInTitle);
+    m_checkTitleBarUseFileIcon->setChecked(settings.m_bTitleBarUseFileIcon);
+    m_spinDisplayMonitor->setValue(settings.m_nDisplayMonitor);
+
+    // Tab 3
+    m_editDefaultGuiFont->setText(settings.m_defaultGUIFont);
+    m_editZoomFactorFont->setText(settings.m_zoomFactorFont);
+    m_colorBg = settings.m_colorBackground;
+    m_colorGui = settings.m_colorGUI;
+    m_colorTrans = settings.m_colorTransparency;
+    updateButtonColor(m_btnBgColor, m_colorBg);
+    updateButtonColor(m_btnGuiColor, m_colorGui);
+    updateButtonColor(m_btnTransColor, m_colorTrans);
+
+    // Tab 4
+    m_comboFileDisplayOrder->setCurrentIndex(static_cast<int>(settings.m_eSorting));
+    m_checkFileSortAscending->setChecked(settings.m_bIsSortedAscending);
+    m_comboFolderNavigation->setCurrentIndex(static_cast<int>(settings.m_eNavigation));
+    m_checkWrapAroundFolder->setChecked(settings.m_bWrapAroundFolder);
+    m_checkNavigateMouseWheel->setChecked(settings.m_bNavigateMouseWheel);
+    m_spinMouseWheelZoomSpeed->setValue(settings.m_dMouseWheelZoomSpeed);
+    m_checkExchangeXButtons->setChecked(settings.m_bExchangeXButtons);
+
+    // Tab 5
+    m_checkReloadWhenImageChanged->setChecked(settings.m_bReloadWhenDisplayedImageChanged);
+    m_checkHighQualityResampling->setChecked(settings.m_bHQRS);
+    m_comboDownSamplingFilter->setCurrentIndex(static_cast<int>(settings.m_eDownsamplingFilter));
+    m_checkAutoRotateExif->setChecked(settings.m_bAutoRotateEXIF);
+    m_checkUseEmbeddedColorProfiles->setChecked(settings.m_bUseEmbeddedColorProfiles);
+    m_comboAutoZoomMode->setCurrentText(settings.GetAutoZoomModeString(settings.m_eAutoZoomMode));
+    m_comboAutoZoomModeFullscreen->setCurrentText(settings.GetAutoZoomModeString(settings.m_eAutoZoomModeFullscreen));
+    m_spinZoomPausePercent->setValue(static_cast<int>(settings.m_zoomPauseFactor * 100));
+    m_spinBookModePageHeight->setValue(settings.m_nBookModePageHeight);
+    m_checkBookModeLaunchFullscreen->setChecked(settings.m_bBookModeLaunchFullscreen);
+    m_checkSmoothPanning->setChecked(settings.m_bSmoothPanning);
+    m_checkSmartPanningKeys->setChecked(settings.m_bSmartPanningKeys);
+
+    // Tab 6
+    m_spinContrast->setValue(settings.m_dContrast);
+    m_spinGamma->setValue(settings.m_dGamma);
+    m_spinSaturation->setValue(settings.m_dSaturation);
+    m_checkAutoContrastCorrection->setChecked(settings.m_bAutoContrastCorrection);
+    m_spinAutoContrastAmount->setValue(settings.m_dAutoContrastAmount);
+    m_spinAutoBrightnessAmount->setValue(settings.m_dAutoBrightnessAmount);
+
+    if (settings.m_fColorCorrections[0] >= 0) {
+        m_editColorCorrection->setText(QString("R: %1 G: %2 B: %3 C: %4 M: %5 Y: %6")
+        .arg(settings.m_fColorCorrections[0])
+        .arg(settings.m_fColorCorrections[1])
+        .arg(settings.m_fColorCorrections[2])
+        .arg(settings.m_fColorCorrections[3])
+        .arg(settings.m_fColorCorrections[4])
+        .arg(settings.m_fColorCorrections[5]));
+    } else {
+        m_editColorCorrection->setText("");
+    }
+
+    // Tab 7
+    m_spinMaxSlideShowFileListSize->setValue(settings.m_nMaxSlideShowFileListSize);
+    m_comboSlideShowTransitionEffect->setCurrentText(CSettingsProvider::ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect));
+    m_spinSlideShowEffectTimeMs->setValue(settings.m_nSlideShowEffectTimeMs);
+    m_checkKeepParams->setChecked(settings.m_bKeepParams);
+}
+
+void SettingsDialog::saveToSettings() {
+    CSettingsProvider& settings = CSettingsProvider::This();
+
+    // Tab 1
+    settings.WriteString("Language", m_comboLanguage->currentText());
+    settings.WriteString("DeleteConfirmation", m_comboDeleteConfirmation->currentText());
+    settings.WriteString("SingleInstance", m_comboSingleInstance->currentText());
+    settings.WriteString("CPUType", m_comboCpuType->currentText());
+    settings.WriteInt("CPUCoresUsed", m_spinCpuCores->value());
+    settings.WriteInt("CacheRange", m_spinCacheRange->value());
+    settings.WriteString("IniEditor", m_comboIniEditor->currentText());
+    if (m_comboIniEditor->currentText() == "custom") {
+        settings.WriteString("IniEditor", m_editCustomIniEditor->text());
+    }
+    settings.WriteBool("StoreToEXEPath", m_checkStoreToExe->isChecked());
+
+    // Tab 2
+    settings.WriteString("ShowFullScreen", m_comboShowFullScreen->currentText());
+    settings.WriteBool("SingleFullScreenInstance", m_checkSingleFullScreenInstance->isChecked());
+    settings.WriteString("DefaultWindowRect", m_comboDefaultWindowRect->currentText());
+    settings.WriteString("MinimalWindowSize", QString("%1 %2").arg(m_spinMinWidth->value()).arg(m_spinMinHeight->value()));
+    settings.WriteBool("WindowBorderlessOnStartup", m_checkWindowBorderless->isChecked());
+    settings.WriteBool("WindowAlwaysOnTopOnStartup", m_checkWindowAlwaysOnTop->isChecked());
+    settings.WriteBool("ShowFilePathInTitle", m_checkShowFilePathInTitle->isChecked());
+    settings.WriteBool("TitleBarUseFileIcon", m_checkTitleBarUseFileIcon->isChecked());
+    settings.WriteInt("DisplayMonitor", m_spinDisplayMonitor->value());
+
+    // Tab 3
+    settings.WriteString("DefaultGUIFont", m_editDefaultGuiFont->text());
+    settings.WriteString("ZoomFactorFont", m_editZoomFactorFont->text());
+    settings.WriteString("BackgroundColor", QString("%1 %2 %3").arg(m_colorBg.red()).arg(m_colorBg.green()).arg(m_colorBg.blue()));
+    settings.WriteString("GUIColor", QString("%1 %2 %3").arg(m_colorGui.red()).arg(m_colorGui.green()).arg(m_colorGui.blue()));
+    settings.WriteString("TransparencyColor", QString("%1 %2 %3").arg(m_colorTrans.red()).arg(m_colorTrans.green()).arg(m_colorTrans.blue()));
+    settings.WriteString("TransparencyMode", m_comboTransparencyMode->currentText());
+
+    // Tab 4
+    settings.WriteString("FileDisplayOrder", m_comboFileDisplayOrder->currentText());
+    settings.WriteBool("FileSortAscending", m_checkFileSortAscending->isChecked());
+    settings.WriteString("FolderNavigation", m_comboFolderNavigation->currentText());
+    settings.WriteBool("WrapAroundFolder", m_checkWrapAroundFolder->isChecked());
+    settings.WriteBool("NavigateWithMouseWheel", m_checkNavigateMouseWheel->isChecked());
+    settings.WriteDouble("MouseWheelZoomSpeed", m_spinMouseWheelZoomSpeed->value());
+    settings.WriteBool("ExchangeXButtons", m_checkExchangeXButtons->isChecked());
+
+    // Tab 5
+    settings.WriteBool("ReloadWhenDisplayedImageChanged", m_checkReloadWhenImageChanged->isChecked());
+    settings.WriteBool("HighQualityResampling", m_checkHighQualityResampling->isChecked());
+    settings.WriteString("DownSamplingFilter", m_comboDownSamplingFilter->currentText());
+    settings.WriteBool("AutoRotateEXIF", m_checkAutoRotateExif->isChecked());
+    settings.WriteBool("UseEmbeddedColorProfiles", m_checkUseEmbeddedColorProfiles->isChecked());
+    settings.WriteString("AutoZoomMode", m_comboAutoZoomMode->currentText());
+    settings.WriteString("AutoZoomModeFullscreen", m_comboAutoZoomModeFullscreen->currentText());
+    settings.WriteInt("ZoomPausePercent", m_spinZoomPausePercent->value());
+    settings.WriteInt("BookModePageHeight", m_spinBookModePageHeight->value());
+    settings.WriteBool("BookModeLaunchFullscreen", m_checkBookModeLaunchFullscreen->isChecked());
+    settings.WriteBool("SmoothPanning", m_checkSmoothPanning->isChecked());
+    settings.WriteBool("SmartPanningKeys", m_checkSmartPanningKeys->isChecked());
+
+    // Tab 6
+    settings.WriteDouble("Contrast", m_spinContrast->value());
+    settings.WriteDouble("Gamma", m_spinGamma->value());
+    settings.WriteDouble("Saturation", m_spinSaturation->value());
+    settings.WriteBool("AutoContrastCorrection", m_checkAutoContrastCorrection->isChecked());
+    settings.WriteDouble("AutoContrastCorrectionAmount", m_spinAutoContrastAmount->value());
+    settings.WriteDouble("AutoBrightnessCorrectionAmount", m_spinAutoBrightnessAmount->value());
+    settings.WriteString("ColorCorrection", m_editColorCorrection->text());
+
+    // Tab 7
+    settings.WriteInt("MaxSlideShowFileListSizeKB", m_spinMaxSlideShowFileListSize->value());
+    settings.WriteString("SlideShowTransitionEffect", m_comboSlideShowTransitionEffect->currentText());
+    settings.WriteInt("SlideShowEffectTime", m_spinSlideShowEffectTimeMs->value());
+    settings.WriteBool("KeepParameters", m_checkKeepParams->isChecked());
 }
 
 float* CSettingsProvider::ColorCorrectionAmounts() { 
@@ -99,14 +647,17 @@ CSettingsProvider::CSettingsProvider() {
         m_eCPUAlgorithm = Helpers::ProbeCPU();
     }
 
-    m_nNumCores = GetInt("CPUCoresUsed", 0, 0, 128);
-    if (m_nNumCores == 0) {
+    m_nNumCoresIni = GetInt("CPUCoresUsed", 0, 0, 128);
+
+    if (m_nNumCoresIni == 0) {
         m_nNumCores = static_cast<int>(std::thread::hardware_concurrency());
         m_nNumCores = std::clamp(m_nNumCores, 1, 8);
         // Limiting to 8 cores, since benchmarks suggest performance improvements start to flatline around that point.
         // Performance can even become worse: 16 threads on 16 thread CPU performing worse than running just 14 threads. Or 8 threads, for that matter.
         // People can still try to use more cores by specifying a non-zero number for "CPUCoresUsed",
-        // but I advise to do some benchmarking in this case to make sure you aren't actually shooting yourself in the foot.        
+        // but I advise to do some benchmarking in this case to make sure you aren't actually shooting yourself in the foot.
+    } else {
+        m_nNumCores = m_nNumCoresIni;
     }
 
     QString sDownSampling = GetString("DownSamplingFilter", "Catrom");
@@ -202,7 +753,7 @@ CSettingsProvider::CSettingsProvider() {
 
     m_bReloadWhenDisplayedImageChanged = GetBool("ReloadWhenDisplayedImageChanged", true);
 
-    m_sIniEditor = GetString("IniEditor", "notepad");
+    m_sIniEditor = GetString("IniEditor", "system");
     if (m_sIniEditor.compare("notepad", Qt::CaseInsensitive) == 0) {
         m_eIniEditor = Helpers::INI_Notepad;
     } else if (m_sIniEditor.compare("system", Qt::CaseInsensitive) == 0) {
@@ -264,17 +815,15 @@ void CSettingsProvider::ReadWriteableINISettings() {
         m_eNavigation = Helpers::NM_LoopDirectory;
     }
 
-    QString sSorting = GetString("FileDisplayOrder", "LastModDate");
-    if (sSorting.compare("CreationDate", Qt::CaseInsensitive) == 0) {
-        m_eSorting = Helpers::FS_CreationTime;
-    } else if (sSorting.compare("FileName", Qt::CaseInsensitive) == 0) {
-        m_eSorting = Helpers::FS_FileName;
+    QString sSorting = GetString("FileDisplayOrder", "FileName");
+    if (sSorting.compare("LastModDate", Qt::CaseInsensitive) == 0) {
+        m_eSorting = Helpers::FS_LastModTime;
     } else if (sSorting.compare("Random", Qt::CaseInsensitive) == 0) {
         m_eSorting = Helpers::FS_Random;
     } else if (sSorting.compare("FileSize", Qt::CaseInsensitive) == 0) {
         m_eSorting = Helpers::FS_FileSize;
     } else {
-        m_eSorting = Helpers::FS_LastModTime;
+        m_eSorting = Helpers::FS_FileName;
     }
 
     m_bIsSortedAscending = GetBool("FileSortAscending", true);
@@ -323,15 +872,14 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
     WriteString("FolderNavigation", sNavigation);
 
     QString sSorting = "FileName";
-    if (eFileSorting == Helpers::FS_CreationTime) {
-        sSorting = "CreationDate";
-    } else if (eFileSorting == Helpers::FS_LastModTime) {
+    if (eFileSorting == Helpers::FS_LastModTime) {
         sSorting = "LastModDate";
-    } else if (eFileSorting == Helpers::FS_Random) {
-        sSorting = "Random";
     } else if (eFileSorting == Helpers::FS_FileSize) {
         sSorting = "FileSize";
+    } else if (eFileSorting == Helpers::FS_Random) {
+        sSorting = "Random";
     }
+
     WriteString("FileDisplayOrder", sSorting);
 
     WriteBool("FileSortAscending", isSortedAscending);
@@ -543,7 +1091,15 @@ void CSettingsProvider::WriteString(const QString& sKey, const QString& sString)
 }
 
 void CSettingsProvider::WriteDouble(const QString& sKey, double dValue) {
-    WriteString(sKey, QString::number(dValue, 'f', 2));
+    // 'g' entfernt trailing zeroes. 15 ist die Standard-Präzision für double.
+    QString sVal = QString::number(dValue, 'g', 15);
+
+    // Falls es eine Ganzzahl ist (kein '.' im String), mindestens eine Null anhängen
+    if (!sVal.contains('.')) {
+        sVal += ".0";
+    }
+
+    WriteString(sKey, sVal);
 }
 
 void CSettingsProvider::WriteBool(const QString& sKey, bool bValue) {

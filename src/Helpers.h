@@ -22,11 +22,10 @@ namespace Helpers {
     // Sorting order of image files
     enum ESorting {
         FS_Undefined = -1,
-        FS_LastModTime,
-        FS_CreationTime,
         FS_FileName,
-        FS_Random,
-        FS_FileSize
+        FS_LastModTime,
+        FS_FileSize,
+        FS_Random
     };
 
     // Navigation mode over directories

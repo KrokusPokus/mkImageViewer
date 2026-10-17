@@ -1585,7 +1585,12 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             this->ShowWindow(SW_MINIMIZE);
             break;
         case IDM_EXPLORE:
+            qDebug() << "IDM_EXPLORE";
             ExploreFile();
+            break;
+        case IDM_SETTINGS_DIALOG:
+            qDebug() << "IDM_SETTINGS_DIALOG";
+            sp.ShowSettingsDialog();
             break;
         case IDM_RELOAD:
             ReloadImage(false);
