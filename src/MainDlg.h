@@ -128,7 +128,7 @@ public:
     bool IsKeepParams() { return m_bKeepParams; }
     int GetRotation() { return m_nRotation; }
     CJPEGImage* GetCurrentImage() { return m_pCurrentImage; }
-    LPCTSTR CurrentFileName(bool bFileTitle);
+    LPCTSTR CurrentFileName(bool bFileNameOnly);
     const CRect& WindowRectOnClose() { return m_windowRectOnClose; } // only valid after having closed the window
     double GetZoomMultiplier(CJPEGImage* pImage, const CRect& clientRect);
     Helpers::EAutoZoomMode GetAutoZoomMode() { return m_bFullScreenMode ? m_eAutoZoomModeFullscreen : m_eAutoZoomModeWindowed; }
@@ -149,8 +149,6 @@ public:
     void DoDragging();
     void EndDragging();
     void SetCursorForMoveSection();
-    //bool ScreenToImage(float & fX, float & fY);
-    //bool ImageToScreen(float & fX, float & fY);
     void ExecuteCommand(int nCommand);
     int TrackPopupMenu(CPoint pos, HMENU hMenu);
     void AdjustWindowToImage(bool bAfterStartup);
@@ -285,9 +283,6 @@ private:
     void AdjustAnimationFrameTime();
     void StopAnimation();
     void ToggleAlwaysOnTop();
-    
-    CString SystemTimeToString(const SYSTEMTIME &time);
-    //CRect ScreenToDIB(const CSize& sizeDIB, const CRect& rect);
 
 /*##################################################################*/
 /* Custom private functions and variables of the linear scaling mod */

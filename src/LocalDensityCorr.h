@@ -23,10 +23,6 @@ public:
     // For JPEG files use the method Helpers::CalculateJPEGFileHash() instead.
     __int64 GetPixelHash() const { return m_nPixelHash; }
 
-    // Get black or white point of image (in grey channel)
-    float GetBlackPt() const { return m_fBlackPt; }
-    float GetWhitePt() const { return m_fWhitePt; }
-
 private:
     CHistogram* m_pHistogramm;
     int m_nLDCWidth;
@@ -42,7 +38,6 @@ private:
     int m_nPSIHeight;
 
     void SmoothLDCMask();
-    uint8* MultiplyMap(double dLightenShadows, double dDarkenHighlights);
     void CreateLDCMap();
 };
 

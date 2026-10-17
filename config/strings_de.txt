@@ -41,61 +41,17 @@
 
 
 // ::: Program Strings ::: (sorted alphabetically) //
-Ascending	Aufsteigend
-Auto contrast and color correction	Automatische Kontrast- und Farbkorrektur
-Auto zoom mode	Auto-Zoom Modus
-Blend	Überblenden
-Book Mode	Buch-Modus
-Brightness	Helligkeit
 Confirm	Bestätigung
-Confirm save default parameters	Standardparameter wirklich speichern?
-Contrast	Kontrast
 Decoding this format requires the Microsoft Visual C++ Redistributable.	Dekodierung dieses Formats benötigt die Microsoft Visual C++ Redistributables.
-Descending	Absteigend
-Do you really want to save the following parameters as default to the INI file	Sollen diese Parameter wirklich als Standardparameter in der INI-Datei gespeichert werden
-File name	Dateiname
-File size	Dateigrösse
-Fill with crop	In Fenster einpassen (nie vergrößern)
-Fill with crop (no zoom)	Fenster füllen (nie vergrößern)
-Fit to screen	Bildschirmgrösse
-Fit to screen (no zoom)	Bildschirmgrösse (nie zoomen)
-High quality resampling	Qualitativ hochwertiges resampling
-Keep parameters	Parameter beibehalten
-Last modification date/time	Änderungsdatum
-Loop folder	Ordner anzeigen
-Loop recursively	Ordner mit Unterordnern anzeigen
-Loop siblings	Ordner gleicher Tiefe anzeigen
-Navigation	
 No image loaded!	Kein Bild geladen!
 No user INI file exists yet. Create user INI file from INI file template?	Es existiert noch keine INI-Datei für den Benutzer. INI-Datei aus Vorlage erstellen?
-None	Keiner
 Not enough memory available	Nicht genug Speicher verfügbar
-Order files by	Dateien sortieren nach
 Press ESC to exit...	ESC drücken zum Beenden...
 Press any key to search the subdirectories for image files.	Bitte eine Taste drücken, um in Unterordnern nach Bilddateien zu suchen.
-Random	Zufällig
 Reason:	Ursache:
-Roll from bottom	Rollen von unten
-Roll from left	Rollen von links
-Roll from right	Rollen von rechts
-Roll from top	Rollen von oben
-Saturation	Sättigung
-Scroll from bottom	Schieben von unten
-Scroll from left	Schieben von links
-Scroll from right	Schieben von rechts
-Scroll from top	Schieben von oben
-Slide from bottom	Rutschen von unten
-Slide from left	Rutschen von links
-Slide from right	Rutschen von rechts
-Slide from top	Rutschen von oben
-Slideshow	Diaschau
 The directory '%s' does not contain any image files!	Der Ordner '%s' enthält keine Bilddateien!
 The file '%s' could not be read!	Die Datei '%s' konnte nicht gelesen werden!
 The file '%s' does not contain a list of file names!	Die Datei '%s' enthält keine Liste von Dateinamen!
-These values will override the values from the INI file located in the program folder of JPEGView!	Diese Werte überschreiben die Werte aus der INI-Datei im Programmordner von JPEGView!
-Transition Effect	Übergangseffekt
-off	aus
-on	ein
 
 // ::: Popup Menu Strings ::: (unsorted to preserve context) //
 Next image	Nächstes Bild
@@ -106,6 +62,7 @@ Rotate -90	Drehen -90
 Mirror horizontally	Horizontal spiegeln
 Mirror vertically	Vertikal spiegeln
 Fit to window	In Fenster einpassen
+Fill with crop	In Fenster einpassen
 Window	Fenster
 Full screen mode	Vollbildmodus
 Fit window to image	Fenster an Bildgröße anpassen
@@ -113,6 +70,7 @@ Hide window title bar	Titelleiste ausblenden
 Set window always on top	Fenster immer vorne
 Play folder as slideshow/movie	Ordner als Diaschau/Animation abspielen
 Pause Slideshow/Movie	Diaschau/Animation pausieren
+Slideshow	Diaschau
 Waiting time	Wartezeit
 1 sec	
 2 sec	
@@ -122,6 +80,21 @@ Waiting time	Wartezeit
 7 sec	
 10 sec	
 20 sec	
+Transition Effect	Übergangseffekt
+None	Keiner
+Blend	Überblenden
+Slide from right	Rutschen von rechts
+Slide from left	Rutschen von links
+Slide from top	Rutschen von oben
+Slide from bottom	Rutschen von unten
+Roll from right	Rollen von rechts
+Roll from left	Rollen von links
+Roll from top	Rollen von oben
+Roll from bottom	Rollen von unten
+Scroll from right	Schieben von rechts
+Scroll from left	Schieben von links
+Scroll from top	Schieben von oben
+Scroll from bottom	Schieben von unten
 Transition Speed	Überblend-Geschwindigkeit
 Very fast	Sehr schnell
 Fast	Schnell
@@ -146,22 +119,26 @@ Copy file path to clipboard	Dateipfad kopieren
 Cut file to clipboard	Datei ausschneiden
 Open containing folder in Explorer	Ordner in Datei Manager öffnen
 Folder Mode	Ordner Modus
+Loop folder	Ordner anzeigen
+Loop recursively	Ordner mit Unterordnern anzeigen
+Loop siblings	Ordner gleicher Tiefe anzeigen
 Sort Order	Sortieren nach
+File name	Dateiname
 Modification date	Änderungsdatum
+File size	Dateigrösse
+Random	Zufällig
+Ascending	Aufsteigend
+Descending	Absteigend
 Auto Zoom Mode	Auto-Zoom Modus
 Fit to window (never upsize)	In Fenster einpassen (nie vergrößern)
 Fill with crop (never upsize)	Fenster füllen (nie vergrößern)
+Book Mode	Buch-Modus
 Auto Contrast	Automatische Kontrast-Korrektur
 Edit Settings	Einstellungs-Datei
 Settings Dialog	Einstellungs-Dialog
 Exit	Beenden
 
-// ::: INFO: Missing Translations [36] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
-//! Navigation
-//! Current View
-//! Fit to window
-//! Window
-//! Pause Slideshow/Movie
+// ::: INFO: Missing Translations [18] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
 //! 1 sec
 //! 2 sec
 //! 3 sec
@@ -180,22 +157,9 @@ Exit	Beenden
 //! 50 fps
 //! 60 fps
 //! 100 fps
-//! Edit image in default editor
-//! Copy scaled image content to clipboard
-//! Copy original image content to clipboard
-//! Copy file path to clipboard
-//! Cut file to clipboard
-//! Folder Mode
-//! Sort Order
-//! Auto Zoom Mode
-//! Fit to window (never upsize)
-//! Fill with crop (never upsize)
-//! Auto Contrast
-//! Edit Settings
-//! Settings Dialog
 
-// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.293025+00:00 //
-//! Translation Progress: 68%
-//! * Total (Strings + Menu) = 113
-//! * Done = 77
-//! * Missing = 36 (32%)
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T20:48:43.476016+00:00 //
+//! Translation Progress: 81%
+//! * Total (Strings + Menu) = 94
+//! * Done = 76
+//! * Missing = 18 (19%)

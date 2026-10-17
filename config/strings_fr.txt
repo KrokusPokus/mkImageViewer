@@ -42,61 +42,17 @@
 
 
 // ::: Program Strings ::: (sorted alphabetically) //
-Ascending	Ordre croissant
-Auto contrast and color correction	Corrections automatique des couleurs et du contraste
-Auto zoom mode	mode zoom automatique
-Blend	Mélanger les calques
-Book Mode	
-Brightness	Gamma
 Confirm	Confirmer
-Confirm save default parameters	Confirmer la sauvegarde des réglages par défaut dans le fichier INI
-Contrast	Contraste
 Decoding this format requires the Microsoft Visual C++ Redistributable.	Décoder ce format requiert que le Redistributable Microsoft Visual C++ soit installé.
-Descending	Ordre décroissant
-Do you really want to save the following parameters as default to the INI file	Souhaitez-vous vraiment enregistrer les paramètres suivants par défaut dans le fichier INI
-File name	Nom du fichier
-File size	Taille du fichier
-Fill with crop	Remplir la fenêtre et rogner l'image
-Fill with crop (no zoom)	Remplir la fenêtre et rogner l'image (sans agrandir)
-Fit to screen	Ajuster l'image à l'écran
-Fit to screen (no zoom)	Ajuster l'image à l'écran (sans agrandir)
-High quality resampling	Réechantillonnage de haute qualité
-Keep parameters	Garder le traitement entre les images
-Last modification date/time	Date de dernière modification
-Loop folder	Parcourir le dossier courant
-Loop recursively	Parcourir le dossier et ses sous-dossiers
-Loop siblings	Parcourir le dossier et ses dossiers frères
-Navigation	Dossiers
 No image loaded!	Aucune image chargée !
 No user INI file exists yet. Create user INI file from INI file template?	Le fichier INI utilisateur n'existe pas encore. En créer un depuis le fichier INI modèle ?
-None	Aucun
 Not enough memory available	mémoire insuffisante
-Order files by	Tri des fichiers par
 Press ESC to exit...	Appuyez sur Échap pour quitter...
 Press any key to search the subdirectories for image files.	Appuyez sur une touche pour rechercher des fichiers images dans les sous-répertoires.
-Random	Aléatoire
 Reason:	Raison:
-Roll from bottom	Dérouler depuis le bas
-Roll from left	Dérouler depuis la gauche
-Roll from right	Dérouler depuis la droite
-Roll from top	Dérouler depuis le haut
-Saturation	Saturation
-Scroll from bottom	Faire défiler depuis le bas
-Scroll from left	Faire défiler depuis la gauche
-Scroll from right	Faire défiler depuis la droite
-Scroll from top	Faire défiler depuis le haut
-Slide from bottom	Faire glisser depuis le bas
-Slide from left	Faire glisser depuis la gauche
-Slide from right	Faire glisser depuis la droite
-Slide from top	Faire glisser depuis le haut
-Slideshow	Diaporama
 The directory '%s' does not contain any image files!	Le répertoire '%s' ne contient aucun fichier image !
 The file '%s' could not be read!	Le fichier '%s' n'a pas pu être lu !
 The file '%s' does not contain a list of file names!	Le fichier '%s' ne contient pas de liste de noms de fichiers !
-These values will override the values from the INI file located in the program folder of JPEGView!	Ce fichier INI utilisateur aura priorité sur le fichier INI du dossier programme de JPEGView !
-Transition Effect	Effet de transition
-off	Inactif
-on	Actif
 
 // ::: Popup Menu Strings ::: (unsorted to preserve context) //
 Next image	Image suivante
@@ -107,6 +63,7 @@ Rotate -90	Rotation -90
 Mirror horizontally	Inversion horizontale
 Mirror vertically	Inversion verticale
 Fit to window	
+Fill with crop	Remplir la fenêtre et rogner l'image
 Window	
 Full screen mode	Mode plein écran
 Fit window to image	Ajuster la fenêtre à l'image
@@ -114,6 +71,7 @@ Hide window title bar	Cacher la barre de titre
 Set window always on top	Positionner la fenêtre toujours au premier plan
 Play folder as slideshow/movie	Jouer le dossier comme diaporama/film
 Pause Slideshow/Movie	
+Slideshow	Diaporama
 Waiting time	Temps d'attente
 1 sec	1 s
 2 sec	2 s
@@ -123,6 +81,21 @@ Waiting time	Temps d'attente
 7 sec	7 s
 10 sec	10 s
 20 sec	20 s
+Transition Effect	Effet de transition
+None	Aucun
+Blend	Mélanger les calques
+Slide from right	Faire glisser depuis la droite
+Slide from left	Faire glisser depuis la gauche
+Slide from top	Faire glisser depuis le haut
+Slide from bottom	Faire glisser depuis le bas
+Roll from right	Dérouler depuis la droite
+Roll from left	Dérouler depuis la gauche
+Roll from top	Dérouler depuis le haut
+Roll from bottom	Dérouler depuis le bas
+Scroll from right	Faire défiler depuis la droite
+Scroll from left	Faire défiler depuis la gauche
+Scroll from top	Faire défiler depuis le haut
+Scroll from bottom	Faire défiler depuis le bas
 Transition Speed	Vitesse de transition
 Very fast	Très rapide
 Fast	Rapide
@@ -142,24 +115,31 @@ Playback speed	Vitesse d'animation
 100 fps	100 ips
 Reload image	Recharger l'image
 Edit image in default editor	
-Copy scaled image content to clipboard	
 Copy original image content to clipboard	
 Copy file path to clipboard	
 Cut file to clipboard	
 Open containing folder in Explorer	Afficher le fichier dans l'explorateur
 Folder Mode	
+Loop folder	Parcourir le dossier courant
+Loop recursively	Parcourir le dossier et ses sous-dossiers
+Loop siblings	Parcourir le dossier et ses dossiers frères
 Sort Order	
+File name	Nom du fichier
 Modification date	Date de modification
+File size	Taille du fichier
+Random	Aléatoire
+Ascending	Ordre croissant
+Descending	Ordre décroissant
 Auto Zoom Mode	
 Fit to window (never upsize)	
 Fill with crop (never upsize)	
+Book Mode	
 Auto Contrast	
 Edit Settings	
 Settings Dialog	
 Exit	Quitter
 
-// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
-//! Book Mode
+// ::: INFO: Missing Translations [20] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
 //! Current View
 //! Fit to window
 //! Window
@@ -168,7 +148,6 @@ Exit	Quitter
 //! 20 fps
 //! 60 fps
 //! Edit image in default editor
-//! Copy scaled image content to clipboard
 //! Copy original image content to clipboard
 //! Copy file path to clipboard
 //! Cut file to clipboard
@@ -177,16 +156,16 @@ Exit	Quitter
 //! Auto Zoom Mode
 //! Fit to window (never upsize)
 //! Fill with crop (never upsize)
+//! Book Mode
 //! Auto Contrast
 //! Edit Settings
 //! Settings Dialog
 
-// ::: INFO: Same Translations [2] ::: (Summary to assist translators: All strings which are known not to need translation [String == Translation]) - Auto-generated by script //
-//! Saturation
+// ::: INFO: Same Translations [1] ::: (Summary to assist translators: All strings which are known not to need translation [String == Translation]) - Auto-generated by script //
 //! Normal
 
-// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.303653+00:00 //
-//! Translation Progress: 81%
-//! * Total (Strings + Menu) = 113
-//! * Done = 92
-//! * Missing = 21 (19%)
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T20:48:43.636011+00:00 //
+//! Translation Progress: 79%
+//! * Total (Strings + Menu) = 94
+//! * Done = 74
+//! * Missing = 20 (21%)

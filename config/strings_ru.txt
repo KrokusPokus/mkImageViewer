@@ -41,61 +41,17 @@
 
 
 // ::: Program Strings ::: (sorted alphabetically) //
-Ascending	По возрастанию
-Auto contrast and color correction	Автокоррекция контрастности и цвета
-Auto zoom mode	Автомасштабирование
-Blend	Растворение
-Book Mode	
-Brightness	Яркость
 Confirm	Подтвердите
-Confirm save default parameters	Сохранить параметры по умолчанию?
-Contrast	Контрастность
 Decoding this format requires the Microsoft Visual C++ Redistributable.	Для декодирования этого формата требуется Microsoft Visual C++ Redistributable.
-Descending	По убыванию
-Do you really want to save the following parameters as default to the INI file	Хотите сохранить эти параметры в INI-файле как стандартные
-File name	Имя файла
-File size	Размер файла
-Fill with crop	Заполнение с обрезкой
-Fill with crop (no zoom)	Заполнение с обрезкой (без увеличения)
-Fit to screen	Подгонка под экран
-Fit to screen (no zoom)	Подгонка под экран (без увеличения)
-High quality resampling	Высококачественный ресемплинг
-Keep parameters	Запоминать параметры
-Last modification date/time	Дата/время изменения
-Loop folder	Циклично в папке
-Loop recursively	Циклично с вложенными папками
-Loop siblings	Циклично с папками той же вложенности
-Navigation	Навигация
 No image loaded!	НЕ ЗАГРУЖЕНО ИЗОБРАЖЕНИЕ!
 No user INI file exists yet. Create user INI file from INI file template?	Пользовательского INI-файла пока нет. Создать его из шаблона INI-файла?
-None	Нет
 Not enough memory available	Недостаточно памяти
-Order files by	Сортировка файлов
 Press ESC to exit...	ESC — выход
 Press any key to search the subdirectories for image files.	Нажмите любую клавишу для поиска графических файлов во вложенных папках.
-Random	Случайно
 Reason:	Причина:
-Roll from bottom	Развёртывание снизу вверх
-Roll from left	Развёртывание слева направо
-Roll from right	Развёртывание справа налево
-Roll from top	Развёртывание сверху вниз
-Saturation	Насыщенность
-Scroll from bottom	Выталкивание снизу вверх
-Scroll from left	Выталкивание слева направо
-Scroll from right	Выталкивание справа налево
-Scroll from top	Выталкивание сверху вниз
-Slide from bottom	Сдвиг снизу вверх
-Slide from left	Сдвиг слева направо
-Slide from right	Сдвиг справа налево
-Slide from top	Сдвиг сверху вниз
-Slideshow	Слайдшоу
 The directory '%s' does not contain any image files!	В папке '%s' нет поддерживаемых графических файлов.
 The file '%s' could not be read!	Невозможно прочитать файл '%s'.
 The file '%s' does not contain a list of file names!	В файле '%s' нет списка имён файлов.
-These values will override the values from the INI file located in the program folder of JPEGView!	Эти значения будут иметь приоритет перед установками в INI-файле в папке с JPEGView.
-Transition Effect	Эффект смены изображений
-off	выкл.
-on	вкл.
 
 // ::: Popup Menu Strings ::: (unsorted to preserve context) //
 Next image	Следующее изображение
@@ -106,6 +62,7 @@ Rotate -90	Повернуть на 90° влево
 Mirror horizontally	Зеркально перевернуть по горизонтали
 Mirror vertically	Зеркально перевернуть по вертикали
 Fit to window	
+Fill with crop	Заполнение с обрезкой
 Window	
 Full screen mode	Полноэкранный режим
 Fit window to image	Подгонка окна по изображению
@@ -113,6 +70,7 @@ Hide window title bar	Скрыть заголовок окна
 Set window always on top	Закрепить окно поверх других окон
 Play folder as slideshow/movie	Слайдшоу/фильм из файлов в папке
 Pause Slideshow/Movie	
+Slideshow	Слайдшоу
 Waiting time	Интервал
 1 sec	1 секунда
 2 sec	2 секунды
@@ -122,6 +80,21 @@ Waiting time	Интервал
 7 sec	7 секунд
 10 sec	10 секунд
 20 sec	20 секунд
+Transition Effect	Эффект смены изображений
+None	Нет
+Blend	Растворение
+Slide from right	Сдвиг справа налево
+Slide from left	Сдвиг слева направо
+Slide from top	Сдвиг сверху вниз
+Slide from bottom	Сдвиг снизу вверх
+Roll from right	Развёртывание справа налево
+Roll from left	Развёртывание слева направо
+Roll from top	Развёртывание сверху вниз
+Roll from bottom	Развёртывание снизу вверх
+Scroll from right	Выталкивание справа налево
+Scroll from left	Выталкивание слева направо
+Scroll from top	Выталкивание сверху вниз
+Scroll from bottom	Выталкивание снизу вверх
 Transition Speed	Скорость эффекта
 Very fast	Очень быстро
 Fast	Быстро
@@ -141,24 +114,31 @@ Playback speed	Скорость воспроизведения
 100 fps	100 кадров в секунду
 Reload image	Перезагрузить изображение
 Edit image in default editor	
-Copy scaled image content to clipboard	
 Copy original image content to clipboard	
 Copy file path to clipboard	
 Cut file to clipboard	
 Open containing folder in Explorer	Открыть папку с файлом в Проводнике
 Folder Mode	
+Loop folder	Циклично в папке
+Loop recursively	Циклично с вложенными папками
+Loop siblings	Циклично с папками той же вложенности
 Sort Order	
+File name	Имя файла
 Modification date	Дата изменения
+File size	Размер файла
+Random	Случайно
+Ascending	По возрастанию
+Descending	По убыванию
 Auto Zoom Mode	
 Fit to window (never upsize)	
 Fill with crop (never upsize)	
+Book Mode	
 Auto Contrast	
 Edit Settings	
 Settings Dialog	
 Exit	Выход
 
-// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
-//! Book Mode
+// ::: INFO: Missing Translations [20] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
 //! Current View
 //! Fit to window
 //! Window
@@ -167,7 +147,6 @@ Exit	Выход
 //! 20 fps
 //! 60 fps
 //! Edit image in default editor
-//! Copy scaled image content to clipboard
 //! Copy original image content to clipboard
 //! Copy file path to clipboard
 //! Cut file to clipboard
@@ -176,12 +155,13 @@ Exit	Выход
 //! Auto Zoom Mode
 //! Fit to window (never upsize)
 //! Fill with crop (never upsize)
+//! Book Mode
 //! Auto Contrast
 //! Edit Settings
 //! Settings Dialog
 
-// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.319829+00:00 //
-//! Translation Progress: 81%
-//! * Total (Strings + Menu) = 113
-//! * Done = 92
-//! * Missing = 21 (19%)
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T20:48:43.887194+00:00 //
+//! Translation Progress: 79%
+//! * Total (Strings + Menu) = 94
+//! * Done = 74
+//! * Missing = 20 (21%)

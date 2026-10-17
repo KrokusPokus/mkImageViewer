@@ -256,32 +256,12 @@ CKeyMap::CKeyMap() {
     fclose(fkm_ptr);
 }
 
-int CKeyMap::GetVirtualKeyCode(LPCTSTR keyName) {
-    CString sBuffer(keyName);
-    sBuffer.TrimLeft();
-    sBuffer.TrimRight();
-    if (sBuffer.IsEmpty()) {
-        return -1;
-    }
-    LPTSTR buffer = sBuffer.GetBuffer(sBuffer.GetLength());
-    int key = _ParseKeys(buffer);
-    return (key == 0) ? -1 : key;
-}
-
 int CKeyMap::GetCombinedKeyCode(int keyCode, bool alt, bool control, bool shift) {
     int nKeyCode = keyCode;
     if (alt) nKeyCode += M_ALT;
     if (control) nKeyCode += M_CTRL;
     if (shift) nKeyCode += M_SHIFT;
     return nKeyCode;
-}
-
-CString CKeyMap::GetShortcutKey(int combinedKeyCode) {
-    if (combinedKeyCode == -1)
-    {
-        return CString(_T(""));
-    }
-    return _GetKeyShortcutName(combinedKeyCode);
 }
 
 void CKeyMap::AddDefaultEscapeHandling() {

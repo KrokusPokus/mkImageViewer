@@ -102,18 +102,6 @@ public:
     GPSCoordinate* GetGPSLongitude() { return m_pLongitude; }
     double GetGPSAltitude() { return m_dAltitude; }
 
-    // Sets the image orientation to given value (if tag was present in input stream).
-    // Writes to the APP1 block passed in constructor.
-    void WriteImageOrientation(int nOrientation);
-    
-    // Updates an existing JPEG compressed thumbnail image by given JPEG stream (SOI stripped)
-    // Writes to the APP1 block passed in constructor. Make sure that enough memory is allocated for this APP1
-    // block to hold the additional thumbnail data.
-    void UpdateJPEGThumbnail(unsigned char* pJPEGStream, int nStreamLen, int nEXIFBlockLenCorrection, CSize sizeThumb);
-
-    // Delete the thumbnail image
-    // Writes to the APP1 block passed in constructor.
-    void DeleteThumbnail();
 public:
     // unknown double value
     static double UNKNOWN_DOUBLE_VALUE;

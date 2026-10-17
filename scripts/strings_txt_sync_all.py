@@ -20,9 +20,9 @@ import sys
 UTF8 = 'utf-8-sig'  # UTF-8 with BOM
 
 
-CONFIG_DIR = Path(__file__).resolve().parent.parent / r"src\Config"
+CONFIG_DIR = Path(__file__).resolve().parent.parent / r"config"
 
-REFERENCE_STRINGS = Path(__file__).resolve().parent.parent / r"src\Config\strings.txt"
+REFERENCE_STRINGS = Path(__file__).resolve().parent.parent / r"config\strings.txt"
 
 
 def parse_strings_txt(filepath):
@@ -512,7 +512,7 @@ if __name__ == "__main__":
         #    for x in missing:
         #        f.write(f"{x}\n")
 
-    """
+    r"""
         reset files in git-bash
 
         $ find src/JPEGView/Config -name "strings_*.txt" -exec git checkout -- {} \;

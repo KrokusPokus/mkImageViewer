@@ -149,7 +149,7 @@ bool CFileDesc::operator < (const CFileDesc& other) const {
     return SortAscending(other) ^ (!sm_bSortAscending);
 }
 
-
+/*
 void CFileDesc::SetName(LPCTSTR sNewName) {
     m_sName = sNewName;
     m_sTitle = (LPCTSTR)m_sName + m_sName.ReverseFind(_T('\\')) + 1;
@@ -158,6 +158,7 @@ void CFileDesc::SetName(LPCTSTR sNewName) {
 void CFileDesc::SetModificationDate(const FILETIME& lastModDate) {
     memcpy(&m_lastModTime, &lastModDate, sizeof(FILETIME));
 }
+*/
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Public interface
@@ -172,28 +173,6 @@ static const TCHAR* csFileEndingsInternal[cnNumEndingsInternal] = {_T("jpg"), _T
 static const int MAX_ENDINGS = 48;
 static int nNumEndings;
 static LPCTSTR* sFileEndings;
-
-// Parses a semicolon separated list of file endings of the form "*.nef;*.cr2;*.dng"
-static void ParseAndAddFileEndings(LPCTSTR sEndings) {
-    if (_tcslen(sEndings) > 2) {
-        LPTSTR buffer = new TCHAR[_tcslen(sEndings) + 1]; // this buffer will not be freed deliberately!
-        _tcscpy(buffer, sEndings);
-        LPTSTR sStart = buffer, sCurrent = buffer;
-        while (*sCurrent != 0 && nNumEndings < MAX_ENDINGS) {
-            while (*sCurrent != 0 && *sCurrent != _T(';')) {
-                sCurrent++;
-            }
-            if (*sCurrent == _T(';')) {
-                *sCurrent = 0;
-                sCurrent++;
-            }
-            if (_tcslen(sStart) > 2) {
-                sFileEndings[nNumEndings++] = sStart + 2;
-            }
-            sStart = sCurrent;
-        }
-    }
-}
 
 // Gets all supported file endings.
 // The length of the returned list is nNumEndings

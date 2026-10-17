@@ -32,9 +32,6 @@ public:
     int GetPaddedWidth() const { return m_nPaddedWidth; }
     int GetPaddedHeight() const { return m_nPaddedHeight; }
 
-    // Generate a BGRA (32 bit) DIB and return it, caller gets ownership of returned object
-    void* ConvertToDIBRGBA() const;
-
 private:
     int GetLineSize() const { return m_nPaddedWidth*4; }    // [GF] i16 -> f32
     int GetMemSize() const { return GetLineSize()*3*m_nPaddedHeight; }

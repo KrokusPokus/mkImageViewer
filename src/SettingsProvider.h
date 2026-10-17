@@ -197,7 +197,6 @@ public:
     LPCTSTR DefaultGUIFont() const { return reinterpret_cast<LPCTSTR>(m_defaultGUIFont.utf16()); }
     LPCTSTR GetEXEPath() const { return reinterpret_cast<LPCTSTR>(m_sEXEPath.utf16()); }
     LPCTSTR GetGlobalINIFileName() const { return reinterpret_cast<LPCTSTR>(m_sIniNameGlobal.utf16()); }    // Get the file name with path of the global INI file (in EXE path)
-    LPCTSTR GetINIFileTitle() const { return reinterpret_cast<LPCTSTR>(m_sIniFileTitle.utf16()); }          // Get the file name (without path) of the user INI file
     LPCTSTR GetUserINIFileName() const { return reinterpret_cast<LPCTSTR>(m_sIniNameUser.utf16()); }        // Get the file name with path of the user INI file (in AppData path)
     LPCTSTR Language() const { return reinterpret_cast<LPCTSTR>(m_sLanguage.utf16()); }
     LPCTSTR ZoomFactorFont() const { return reinterpret_cast<LPCTSTR>(m_zoomFactorFont.utf16()); }
@@ -206,7 +205,6 @@ public:
     void SaveCustomSettings();
     void SaveStickyWindowRect(CRect rect);
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
-    void SetMonitorOverride(int nMonitor) { m_nDisplayMonitor = nMonitor; }
     void SetUseEmbeddedColorProfiles(int bUseEmbeddedColorProfiles) { m_bUseEmbeddedColorProfiles = (bUseEmbeddedColorProfiles != 0); }
 
     // This will only save a subset of settings to the INI file located in AppData\JPEGView\JPEGView.ini.

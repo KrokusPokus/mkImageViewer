@@ -26,8 +26,10 @@ public:
     const CString& GetName() const { return m_sName; }
 
     // Only use after a rename of a file, respectively changing its modification date
+    /*
     void SetName(LPCTSTR sNewName);
     void SetModificationDate(const FILETIME& lastModDate);
+    */
 
     // File title (without path)
     LPCTSTR GetTitle() const { return m_sTitle; }

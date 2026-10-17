@@ -1364,8 +1364,6 @@ LRESULT CMainDlg::OnXButtonDown(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/,
 
 LRESULT CMainDlg::OnMouseMove(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
     // Turn mouse pointer on when mouse has moved some distance
-    int nOldMouseY = m_nMouseY;
-    int nOldMouseX = m_nMouseX;
     m_nMouseX = GET_X_LPARAM(lParam);
     m_nMouseY = GET_Y_LPARAM(lParam);
     if (!m_bDragging) {
@@ -3761,56 +3759,11 @@ void CMainDlg::SaveParameters() {
                                            m_eAutoZoomModeFullscreen,
                                            m_eTransitionEffect);
 }
-/*
-CRect CMainDlg::ScreenToDIB(const CSize& sizeDIB, const CRect& rect) {
-    int nOffsetX = (sizeDIB.cx - m_clientRect.Width())/2;
-    int nOffsetY = (sizeDIB.cy - m_clientRect.Height())/2;
 
-    CRect rectDIB = CRect(rect.left + nOffsetX, rect.top + nOffsetY, rect.right + nOffsetX, rect.bottom + nOffsetY);
-    
-    CRect rectClipped;
-    rectClipped.IntersectRect(rectDIB, CRect(0, 0, sizeDIB.cx, sizeDIB.cy));
-    return rectClipped;
-}
-
-bool CMainDlg::ScreenToImage(float & fX, float & fY) {
-    if (m_pCurrentImage == NULL) {
-        return false;
-    }
-    int nOffsetX = (m_pCurrentImage->DIBWidth() - m_clientRect.Width())/2;
-    int nOffsetY = (m_pCurrentImage->DIBHeight() - m_clientRect.Height())/2;
-
-    fX += nOffsetX;
-    fY += nOffsetY;
-
-    m_pCurrentImage->DIBToOrig(fX, fY);
-
-    return true;
-}
-
-bool CMainDlg::ImageToScreen(float & fX, float & fY) {
-    if (m_pCurrentImage == NULL) {
-        return false;
-    }
-    m_pCurrentImage->OrigToDIB(fX, fY);
-
-    int nOffsetX = (m_pCurrentImage->DIBWidth() - m_clientRect.Width())/2;
-    int nOffsetY = (m_pCurrentImage->DIBHeight() - m_clientRect.Height())/2;
-
-    fX -= nOffsetX;
-    fY -= nOffsetY;
-
-    return true;
-}
-*/
-/// <summary>
-/// Get current filename/filepath
-/// </summary>
-/// <param name="bFileTitle">If true, returns only the filename part.  If false, returns complete filepath</param>
-/// <returns>Returns the filename either just the title or full filepath</returns>
-LPCTSTR CMainDlg::CurrentFileName(bool bFileTitle) {
+// Get current filename or filepath
+LPCTSTR CMainDlg::CurrentFileName(bool bFileNameOnly) {
     if (m_pFileList != NULL) {
-        return bFileTitle ? m_pFileList->CurrentFileTitle() : m_pFileList->Current();
+        return bFileNameOnly ? m_pFileList->CurrentFileTitle() : m_pFileList->Current();
     } else {
         return NULL;
     }
@@ -4477,16 +4430,6 @@ void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
     CString sSortMode = sSortModes[(int)nSortMode];
     //sSortMode += (bUpCounting ? _T(" ^") : _T(" v"));
     SetToast(sSortMode);
-}
-
-CString CMainDlg::SystemTimeToString(const SYSTEMTIME &time) {
-    TCHAR sBufferDate[64];
-    TCHAR sBufferDay[8];
-    TCHAR sBufferTime[64];
-    ::GetDateFormat(LOCALE_USER_DEFAULT, 0, &time, _T("ddd"), sBufferDay, 8);
-    ::GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, sBufferDate, 64);
-    ::GetTimeFormat(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &time, NULL, sBufferTime, 64);
-    return CString(sBufferDay) + _T(" ") + sBufferDate + _T(" ") + sBufferTime;
 }
 
 // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images

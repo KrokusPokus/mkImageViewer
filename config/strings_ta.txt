@@ -41,61 +41,17 @@
 
 
 // ::: Program Strings ::: (sorted alphabetically) //
-Ascending		ஏறுமுகம்
-Auto contrast and color correction		தானியங்கு மாறுபாடு மற்றும் வண்ண திருத்தம்
-Auto zoom mode		ஆட்டோ ஜூம் பயன்முறை
-Blend		கலவை
-Book Mode	
-Brightness		பிரகாசம்
 Confirm		உறுதிப்படுத்தவும்
-Confirm save default parameters		இயல்புநிலை அளவுருக்களை சேமிப்பதை உறுதிப்படுத்தவும்
-Contrast		மாறுபாடு
 Decoding this format requires the Microsoft Visual C++ Redistributable.		இந்த வடிவமைப்பை டிகோட் செய்ய மைக்ரோசாஃப்ட் விஷுவல் சி++ மறுபகிர்வு செய்ய வேண்டும்.
-Descending		இறங்குதல்
-Do you really want to save the following parameters as default to the INI file		INI கோப்பில் பின்வரும் அளவுருக்களை இயல்புநிலையாகச் சேமிக்க விரும்புகிறீர்களா
-File name		கோப்பு பெயர்
-File size		கோப்பின் அளவு
-Fill with crop		பயிர் நிரப்பவும்
-Fill with crop (no zoom)		செதுக்கினால் நிரப்பவும் (ஜூம் இல்லை)
-Fit to screen		திரைக்கு பொருந்தும்
-Fit to screen (no zoom)		திரைக்கு பொருத்தம் (ஜூம் இல்லை)
-High quality resampling		உயர்தர மறு மாதிரி
-Keep parameters		அளவுருக்களை வைத்திருங்கள்
-Last modification date/time		கடைசி மாற்றம் தேதி/நேரம்
-Loop folder		லூப் கோப்புறை
-Loop recursively		சுழல் சுழற்சி
-Loop siblings		லூப் உடன்பிறப்புகள்
-Navigation		வழிசெலுத்தல்
 No image loaded!		படம் ஏற்றப்படவில்லை!
 No user INI file exists yet. Create user INI file from INI file template?		பயனர் INI கோப்பு எதுவும் இதுவரை இல்லை. INI கோப்பு டெம்ப்ளேட்டிலிருந்து பயனர் INI கோப்பை உருவாக்கவா?
-None		இல்லை
 Not enough memory available		போதுமான நினைவகம் இல்லை
-Order files by		கோப்புகளை ஆர்டர் செய்யவும்
 Press ESC to exit...		வெளியேற ESC ஐ அழுத்தவும்...
 Press any key to search the subdirectories for image files.		படக் கோப்புகளுக்கான துணை அடைவுகளைத் தேட எந்த விசையையும் அழுத்தவும்.
-Random		சீரற்ற
 Reason:		காரணம்:
-Roll from bottom		கீழே இருந்து உருட்டவும்
-Roll from left		இடமிருந்து உருட்டவும்
-Roll from right		வலமிருந்து உருட்டவும்
-Roll from top		மேலே இருந்து உருட்டவும்
-Saturation		செறிவூட்டல்
-Scroll from bottom		கீழே இருந்து உருட்டவும்
-Scroll from left		இடமிருந்து உருட்டவும்
-Scroll from right		வலமிருந்து உருட்டவும்
-Scroll from top		மேலே இருந்து உருட்டவும்
-Slide from bottom		கீழே இருந்து ஸ்லைடு
-Slide from left		இடமிருந்து ஸ்லைடு
-Slide from right		வலமிருந்து ஸ்லைடு
-Slide from top		மேலே இருந்து ஸ்லைடு
-Slideshow		ஸ்லைடுஷோ
 The directory '%s' does not contain any image files!		'%s' கோப்பகத்தில் படக் கோப்புகள் எதுவும் இல்லை!
 The file '%s' could not be read!	'%s' கோப்பைப் படிக்க முடியவில்லை!
 The file '%s' does not contain a list of file names!		'%s' கோப்பில் கோப்பு பெயர்களின் பட்டியல் இல்லை!
-These values will override the values from the INI file located in the program folder of JPEGView!		இந்த மதிப்புகள் JPEGView இன் நிரல் கோப்புறையில் உள்ள INI கோப்பிலிருந்து மதிப்புகளை மீறும்!
-Transition Effect		மாற்றம் விளைவு
-off		ஆஃப்
-on		அன்று
 
 // ::: Popup Menu Strings ::: (unsorted to preserve context) //
 Next image		அடுத்த படம்
@@ -106,6 +62,7 @@ Rotate -90		சுழற்று -90
 Mirror horizontally		கிடைமட்டமாக கண்ணாடி
 Mirror vertically		செங்குத்தாக கண்ணாடி
 Fit to window	
+Fill with crop		பயிர் நிரப்பவும்
 Window	
 Full screen mode		முழு திரையில் முறையில்
 Fit window to image		படத்திற்கு சாளரத்தை பொருத்தவும்
@@ -113,6 +70,7 @@ Hide window title bar		சாளர தலைப்புப் பட்டி�
 Set window always on top		சாளரத்தை எப்போதும் மேலே அமைக்கவும்
 Play folder as slideshow/movie		கோப்புறையை ஸ்லைடுஷோ/திரைப்படமாக இயக்கவும்
 Pause Slideshow/Movie	
+Slideshow		ஸ்லைடுஷோ
 Waiting time		காத்திருக்கும் நேரம்
 1 sec		1 நொடி
 2 sec		2 நொடி
@@ -122,6 +80,21 @@ Waiting time		காத்திருக்கும் நேரம்
 7 sec		7 நொடி
 10 sec		10 நொடி
 20 sec		20 நொடி
+Transition Effect		மாற்றம் விளைவு
+None		இல்லை
+Blend		கலவை
+Slide from right		வலமிருந்து ஸ்லைடு
+Slide from left		இடமிருந்து ஸ்லைடு
+Slide from top		மேலே இருந்து ஸ்லைடு
+Slide from bottom		கீழே இருந்து ஸ்லைடு
+Roll from right		வலமிருந்து உருட்டவும்
+Roll from left		இடமிருந்து உருட்டவும்
+Roll from top		மேலே இருந்து உருட்டவும்
+Roll from bottom		கீழே இருந்து உருட்டவும்
+Scroll from right		வலமிருந்து உருட்டவும்
+Scroll from left		இடமிருந்து உருட்டவும்
+Scroll from top		மேலே இருந்து உருட்டவும்
+Scroll from bottom		கீழே இருந்து உருட்டவும்
 Transition Speed		மாற்றம் வேகம்
 Very fast		மிகவும் வேகமாக
 Fast		வேகமாக
@@ -141,24 +114,31 @@ Playback speed		பின்னணி வேகம்
 100 fps		100 fps
 Reload image		படத்தை மீண்டும் ஏற்றவும்
 Edit image in default editor	
-Copy scaled image content to clipboard	
 Copy original image content to clipboard	
 Copy file path to clipboard	
 Cut file to clipboard	
 Open containing folder in Explorer		எக்ஸ்ப்ளோரரில் உள்ள கோப்புறையைத் திறக்கவும்
 Folder Mode	
+Loop folder		லூப் கோப்புறை
+Loop recursively		சுழல் சுழற்சி
+Loop siblings		லூப் உடன்பிறப்புகள்
 Sort Order	
+File name		கோப்பு பெயர்
 Modification date		மாற்றம் தேதி
+File size		கோப்பின் அளவு
+Random		சீரற்ற
+Ascending		ஏறுமுகம்
+Descending		இறங்குதல்
 Auto Zoom Mode	
 Fit to window (never upsize)	
 Fill with crop (never upsize)	
+Book Mode	
 Auto Contrast	
 Edit Settings	
 Settings Dialog	
 Exit		வெளியேறு
 
-// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
-//! Book Mode
+// ::: INFO: Missing Translations [20] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
 //! Current View
 //! Fit to window
 //! Window
@@ -167,7 +147,6 @@ Exit		வெளியேறு
 //! 20 fps
 //! 60 fps
 //! Edit image in default editor
-//! Copy scaled image content to clipboard
 //! Copy original image content to clipboard
 //! Copy file path to clipboard
 //! Cut file to clipboard
@@ -176,12 +155,13 @@ Exit		வெளியேறு
 //! Auto Zoom Mode
 //! Fit to window (never upsize)
 //! Fill with crop (never upsize)
+//! Book Mode
 //! Auto Contrast
 //! Edit Settings
 //! Settings Dialog
 
-// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.329330+00:00 //
-//! Translation Progress: 81%
-//! * Total (Strings + Menu) = 113
-//! * Done = 92
-//! * Missing = 21 (19%)
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T20:48:44.031932+00:00 //
+//! Translation Progress: 79%
+//! * Total (Strings + Menu) = 94
+//! * Done = 74
+//! * Missing = 20 (21%)

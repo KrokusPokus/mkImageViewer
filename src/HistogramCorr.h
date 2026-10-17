@@ -31,10 +31,6 @@ public:
     int GetGMean() const { return m_nGMean; }
     int GetRMean() const { return m_nRMean; }
 
-    // Examines the histogram to detect if this could be a night shot
-    // The returned number is between 0 (no night shot) and 1 (night shot)
-    float IsNightShot() const;
-
 private:
     int m_nTotalValues;
     int m_ChannelR[256];

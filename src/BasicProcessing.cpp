@@ -226,31 +226,6 @@ int32* CBasicProcessing::CreateColorSaturationLUTs(double dSaturation) {
     return pLUTs;
 }
 
-int16* CBasicProcessing::Create1Channel16bppGrayscaleImage(int nWidth, int nHeight, const void* pDIBPixels, int nChannels) {
-    // Create LUTs for grayscale conversion
-    const double cdScaler = 1 << 16; // 1.0 is represented as 2^16
-    uint32 LUTs[3 * 256];
-    for (int i = 0; i < 256; i++) {
-        LUTs[i] = (uint32)(0.299 * i * cdScaler + 0.5);
-        LUTs[256 + i] = (uint32)(0.587 * i * cdScaler + 0.5);
-        LUTs[512 + i] = (uint32)(0.114 * i * cdScaler + 0.5);
-    }
-
-    int16* pNewImage = new(std::nothrow) int16[nWidth * nHeight];
-    if (pNewImage == NULL) return NULL;
-    int nPadSrc = Helpers::DoPadding(nWidth*nChannels, 4) - nWidth*nChannels;
-    int16* pTarget = pNewImage;
-    const uint8* pSource = (uint8*)pDIBPixels;
-    for (int j = 0; j < nHeight; j++) {
-        for (int i = 0; i < nWidth; i++) {
-            *pTarget++ = (LUTs[pSource[0]] + LUTs[256 + pSource[1]] + LUTs[512 + pSource[2]] + 32767) >> 10; // from 24 to 14 bits
-            pSource += nChannels;
-        }
-        pSource += nPadSrc;
-    }
-    return pNewImage;
-}
-
 void* CBasicProcessing::Apply3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const uint8* pLUT) {
     if (pDIBPixels == NULL || pLUT == NULL) {
         return NULL;
@@ -420,28 +395,6 @@ void* ApplyLDC32bpp_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize di
     }
     delete[] pMulLUT;
     return pTarget;
-}
-
-void* CBasicProcessing::ApplyLDC32bpp(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-                                      CSize ldcMapSize, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap,
-                                      float fBlackPt, float fWhitePt, float fBlackPtSteepness) {
-
-    if (pDIBPixels == NULL || pLUT == NULL || pLDCMap == NULL) {
-      return NULL;
-    }
-    if (fullTargetSize.cx <= 2 || fullTargetSize.cy <= 2) {
-        // cannot apply to tiny images
-        return Apply3ChannelLUT32bpp(clippedTargetSize.cx, clippedTargetSize.cy, pDIBPixels, pLUT);
-    }
-
-    uint32* pTarget = new(std::nothrow) uint32[clippedTargetSize.cx * clippedTargetSize.cy];
-    if (pTarget == NULL) return NULL;
-    CProcessingThreadPool& threadPool = CProcessingThreadPool::This();
-    CRequestLDC request(pDIBPixels, clippedTargetSize, pTarget, fullTargetSize, fullTargetOffset,
-        ldcMapSize, pSatLUTs, pLUT, pLDCMap, fBlackPt, fWhitePt, fBlackPtSteepness);
-    bool bSuccess = threadPool.Process(&request);
-
-    return bSuccess ? pTarget : NULL;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -784,88 +737,6 @@ static void RotateInplace(double& dX, double& dY, double dAngle) {
     dY = dYr;
 }
 
-void* CBasicProcessing::PointSampleWithRotation(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize, 
-    CSize sourceSize, double dRotation, const void* pPixels, int nChannels, COLORREF backColor) {
-    if (fullTargetSize.cx < 1 || fullTargetSize.cy < 1 ||
-        clippedTargetSize.cx < 1 || clippedTargetSize.cy < 1 ||
-        fullTargetOffset.x < 0 || fullTargetOffset.x < 0 ||
-        clippedTargetSize.cx + fullTargetOffset.x > fullTargetSize.cx ||
-        clippedTargetSize.cy + fullTargetOffset.y > fullTargetSize.cy ||
-        pPixels == NULL || (nChannels != 3 && nChannels != 4)) {
-        return NULL;
-    }
-
-    uint8* pDIB = new(std::nothrow) uint8[clippedTargetSize.cx*4 * clippedTargetSize.cy];
-    if (pDIB == NULL) return NULL;
-
-    uint32 nBackColor = (GetRValue(backColor) << 16) + (GetGValue(backColor) << 8) + GetBValue(backColor) + ALPHA_OPAQUE;
-    double dFirstX = -(sourceSize.cx - 1) * 0.5;
-    double dFirstY = -(sourceSize.cy - 1) * 0.5;
-    double dIncX1 = dFirstX + ((fullTargetSize.cx == 1) ? 0 : (double)(sourceSize.cx)/(fullTargetSize.cx - 1));
-    double dIncY1 = dFirstY;
-    double dIncX2 = dFirstX;
-    double dIncY2 = dFirstY + ((fullTargetSize.cy == 1) ? 0 : (double)(sourceSize.cy)/(fullTargetSize.cy - 1));
-    RotateInplace(dFirstX, dFirstY, -dRotation);
-    RotateInplace(dIncX1, dIncY1, -dRotation);
-    RotateInplace(dIncX2, dIncY2, -dRotation);
-    dIncX1 = dIncX1 - dFirstX;
-    dIncY1 = dIncY1 - dFirstY;
-    dIncX2 = dIncX2 - dFirstX;
-    dIncY2 = dIncY2 - dFirstY;
-
-    int32 nFirstX = Helpers::RoundToInt(65536 * (dFirstX + (sourceSize.cx - 1) * 0.5));
-    int32 nFirstY = Helpers::RoundToInt(65536 * (dFirstY + (sourceSize.cy - 1) * 0.5));
-    int32 nIncrementX1 = Helpers::RoundToInt(65536 * dIncX1);
-    int32 nIncrementY1 = Helpers::RoundToInt(65536 * dIncY1);
-    int32 nIncrementX2 = Helpers::RoundToInt(65536 * dIncX2);
-    int32 nIncrementY2 = Helpers::RoundToInt(65536 * dIncY2);
-
-    int nPaddedSourceWidth = Helpers::DoPadding(sourceSize.cx * nChannels, 4);
-    const uint8* pSrc = NULL;
-    uint8* pDst = pDIB;
-    int32 nX = nFirstX + fullTargetOffset.x * nIncrementX1 + fullTargetOffset.y * nIncrementX2;
-    int32 nY = nFirstY + fullTargetOffset.x * nIncrementY1 + fullTargetOffset.y * nIncrementY2;
-    for (int j = 0; j < clippedTargetSize.cy; j++) {
-        int nCurX = nX;
-        int nCurY = nY;
-        if (nChannels == 3) {
-            for (int i = 0; i < clippedTargetSize.cx; i++) {
-                int32 nCurRealX = nCurX >> 16;
-                int32 nCurRealY = nCurY >> 16;
-                if (nCurRealX >= 0 && nCurRealX < sourceSize.cx && nCurRealY >= 0 && nCurRealY < sourceSize.cy) {
-                    pSrc = (uint8*)pPixels + nPaddedSourceWidth * nCurRealY + nCurRealX * 3;
-                    uint32 d = i*4;
-                    pDst[d] = pSrc[0];
-                    pDst[d+1] = pSrc[1];
-                    pDst[d+2] = pSrc[2];
-                    pDst[d+3] = 0xFF;
-                } else {
-                    *((uint32*)pDst + i) = nBackColor;
-                }
-                nCurX += nIncrementX1;
-                nCurY += nIncrementY1;
-            }
-        } else {
-            for (int i = 0; i < clippedTargetSize.cx; i++) {
-                int32 nCurRealX = nCurX >> 16;
-                int32 nCurRealY = nCurY >> 16;
-                if (nCurRealX >= 0 && nCurRealX < sourceSize.cx && nCurRealY >= 0 && nCurRealY < sourceSize.cy) {
-                    pSrc = (uint8*)pPixels + nPaddedSourceWidth * nCurRealY + nCurRealX * 4;
-                    *((uint32*)pDst + i) = *((uint32*)pSrc);
-                } else {
-                    *((uint32*)pDst + i) = nBackColor;
-                }
-                nCurX += nIncrementX1;
-                nCurY += nIncrementY1;
-            }
-        }
-        pDst += clippedTargetSize.cx*4;
-        nX += nIncrementX2;
-        nY += nIncrementY2;
-    }
-    return pDIB;
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////////
 // High quality rotation using bicubic sampling
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -1105,42 +976,6 @@ static uint8* ApplyFilter(int nSourceWidth, int nTargetWidth, int nHeight,
     }
 
     return pTarget;
-}
-
-// Apply filtering in x-direction and rotate, 16 bpp 1 channel image
-// NOTE: No saturation is done, only valid for filters that do not require saturation.
-// The filter is applied to the pixel centers, therefore no resize filters are possible.
-// nSourceWidth : Width of source in pixels
-// nTargetWidth: Width of target image in pixels (note that target image is rotated compared to source)
-// nStartX, nStartY: Start position for filtering in source image
-// nRunX, nRunY: Number of pixels in x and y to filter
-// filter: Filter to apply (in x direction)
-// pSource: Source image
-// pTarget: Target image, width must be nTargetWidth
-static void ApplyFilter1C16bpp(int nSourceWidth, int nTargetWidth,
-                               int nStartX, int nStartY,
-                               int nRunX, int nRunY,
-                               const FilterKernelBlock& filter,
-                               const int16* pSource, int16* pTarget) {
-
-    for (int j = 0; j < nRunY; j++) {
-        const int16* pSourcePixelLine = pSource + nStartX + nSourceWidth * (j + nStartY);
-        int16* pTargetPixelLine = pTarget + j;
-        int16* pTargetPixel = pTargetPixelLine;
-        for (int i = 0; i < nRunX; i++) {
-            FilterKernel* pKernel = filter.Indices[i + nStartX];
-            const int16* pSourcePixel = pSourcePixelLine + i - pKernel->FilterOffset;
-            int nPixelValue = 0;
-            for (int n = 0; n < pKernel->FilterLen; n++) {
-                nPixelValue += pKernel->Kernel[n] * pSourcePixel[n];
-            }
-            nPixelValue = nPixelValue >> 14;
-
-            *pTargetPixel = nPixelValue;
-            // rotate: go to next row in target
-            pTargetPixel += nTargetWidth;
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////

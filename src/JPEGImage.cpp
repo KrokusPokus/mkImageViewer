@@ -426,15 +426,6 @@ void CJPEGImage::VerifyDIBPixelsCreated() {
     }
 }
 
-void CJPEGImage::SetInitialParameters(const CImageProcessingParams& imageProcParams, 
-                                      EProcessingFlags procFlags, int nRotation, double dZoom, CPoint offsets) {
-    m_nInitialRotation = nRotation;
-    m_eProcFlagsInitial = procFlags;
-    m_imageProcParamsInitial = imageProcParams;
-    m_dInitialZoom = dZoom;
-    m_initialOffsets = offsets;
-}
-
 void CJPEGImage::RestoreInitialParameters(LPCTSTR sFileName, const CImageProcessingParams& imageProcParams, 
                                           EProcessingFlags & procFlags, int nRotation, double dZoom, 
                                           CPoint offsets, CSize targetSize, CSize monitorSize) {
@@ -446,10 +437,6 @@ void CJPEGImage::RestoreInitialParameters(LPCTSTR sFileName, const CImageProcess
     m_eProcFlagsInitial = procFlags;
     procFlags = m_eProcFlagsInitial;
     m_imageProcParamsInitial = imageProcParams;
-}
-
-void CJPEGImage::GetFileParams(LPCTSTR sFileName, EProcessingFlags& eFlags, CImageProcessingParams& params) const {
-
 }
 
 void CJPEGImage::SetFileDependentProcessParams(LPCTSTR sFileName, CProcessParams* pParams) {
@@ -465,23 +452,7 @@ void CJPEGImage::SetFileDependentProcessParams(LPCTSTR sFileName, CProcessParams
     m_imageProcParamsInitial = pParams->ImageProcParams;
 }
 
-void CJPEGImage::DIBToOrig(float & fX, float & fY) {
-    float fXo = m_TargetOffset.x + fX;
-    float fYo = m_TargetOffset.y + fY;
-    fX = fXo/m_FullTargetSize.cx*m_nOrigWidth;
-    fY = fYo/m_FullTargetSize.cy*m_nOrigHeight;
-}
 
-void CJPEGImage::OrigToDIB(float & fX, float & fY) {
-    float fXo = fX/m_nOrigWidth*m_FullTargetSize.cx;
-    float fYo = fY/m_nOrigHeight*m_FullTargetSize.cy;
-    fX = fXo - m_TargetOffset.x;
-    fY = fYo - m_TargetOffset.y;
-}
-
-__int64 CJPEGImage::GetUncompressedPixelHash() const { 
-    return (m_pLDC == NULL) ? 0 : m_pLDC->GetPixelHash(); 
-}
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Private
@@ -683,18 +654,6 @@ bool CJPEGImage::ConvertSrcTo4Channels() {
         return pNewOriginalPixels != NULL;
     }
     return true;
-}
-
-CSize CJPEGImage::SizeAfterRotation(const CRotationParams& rotationParams) {
-    int nDiff = ((rotationParams.Rotation - m_rotationParams.Rotation) + 360) % 360;
-    CSize size = (nDiff == 90 || nDiff == 270) ? CSize(m_nOrigHeight, m_nOrigWidth) : CSize(m_nOrigWidth, m_nOrigHeight);
-    double dDiff = fabs(rotationParams.FreeRotation - m_rotationParams.FreeRotation);
-    if (dDiff >= 0.009) {
-        CPoint offset;
-        return GetSizeAfterFreeRotation(size, 2 * 3.141592653 * rotationParams.FreeRotation / 360, GetRotationFlag(rotationParams.Flags, RFLAG_AutoCrop),
-            GetRotationFlag(rotationParams.Flags, RFLAG_KeepAspectRatio), offset);
-    }
-    return size;
 }
 
 CSize CJPEGImage::GetSizeAfterFreeRotation(const CSize& sourceSize, double dRotation, bool bAutoCrop, bool bKeepAspectRatio, CPoint & offset) {

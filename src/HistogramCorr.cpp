@@ -129,31 +129,6 @@ static float GetHistogramArea(const int* pHistogram, int nTotalValues, float fSt
     return (float)nSum/nTotalValues;
 }
 
-float CHistogram::IsNightShot() const {
-    if (m_fNightshot >= 0) {
-        return m_fNightshot;
-    }
-
-    // 1. Check brightness level with 80% of pixels below
-    uint32 nLimit80 = m_nTotalValues*80/100;
-    uint32 nPixels = 0;
-    int i = 0;
-    while (nPixels < nLimit80) {
-        nPixels += m_ChannelGrey[i++];
-    }
-    float fValue80 = (i-1)/255.0f;
-    float fArea10 = GetHistogramArea(m_ChannelGrey, m_nTotalValues, 0.0f, 0.1f);
-    float fArea50aboveRed = GetHistogramArea(m_ChannelR, m_nTotalValues, 0.4f, 1.0f);
-    float fArea50aboveGreen = GetHistogramArea(m_ChannelG, m_nTotalValues, 0.4f, 1.0f);
-    float fArea50aboveBlue = GetHistogramArea(m_ChannelB, m_nTotalValues, 0.4f, 1.0f);
-
-    float fNightshot = std::min(1.0f, (1.0f - fValue80)*1.6f) - std::max(0.0f, 1 - fArea10*3) -
-        5*std::max(fArea50aboveRed, std::max(fArea50aboveGreen, fArea50aboveBlue));
-    ((CHistogram*)(this))->m_fNightshot = std::min(1.0f, std::max(0.0f, fNightshot)); // cache it to speed up
-
-    return m_fNightshot;
-}
-
 ///////////////////////////////////////////////////////////////////////////////////
 // CHistogramCorr class - helpers
 ///////////////////////////////////////////////////////////////////////////////////

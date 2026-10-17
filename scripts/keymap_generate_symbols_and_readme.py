@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 from datetime import datetime, timezone
 
+CFG_PATH = Path(__file__).resolve().parent.parent / "config"
 SRC_PATH = Path(__file__).resolve().parent.parent / "src"
 
 
@@ -37,7 +38,7 @@ def keymap_resource_parse():
             # remove the newlines captured by readline()
             line = line.strip()
 
-            m = re.fullmatch("(#define)\s+(\w+)\s+(\d+)\s+// :KeyMap: (.*)", line)
+            m = re.fullmatch(r"(#define)\s+(\w+)\s+(\d+)\s+// :KeyMap: (.*)", line)
             if m:
                 d_int[m.group(2)] = int(m.group(3))
                 d_comment[m.group(2)] = m.group(4)
@@ -50,7 +51,7 @@ def keymap_generate_internal_config():
 
         it is intentionally made to be less readable by not doing any padding
     """
-    TARGET_FILE = SRC_PATH / r"Config\symbols.km"  # make filename discreet, since it really shouldn't confuse the user
+    TARGET_FILE = CFG_PATH / r"symbols.km"  # make filename discreet, since it really shouldn't confuse the user
 
     (d_index, d_comment) = keymap_resource_parse()
 
@@ -64,7 +65,7 @@ def keymap_generate_internal_config():
 //
 // NOTE: This file does NOT need to be localized, as users do not (should not) interact with this file.
 //
-// Devs: see "extras\scripts" for more info.\n\n""")
+// Devs: see "extras\\scripts" for more info.\n\n""")
 
         for k, v in d_index.items():
             f.write(f"#define {k} {v}\n")
@@ -79,7 +80,7 @@ def keymap_generate_reference_readme():
 
     the generated file is NOT PARSED by JPEGView at all, it's only a readme, so it can be translated without worry of a bad edit
     """
-    TARGET_FILE = SRC_PATH / r"Config\KeyMap-README.html"
+    TARGET_FILE = CFG_PATH / r"KeyMap-README.html"
 
     (d_index, d_comment) = keymap_resource_parse()
 
@@ -231,7 +232,7 @@ but not with other keys or other mouse buttons.
 
 <!--
 <p><i>
-    (Devs: see "extras\scripts" for more info.)
+    (Devs: see "extras\\scripts" for more info.)
 </i></p>
 -->
 
@@ -262,7 +263,7 @@ but not with other keys or other mouse buttons.
     </td>
   </tr>\n""")
 
-        f.write("</html>")
+        f.write("</table></body></html>")
 
 
 
@@ -281,62 +282,3 @@ if __name__ == "__main__":
 
 
 
-
-# this is what it looked like before I went to HTML
-f"""=== KeyMap Configuration Readme ===
-
-JPEGView allows customizing what each key and key combination will do.
-
-- Translation Credits -
-Language=English
-TranslatorName=
-Contact=
-LastUpdated=31-JAN-2023
-
------ Basics -----
-Edit "KeyMap.txt" to change keys and actions to your preference.
-
-The format is:
-  <Key or mouse combination>			<command>
-
-NOTE: A small number of keys is predefined and cannot be changed:
-* F1 for help
-* Alt+F4 for exit
-* 0..9 for slide show
-
-
------ Keys -----
-The following keys are recognized:
-* Alt, Ctrl, Shift
-* Esc, Return, Space, End, Home, Back, Tab, PgDn, PgUp
-* Left, Right, Up, Down, Insert, Del, Plus, Minus, Mul, Div, Comma, Period
-* A .. Z
-* F1 .. F12
-
-
------ Mouse -----
-It is also possible to bind a command to a mouse button.
-Be careful when you override the default functionality (e.g. to pan with left mouse)!
-Mouse buttons can be combined with:  Alt, Ctrl and Shift
-but not with other keys or other mouse buttons.
-
-The following mouse buttons are recognized:
-* MouseL, MouseR, MouseM
-* MouseX1, MouseX2
-* MouseDblClk
-(Left, right, middle, extra mouse buttons, mouse left double click)
-
-
------ Rules -----
-NOTE: Mapping multiple keys to the same command is allowed, but not multiple commands to the same key
-
-WARNING: Be sure not to corrupt the "KeyMap.txt", or else no keys will work anymore!
-
-
------ Supported Commands -----
-The following is a list of available JPEGView commands which can be mapped to keys/mouse
-On the left is the command, on the right is a brief description of the command.
-
-NOTE: THIS LIST WAS AUTO-GENERATED FROM SOURCE -- LastUpdated: {datetime.now(timezone.utc).isoformat()}
-(JPEGView does not read this file, it's for documentation only)
-(Devs: see "extras\scripts" for more info.)\n\n\n"""

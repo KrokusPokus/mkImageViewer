@@ -451,35 +451,6 @@ CEXIFReader::~CEXIFReader(void) {
     delete m_pLongitude;
 }
 
-void CEXIFReader::WriteImageOrientation(int nOrientation) {
-    if (m_pTagOrientation != NULL && ImageOrientationPresent()) {
-        WriteShortTag(m_pTagOrientation, nOrientation, m_bLittleEndian);
-    }
-}
-
-void CEXIFReader::DeleteThumbnail() {
-    if (m_pLastIFD0 != NULL) {
-        *m_pLastIFD0 = 0;
-    }
-}
-
-void CEXIFReader::UpdateJPEGThumbnail(unsigned char* pJPEGStream, int nStreamLen, int nEXIFBlockLenCorrection, CSize sizeThumb) {
-    if (!m_bHasJPEGCompressedThumbnail) {
-        return;
-    }
-    uint8* pTagOffsetSOI = FindTag(m_pIFD1, m_pLastIFD1, 0x0201, m_bLittleEndian);
-    uint32 nOffsetSOI = ReadLongTag(pTagOffsetSOI, m_bLittleEndian);
-    uint8* pTIFFHeader = m_pApp1 + 10;
-    uint8* pSOI = pTIFFHeader + nOffsetSOI;
-    memcpy(pSOI + 2, pJPEGStream, nStreamLen);
-
-    uint8* pTagJPEGBytes = FindTag(m_pIFD1, m_pLastIFD1, 0x0202, m_bLittleEndian);
-    WriteLongTag(pTagJPEGBytes, nStreamLen + 2, m_bLittleEndian);
-    int nNewApp1Size = m_pApp1[2]*256 + m_pApp1[3] + nEXIFBlockLenCorrection;
-    m_pApp1[2] = nNewApp1Size >> 8;
-    m_pApp1[3] = nNewApp1Size & 0xFF;
-}
-
 void CEXIFReader::ReadGPSData(uint8* pTIFFHeader, uint8* pTagGPSIFD, int nApp1Size, bool bLittleEndian) {
     uint32 nOffsetGPS = ReadLongTag(pTagGPSIFD, bLittleEndian);
     if (nOffsetGPS == 0) {

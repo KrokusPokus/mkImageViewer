@@ -62,9 +62,6 @@ public:
     // Releases the cached image file if an image of the specified name is cached
     void ReleaseFile(LPCTSTR strFileName);
 
-    // Gets the request handle value used for the last request
-    static int GetCurHandleValue() { return m_curHandle; }
-
 private:
 
     // Request for loading an image

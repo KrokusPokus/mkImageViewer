@@ -81,9 +81,6 @@ public:
     // Gets the hash value of the pixels, for JPEGs the hash is on the compressed pixels
     __int64 GetPixelHash() const { return m_nPixelHash; }
 
-    // Gets the pixel hash over the de-compressed pixels
-    __int64 GetUncompressedPixelHash() const;
-
     // Original image size. Operations on the original pixels will change this size!
     int OrigWidth() const { return m_nOrigWidth; }
     int OrigHeight() const { return m_nOrigHeight; }
@@ -97,10 +94,6 @@ public:
     // Size of DIB - size of resampled section of the original image. If zero, no DIB is currently available.
     int DIBWidth() const { return m_ClippingSize.cx; }
     int DIBHeight() const { return m_ClippingSize.cy; }
-
-    // Convert DIB coordinates into original image coordinates and vice versa
-    void DIBToOrig(float & fX, float & fY);
-    void OrigToDIB(float & fX, float & fY);
 
     // Gets the rotation applied to the pixels
     const CRotationParams& GetRotationParams() {return m_rotationParams; }
@@ -165,16 +158,10 @@ public:
     // Gets the offsets as set as default (can vary from file to file)
     CPoint GetInitialOffsets() const { return m_initialOffsets; }
 
-    // Sets the initial parameters to the given values.
-    void SetInitialParameters(const CImageProcessingParams& imageProcParams, EProcessingFlags procFlags, int nRotation, double dZoom, CPoint offsets);
-
     // Restores the initial parameters to the parameters dependent on the directory (not the file)
     // Outputs the processing flags set for this directory
     void RestoreInitialParameters(LPCTSTR sFileName, const CImageProcessingParams& imageProcParams, 
         EProcessingFlags & procFlags, int nRotation, double dZoom, CPoint offsets, CSize targetSize, CSize monitorSize);
-
-    // Gets the processing parameters and flags according to param DB or file path.
-    void GetFileParams(LPCTSTR sFileName, EProcessingFlags& eFlags, CImageProcessingParams& params) const;
 
     // To be called after creation of the object to initialize the initial processing parameters.
     // Input are the global defaults for the processing parameters, output (in pParams) are the
@@ -354,9 +341,6 @@ private:
 
     // makes sure that the input image (m_pOrigPixels) is a 4 channel BGRA image (converts if necessary)
     bool ConvertSrcTo4Channels();
-
-    // Return size of original image if the image would be rotated the given amount
-    CSize SizeAfterRotation(const CRotationParams& rotationParams);
 
     // Gets the new size of the image after doing a free rotation
     static CSize GetSizeAfterFreeRotation(const CSize& sourceSize, double dRotation, bool bAutoCrop, bool bKeepAspectRatio, CPoint & offset);

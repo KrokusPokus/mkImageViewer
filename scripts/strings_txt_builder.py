@@ -33,7 +33,7 @@ UTF8 = 'utf-8-sig'
 # while it's not needed, all existing files have it, and I think it helps some editors, so leave it in
 # https://stackoverflow.com/questions/2223882/whats-the-difference-between-utf-8-and-utf-8-with-bom
 
-
+CONFIG_DIR = Path(__file__).resolve().parent.parent / r"config"
 SOURCE_DIR = Path(__file__).resolve().parent.parent / r"src"
 
 
@@ -86,7 +86,7 @@ def find_ini_usercommand():
     # UserCmd0="KeyCode: Shift+Del Cmd: 'cmd /c del %filename%' Confirm: 'Do you really want to permanently delete the file %filename%?' HelpText: 'Shift+Del\tDelete current file on disk permanently' Flags: 'WaitForTerminate ReloadFileList MoveToNext'"
     #user_cmd = find_all_pattern(r'[^;]\s*UserCmd[0-9]+=".*?Confirm: \'(.*?)\'..........
 
-    filepath = SOURCE_DIR / "Config/JPEGView.ini"
+    filepath = CONFIG_DIR / "JPEGView.ini"
 
     ret = {}
 
@@ -302,7 +302,7 @@ def dump_strings_txt(sorted_strings_dict, menu_list):
     """
     menu_strings = menu_list.copy()  # because we're modifying it later
 
-    OUT_FILE = SOURCE_DIR / "Config" / "strings.txt"
+    OUT_FILE = CONFIG_DIR / "strings.txt"
 
     # dump the dict out
 

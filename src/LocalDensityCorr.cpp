@@ -227,28 +227,6 @@ void CLocalDensityCorr::CreateLDCMap() {
     SmoothLDCMask();
 }
 
-// Multiply the LDC map by given factors in lower and upper range and return new LDC map
-uint8* CLocalDensityCorr::MultiplyMap(double dLightenShadows, double dDarkenHighlights) {
-    if (m_pLDCMap == NULL) { return NULL; }
-    int nLightenValue = (int)(dLightenShadows * 65536 + 0.5);
-    int nDarkenValue = (int)(dDarkenHighlights * 65536 + 0.5);
-    uint8* pSrc = m_pLDCMap;
-    uint8* pDst = new uint8[m_nLDCHeight*m_nLDCWidth];
-    uint8* pNewLDC = pDst;
-    for (int i = 0; i < m_nLDCHeight; i++) {
-        for (int j = 0; j < m_nLDCWidth; j++) {
-            if (*pSrc <= 127) {
-                *pDst = 127 - ((127 - *pSrc)*nDarkenValue >> 16);
-            } else {
-                *pDst = 127 + ((*pSrc - 127)*nLightenValue >> 16);
-            }
-            pSrc++; pDst++;
-        }
-    }
-
-    return pNewLDC;
-}
-
 // Smooth LDC mask by a triangle filter of length 3
 void CLocalDensityCorr::SmoothLDCMask() {
     if (m_nLDCHeight <= 2 || m_nLDCWidth <= 2) {

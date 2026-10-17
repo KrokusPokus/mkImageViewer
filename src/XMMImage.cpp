@@ -61,32 +61,6 @@ CXMMImage::~CXMMImage(void) {
     }
 }
 
-void* CXMMImage::ConvertToDIBRGBA() const {
-    if (m_pMemory == NULL) {
-        return NULL;
-    }
-    uint8* pDIB = new uint8[m_nWidth*4 * m_nHeight];
-    
-    uint16* pSrc = (uint16*) m_pMemory;
-    uint8* pDst = pDIB;
-    for (int j = 0; j < m_nHeight; j++) {
-        for (int i = 0; i < m_nWidth; i++) {
-            int d = i*4;
-            int s = i;
-            pDst[d] = (uint8)(pSrc[s] >> 6);
-            s += m_nPaddedWidth;
-            pDst[d+1] = (uint8)(pSrc[s] >> 6);
-            s += m_nPaddedWidth;
-            pDst[d+2] = (uint8)(pSrc[s] >> 6);
-            pDst[d+3] = 0xFF;
-        }
-        pSrc += 3*m_nPaddedWidth;
-        pDst += m_nWidth*4;
-    }
-
-    return pDIB;
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////
 // Private
 /////////////////////////////////////////////////////////////////////////////////////////

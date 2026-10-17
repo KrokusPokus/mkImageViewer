@@ -84,10 +84,6 @@ public:
     // Creates 6 * 256 int32 entries for the matrix elements of the saturation matrix. The elements are in 8.24 fixed point format.
     static int32* CreateColorSaturationLUTs(double dSaturation);
 
-    // Create a one channel 16 bpp gray scale image from a 32 or 24 bpp BGR(A) DIB image (nChannels must be 3 or 4)
-    // In the resulting image, 14 bits are used, thus white is 2^14 
-    static int16* Create1Channel16bppGrayscaleImage(int nWidth, int nHeight, const void* pDIBPixels, int nChannels);
-
     // Apply a three channel LUT (memory layout: 256 uint8 values for B channel, followed by 256 uint8 values for G channel,
     // followed by 256 uint8 values for R channel, totally 3*256 bytes) to a 32 bpp BGRA DIB.
     // Notice that the A channel is not processed and set to fixed value 0xFF.
@@ -104,24 +100,6 @@ public:
     // coordinates (xo, yo) - denoted as 'fullTargetOffset' - and a cropping rectangle size (wc, hc) - denoted
     // as 'clippedTargetSize'.
 
-    // Applies the LDC (local density correction) map and a three channel LUT (256*B, 256*G, 256*R, see above for details)
-    // to a 32 bpp BGRA DIB.
-    // Notice that the A channel is not processed and set to fixed value 0xFF.
-    // This method is used to lighten shadows and darken highlights.
-    // fullTargetSize: Virtual size of zoomed image.
-    // fullTargetOffset: Offset for start of clipping window (in the region given by fullTargetSize)
-    // clippedTargetSize: Actual clipped window size, this is also the size of the input DIB
-    // ldcMapSize: Size of LDC map in pixels
-    // pDIBPixels: 32 bpp input DIB, size is clippedTargetSize
-    // pSatLUTs: saturation LUTs - can be NULL. Format as returned by CreateColorSaturationLUTs() method.
-    // pLUT: three channel LUT (BBBBB..., GGGGG..., RRRRRR..., 256 entries per channel)
-    // pLDCMap: LDC map, 8 bits per pixel, grayscale
-    // fBlackPt, fWhitePt: Black and white point of original unprocessed, unclipped image
-    // fBlackPtSteepness: Steepness of black point correction (0..1)
-    static void* ApplyLDC32bpp(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        CSize ldcMapSize, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap, 
-        float fBlackPt, float fWhitePt, float fBlackPtSteepness);
-
     // Resize 32 or 24 bpp BGR(A) image using point sampling (i.e. no interpolation).
     // Point sampling is fast but produces a lot of aliasing artifacts.
     // Notice that the A channel is kept unchanged for 32 bpp images.
@@ -135,16 +113,6 @@ public:
     // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
     static void* PointSample(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize, 
         CSize sourceSize, const void* pPixels, int nChannels);
-
-    // Rotate 32 or 24 bpp BGR(A) image and resample using point sampling (i.e. no interpolation). Rotation is around image center.
-    // Notice that the A channel is kept unchanged for 32 bpp images.
-    // Notice that the returned image is always 32 bpp!
-    // dRotation: Rotation angle in radians
-    // backColor: Color to fill areas in rotated target image that are outside of source image. The A value is ignored and set to 0xFF.
-    // See PointSample() for other parameters
-    // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
-    static void* PointSampleWithRotation(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize, 
-        CSize sourceSize, double dRotation, const void* pPixels, int nChannels, COLORREF backColor);
 
     // High quality downsampling of 32 or 24 bpp BGR(A) image to target size, using a set of down-sampling kernels.
     // Notice that the A channel is not processed and set to fixed value 0xFF.

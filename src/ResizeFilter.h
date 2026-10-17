@@ -195,30 +195,4 @@ private:
     const CResizeFilter& m_filter;
 };
 
-// Gauss filter (low pass filter). This filter is not a resize filter.
-class CGaussFilter {
-public:
-    // Calculate 1D Gauss filter block of specified size, with border handling.
-    // Radius is in pixels.
-    CGaussFilter(int nSourceSize, double dRadius);
-    ~CGaussFilter(void);
-
-    // Gets a set of kernels for applying a 1D Gauss filter to an image of size give in constructor.
-    // Gauss is a separable filter, thus an 1D filter can be applied to X, then another 1D filter to Y.
-    // The returned filter must not be deleted by the caller
-    const FilterKernelBlock& GetFilterKernels() const { return m_kernels; }
-
-    enum {
-        // 1.0 in our fixed point format, thus using 2.14 FP format
-        FP_ONE = 16383
-    };
-private:
-    int m_nSourceSize;
-    double m_dRadius;
-    FilterKernelBlock m_kernels;
-
-    void CalculateKernels();
-    static FilterKernel CalculateKernel(double dRadius);
-};
-
 #endif // RESIZEFILTER_H

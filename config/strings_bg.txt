@@ -41,61 +41,17 @@
 
 
 // ::: Program Strings ::: (sorted alphabetically) //
-Ascending	Възходящо
-Auto contrast and color correction	Автоматичен контраст и корекция на цветовете
-Auto zoom mode	Режим на автоматично мащабиране
-Blend	Бленда
-Book Mode	
-Brightness	Яркост
 Confirm	Потвърди
-Confirm save default parameters	Потвърди запазване на параметрите по подразбиране
-Contrast	Контраст
 Decoding this format requires the Microsoft Visual C++ Redistributable.	Декодирането на този формат изисква Microsoft Visual C++ Redistributable.
-Descending	Низходящо
-Do you really want to save the following parameters as default to the INI file	Искате ли да запазите следните параметри по подразбиране в INI файла
-File name	Име на файла
-File size	Размер на файла
-Fill with crop	Запълни с изрязване
-Fill with crop (no zoom)	Запълни с изрязване (без мащабиране)
-Fit to screen	Побиране в екрана
-Fit to screen (no zoom)	Побиране в екрана (без мащабиране)
-High quality resampling	Висококачествено изглаждане
-Keep parameters	Запазване на параметрите
-Last modification date/time	Дата/час на последна промяна
-Loop folder	Текущата папка
-Loop recursively	Рекурсивно (всички подпапки)
-Loop siblings	Сродни папки (на същото ниво)
-Navigation	Навигация
 No image loaded!	Няма заредено изображение!
 No user INI file exists yet. Create user INI file from INI file template?	Все още не съществува потребителски INI файл. Създаване на потребителски INI файл от шаблон на INI файл?
-None	Няма
 Not enough memory available	Няма достатъчно налична памет
-Order files by	Подреждане на файлове по
 Press ESC to exit...	Натиснете ESC за изход...
 Press any key to search the subdirectories for image files.	Натиснете произволен клавиш, за да търсите в поддиректориите за файлове с изображения.
-Random	Случайно
 Reason:	Причина:
-Roll from bottom	Разгръщане отдолу нагоре
-Roll from left	Разгръщане от ляво
-Roll from right	Разгръщане от дясно
-Roll from top	Разгръщане отгоре надолу
-Saturation	Насищане
-Scroll from bottom	Превъртане отдолу нагоре
-Scroll from left	Превъртане от ляво
-Scroll from right	Превъртане от дясно
-Scroll from top	Превъртане отгоре надолу
-Slide from bottom	Плъзгане отдолу нагоре
-Slide from left	Плъзгане от ляво
-Slide from right	Плъзгане от дясно
-Slide from top	Плъзгане отгоре надолу
-Slideshow	Слайдшоу
 The directory '%s' does not contain any image files!	Директорията '%s' не съдържа файлове с изображения!
 The file '%s' could not be read!	Файлът '%s' не можа да бъде прочетен!
 The file '%s' does not contain a list of file names!	Файлът '%s' не съдържа списък с имена на файлове!
-These values will override the values from the INI file located in the program folder of JPEGView!	Тези стойности ще заменят стойностите от INI файла, намиращ се в програмната папка на JPEGView!
-Transition Effect	Преходен ефект
-off	изключено
-on	включено
 
 // ::: Popup Menu Strings ::: (unsorted to preserve context) //
 Next image	Следващо изображение
@@ -106,6 +62,7 @@ Rotate -90	Завъртане -90
 Mirror horizontally	Огледално по хоризонтала
 Mirror vertically	Огледално по вертикала
 Fit to window	
+Fill with crop	Запълни с изрязване
 Window	
 Full screen mode	Режим на цял екран
 Fit window to image	Напасване на прозореца към изображението
@@ -113,6 +70,7 @@ Hide window title bar	Скриване на заглавната лента на
 Set window always on top	Поставяне на прозореца винаги отгоре
 Play folder as slideshow/movie	Възпроизвеждане на папка като слайдшоу/филм
 Pause Slideshow/Movie	
+Slideshow	Слайдшоу
 Waiting time	Време за изчакване
 1 sec	1 сек
 2 sec	2 сек
@@ -122,6 +80,21 @@ Waiting time	Време за изчакване
 7 sec	7 сек
 10 sec	10 сек
 20 sec	20 сек
+Transition Effect	Преходен ефект
+None	Няма
+Blend	Бленда
+Slide from right	Плъзгане от дясно
+Slide from left	Плъзгане от ляво
+Slide from top	Плъзгане отгоре надолу
+Slide from bottom	Плъзгане отдолу нагоре
+Roll from right	Разгръщане от дясно
+Roll from left	Разгръщане от ляво
+Roll from top	Разгръщане отгоре надолу
+Roll from bottom	Разгръщане отдолу нагоре
+Scroll from right	Превъртане от дясно
+Scroll from left	Превъртане от ляво
+Scroll from top	Превъртане отгоре надолу
+Scroll from bottom	Превъртане отдолу нагоре
 Transition Speed	Скорост на прехода
 Very fast	Много бърза
 Fast	Бърза
@@ -141,24 +114,31 @@ Playback speed	Скорост на възпроизвеждане
 100 fps	100 fps
 Reload image	Презареждане на изображението
 Edit image in default editor	
-Copy scaled image content to clipboard	
 Copy original image content to clipboard	
 Copy file path to clipboard	
 Cut file to clipboard	
 Open containing folder in Explorer	Отваряне на съдържащата папка в Explorer
 Folder Mode	
+Loop folder	Текущата папка
+Loop recursively	Рекурсивно (всички подпапки)
+Loop siblings	Сродни папки (на същото ниво)
 Sort Order	
+File name	Име на файла
 Modification date	Дата на промяна
+File size	Размер на файла
+Random	Случайно
+Ascending	Възходящо
+Descending	Низходящо
 Auto Zoom Mode	
 Fit to window (never upsize)	
 Fill with crop (never upsize)	
+Book Mode	
 Auto Contrast	
 Edit Settings	
 Settings Dialog	
 Exit	Изход
 
-// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
-//! Book Mode
+// ::: INFO: Missing Translations [20] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
 //! Current View
 //! Fit to window
 //! Window
@@ -167,7 +147,6 @@ Exit	Изход
 //! 20 fps
 //! 60 fps
 //! Edit image in default editor
-//! Copy scaled image content to clipboard
 //! Copy original image content to clipboard
 //! Copy file path to clipboard
 //! Cut file to clipboard
@@ -176,6 +155,7 @@ Exit	Изход
 //! Auto Zoom Mode
 //! Fit to window (never upsize)
 //! Fill with crop (never upsize)
+//! Book Mode
 //! Auto Contrast
 //! Edit Settings
 //! Settings Dialog
@@ -188,8 +168,8 @@ Exit	Изход
 //! 50 fps
 //! 100 fps
 
-// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.289326+00:00 //
-//! Translation Progress: 81%
-//! * Total (Strings + Menu) = 113
-//! * Done = 92
-//! * Missing = 21 (19%)
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T20:48:43.438922+00:00 //
+//! Translation Progress: 79%
+//! * Total (Strings + Menu) = 94
+//! * Done = 74
+//! * Missing = 20 (21%)

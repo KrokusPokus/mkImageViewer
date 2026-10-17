@@ -64,6 +64,8 @@ static inline bool GetRotationFlag(ERotationFlags eFlags, ERotationFlags eFlagTo
 // Parameters used for image rotation
 class CRotationParams {
 public:
+    CRotationParams() : Rotation(0), FreeRotation(0.0), Flags(RFLAG_None) {}
+
     explicit CRotationParams(int rotation) {
         Rotation = rotation;
         FreeRotation = 0;
@@ -93,6 +95,7 @@ public:
     ERotationFlags Flags;
 };
 
+/*
 // Parameters used to process an image, including geometry
 class CProcessParams {
 public:
@@ -131,6 +134,48 @@ public:
     CImageProcessingParams ImageProcParams;
     EProcessingFlags ProcFlags;
     Helpers::EAutoZoomMode AutoZoomMode;
+};
+*/
+class CProcessParams {
+public:
+    // TargetWidth, TargetHeight is the dimension of the target output window, the image is fit into this rectangle
+    // rotationParams specifies base rotation; nUserRotation will be added to it
+    // dZoom is the zoom factor compared to initial image size (1.0 means no zoom)
+    // offsets are relative to center of image and refer to original image size (not zoomed)
+    CProcessParams(int nTargetWidth,
+                   int nTargetHeight,
+                   CSize monitorSize,
+                   const CRotationParams& rotationParams,
+                   int nUserRotation,
+                   double dZoom,
+                   Helpers::EAutoZoomMode eAutoZoomMode,
+                   CPoint offsets,
+                   Helpers::ETransparencyMode eTransparencyMode,
+                   const CImageProcessingParams& imageProcParams,
+                   EProcessingFlags eProcFlags)
+        : TargetWidth(nTargetWidth),
+        TargetHeight(nTargetHeight),
+        MonitorSize(monitorSize),
+        RotationParams(rotationParams),
+        UserRotation(nUserRotation),
+        Zoom(dZoom),
+        AutoZoomMode(eAutoZoomMode),
+        Offsets(offsets),
+        TransparencyMode(eTransparencyMode),
+        ImageProcParams(imageProcParams),
+        ProcFlags(eProcFlags) {}
+
+    int TargetWidth{0};
+    int TargetHeight{0};
+    CSize MonitorSize{};
+    CRotationParams RotationParams{};
+    int UserRotation{0};
+    double Zoom{1.0};
+    Helpers::EAutoZoomMode AutoZoomMode{};
+    CPoint Offsets{};
+    Helpers::ETransparencyMode TransparencyMode{}; // for transparent background
+    CImageProcessingParams ImageProcParams{};
+    EProcessingFlags ProcFlags{};
 };
 
 #endif // PROCESSPARAMS_H

@@ -41,61 +41,17 @@
 
 
 // ::: Program Strings ::: (sorted alphabetically) //
-Ascending	Növekvő számlálás
-Auto contrast and color correction	Automatikus kontraszt és színkorrekció
-Auto zoom mode	Automatikus nagyítás mód
-Blend	Keverés
-Book Mode	
-Brightness	Fényerősség
 Confirm	Megerősít
-Confirm save default parameters	Erősítse meg az alapértelmezett paraméterek mentését
-Contrast	Kontraszt
 Decoding this format requires the Microsoft Visual C++ Redistributable.	Ennek a formátumnak a dekódolásához Microsoft Visual C++ Redistributable szükséges.
-Descending	Csökkenő számlálás
-Do you really want to save the following parameters as default to the INI file	Biztosan el szeretné menteni a következő paramétereket alapértelmezettként az INI fájlba?
-File name	Fájl név
-File size	Fájl méret
-Fill with crop	Töltsük fel a kivágással
-Fill with crop (no zoom)	Kivágás kivágással (nincs nagyítás)
-Fit to screen	Képernyőhöz igazítva
-Fit to screen (no zoom)	Képernyőhöz igazítás (nincs nagyítás)
-High quality resampling	Kiváló minőségű újramintavételezés
-Keep parameters	Tartsa meg a paramétereket
-Last modification date/time	Utolsó módosítás dátuma/időpontja
-Loop folder	Hurok mappa
-Loop recursively	Rekurzív hurok
-Loop siblings	Hurok testvérek
-Navigation	Navigáció
 No image loaded!	Nincs kép betöltve!
 No user INI file exists yet. Create user INI file from INI file template?	Nincs felhasználói INI-fájl. Hozzon létre felhasználói INI-fájlt sablonból?
-None	Egyik sem
 Not enough memory available	Nincs elég memória
-Order files by	Fájlok rendezése a következő szerint
 Press ESC to exit...	Nyomja meg az ESC gombot a kilépéshez...
 Press any key to search the subdirectories for image files.	Bármely billentyű megnyomásával képfájlokat kereshet az alkönyvtárak között.
-Random	Véletlen
 Reason:	Ok:
-Roll from bottom	Forgass alulról
-Roll from left	Forgass balról
-Roll from right	Forgass jobbról
-Roll from top	Forgass felülről
-Saturation	Telítettség
-Scroll from bottom	Görgessen alulról
-Scroll from left	Görgessen balról
-Scroll from right	Görgessen jobbról
-Scroll from top	Görgessen felülről
-Slide from bottom	Csúsztassa alulról
-Slide from left	Csúsztassa balról
-Slide from right	Csúsztassa jobbról
-Slide from top	Csúsztassa felülről
-Slideshow	Diavetítés
 The directory '%s' does not contain any image files!	A '%s' könyvtár nem tartalmaz képfájlokat!
 The file '%s' could not be read!	A '%s' fájl nem olvasható!
 The file '%s' does not contain a list of file names!	A '%s' fájl nem tartalmazza a fájlnevek listáját!
-These values will override the values from the INI file located in the program folder of JPEGView!	Ezek az értékek felülírják a JPEGView program mappájában található INI fájl értékeit!
-Transition Effect	Átmenet hatás
-off	ki
-on	be
 
 // ::: Popup Menu Strings ::: (unsorted to preserve context) //
 Next image	Következő kép
@@ -106,6 +62,7 @@ Rotate -90	Forgatás -90
 Mirror horizontally	Vízszintes tükrözés
 Mirror vertically	Függőleges  tükrözés
 Fit to window	
+Fill with crop	Töltsük fel a kivágással
 Window	
 Full screen mode	Teljes képernyős mód
 Fit window to image	Illessze az ablakot a képhez
@@ -113,6 +70,7 @@ Hide window title bar	Az ablak címsorának elrejtése
 Set window always on top	Az ablak legyen mindig felül
 Play folder as slideshow/movie	Mappa lejátszása diavetítésként/filmként
 Pause Slideshow/Movie	
+Slideshow	Diavetítés
 Waiting time	Várakozási idő
 1 sec	1 mp
 2 sec	2 mp
@@ -122,6 +80,21 @@ Waiting time	Várakozási idő
 7 sec	7 mp
 10 sec	10 mp
 20 sec	20 mp
+Transition Effect	Átmenet hatás
+None	Egyik sem
+Blend	Keverés
+Slide from right	Csúsztassa jobbról
+Slide from left	Csúsztassa balról
+Slide from top	Csúsztassa felülről
+Slide from bottom	Csúsztassa alulról
+Roll from right	Forgass jobbról
+Roll from left	Forgass balról
+Roll from top	Forgass felülről
+Roll from bottom	Forgass alulról
+Scroll from right	Görgessen jobbról
+Scroll from left	Görgessen balról
+Scroll from top	Görgessen felülről
+Scroll from bottom	Görgessen alulról
 Transition Speed	Átmenet sebessége
 Very fast	Nagyon gyors
 Fast	Gyors
@@ -141,24 +114,31 @@ Playback speed	Lejátszási sebesség
 100 fps	100 fps
 Reload image	Kép újratöltése
 Edit image in default editor	
-Copy scaled image content to clipboard	
 Copy original image content to clipboard	
 Copy file path to clipboard	
 Cut file to clipboard	
 Open containing folder in Explorer	A tartalmazó könyvtár megnyitása Intézővel
 Folder Mode	
+Loop folder	Hurok mappa
+Loop recursively	Rekurzív hurok
+Loop siblings	Hurok testvérek
 Sort Order	
+File name	Fájl név
 Modification date	Módosítás dátuma
+File size	Fájl méret
+Random	Véletlen
+Ascending	Növekvő számlálás
+Descending	Csökkenő számlálás
 Auto Zoom Mode	
 Fit to window (never upsize)	
 Fill with crop (never upsize)	
+Book Mode	
 Auto Contrast	
 Edit Settings	
 Settings Dialog	
 Exit	Kilépés
 
-// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
-//! Book Mode
+// ::: INFO: Missing Translations [20] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
 //! Current View
 //! Fit to window
 //! Window
@@ -167,7 +147,6 @@ Exit	Kilépés
 //! 20 fps
 //! 60 fps
 //! Edit image in default editor
-//! Copy scaled image content to clipboard
 //! Copy original image content to clipboard
 //! Copy file path to clipboard
 //! Cut file to clipboard
@@ -176,6 +155,7 @@ Exit	Kilépés
 //! Auto Zoom Mode
 //! Fit to window (never upsize)
 //! Fill with crop (never upsize)
+//! Book Mode
 //! Auto Contrast
 //! Edit Settings
 //! Settings Dialog
@@ -188,8 +168,8 @@ Exit	Kilépés
 //! 50 fps
 //! 100 fps
 
-// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.305542+00:00 //
-//! Translation Progress: 81%
-//! * Total (Strings + Menu) = 113
-//! * Done = 92
-//! * Missing = 21 (19%)
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T20:48:43.664491+00:00 //
+//! Translation Progress: 79%
+//! * Total (Strings + Menu) = 94
+//! * Done = 74
+//! * Missing = 20 (21%)
