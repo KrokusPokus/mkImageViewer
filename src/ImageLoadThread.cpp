@@ -724,11 +724,7 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
             uint8* pPixelData = NULL;
             void* pEXIFData = NULL;
 
-            // If UseEmbeddedColorProfiles is true and the image isn't animated, we should use GDI+ for better color management
-            bool bUseGDIPlus = CSettingsProvider::This().UseEmbeddedColorProfiles();
-            if (bUseCachedDecoder || !bUseGDIPlus || PngReader::MustUseLibpng(pBuffer, nFileSize))
-                pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-
+            pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
             if (pPixelData != NULL) {
                 if (bHasAnimation)
                     m_sLastPngFileName = sFileName;
