@@ -178,7 +178,6 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Reload image",                    IDM_RELOAD_FULL
         MENUITEM "Edit image in default editor",       IDM_OPEN_DEFAULT_EDITOR
-        MENUITEM "Copy scaled image content to clipboard",   IDM_COPY
         MENUITEM "Copy original image content to clipboard", IDM_COPY_FULL
         MENUITEM "Copy file path to clipboard",              IDM_COPY_PATH
         MENUITEM "Cut file to clipboard",           IDM_CUT_FILE

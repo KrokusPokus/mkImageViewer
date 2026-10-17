@@ -91,6 +91,10 @@ namespace Helpers {
         INI_Custom
     };
 
+    static float DPIScalingFactor = -1.0f; // is set to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
+	
+    static TCHAR buffAppPath[MAX_PATH + 32] = _T("");
+
     // Maximum and minimum allowed zoom factors for images
     const double ZoomMax = DBL_MAX; // unbound the maximum zoom, previously set at 16.0 (1600%)
     const double ZoomMin = DBL_MIN; // unbound the minimum zoom, previously set at 0.1 (10%)
@@ -103,6 +107,9 @@ namespace Helpers {
     inline int RoundToInt(double d) {
         return (d < 0) ? (int)(d - 0.5) : (int)(d + 0.5);
     }
+
+    // Scales a pixel value given in 96 DPI to screen pixels, taking the screen DPI into account
+    int ScaleWithDPI(int value);
 
     // Based on: https://github.com/sdneon/jpegview.git
     // COLORREF is 0x00bbggrr. 0xFF00000 signals we don't use an override color

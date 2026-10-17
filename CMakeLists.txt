@@ -67,7 +67,7 @@ set(SOURCES
     src/EXIFReader.cpp
     src/FileList.cpp
     src/Helpers.cpp
-    src/HelpersGUI.cpp
+
     src/HistogramCorr.cpp
     src/ICCProfileTransform.cpp
     src/ImageLoadThread.cpp

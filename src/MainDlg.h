@@ -169,7 +169,7 @@ private:
     CJPEGImage * m_pCurrentImage; // currently displayed image
     bool m_bOutOfMemoryLastImage; // true if the last image could not be requested because not enough memory
     bool m_bExceptionErrorLastImage; // true if the last image could not be requested because of an unhandled exception
-    int m_nLastLoadError; // one of HelpersGUI::EFileLoadError
+    int m_nLastLoadError; // one of EFileLoadError
     
     // Current parameter set
     int m_nRotation; // this can only be 0, 90, 180 or 270

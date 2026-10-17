@@ -11,8 +11,8 @@
 #include "MultiMonitorSupport.h"
 #include "HistogramCorr.h"
 #include "Clipboard.h"
+#include "ProcessParams.h"
 #include "NLS.h"
-#include "HelpersGUI.h"
 #include "TimerEventIDs.h"
 #include "ResizeFilter.h"
 #include "ProcessingThreadPool.h"
@@ -25,83 +25,136 @@
 #include <QMessageBox>
 
 
-//////////////////////////////////////////////////////////////////////////////////////////////
-// Constants
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-static const int MIN_WND_WIDTH = 320;
-static const int MIN_WND_HEIGHT = 240;
-
-static const int NUM_THREADS = 1; // number of readahead threads to use. Use "1" since the ImageLoaders aren't thread save and JxlReader/PngReaderer/WebpReaderWriter can't do out of order frame access!
-static const int ZOOM_TIMEOUT = 50; // refinement done after this many milliseconds
-static const int ZOOM_TEXT_TIMEOUT = 1000; // zoom label disappears after this many milliseconds
-
-static const int ZOOM_TEXT_RECT_WIDTH = 70; // zoom label width
-static const int ZOOM_TEXT_RECT_HEIGHT = 25; // zoom label height
-static const int ZOOM_TEXT_RECT_OFFSET_X = 30; // zoom label offset from right border
-static const int ZOOM_TEXT_RECT_OFFSET_Y = 20; // zoom label offset from bottom border
-
-static const int TOAST_TEXT_RECT_OFFSET_X = 30;
-static const int TOAST_TEXT_RECT_OFFSET_Y = 20;
-static const int TOAST_TEXT_RECT_HEIGHT = 60;
-
-static const int PAN_STEP = 48; // number of pixels to pan if pan with cursor keys (SHIFT+up/down/left/right)
-
-static const int NO_REQUEST = 1; // used in GotoImage() method
-static const int NO_REMOVE_KEY_MSG = 2; // used in GotoImage() method
-static const int KEEP_PARAMETERS = 4; // used in GotoImage() method
-static const int NO_UPDATE_WINDOW = 8; // used in GotoImage() method
-
-static const CSize HUGE_SIZE = CSize(99999999, 99999999);
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-// Gets default image processing parameters as set in INI file
-static CImageProcessingParams GetDefaultProcessingParams() {
-    CSettingsProvider& sp = CSettingsProvider::This();
-    return CImageProcessingParams(
-        sp.Contrast(),
-        sp.Gamma(),
-        sp.Saturation(),
-        0.0, // ColorCorrectionFactor
-        0.5); // ContrastCorrectionFactor
-}
-
-// Gets hardcoded processing parameters, turning off all processing
-static CImageProcessingParams GetNoProcessingParams() {
-    return CImageProcessingParams(0.0, 1.0, 1.0, 0.0, 0.5); 
-}
-
-// Gets default image processing flags as set in INI file
-static EProcessingFlags GetDefaultProcessingFlags() {
-    CSettingsProvider& sp = CSettingsProvider::This();
-    EProcessingFlags eProcFlags = PFLAG_None;
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, sp.HighQualityResampling());
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrast, sp.AutoContrastCorrection());
-    return eProcFlags;
-}
-
-// Create processing flags from literal boolean values
-static EProcessingFlags CreateProcessingFlags(bool bHQResampling, bool bAutoContrast, bool bKeepParams) {
-    EProcessingFlags eProcFlags = PFLAG_None;
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, bHQResampling);
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrast, bAutoContrast);
-    eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_KeepParams, bKeepParams);
-    return eProcFlags;
-}
-
-// Initialize boolean processing values from flag bitfield
-static void InitFromProcessingFlags(EProcessingFlags eFlags, bool& bHQResampling, bool& bAutoContrast) {
-    bHQResampling = GetProcessingFlag(eFlags, PFLAG_HighQualityResampling);
-    bAutoContrast = GetProcessingFlag(eFlags, PFLAG_AutoContrast);
-}
-
-// Define function pointer type for wine_get_version
-typedef const char* (__cdecl* pwine_get_version)(void);
-
 namespace {
+
+    static const int MIN_WND_WIDTH = 320;
+    static const int MIN_WND_HEIGHT = 240;
+
+    static const int NUM_THREADS = 1; // number of readahead threads to use. Use "1" since the ImageLoaders aren't thread save and JxlReader/PngReaderer/WebpReaderWriter can't do out of order frame access!
+    static const int ZOOM_TIMEOUT = 50; // refinement done after this many milliseconds
+    static const int ZOOM_TEXT_TIMEOUT = 1000; // zoom label disappears after this many milliseconds
+
+    static const int ZOOM_TEXT_RECT_WIDTH = 70; // zoom label width
+    static const int ZOOM_TEXT_RECT_HEIGHT = 25; // zoom label height
+    static const int ZOOM_TEXT_RECT_OFFSET_X = 30; // zoom label offset from right border
+    static const int ZOOM_TEXT_RECT_OFFSET_Y = 20; // zoom label offset from bottom border
+
+    static const int TOAST_TEXT_RECT_OFFSET_X = 30;
+    static const int TOAST_TEXT_RECT_OFFSET_Y = 20;
+    static const int TOAST_TEXT_RECT_HEIGHT = 60;
+
+    static const int PAN_STEP = 48; // number of pixels to pan if pan with cursor keys (SHIFT+up/down/left/right)
+
+    static const int NO_REQUEST = 1; // used in GotoImage() method
+    static const int NO_REMOVE_KEY_MSG = 2; // used in GotoImage() method
+    static const int KEEP_PARAMETERS = 4; // used in GotoImage() method
+    static const int NO_UPDATE_WINDOW = 8; // used in GotoImage() method
+
+    static const CSize HUGE_SIZE = CSize(99999999, 99999999);
+
+    HFONT DefaultGUIFont = NULL;
+    HFONT SystemFont = NULL;
+    HFONT DefaultZoomFactorFont = NULL;
+
+    // Errors that occur during loading a file
+    enum EFileLoadError {
+        FileLoad_Ok = 0,
+        FileLoad_LoadError = 1,
+        FileLoad_SlideShowListInvalid = 2,
+        FileLoad_NoFilesInDirectory = 3,
+
+        // these can be combined with other error codes, so make sure they work with bit arithmetic
+        FileLoad_OutOfMemory = 65536,
+        FileLoad_ExceptionError = 32768
+    };
+
+    // Creates a font from the INI file description:
+    // "Font face" fontSizePoints [bold]
+    // Returns NULL if default font shall be used
+    static HFONT CreateFontFromINIDescription(HDC dc, LPCTSTR sIniFileDescription)
+    {
+        CString sIniDesc(sIniFileDescription);
+        sIniDesc.TrimLeft(); sIniDesc.TrimRight();
+
+        CString sFontName;
+        float fFontSize = 9.0f;
+        bool isBold = false;
+        if (sIniDesc.CompareNoCase(_T("default")) != 0) {
+            if (sIniDesc.Find(_T(' ')) == -1) {
+                sIniDesc.TrimLeft(_T('"')); sIniDesc.TrimRight(_T('"'));
+                sFontName = sIniDesc;
+            } else {
+                TCHAR delimiter = (sIniDesc.GetAt(0) == _T('"')) ? _T('"') : _T(' ');
+                sIniDesc.TrimLeft(_T('"'));
+                if (delimiter != _T('"') && sIniDesc.FindOneOf(_T("0123456789")) == -1) {
+                    sFontName = sIniDesc;
+                } else {
+                    int indexEndOfFilename = sIniDesc.Find(delimiter);
+                    if (indexEndOfFilename < 0) {
+                        sFontName = sIniDesc;
+                    } else {
+                        sFontName =  sIniDesc.Left(indexEndOfFilename);
+                        sIniDesc = sIniDesc.Mid(indexEndOfFilename + 1);
+                        fFontSize = (float)_ttof(sIniDesc);
+                        if (fFontSize <= 0.0)
+                            fFontSize = 9.0;
+                        fFontSize = std::max(7.0f, std::min(30.0f, fFontSize));
+                        isBold = sIniDesc.Find(_T("bold")) != -1;
+                    }
+                }
+            }
+        }
+
+        if (sFontName.IsEmpty())
+            return (HFONT)NULL;
+
+        int nHeight = - (int)(0.5f + fFontSize * ::GetDeviceCaps(dc, LOGPIXELSY) / 72);
+        return ::CreateFont(nHeight, 0, 0, 0, isBold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+                            CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, VARIABLE_PITCH, sFontName);
+    }
+
+    // Gets default image processing parameters as set in INI file
+    static CImageProcessingParams GetDefaultProcessingParams() {
+        CSettingsProvider& sp = CSettingsProvider::This();
+        return CImageProcessingParams(
+            sp.Contrast(),
+            sp.Gamma(),
+            sp.Saturation(),
+            0.0, // ColorCorrectionFactor
+            0.5); // ContrastCorrectionFactor
+    }
+
+    // Gets hardcoded processing parameters, turning off all processing
+    static CImageProcessingParams GetNoProcessingParams() {
+        return CImageProcessingParams(0.0, 1.0, 1.0, 0.0, 0.5);
+    }
+
+    // Gets default image processing flags as set in INI file
+    static EProcessingFlags GetDefaultProcessingFlags() {
+        CSettingsProvider& sp = CSettingsProvider::This();
+        EProcessingFlags eProcFlags = PFLAG_None;
+        eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, sp.HighQualityResampling());
+        eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrast, sp.AutoContrastCorrection());
+        return eProcFlags;
+    }
+
+    // Create processing flags from literal boolean values
+    static EProcessingFlags CreateProcessingFlags(bool bHQResampling, bool bAutoContrast, bool bKeepParams) {
+        EProcessingFlags eProcFlags = PFLAG_None;
+        eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, bHQResampling);
+        eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrast, bAutoContrast);
+        eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_KeepParams, bKeepParams);
+        return eProcFlags;
+    }
+
+    // Initialize boolean processing values from flag bitfield
+    static void InitFromProcessingFlags(EProcessingFlags eFlags, bool& bHQResampling, bool& bAutoContrast) {
+        bHQResampling = GetProcessingFlag(eFlags, PFLAG_HighQualityResampling);
+        bAutoContrast = GetProcessingFlag(eFlags, PFLAG_AutoContrast);
+    }
+
+    // Define function pointer type for wine_get_version
+    typedef const char* (__cdecl* pwine_get_version)(void);
 
     // If dZoom > 0: Gets the virtual image size when applying the given zoom factor
     // If dZoom < 0: Gets the image size to fit the image to the given screen size, using the given auto zoom mode.
@@ -227,6 +280,197 @@ namespace {
 		return CSize(workingArea.Width() - borderSize.cx, workingArea.Height() - borderSize.cy);
 	}
 
+    // Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
+    void DrawImageLoadErrorText(CDC& dc, const CRect& clientRect, LPCTSTR sFailedFileName, int nFileLoadError, int nLoadErrorDetail) {
+        bool bOutOfMemory = nLoadErrorDetail & FileLoad_OutOfMemory;
+        bool bExceptionError = nLoadErrorDetail & FileLoad_ExceptionError;
+
+        const int BUF_LEN = 512;
+        TCHAR buff[BUF_LEN];
+        buff[0] = 0;
+        CRect rectText(0, clientRect.Height()/2 - Helpers::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
+        switch (nFileLoadError) {
+        case FileLoad_LoadError:
+            _stprintf_s(buff, BUF_LEN, CNLS::GetString(_T("The file '%s' could not be read!")), sFailedFileName);
+            break;
+        case FileLoad_SlideShowListInvalid:
+            _stprintf_s(buff, BUF_LEN, CNLS::GetString(_T("The file '%s' does not contain a list of file names!")), sFailedFileName);
+            break;
+        case FileLoad_NoFilesInDirectory:
+            _stprintf_s(buff, BUF_LEN, CString(CNLS::GetString(_T("The directory '%s' does not contain any image files!")))  + _T('\n') +
+                                           CNLS::GetString(_T("Press any key to search the subdirectories for image files.")), sFailedFileName);
+            break;
+        default:
+            return;
+        }
+        if (bOutOfMemory) {
+            _tcscat_s(buff, BUF_LEN, _T("\n"));
+            _tcscat_s(buff, BUF_LEN, CString(CNLS::GetString(_T("Reason:"))) + _T(" ") + CNLS::GetString(_T("Not enough memory available")));
+        } else if (nFileLoadError == FileLoad_LoadError) {
+            LPCTSTR sEnding = _tcsrchr(sFailedFileName, _T('.'));
+            if (sEnding != NULL) {
+                sEnding += 1;
+                if (_tcsicmp(sEnding, _T("JXL")) == 0 ||
+                    _tcsicmp(sEnding, _T("HEIF")) == 0 ||
+                    _tcsicmp(sEnding, _T("HEIC")) == 0 ||
+                    _tcsicmp(sEnding, _T("AVIF")) == 0) {
+
+                    if (bExceptionError) {
+                        _tcscat_s(buff, BUF_LEN, _T("\n"));
+                        _tcscat_s(buff, BUF_LEN, CNLS::GetString(_T("Decoding this format requires the Microsoft Visual C++ Redistributable.")));
+                    }
+                }
+            }
+        }
+        dc.DrawText(buff, -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+    }
+
+    void SelectDefaultGUIFont(HDC dc) {
+        if (DefaultGUIFont == NULL) {
+            DefaultGUIFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().DefaultGUIFont());
+            if (DefaultGUIFont == NULL)
+                DefaultGUIFont = (HFONT)::GetStockObject(DEFAULT_GUI_FONT);
+        }
+        ::SelectObject(dc, DefaultGUIFont);
+    }
+
+    void SelectDefaultSystemFont(HDC dc) {
+        if (SystemFont == NULL) {
+            SystemFont = CreateFontFromINIDescription(dc, _T("\"Arial\" 12.0 bold"));
+        }
+        ::SelectObject(dc, SystemFont);
+    }
+
+    void SelectDefaultZoomFactorFont(HDC dc) {
+        if (DefaultZoomFactorFont == NULL) {
+            DefaultZoomFactorFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().ZoomFactorFont());
+            if (DefaultZoomFactorFont == NULL)
+                DefaultZoomFactorFont = CreateFontFromINIDescription(dc, _T("\"Arial\" 10.0 bold"));
+        }
+        ::SelectObject(dc, DefaultZoomFactorFont);
+    }
+
+    void TranslateMenuStrings(HMENU hMenu, CKeyMap* pKeyMap) {
+        int nMenuItemCount = ::GetMenuItemCount(hMenu);
+        for (int i = 0; i < nMenuItemCount; i++) {
+            const int TEXT_BUFF_LEN = 128;
+            TCHAR menuText[TEXT_BUFF_LEN];
+            ::GetMenuString(hMenu, i, (LPTSTR)&menuText, TEXT_BUFF_LEN, MF_BYPOSITION);
+            menuText[TEXT_BUFF_LEN-1] = 0;
+            TCHAR* pTab = _tcschr(menuText, _T('\t'));
+            if (pTab != NULL) {
+                *pTab = 0;
+                pTab++;
+            }
+            CString sKeyDesc;
+            if (pKeyMap != NULL) {
+                int nMenuItemId = ::GetMenuItemID(hMenu, i);
+                sKeyDesc = pKeyMap->GetKeyStringForCommand(nMenuItemId);
+            }
+            CString sNewMenuText = CNLS::GetString(menuText);
+            if (sNewMenuText != menuText || !sKeyDesc.IsEmpty() || pTab != NULL) {
+                if (pTab != NULL && pTab[0] != 0) {
+                    sNewMenuText += _T('\t');
+                    if (pTab[0] == _T('0') && pTab[1] == _T('x')) {
+                        // These hexadecimal mappings force to use the shortcut for the given command id
+                        // instead of the shortcut of the menu item command id.
+                        int nCommand;
+                        _stscanf(pTab, _T("%x"), &nCommand);
+                        if (nCommand == 0xFFFF) {
+                            // Exit JPEGView is special
+                            CString shortCutExit = pKeyMap->GetKeyStringForCommand(0xFF);
+                            if (shortCutExit.IsEmpty()) {
+                                shortCutExit = pKeyMap->GetKeyStringForCommand(IDM_EXIT);
+                            }
+                            sNewMenuText += shortCutExit;
+                        } else {
+                            sNewMenuText += pKeyMap->GetKeyStringForCommand(nCommand);
+                        }
+                    } else {
+                        // if the text after the \t is not a hex code, append it translated
+                        sNewMenuText += CNLS::GetString(pTab);
+                    }
+                } else if (!sKeyDesc.IsEmpty()) {
+                    sNewMenuText += _T('\t');
+                    sNewMenuText += sKeyDesc;
+                }
+                MENUITEMINFO menuInfo{ 0 };
+                menuInfo.cbSize = sizeof(MENUITEMINFO);
+                menuInfo.fMask = MIIM_STRING;
+                menuInfo.dwTypeData = (LPTSTR)(LPCTSTR)sNewMenuText;
+                ::SetMenuItemInfo(hMenu, i, TRUE, &menuInfo);
+            }
+
+            HMENU hSubMenu = ::GetSubMenu(hMenu, i);
+            if (hSubMenu != NULL) {
+                TranslateMenuStrings(hSubMenu, pKeyMap);
+            }
+        }
+    }
+
+    // Draws a text with a black outline to improve readability. nFormat is according to format in GDI DrawText method.
+    void DrawTextBordered(CDC& dc, LPCTSTR sText, const CRect& rect, UINT nFormat) {
+        int oldBkMode = dc.GetBkMode();
+        if (oldBkMode != TRANSPARENT) {
+            dc.SetBkMode(TRANSPARENT);
+        }
+
+        COLORREF oldColor = dc.SetTextColor(RGB(0, 0, 0));
+
+        CRect textRect = rect;
+        textRect.InflateRect(-1, -1);
+
+        textRect.OffsetRect(-1, 0); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
+        textRect.OffsetRect(2, 0); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
+        textRect.OffsetRect(-1, -1); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
+        textRect.OffsetRect(0, 2); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
+        textRect.OffsetRect(0, -1);
+
+        dc.SetTextColor(oldColor);
+        dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
+
+        if (oldBkMode != TRANSPARENT) {
+            dc.SetBkMode(oldBkMode);
+        }
+    }
+
+    // Draws a 32 bit DIB centered in the given target area, filling the remaining area with the given brush
+    // The bmInfo struct will be initialized by this method and does not need to be preinitialized.
+    // Return value is the top, left coordinate of the painted DIB in the target area
+    CPoint DrawDIB32bppWithBlackBorders(CDC& dc, BITMAPINFO& bmInfo, void* pDIBData, HBRUSH backBrush, const CRect& targetArea, CSize dibSize, CPoint offset) {
+        memset(&bmInfo, 0, sizeof(BITMAPINFO));
+        bmInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmInfo.bmiHeader.biWidth = dibSize.cx;
+        bmInfo.bmiHeader.biHeight = -dibSize.cy;
+        bmInfo.bmiHeader.biPlanes = 1;
+        bmInfo.bmiHeader.biBitCount = 32;
+        bmInfo.bmiHeader.biCompression = BI_RGB;
+        int xDest = (targetArea.Width() - dibSize.cx) / 2 + offset.x;
+        int yDest = (targetArea.Height() - dibSize.cy) / 2 + offset.y;
+
+        // remaining client area is painted black
+        if (xDest > 0) {
+            CRect r(0, 0, xDest, targetArea.Height());
+            dc.FillRect(&r, backBrush);
+        }
+        if (xDest + dibSize.cx < targetArea.Width()) {
+            CRect r(xDest + dibSize.cx, 0, targetArea.Width(), targetArea.Height());
+            dc.FillRect(&r, backBrush);
+        }
+        if (yDest > 0) {
+            CRect r(xDest, 0, xDest + dibSize.cx, yDest);
+            dc.FillRect(&r, backBrush);
+        }
+        if (yDest + dibSize.cy < targetArea.Height()) {
+            CRect r(xDest, yDest + dibSize.cy, xDest + dibSize.cx, targetArea.Height());
+            dc.FillRect(&r, backBrush);
+        }
+
+        dc.SetDIBitsToDevice(xDest, yDest, dibSize.cx, dibSize.cy, 0, 0, 0, dibSize.cy, pDIBData,
+                             &bmInfo, DIB_RGB_COLORS);
+
+        return CPoint(xDest, yDest);
+    }
 
 } // namespace
 
@@ -273,7 +517,7 @@ CMainDlg::CMainDlg(LPCTSTR sStartupFile) {
     m_pCurrentImage = NULL;
     m_bOutOfMemoryLastImage = false;
     m_bExceptionErrorLastImage = false;
-    m_nLastLoadError = HelpersGUI::FileLoad_Ok;
+    m_nLastLoadError = FileLoad_Ok;
 
     m_bAutoExit = false;
     m_nLastSlideShowImageTickCount = 0;
@@ -335,9 +579,9 @@ CMainDlg::CMainDlg(LPCTSTR sStartupFile) {
     m_bUseEmbeddedColorProfiles = sp.UseEmbeddedColorProfiles();
     m_strToast = _T("");
 
-/*############################################*/
-/* Custom variables of the linear scaling mod */
-/*############################################*/
+    /*############################################*/
+    /* Custom variables of the linear scaling mod */
+    /*############################################*/
 
     m_hmodDwmapi = NULL;
     m_bDWMenabled = FALSE;
@@ -388,7 +632,7 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
 
     // set the scaling of the screen (DPI) compared to 96 DPI (design value)
     CPaintDC dc(this->m_hWnd);
-    HelpersGUI::DPIScalingFactor = ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f;
+    Helpers::DPIScalingFactor = ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f;
 
     ::SetClassLongPtr(m_hWnd, GCLP_HCURSOR, NULL);
 
@@ -613,7 +857,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         // Paint the DIB
         if (pDIBData != NULL) {
             BITMAPINFO bmInfo{ 0 };
-            CPoint ptDIBStart = HelpersGUI::DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, m_DIBOffsets);
+            CPoint ptDIBStart = DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, m_DIBOffsets);
         }
         if (m_bZoomMode) m_offsets = unlimitedOffsets;
 
@@ -787,7 +1031,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 
             // Variant with outlined text
             //dc.SetBkMode(TRANSPARENT);    // OPAQUE / TRANSPARENT
-            //HelpersGUI::DrawTextBordered(dc, infoText, &m_clientRect, DT_LEFT | DT_EXTERNALLEADING | DT_WORDBREAK | DT_NOPREFIX);
+            //DrawTextBordered(dc, infoText, &m_clientRect, DT_LEFT | DT_EXTERNALLEADING | DT_WORDBREAK | DT_NOPREFIX);
             
             DeleteObject(hFont);
         }
@@ -799,15 +1043,15 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
     // Show current zoom factor
     if (m_bInZooming || m_bShowZoomFactor) {
         dc.SetTextColor(CSettingsProvider::This().ColorGUI());
-        HelpersGUI::SelectDefaultZoomFactorFont(dc);
-        HelpersGUI::DrawTextBordered(dc, formatOutputZoomFactor(m_dZoom).toStdWString().c_str(), GetZoomTextRect(), DT_RIGHT);
+        SelectDefaultZoomFactorFont(dc);
+        DrawTextBordered(dc, formatOutputZoomFactor(m_dZoom).toStdWString().c_str(), GetZoomTextRect(), DT_RIGHT);
     }
 
     if (!m_strToast.IsEmpty())
     {
         dc.SetTextColor(CSettingsProvider::This().ColorGUI());
-        HelpersGUI::SelectDefaultSystemFont(dc);
-        HelpersGUI::DrawTextBordered(dc, m_strToast.GetString(), GetToastTextRect(), DT_RIGHT);
+        SelectDefaultSystemFont(dc);
+        DrawTextBordered(dc, m_strToast.GetString(), GetToastTextRect(), DT_RIGHT);
     }
 
     SetCursorForMoveSection();
@@ -845,7 +1089,7 @@ void CMainDlg::PaintToDC(CDC& dc) {
                 CreateDefaultProcessingFlags());
         if (pDIBData != NULL) {
             BITMAPINFO bmInfo{ 0 };
-            CPoint ptDIBStart = HelpersGUI::DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, CPoint(0, 0));
+            CPoint ptDIBStart = DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, CPoint(0, 0));
         }
 
         DisplayErrors(pCurrentImage, m_clientRect, dc);
@@ -860,22 +1104,20 @@ void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const CRect& clientRect,
         
     dc.SetTextColor(CSettingsProvider::This().ColorGUI());
     if (m_sStartupFile.IsEmpty() && m_pCurrentImage == NULL) {
-        CRect rectText(0, clientRect.Height()/2 - HelpersGUI::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
+        CRect rectText(0, clientRect.Height()/2 - Helpers::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
         dc.DrawText(CString(CNLS::GetString(_T("No image loaded!"))) + _T("\n\n")  + CNLS::GetString(_T("Press ESC to exit...")), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
     } else if (pCurrentImage == NULL) {
         CString sFileName;
-        if (m_nLastLoadError == HelpersGUI::FileLoad_SlideShowListInvalid) {
+        if (m_nLastLoadError == FileLoad_SlideShowListInvalid) {
             sFileName = m_sStartupFile;
-        } else if (m_nLastLoadError == HelpersGUI::FileLoad_NoFilesInDirectory) {
+        } else if (m_nLastLoadError == FileLoad_NoFilesInDirectory) {
             sFileName = m_pFileList->CurrentDirectory();
         } else {
             sFileName = CurrentFileName(false);
         }
 
-        HelpersGUI::DrawImageLoadErrorText(dc, clientRect,
-                                           sFileName,
-                                           m_nLastLoadError,
-                                           (m_bOutOfMemoryLastImage ? HelpersGUI::FileLoad_OutOfMemory : 0) | (m_bExceptionErrorLastImage ? HelpersGUI::FileLoad_ExceptionError : 0));
+        DrawImageLoadErrorText(dc, clientRect, sFileName, m_nLastLoadError,
+            (m_bOutOfMemoryLastImage ? FileLoad_OutOfMemory : 0) | (m_bExceptionErrorLastImage ? FileLoad_ExceptionError : 0));
     }
 
     if (oldBkMode != TRANSPARENT) {
@@ -1263,14 +1505,14 @@ LRESULT CMainDlg::OnKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOOL& /
     bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
     bool bAlt = (::GetKeyState(VK_MENU) & 0x8000) != 0;
 
-    bool bHandled = false;
-    if (!bCtrl && wParam != VK_ESCAPE && m_nLastLoadError == HelpersGUI::FileLoad_NoFilesInDirectory && !m_sStartupFile.IsEmpty()) {
+    //bool bHandled = false;
+    if (!bCtrl && wParam != VK_ESCAPE && m_nLastLoadError == FileLoad_NoFilesInDirectory && !m_sStartupFile.IsEmpty()) {
         // search in subfolders if initial directory has no images
-        bHandled = true;
+        //bHandled = true;
         m_pFileList->SetNavigationMode(Helpers::NM_LoopSubDirectories);
         GotoImage(POS_Next);
     } else if (wParam == VK_F1) {
-        bHandled = true;
+        //bHandled = true;
         ExecuteCommand(IDM_HELP);
     } else {
         int nCommand = m_pKeyMap->GetCommandIdForKey((int)wParam, bAlt, bCtrl, bShift);
@@ -1286,7 +1528,7 @@ LRESULT CMainDlg::OnKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOOL& /
                 }
             }
 
-            bHandled = true;
+            //bHandled = true;
             ExecuteCommand(nCommand);
         }
     }
@@ -1618,7 +1860,7 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
     if (hMenu == NULL) return 1;
 
     HMENU hMenuTrackPopup = ::GetSubMenu(hMenu, 0);
-    HelpersGUI::TranslateMenuStrings(hMenuTrackPopup, m_pKeyMap);
+    TranslateMenuStrings(hMenuTrackPopup, m_pKeyMap);
     
     if (m_bAutoContrast) ::CheckMenuItem(hMenuTrackPopup, IDM_AUTO_CORRECTION, MF_CHECKED);
 
@@ -3000,7 +3242,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                                                     m_bOutOfMemoryLastImage,
                                                     m_bExceptionErrorLastImage);
 
-    m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? HelpersGUI::FileLoad_NoFilesInDirectory : HelpersGUI::FileLoad_LoadError) : HelpersGUI::FileLoad_Ok;
+    m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
 
 //* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
 //* Debugging */    ::OutputDebugStringW(debugtext);
@@ -3510,13 +3752,14 @@ void CMainDlg::SaveParameters() {
     }
 
     EProcessingFlags eFlags = CreateDefaultProcessingFlags(m_bKeepParams);
-    CString sText = HelpersGUI::GetINIFileSaveConfirmationText(*m_pImageProcParams, eFlags,
-        m_pFileList->GetNavigationMode(), m_pFileList->GetSorting(), m_pFileList->IsSortedAscending(), GetAutoZoomMode(), m_eTransitionEffect);
-
-    if (IDYES == this->MessageBox(sText, CNLS::GetString(_T("Confirm save default parameters")), MB_YESNO | MB_ICONQUESTION)) {
-        CSettingsProvider::This().SaveSettings(*m_pImageProcParams, eFlags, m_pFileList->GetNavigationMode(), m_pFileList->GetSorting(), m_pFileList->IsSortedAscending(),
-            m_eAutoZoomModeWindowed, m_eAutoZoomModeFullscreen, m_eTransitionEffect);
-    }
+    CSettingsProvider::This().SaveSettings(*m_pImageProcParams,
+                                           eFlags,
+                                           m_pFileList->GetNavigationMode(),
+                                           m_pFileList->GetSorting(),
+                                           m_pFileList->IsSortedAscending(),
+                                           m_eAutoZoomModeWindowed,
+                                           m_eAutoZoomModeFullscreen,
+                                           m_eTransitionEffect);
 }
 /*
 CRect CMainDlg::ScreenToDIB(const CSize& sizeDIB, const CRect& rect) {
@@ -3605,21 +3848,21 @@ void CMainDlg::ToggleMonitor() {
 }
 
 CRect CMainDlg::GetZoomTextRect() {
-    int nEndX = m_clientRect.right - HelpersGUI::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
-    int nStartX = nEndX - HelpersGUI::ScaleWithDPI(ZOOM_TEXT_RECT_WIDTH);
+    int nEndX = m_clientRect.right - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
+    int nStartX = nEndX - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_WIDTH);
     
-    int nEndY = m_clientRect.bottom - HelpersGUI::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_Y);
-    int nStartY = nEndY - HelpersGUI::ScaleWithDPI(ZOOM_TEXT_RECT_HEIGHT);
+    int nEndY = m_clientRect.bottom - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_Y);
+    int nStartY = nEndY - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_HEIGHT);
     
     return CRect(nStartX, nStartY, nEndX, nEndY);
 }
 
 CRect CMainDlg::GetToastTextRect() {
-    int nEndX = m_clientRect.right - HelpersGUI::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
+    int nEndX = m_clientRect.right - Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
     int nStartX = m_clientRect.right/2;
     
-    int nStartY = HelpersGUI::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_Y);
-    int nEndY = nStartY + HelpersGUI::ScaleWithDPI(TOAST_TEXT_RECT_HEIGHT);
+    int nStartY = Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_Y);
+    int nEndY = nStartY + Helpers::ScaleWithDPI(TOAST_TEXT_RECT_HEIGHT);
     
     return CRect(nStartX, nStartY, nEndX, nEndY);
 }
@@ -3764,13 +4007,13 @@ int CMainDlg::GetLoadErrorAfterOpenFile() {
     if (m_pCurrentImage == NULL) {
         if (CurrentFileName(false) == NULL) {
             if (m_pFileList->IsSlideShowList()) {
-                return HelpersGUI::FileLoad_SlideShowListInvalid;
+                return FileLoad_SlideShowListInvalid;
             }
-            return HelpersGUI::FileLoad_NoFilesInDirectory;
+            return FileLoad_NoFilesInDirectory;
         }
-        return HelpersGUI::FileLoad_LoadError;
+        return FileLoad_LoadError;
     }
-    return HelpersGUI::FileLoad_Ok;
+    return FileLoad_Ok;
 }
 
 void CMainDlg::PrefetchDIB(const CRect& clientRect) {

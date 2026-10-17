@@ -8,11 +8,12 @@
 
 
 namespace Helpers {
-
-	float DPIScalingFactor = -1.0f;
-
-	static TCHAR buffAppPath[MAX_PATH + 32] = _T("");
-
+	
+    int ScaleWithDPI(int value)
+    {
+        return (int)(value * DPIScalingFactor + 0.5f);
+    }
+	
 	LPCTSTR JPEGViewAppDataPath() {
 		if (buffAppPath[0] == 0) {
 			::SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, buffAppPath);
