@@ -1,5 +1,4 @@
 #include "KeyMap.h"
-//#include "NLS.h"
 #include "resource.h"
 #include "Helpers.h"
 #include "SettingsProvider.h"

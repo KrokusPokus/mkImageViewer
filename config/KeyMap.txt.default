@@ -1,0 +1,73 @@
+// This file defines the key mapping for JPEGView
+// Make sure not to corrupt it - or else no keys will work anymore!
+// See KeyMap-README.html for more information on how to customize this file.
+
+PgUp                    IDM_PREVFILE
+PgDn                    IDM_NEXTFILE
+
+Up                      IDM_PAN_UP
+Down                    IDM_PAN_DOWN
+Left                    IDM_PAN_LEFT
+Right                   IDM_PAN_RIGHT
+
+Back                    IDM_PREV
+Space                   IDM_NEXT
+
+Home                    IDM_FIRST
+End                     IDM_LAST
+
+Plus                    IDM_ZOOM_INC
+Minus                   IDM_ZOOM_DEC
+Del                     IDM_DELETE_FILE
+Shift+Del               IDM_DELETE_FILE
+
+F2                      IDM_RENAME
+F3                      IDM_TOGGLE_RESAMPLING_QUALITY
+F4                      IDM_AUTO_CORRECTION
+F5                      IDM_RELOAD_FULL
+F11                     IDM_FULL_SCREEN_MODE
+Return                  IDM_FULL_SCREEN_MODE
+
+Ctrl+C                  IDM_COPY_FULL
+Ctrl+Shift+C            IDM_COPY_PATH
+
+Ctrl+E                  IDM_OPEN_DEFAULT_EDITOR
+Ctrl+O                  IDM_SETTINGS_DIALOG
+Ctrl+L                  IDM_EXPLORE
+Ctrl+M                  IDM_CONTEXT_MENU
+Ctrl+T                  IDM_MARK_FOR_TOGGLE
+Ctrl+X                  IDM_CUT_FILE
+
+1                       IDM_ZOOM_100
+2                       IDM_ZOOM_50
+3                       IDM_ZOOM_25
+
+A                       IDM_TOGGLE_TRANSPARENCY
+E                       IDM_TOGGLE_USE_EMBEDDED_COLOR_PROFILES
+F                       IDM_TOGGLE_AUTO_ZOOM_FIT
+H                       IDM_MIRROR_H
+I                       IDM_TOGGLE_INFO_OVERLAY
+L                       IDM_ROTATE_270
+M                       IDM_MINIMIZE
+R                       IDM_ROTATE_90
+S                       IDM_SLIDESHOW_RESUME
+T                       IDM_TOGGLE
+V                       IDM_MIRROR_V
+Z                       IDM_TOGGLE_SORT_RANDOM
+
+MouseL                  IDM_PREV
+MouseDblClk             IDM_PREV
+MouseR                  IDM_NEXT
+MouseM                  IDM_FULL_SCREEN_MODE
+MouseX1                 IDM_CONTEXT_MENU
+
+Numpad0                 IDM_PLAYPAUSE
+Numpad1                 IDM_MOVIE_5_FPS
+Numpad2                 IDM_MOVIE_10_FPS
+Numpad3                 IDM_MOVIE_15_FPS
+Numpad4                 IDM_MOVIE_20_FPS
+Numpad5                 IDM_MOVIE_25_FPS
+Numpad6                 IDM_MOVIE_30_FPS
+Numpad7                 IDM_MOVIE_50_FPS
+Numpad8                 IDM_MOVIE_60_FPS
+Numpad9                 IDM_MOVIE_100_FPS

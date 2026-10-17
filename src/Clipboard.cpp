@@ -2,7 +2,6 @@
 #include "JPEGImage.h"
 #include "Helpers.h"
 #include "BasicProcessing.h"
-#include "MaxImageDef.h"
 #include <gdiplus.h>
 
 // Hilfsfunktion: Wandelt Windows-Pfade (z. B. C:\Bilder\test.jpg) in file://-URIs um,

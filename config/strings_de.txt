@@ -1,0 +1,202 @@
+﻿//! This file must be encoded with UTF-8 (e.g. with Windows Notepad)
+//! LICENSE: This localization file is part of JPEGView <https://github.com/sylikc/jpegview> and distributed under the same license.  See <https://github.com/sylikc/jpegview/blob/master/LICENSE.txt> for more info.
+
+//! Standard  Filename Convention: 'strings_%languagecode%.txt' where %languagecode% is the ISO 639-1 language code e.g. 'en' for English (See <https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes>)
+//! Alternate Filename Convention: 'strings_%languagecode%-%countrycode%.txt' where %countrycode% is the ISO 3166-1 country code e.g. 'US' for United States (See <https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes>)
+//!    Use the alternate filename convention only when the standard filename already exist (e.g. specifying a country-specific dialect for an existing language)
+
+////////////////////
+// ::: Translation Info ::: //
+//: ISO 639-1 code: de
+//: ISO 3166-1 code:
+//: Language: German
+//: Translator(s) - Name <Contact Info/URL>:
+//: Last Updated:
+//: Additional Notes:
+////////////////////
+
+////////////////////
+// ::: Instructions / Help ::: (help for translators only, does not need to be translated) //
+
+//? Line Format:    English string<tab>Translated string<newline>
+//? * Lines beginning with "//" (comments) are ignored
+//? * Blank lines are ignored
+//? * Lines without a <tab> are ignored
+//? * Lines with no text after the <tab> are ignored
+//? * Multiple tabs are permitted between English and Translated string, e.g. this is valid:    English string<tab><tab><tab>Translated string<newline>
+
+//? NOTE: %s %d have special meanings in the strings, so make sure they appear somewhere in the translated string!
+
+//? For the strings below which are short and have no context:
+//?   "in"        in context: is shorthand for "inch"
+//?   "cm"        in context: is shorthand for "centimeter"
+//?   "C - R"     in context: is "Cyan Red" colors
+//?   "M - G"     in context: is "Magenta Green" colors
+//?   "Y - B"     in context: is "Yellow Blue" colors
+//?   "yes"/"no"  in context: is for showing EXIF flags
+//?   "on"/"off"  in context: is for showing a setting active or not
+//?   "Filter"    in context: is used in Resize image, "sampling filter"
+//?   "Box"       in context: is used in Resize image sampling filter "Box filter"
+////////////////////
+
+
+// ::: Program Strings ::: (sorted alphabetically) //
+Ascending	Aufsteigend
+Auto contrast and color correction	Automatische Kontrast- und Farbkorrektur
+Auto zoom mode	Auto-Zoom Modus
+Blend	Überblenden
+Book Mode	Buch-Modus
+Brightness	Helligkeit
+Confirm	Bestätigung
+Confirm save default parameters	Standardparameter wirklich speichern?
+Contrast	Kontrast
+Decoding this format requires the Microsoft Visual C++ Redistributable.	Dekodierung dieses Formats benötigt die Microsoft Visual C++ Redistributables.
+Descending	Absteigend
+Do you really want to save the following parameters as default to the INI file	Sollen diese Parameter wirklich als Standardparameter in der INI-Datei gespeichert werden
+File name	Dateiname
+File size	Dateigrösse
+Fill with crop	Bildschirmgrösse (randlos)
+Fill with crop (no zoom)	Bildschirmgrösse (randlos, nie zoomen)
+Fit to screen	Bildschirmgrösse
+Fit to screen (no zoom)	Bildschirmgrösse (nie zoomen)
+High quality resampling	Qualitativ hochwertiges resampling
+Keep parameters	Parameter beibehalten
+Last modification date/time	Änderungsdatum
+Loop folder	Ordner anzeigen
+Loop recursively	Ordner mit Unterordnern anzeigen
+Loop siblings	Ordner gleicher Tiefe anzeigen
+Navigation	
+No image loaded!	Kein Bild geladen!
+No user INI file exists yet. Create user INI file from INI file template?	Es existiert noch keine INI-Datei für den Benutzer. INI-Datei aus Vorlage erstellen?
+None	Keiner
+Not enough memory available	Nicht genug Speicher verfügbar
+Order files by	Dateien sortieren nach
+Press ESC to exit...	ESC drücken zum Beenden...
+Press any key to search the subdirectories for image files.	Bitte eine Taste drücken, um in Unterordnern nach Bilddateien zu suchen.
+Random	Zufällig
+Reason:	Ursache:
+Roll from bottom	Rollen von unten
+Roll from left	Rollen von links
+Roll from right	Rollen von rechts
+Roll from top	Rollen von oben
+Saturation	Sättigung
+Scroll from bottom	Schieben von unten
+Scroll from left	Schieben von links
+Scroll from right	Schieben von rechts
+Scroll from top	Schieben von oben
+Slide from bottom	Rutschen von unten
+Slide from left	Rutschen von links
+Slide from right	Rutschen von rechts
+Slide from top	Rutschen von oben
+Slideshow	Diaschau
+The directory '%s' does not contain any image files!	Der Ordner '%s' enthält keine Bilddateien!
+The file '%s' could not be read!	Die Datei '%s' konnte nicht gelesen werden!
+The file '%s' does not contain a list of file names!	Die Datei '%s' enthält keine Liste von Dateinamen!
+These values will override the values from the INI file located in the program folder of JPEGView!	Diese Werte überschreiben die Werte aus der INI-Datei im Programmordner von JPEGView!
+Transition Effect	Übergangseffekt
+off	aus
+on	ein
+
+// ::: Popup Menu Strings ::: (unsorted to preserve context) //
+Next image	Nächstes Bild anzeigen
+Previous image	Voriges Bild anzeigen
+Current View	
+Rotate +90	Drehen +90
+Rotate -90	Drehen -90
+Mirror horizontally	Horizontal spiegeln
+Mirror vertically	Vertikal spiegeln
+Fit to window	
+Window	
+Full screen mode	Vollbildmodus
+Fit window to image	Fenstergrösse an Bild anpassen
+Hide window title bar	Titelleiste ausblenden
+Set window always on top	Fenster im Vordergrund halten
+Play folder as slideshow/movie	Ordner als Diaschau/Film abspielen
+Pause Slideshow/Movie	
+Waiting time	Wartezeit
+1 sec	
+2 sec	
+3 sec	
+4 sec	
+5 sec	
+7 sec	
+10 sec	
+20 sec	
+Transition Speed	Übergangsgeschwindigkeit
+Very fast	Sehr schnell
+Fast	Schnell
+Normal	
+Slow	Langsam
+Very slow	Sehr langsam
+Movie	Film
+Playback speed	Wiedergabe-Geschwindigkeit
+5 fps	
+10 fps	
+15 fps	
+20 fps	
+25 fps	
+30 fps	
+50 fps	
+60 fps	
+100 fps	
+Reload image	Bild neu laden
+Edit image in default editor	
+Copy scaled image content to clipboard	
+Copy original image content to clipboard	
+Copy file path to clipboard	
+Cut file to clipboard	
+Open containing folder in Explorer	Ordner in Datei Manager öffnen
+Folder Mode	
+Sort Order	
+Modification date	Änderungsdatum
+Auto Zoom Mode	
+Fit to window (never upsize)	
+Fill with crop (never upsize)	
+Auto Contrast	
+Edit Settings	
+Settings Dialog	
+Exit	Beenden
+
+// ::: INFO: Missing Translations [36] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
+//! Navigation
+//! Current View
+//! Fit to window
+//! Window
+//! Pause Slideshow/Movie
+//! 1 sec
+//! 2 sec
+//! 3 sec
+//! 4 sec
+//! 5 sec
+//! 7 sec
+//! 10 sec
+//! 20 sec
+//! Normal
+//! 5 fps
+//! 10 fps
+//! 15 fps
+//! 20 fps
+//! 25 fps
+//! 30 fps
+//! 50 fps
+//! 60 fps
+//! 100 fps
+//! Edit image in default editor
+//! Copy scaled image content to clipboard
+//! Copy original image content to clipboard
+//! Copy file path to clipboard
+//! Cut file to clipboard
+//! Folder Mode
+//! Sort Order
+//! Auto Zoom Mode
+//! Fit to window (never upsize)
+//! Fill with crop (never upsize)
+//! Auto Contrast
+//! Edit Settings
+//! Settings Dialog
+
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.293025+00:00 //
+//! Translation Progress: 68%
+//! * Total (Strings + Menu) = 113
+//! * Done = 77
+//! * Missing = 36 (32%)

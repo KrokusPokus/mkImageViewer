@@ -2,69 +2,109 @@
 #include "SettingsProvider.h"
 #include "Helpers.h"
 #include "DirectoryWatcher.h"
-#include "Shlwapi.h"
 #include <set>
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ///////////////////////////////////////////////////////////////////////////////////
 
-// static initializers
 Helpers::ESorting CFileDesc::sm_eSorting = Helpers::FS_LastModTime;
 bool CFileDesc::sm_bSortAscending = true;
 Helpers::ENavigationMode CFileList::sm_eMode = Helpers::NM_LoopDirectory;
 
-// Helper to add the current file of filefind object to the list
-static void AddToFileList(std::list<CFileDesc> & fileList, CFindFile & fileFind, LPCTSTR expectedExtension) {
-    if (!fileFind.IsDirectory()) {
-        if (expectedExtension != NULL) {
-            // compare if the extension is the expected extension
-            // this is required because a strange behavior of CFindFile: If searching for "*.tif", .tiff files are also found
-            CString fileName = fileFind.GetFileName();
-            int lastDot = fileName.ReverseFind(_T('.'));
-            if (_tcsicmp(((LPCTSTR)fileName) + lastDot + 1, expectedExtension) != 0) {
-                return;
-            }
-        }
-        FILETIME lastWriteTime, creationTime;
-        fileFind.GetLastWriteTime(&lastWriteTime);
-        fileFind.GetCreationTime(&creationTime);
-        CFileDesc thisFile(fileFind.GetFilePath(), &lastWriteTime, &creationTime, fileFind.GetFileSize());
-        fileList.push_back(thisFile);
-    }
-}
+namespace {
+	// Helper to add the current file of filefind object to the list
+	static void AddToFileList(std::list<CFileDesc> & fileList, CFindFile & fileFind, LPCTSTR expectedExtension) {
+		if (!fileFind.IsDirectory()) {
+			if (expectedExtension != NULL) {
+				// compare if the extension is the expected extension
+				// this is required because a strange behavior of CFindFile: If searching for "*.tif", .tiff files are also found
+				CString fileName = fileFind.GetFileName();
+				int lastDot = fileName.ReverseFind(_T('.'));
+				if (_tcsicmp(((LPCTSTR)fileName) + lastDot + 1, expectedExtension) != 0) {
+					return;
+				}
+			}
+			FILETIME lastWriteTime, creationTime;
+			fileFind.GetLastWriteTime(&lastWriteTime);
+			fileFind.GetCreationTime(&creationTime);
+			CFileDesc thisFile(fileFind.GetFilePath(), &lastWriteTime, &creationTime, fileFind.GetFileSize());
+			fileList.push_back(thisFile);
+		}
+	}
 
-static bool s_bUseLogicalStringCompare = true;
-static bool s_bUseLogicalStringCompareValid = false;
+	static bool s_bUseLogicalStringCompare = true;
+	static bool s_bUseLogicalStringCompareValid = false;
 
-// Used by method below
-static bool IsNoLogicalStrCmpSetInRegistryHive(HKEY hKeyRoot) {
-    HKEY key;
-    if (RegOpenKeyEx(hKeyRoot, _T("Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer"), 0, KEY_READ, &key) == ERROR_SUCCESS) {
-        DWORD value;
-        DWORD size = sizeof(DWORD);
-        DWORD type;
-        if (RegQueryValueEx(key, _T("NoStrCmpLogical"), NULL, &type, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
-            if (type == REG_DWORD) {
-                RegCloseKey(key);
-                return value == 1;
-            }
-        }
-        RegCloseKey(key);
-    }
-    return false;
-}
+	// Used by method below
+	static bool IsNoLogicalStrCmpSetInRegistryHive(HKEY hKeyRoot) {
+		HKEY key;
+		if (RegOpenKeyEx(hKeyRoot, _T("Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer"), 0, KEY_READ, &key) == ERROR_SUCCESS) {
+			DWORD value;
+			DWORD size = sizeof(DWORD);
+			DWORD type;
+			if (RegQueryValueEx(key, _T("NoStrCmpLogical"), NULL, &type, (LPBYTE)&value, &size) == ERROR_SUCCESS) {
+				if (type == REG_DWORD) {
+					RegCloseKey(key);
+					return value == 1;
+				}
+			}
+			RegCloseKey(key);
+		}
+		return false;
+	}
 
-// Queries the registry if logical string comparing (file9.txt before file10.txt) shall be used.
-// This is default in Windows XP and later.
-static bool UseLogicalStringCompare() {
-    if (!s_bUseLogicalStringCompareValid) {
-        s_bUseLogicalStringCompareValid = true;
-        s_bUseLogicalStringCompare = !(IsNoLogicalStrCmpSetInRegistryHive(HKEY_LOCAL_MACHINE) || 
-            IsNoLogicalStrCmpSetInRegistryHive(HKEY_CURRENT_USER));
-    }
-    return s_bUseLogicalStringCompare;
-}
+	// Queries the registry if logical string comparing (file9.txt before file10.txt) shall be used.
+	// This is default in Windows XP and later.
+	static bool UseLogicalStringCompare() {
+		if (!s_bUseLogicalStringCompareValid) {
+			s_bUseLogicalStringCompareValid = true;
+			s_bUseLogicalStringCompare = !(IsNoLogicalStrCmpSetInRegistryHive(HKEY_LOCAL_MACHINE) || 
+				IsNoLogicalStrCmpSetInRegistryHive(HKEY_CURRENT_USER));
+		}
+		return s_bUseLogicalStringCompare;
+	}
+
+    // search string in string (as strstr()) ignoring case
+	LPTSTR stristr(LPCTSTR szStringToBeSearched, LPCTSTR szSubstringToSearchFor) {
+		LPCTSTR pPos = NULL;
+		LPCTSTR szCopy1 = NULL;
+		LPCTSTR szCopy2 = NULL;
+		 
+		// verify parameters
+		if ( szStringToBeSearched == NULL || szSubstringToSearchFor == NULL ) {
+			return (LPTSTR)szStringToBeSearched;
+		}
+		 
+		// empty substring - return input (consistent with strstr)
+		if ( _tcslen(szSubstringToSearchFor) == 0 ) {
+			return (LPTSTR)szStringToBeSearched;
+		}
+		 
+		szCopy1 = _tcslwr(_tcsdup(szStringToBeSearched));
+		szCopy2 = _tcslwr(_tcsdup(szSubstringToSearchFor));
+		 
+		if ( szCopy1 == NULL || szCopy2 == NULL ) {
+			// another option is to raise an exception here
+			free((void*)szCopy1);
+			free((void*)szCopy2);
+			return NULL;
+		}
+		 
+		pPos = _tcsstr(szCopy1, szCopy2);
+		 
+		if ( pPos != NULL ) {
+			// map to the original string
+			pPos = szStringToBeSearched + (pPos - szCopy1);
+		}
+		 
+		free((void*)szCopy1);
+		free((void*)szCopy2);
+		 
+		return (LPTSTR)pPos;
+	}
+
+} // namespace
 
 ///////////////////////////////////////////////////////////////////////////////////
 // CFileDesc
@@ -879,7 +919,7 @@ bool CFileList::TryReadingSlideShowList(const CString & sSlideShowFile) {
                 // try to find file name with relative path
                 LPCTSTR* allFileEndings = GetSupportedFileEndingList();
                 for (int i = 0; i < nNumEndings; i++) {
-                    pStart = Helpers::stristr(lineBuff, (LPCTSTR)(CString(_T(".")) + allFileEndings[i]));
+                    pStart = stristr(lineBuff, (LPCTSTR)(CString(_T(".")) + allFileEndings[i]));
                     if (pStart != NULL) {
                         while (pStart >= lineBuff && *pStart != _T('"') && *pStart != _T('>')) pStart--;
                         pStart++;

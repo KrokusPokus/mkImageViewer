@@ -1,0 +1,231 @@
+﻿//! This file must be encoded with UTF-8 (e.g. with Windows Notepad)
+//! LICENSE: This localization file is part of JPEGView <https://github.com/sylikc/jpegview> and distributed under the same license.  See <https://github.com/sylikc/jpegview/blob/master/LICENSE.txt> for more info.
+
+//! Standard  Filename Convention: 'strings_%languagecode%.txt' where %languagecode% is the ISO 639-1 language code e.g. 'en' for English (See <https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes>)
+//! Alternate Filename Convention: 'strings_%languagecode%-%countrycode%.txt' where %countrycode% is the ISO 3166-1 country code e.g. 'US' for United States (See <https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes>)
+//!    Use the alternate filename convention only when the standard filename already exist (e.g. specifying a country-specific dialect for an existing language)
+
+////////////////////
+// ::: Translation Info ::: //
+//: ISO 639-1 code: be
+//: ISO 3166-1 code:
+//: Language: Belarusian
+//: Translator(s) - Name <Contact Info/URL>: Uładzimir Panada
+//: Last Updated:
+//: Additional Notes:
+////////////////////
+
+////////////////////
+// ::: Instructions / Help ::: (help for translators only, does not need to be translated) //
+
+//? Line Format:    English string<tab>Translated string<newline>
+//? * Lines beginning with "//" (comments) are ignored
+//? * Blank lines are ignored
+//? * Lines without a <tab> are ignored
+//? * Lines with no text after the <tab> are ignored
+//? * Multiple tabs are permitted between English and Translated string, e.g. this is valid:    English string<tab><tab><tab>Translated string<newline>
+
+//? NOTE: %s %d have special meanings in the strings, so make sure they appear somewhere in the translated string!
+
+//? For the strings below which are short and have no context:
+//?   "in"        in context: is shorthand for "inch"
+//?   "cm"        in context: is shorthand for "centimeter"
+//?   "C - R"     in context: is "Cyan Red" colors
+//?   "M - G"     in context: is "Magenta Green" colors
+//?   "Y - B"     in context: is "Yellow Blue" colors
+//?   "yes"/"no"  in context: is for showing EXIF flags
+//?   "on"/"off"  in context: is for showing a setting active or not
+//?   "Filter"    in context: is used in Resize image, "sampling filter"
+//?   "Box"       in context: is used in Resize image sampling filter "Box filter"
+////////////////////
+
+
+// ::: Program Strings ::: (sorted alphabetically) //
+Ascending	
+Auto contrast and color correction	Аўтакарэкцыя колеру і кантрасту
+Auto zoom mode	Аўтаматычная зьмена маштабу
+Blend	
+Book Mode	
+Brightness	Яркасьць
+Confirm	Пацьвердзіць
+Confirm save default parameters	Пацьвердзіць захаваньне асноўных параметраў
+Contrast	Кантраст
+Decoding this format requires the Microsoft Visual C++ Redistributable.	
+Descending	
+Do you really want to save the following parameters as default to the INI file	Ці захаваць гэтыя наладкі як асноўныя ў INI-файле
+File name	назваў
+File size	
+Fill with crop	запоўніць з абрэзкай
+Fill with crop (no zoom)	запоўніць з абрэзкай (не павялічваць)
+Fit to screen	дапасаваць
+Fit to screen (no zoom)	дапасаваць (не павялічваць)
+High quality resampling	
+Keep parameters	Ужываць параметры апрацоўкі надалей
+Last modification date/time	даты/часу мадыфікацыі
+Loop folder	тэчкі
+Loop recursively	укладзеных тэчак
+Loop siblings	тэчак аднаго ўзроўню
+Navigation	Прагляд у межах
+No image loaded!	Выява не абраная!
+No user INI file exists yet. Create user INI file from INI file template?	Карыстальніцкага INI-файла няма. Стварыць яго з шаблону INI-файла?
+None	
+Not enough memory available	недахоп памяці
+Order files by	Парадкаваць файлы паводе
+Press ESC to exit...	Націснуць ESC для выхаду...
+Press any key to search the subdirectories for image files.	Націснуць любую кнопку для пошуку файлаў выяваў ва ўкладзеных тэчках.
+Random	выпадкова
+Reason:	Прычына:
+Roll from bottom	
+Roll from left	
+Roll from right	
+Roll from top	
+Saturation	Насычанасьць
+Scroll from bottom	
+Scroll from left	
+Scroll from right	
+Scroll from top	
+Slide from bottom	
+Slide from left	
+Slide from right	
+Slide from top	
+Slideshow	Слайдшоў
+The directory '%s' does not contain any image files!	У тэчцы '%s' няма файлаў выяваў!
+The file '%s' could not be read!	Файл '%s' нечытэльны!
+The file '%s' does not contain a list of file names!	У файле '%s' няма сьпісу назваў файлаў!
+These values will override the values from the INI file located in the program folder of JPEGView!	Гэтыя наладкі будуць захаваныя ў INI-файле JPEGView!
+Transition Effect	
+off	не
+on	так
+
+// ::: Popup Menu Strings ::: (unsorted to preserve context) //
+Next image	Наступная выява
+Previous image	Папярэдняя выява
+Current View	
+Rotate +90	паварот на +90°
+Rotate -90	паварот на -90°
+Mirror horizontally	люстраны гарызантальны паварот
+Mirror vertically	люстраны вертыкальны паварот
+Fit to window	
+Window	
+Full screen mode	поўнаэкранны рэжым
+Fit window to image	Дапасаваць вакно да выявы
+Hide window title bar	
+Set window always on top	
+Play folder as slideshow/movie	Слайдшоў/фільм
+Pause Slideshow/Movie	
+Waiting time	Праз
+1 sec	
+2 sec	
+3 sec	
+4 sec	
+5 sec	
+7 sec	
+10 sec	
+20 sec	
+Transition Speed	
+Very fast	
+Fast	
+Normal	
+Slow	
+Very slow	
+Movie	Фільм
+Playback speed	
+5 fps	
+10 fps	
+15 fps	
+20 fps	
+25 fps	
+30 fps	
+50 fps	
+60 fps	
+100 fps	
+Reload image	Пераадкрыць
+Edit image in default editor	
+Copy scaled image content to clipboard	
+Copy original image content to clipboard	
+Copy file path to clipboard	
+Cut file to clipboard	
+Open containing folder in Explorer	
+Folder Mode	
+Sort Order	
+Modification date	даты мадыфікацыі
+Auto Zoom Mode	
+Fit to window (never upsize)	
+Fill with crop (never upsize)	
+Auto Contrast	
+Edit Settings	
+Settings Dialog	
+Exit	Выхад
+
+// ::: INFO: Missing Translations [65] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
+//! Ascending
+//! Blend
+//! Book Mode
+//! Decoding this format requires the Microsoft Visual C++ Redistributable.
+//! Descending
+//! File size
+//! High quality resampling
+//! None
+//! Roll from bottom
+//! Roll from left
+//! Roll from right
+//! Roll from top
+//! Scroll from bottom
+//! Scroll from left
+//! Scroll from right
+//! Scroll from top
+//! Slide from bottom
+//! Slide from left
+//! Slide from right
+//! Slide from top
+//! Transition Effect
+//! Current View
+//! Fit to window
+//! Window
+//! Hide window title bar
+//! Set window always on top
+//! Pause Slideshow/Movie
+//! 1 sec
+//! 2 sec
+//! 3 sec
+//! 4 sec
+//! 5 sec
+//! 7 sec
+//! 10 sec
+//! 20 sec
+//! Transition Speed
+//! Very fast
+//! Fast
+//! Normal
+//! Slow
+//! Very slow
+//! Playback speed
+//! 5 fps
+//! 10 fps
+//! 15 fps
+//! 20 fps
+//! 25 fps
+//! 30 fps
+//! 50 fps
+//! 60 fps
+//! 100 fps
+//! Edit image in default editor
+//! Copy scaled image content to clipboard
+//! Copy original image content to clipboard
+//! Copy file path to clipboard
+//! Cut file to clipboard
+//! Open containing folder in Explorer
+//! Folder Mode
+//! Sort Order
+//! Auto Zoom Mode
+//! Fit to window (never upsize)
+//! Fill with crop (never upsize)
+//! Auto Contrast
+//! Edit Settings
+//! Settings Dialog
+
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.287134+00:00 //
+//! Translation Progress: 42%
+//! * Total (Strings + Menu) = 113
+//! * Done = 48
+//! * Missing = 65 (58%)

@@ -1,8 +1,9 @@
-#include <locale.h>
-#include <gdiplus.h>
 #include "resource.h"
 #include "MainDlg.h"
 #include "SettingsProvider.h"
+
+#include <clocale>
+#include <gdiplus.h>
 
 CAppModule _Module;
 

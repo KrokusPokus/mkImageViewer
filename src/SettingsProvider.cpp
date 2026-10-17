@@ -25,10 +25,122 @@
 #include <thread>    // Needed for std::thread::hardware_concurrency()
 #include <algorithm>
 
-static const char* DEFAULT_INI_FILE_NAME = "JPEGView.ini";
-static const char* SECTION_NAME = "JPEGView";
+namespace {
 
-static float COLOR_CORR_DEFAULT_FACTORS[6] = {0.2f, 0.1f, 0.3f, 0.3f, 0.3f, 0.15f};
+    constexpr const char* DEFAULT_INI_FILE_NAME = "JPEGView.ini";
+    constexpr const char* SECTION_NAME = "JPEGView";
+
+    constexpr float COLOR_CORR_DEFAULT_FACTORS[6] = {0.2f, 0.1f, 0.3f, 0.3f, 0.3f, 0.15f};
+
+    // Scrollbereich um jeden Tab legen für kleine Bildschirmauflösungen
+    QWidget* makeScrollable(QWidget* content) {
+        QScrollArea* area = new QScrollArea();
+        area->setWidgetResizable(true);
+        area->setFrameShape(QFrame::NoFrame);
+        area->setWidget(content);
+        return area;
+    }
+
+
+    void updateButtonColor(QPushButton* button, const QColor& color) {
+        button->setText(color.name());
+        button->setStyleSheet(QString("background-color: %1; color: %2;")
+                                  .arg(color.name())
+                                  .arg((color.lightness() < 128) ? "#FFFFFF" : "#000000"));
+    }
+
+
+    QString GetAutoZoomModeString(Helpers::EAutoZoomMode autoZoomMode) {
+        switch (autoZoomMode) {
+        case Helpers::ZM_FillScreen:       return "Fill";
+        case Helpers::ZM_FitToScreen:      return "Fit";
+        case Helpers::ZM_FillScreenNoZoom: return "FillNoZoom";
+        case Helpers::ZM_None:             return "None";
+        case Helpers::ZM_BookMode:         return "BookMode";
+        default:                           return "FitNoZoom";
+        }
+    }
+
+
+    Helpers::ETransitionEffect ConvertTransitionEffectFromString(QStringView str) {
+        if (str.isEmpty()) {
+            return Helpers::TE_None;
+        }
+
+        // Statische Map für schnelle O(1)-Zuordnung (Case-Insensitive)
+        static const QHash<QString, Helpers::ETransitionEffect> effectMap = {
+            { "blend",    Helpers::TE_Blend },
+            { "sliderl",  Helpers::TE_SlideRL },
+            { "slidelr",  Helpers::TE_SlideLR },
+            { "slidetb",  Helpers::TE_SlideTB },
+            { "slidebt",  Helpers::TE_SlideBT },
+            { "rollrl",   Helpers::TE_RollRL },
+            { "rolllr",   Helpers::TE_RollLR },
+            { "rolltb",   Helpers::TE_RollTB },
+            { "rollbt",   Helpers::TE_RollBT },
+            { "scrollrl", Helpers::TE_ScrollRL },
+            { "scrolllr", Helpers::TE_ScrollLR },
+            { "scrolltb", Helpers::TE_ScrollTB },
+            { "scrollbt", Helpers::TE_ScrollBT }
+        };
+
+        return effectMap.value(str.toString().toLower(), Helpers::TE_None);
+    }
+
+    QString ConvertTransitionEffectToString(Helpers::ETransitionEffect effect) {
+        static const QMap<Helpers::ETransitionEffect, QString> stringMap = {
+            { Helpers::TE_None,     "None" },
+            { Helpers::TE_Blend,    "Blend" },
+            { Helpers::TE_SlideRL,  "SlideRL" },
+            { Helpers::TE_SlideLR,  "SlideLR" },
+            { Helpers::TE_SlideTB,  "SlideTB" },
+            { Helpers::TE_SlideBT,  "SlideBT" },
+            { Helpers::TE_RollRL,   "RollRL" },
+            { Helpers::TE_RollLR,   "RollLR" },
+            { Helpers::TE_RollTB,   "RollTB" },
+            { Helpers::TE_RollBT,   "RollBT" },
+            { Helpers::TE_ScrollRL, "ScrollRL" },
+            { Helpers::TE_ScrollLR, "ScrollLR" },
+            { Helpers::TE_ScrollTB, "ScrollTB" },
+            { Helpers::TE_ScrollBT, "ScrollBT" }
+        };
+
+        return stringMap.value(effect, "None");
+    }
+
+    // Tests if the CPU supports AVX2, SSE, MMX(2)
+    Helpers::CPUType ProbeCPU(void) {
+        static Helpers::CPUType cpuType = Helpers::CPU_Unknown;
+		
+        if (cpuType != Helpers::CPU_Unknown) {
+			return cpuType;
+		}
+
+		__try {
+			// check if CPU supports AVX and the xgetbv instruction
+			int abcd[4];
+			__cpuid(abcd, 1);
+			if ((abcd[2] & 0x18000000) != 0x18000000) // AVX and OSXSAVE bits
+				return Helpers::CPU_SSE;
+			if ((abcd[2] & 0x04000000) == 0) // XSAVE bit, support for xgetbv
+				return Helpers::CPU_SSE;
+
+			// check if operating system supports AVX(2)
+			unsigned long long xcr0 = _xgetbv(0);
+			if ((xcr0 & 6) != 6)
+				return Helpers::CPU_SSE; // nope, only use SSE
+
+			// check if AVX2 instructions are supported
+			const int AVX2BITMASK = 1 << 5;
+			__cpuidex(abcd, 7, 0);
+			return (abcd[1] & AVX2BITMASK) ? Helpers::CPU_AVX2 : Helpers::CPU_SSE;
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER) {
+			return Helpers::CPU_SSE;
+		}
+	}
+
+} // namespace
 
 std::unique_ptr<CSettingsProvider> CSettingsProvider::sm_instance = nullptr;
 
@@ -49,7 +161,7 @@ bool CSettingsProvider::ShowSettingsDialog(QWidget* parent) {
     if (!qApp) {
         localApp = std::make_unique<QApplication>(argc, argv);
     }
-	
+
     SettingsDialog dlg(parent);
     dlg.loadFromSettings();
     if (dlg.exec() == QDialog::Accepted) {
@@ -90,15 +202,6 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     mainLayout->addWidget(buttonBox);
-}
-
-// Helper: Scrollbereich um jeden Tab legen für kleine Bildschirmauflösungen
-static QWidget* makeScrollable(QWidget* content) {
-    QScrollArea* area = new QScrollArea();
-    area->setWidgetResizable(true);
-    area->setFrameShape(QFrame::NoFrame);
-    area->setWidget(content);
-    return area;
 }
 
 // ----------------------------------------------------------------------------
@@ -407,13 +510,6 @@ void SettingsDialog::pickColor(QColor& target, QPushButton* button) {
     }
 }
 
-void SettingsDialog::updateButtonColor(QPushButton* button, const QColor& color) {
-    button->setText(color.name());
-    button->setStyleSheet(QString("background-color: %1; color: %2;")
-    .arg(color.name())
-    .arg((color.lightness() < 128) ? "#FFFFFF" : "#000000"));
-}
-
 void SettingsDialog::loadFromSettings() {
     CSettingsProvider& settings = CSettingsProvider::This();
 
@@ -463,8 +559,8 @@ void SettingsDialog::loadFromSettings() {
     m_comboDownSamplingFilter->setCurrentIndex(static_cast<int>(settings.m_eDownsamplingFilter));
     m_checkAutoRotateExif->setChecked(settings.m_bAutoRotateEXIF);
     m_checkUseEmbeddedColorProfiles->setChecked(settings.m_bUseEmbeddedColorProfiles);
-    m_comboAutoZoomMode->setCurrentText(settings.GetAutoZoomModeString(settings.m_eAutoZoomMode));
-    m_comboAutoZoomModeFullscreen->setCurrentText(settings.GetAutoZoomModeString(settings.m_eAutoZoomModeFullscreen));
+    m_comboAutoZoomMode->setCurrentText(GetAutoZoomModeString(settings.m_eAutoZoomMode));
+    m_comboAutoZoomModeFullscreen->setCurrentText(GetAutoZoomModeString(settings.m_eAutoZoomModeFullscreen));
     m_spinZoomPausePercent->setValue(static_cast<int>(settings.m_zoomPauseFactor * 100));
     m_spinBookModePageHeight->setValue(settings.m_nBookModePageHeight);
     m_checkBookModeLaunchFullscreen->setChecked(settings.m_bBookModeLaunchFullscreen);
@@ -481,19 +577,19 @@ void SettingsDialog::loadFromSettings() {
 
     if (settings.m_fColorCorrections[0] >= 0) {
         m_editColorCorrection->setText(QString("R: %1 G: %2 B: %3 C: %4 M: %5 Y: %6")
-        .arg(settings.m_fColorCorrections[0])
-        .arg(settings.m_fColorCorrections[1])
-        .arg(settings.m_fColorCorrections[2])
-        .arg(settings.m_fColorCorrections[3])
-        .arg(settings.m_fColorCorrections[4])
-        .arg(settings.m_fColorCorrections[5]));
+                                           .arg(settings.m_fColorCorrections[0])
+                                           .arg(settings.m_fColorCorrections[1])
+                                           .arg(settings.m_fColorCorrections[2])
+                                           .arg(settings.m_fColorCorrections[3])
+                                           .arg(settings.m_fColorCorrections[4])
+                                           .arg(settings.m_fColorCorrections[5]));
     } else {
         m_editColorCorrection->setText("");
     }
 
     // Tab 7
     m_spinMaxSlideShowFileListSize->setValue(settings.m_nMaxSlideShowFileListSize);
-    m_comboSlideShowTransitionEffect->setCurrentText(CSettingsProvider::ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect));
+    m_comboSlideShowTransitionEffect->setCurrentText(ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect));
     m_spinSlideShowEffectTimeMs->setValue(settings.m_nSlideShowEffectTimeMs);
     m_checkKeepParams->setChecked(settings.m_bKeepParams);
 }
@@ -572,7 +668,7 @@ void SettingsDialog::saveToSettings() {
     settings.WriteBool("KeepParameters", m_checkKeepParams->isChecked());
 }
 
-float* CSettingsProvider::ColorCorrectionAmounts() { 
+const float* CSettingsProvider::ColorCorrectionAmounts() {
     return (m_fColorCorrections[0] < 0) ? COLOR_CORR_DEFAULT_FACTORS : m_fColorCorrections;
 }
 
@@ -644,7 +740,7 @@ CSettingsProvider::CSettingsProvider() {
     } else if (sCPU.compare("AVX2", Qt::CaseInsensitive) == 0) {
         m_eCPUAlgorithm = Helpers::CPU_AVX2;
     } else {
-        m_eCPUAlgorithm = Helpers::ProbeCPU();
+        m_eCPUAlgorithm = ProbeCPU();
     }
 
     m_nNumCoresIni = GetInt("CPUCoresUsed", 0, 0, 128);
@@ -787,8 +883,8 @@ CSettingsProvider::CSettingsProvider() {
         }
     }
 
-// -------------------------------------------------------------------------------------------
-// [GF] Custom non-writable ini settings of this mod
+    // -------------------------------------------------------------------------------------------
+    // [GF] Custom non-writable ini settings of this mod
 
     m_bBookModeLaunchFullscreen = GetBool("BookModeLaunchFullscreen", true);
     m_bSmoothPanning = GetBool("SmoothPanning", true);
@@ -834,12 +930,12 @@ void CSettingsProvider::ReadWriteableINISettings() {
     m_bKeepParams = GetBool("KeepParameters", false);
     m_eSlideShowTransitionEffect = ConvertTransitionEffectFromString(GetString("SlideShowTransitionEffect", ""));
 
-// -------------------------------------------------------------------------------------------
-// [GF] Custom writable ini settings of this mod
+    // -------------------------------------------------------------------------------------------
+    // [GF] Custom writable ini settings of this mod
 
     m_nBookModePageHeight = GetInt("BookModePageHeight", 122, 100, 1000);
 
-// -------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------
 }
 
 void CSettingsProvider::SaveCustomSettings() {
@@ -848,12 +944,12 @@ void CSettingsProvider::SaveCustomSettings() {
     m_bUserINIExists = true;
 }
 
-void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams, 
+void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
                                      EProcessingFlags eProcFlags,
-                                     Helpers::ENavigationMode eNavigationMode, 
-                                     Helpers::ESorting eFileSorting, 
+                                     Helpers::ENavigationMode eNavigationMode,
+                                     Helpers::ESorting eFileSorting,
                                      bool isSortedAscending,
-                                     Helpers::EAutoZoomMode eAutoZoomMode, 
+                                     Helpers::EAutoZoomMode eAutoZoomMode,
                                      Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
                                      Helpers::ETransitionEffect eSlideShowTransitionEffect) {
     MakeSureUserINIExists();
@@ -899,10 +995,10 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
 void CSettingsProvider::SaveStickyWindowRect(CRect rect) {
     if (ToCRect(m_stickyWindowRect) != rect && !rect.IsRectEmpty()) {
         QString sRect = QString("%1 %2 %3 %4")
-                            .arg(rect.left)
-                            .arg(rect.top)
-                            .arg(rect.right)
-                            .arg(rect.bottom);
+        .arg(rect.left)
+            .arg(rect.top)
+            .arg(rect.right)
+            .arg(rect.bottom);
 
         MakeSureUserINIExists();
         WriteString("StickyWindowRect", sRect);
@@ -1070,17 +1166,6 @@ Helpers::EAutoZoomMode CSettingsProvider::GetAutoZoomMode(const QString& sKey, H
     return defaultZoomMode;
 }
 
-QString CSettingsProvider::GetAutoZoomModeString(Helpers::EAutoZoomMode autoZoomMode) const {
-    switch (autoZoomMode) {
-        case Helpers::ZM_FillScreen:       return "Fill";
-        case Helpers::ZM_FitToScreen:      return "Fit";
-        case Helpers::ZM_FillScreenNoZoom: return "FillNoZoom";
-        case Helpers::ZM_None:             return "None";
-        case Helpers::ZM_BookMode:         return "BookMode";
-        default:                           return "FitNoZoom";
-    }
-}
-
 void CSettingsProvider::WriteString(const QString& sKey, const QString& sString) {
     QSettings settings(m_sIniNameUser, QSettings::IniFormat);
     settings.beginGroup(SECTION_NAME);
@@ -1108,50 +1193,4 @@ void CSettingsProvider::WriteBool(const QString& sKey, bool bValue) {
 
 void CSettingsProvider::WriteInt(const QString& sKey, int nValue) {
     WriteString(sKey, QString::number(nValue));
-}
-
-Helpers::ETransitionEffect CSettingsProvider::ConvertTransitionEffectFromString(QStringView str) {
-    if (str.isEmpty()) {
-        return Helpers::TE_None;
-    }
-
-    // Statische Map für schnelle O(1)-Zuordnung (Case-Insensitive)
-    static const QHash<QString, Helpers::ETransitionEffect> effectMap = {
-        { "blend",    Helpers::TE_Blend },
-        { "sliderl",  Helpers::TE_SlideRL },
-        { "slidelr",  Helpers::TE_SlideLR },
-        { "slidetb",  Helpers::TE_SlideTB },
-        { "slidebt",  Helpers::TE_SlideBT },
-        { "rollrl",   Helpers::TE_RollRL },
-        { "rolllr",   Helpers::TE_RollLR },
-        { "rolltb",   Helpers::TE_RollTB },
-        { "rollbt",   Helpers::TE_RollBT },
-        { "scrollrl", Helpers::TE_ScrollRL },
-        { "scrolllr", Helpers::TE_ScrollLR },
-        { "scrolltb", Helpers::TE_ScrollTB },
-        { "scrollbt", Helpers::TE_ScrollBT }
-    };
-
-    return effectMap.value(str.toString().toLower(), Helpers::TE_None);
-}
-
-QString CSettingsProvider::ConvertTransitionEffectToString(Helpers::ETransitionEffect effect) {
-    static const QMap<Helpers::ETransitionEffect, QString> stringMap = {
-        { Helpers::TE_None,     "None" },
-        { Helpers::TE_Blend,    "Blend" },
-        { Helpers::TE_SlideRL,  "SlideRL" },
-        { Helpers::TE_SlideLR,  "SlideLR" },
-        { Helpers::TE_SlideTB,  "SlideTB" },
-        { Helpers::TE_SlideBT,  "SlideBT" },
-        { Helpers::TE_RollRL,   "RollRL" },
-        { Helpers::TE_RollLR,   "RollLR" },
-        { Helpers::TE_RollTB,   "RollTB" },
-        { Helpers::TE_RollBT,   "RollBT" },
-        { Helpers::TE_ScrollRL, "ScrollRL" },
-        { Helpers::TE_ScrollLR, "ScrollLR" },
-        { Helpers::TE_ScrollTB, "ScrollTB" },
-        { Helpers::TE_ScrollBT, "ScrollBT" }
-    };
-
-    return stringMap.value(effect, "None");
 }

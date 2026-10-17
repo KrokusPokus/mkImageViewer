@@ -1,0 +1,188 @@
+﻿//! This file must be encoded with UTF-8 (e.g. with Windows Notepad)
+//! LICENSE: This localization file is part of JPEGView <https://github.com/sylikc/jpegview> and distributed under the same license.  See <https://github.com/sylikc/jpegview/blob/master/LICENSE.txt> for more info.
+
+//! Standard  Filename Convention: 'strings_%languagecode%.txt' where %languagecode% is the ISO 639-1 language code e.g. 'en' for English (See <https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes>)
+//! Alternate Filename Convention: 'strings_%languagecode%-%countrycode%.txt' where %countrycode% is the ISO 3166-1 country code e.g. 'US' for United States (See <https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes>)
+//!    Use the alternate filename convention only when the standard filename already exist (e.g. specifying a country-specific dialect for an existing language)
+
+////////////////////
+// ::: Translation Info ::: //
+//: ISO 639-1 code: zh
+//: ISO 3166-1 code: tw
+//: Language: Chinese, Traditional (繁體中文)
+//: Translator(s) - Name <Contact Info/URL>: 風逸蘭
+//: Last Updated:
+//: Additional Notes:
+//Update:2023/03/09 - Based on the simplified Chinese version converted chs -> cht
+////////////////////
+
+////////////////////
+// ::: Instructions / Help ::: (help for translators only, does not need to be translated) //
+
+//? Line Format:    English string<tab>Translated string<newline>
+//? * Lines beginning with "//" (comments) are ignored
+//? * Blank lines are ignored
+//? * Lines without a <tab> are ignored
+//? * Lines with no text after the <tab> are ignored
+//? * Multiple tabs are permitted between English and Translated string, e.g. this is valid:    English string<tab><tab><tab>Translated string<newline>
+
+//? NOTE: %s %d have special meanings in the strings, so make sure they appear somewhere in the translated string!
+
+//? For the strings below which are short and have no context:
+//?   "in"        in context: is shorthand for "inch"
+//?   "cm"        in context: is shorthand for "centimeter"
+//?   "C - R"     in context: is "Cyan Red" colors
+//?   "M - G"     in context: is "Magenta Green" colors
+//?   "Y - B"     in context: is "Yellow Blue" colors
+//?   "yes"/"no"  in context: is for showing EXIF flags
+//?   "on"/"off"  in context: is for showing a setting active or not
+//?   "Filter"    in context: is used in Resize image, "sampling filter"
+//?   "Box"       in context: is used in Resize image sampling filter "Box filter"
+////////////////////
+
+
+// ::: Program Strings ::: (sorted alphabetically) //
+Ascending	升序
+Auto contrast and color correction	自動對比度和色彩校正
+Auto zoom mode	自動縮放模式
+Blend	混合
+Book Mode	
+Brightness	亮度
+Confirm	確認
+Confirm save default parameters	確認保存默認參數
+Contrast	對比度
+Decoding this format requires the Microsoft Visual C++ Redistributable.	解碼此格式需要 Microsoft Visual C++ Redistributable。
+Descending	降序
+Do you really want to save the following parameters as default to the INI file	您真的想要將以下參數保存為默認的 INI 文件？
+File name	文件名
+File size	文件大小
+Fill with crop	用裁剪來填充
+Fill with crop (no zoom)	用裁剪填充（無縮放）
+Fit to screen	適合屏幕
+Fit to screen (no zoom)	適合屏幕（無縮放）
+High quality resampling	高質量重採樣
+Keep parameters	保持參數
+Last modification date/time	最後修改日期/時間
+Loop folder	當前目錄循環
+Loop recursively	遞歸循環
+Loop siblings	同級目錄循環
+Navigation	導航
+No image loaded!	未加載圖片！
+No user INI file exists yet. Create user INI file from INI file template?	尚無用戶INI文件。是否從INI文件模板來創建用戶INI文件？
+None	無
+Not enough memory available	沒有足夠的可用內存
+Order files by	文件排序依據
+Press ESC to exit...	按下ESC退出...
+Press any key to search the subdirectories for image files.	按任意鍵來查找子目錄中的圖片文件。
+Random	隨機
+Reason:	原因：
+Roll from bottom	從下側捲動
+Roll from left	從左側捲動
+Roll from right	從右側捲動
+Roll from top	從上側捲動
+Saturation	飽和度
+Scroll from bottom	從下側滾動
+Scroll from left	從左側滾動
+Scroll from right	從右側滾動
+Scroll from top	從上側滾動
+Slide from bottom	從下側滑動
+Slide from left	從左側滑動
+Slide from right	從右側滑動
+Slide from top	從上側滑動
+Slideshow	幻燈片
+The directory '%s' does not contain any image files!	目錄'%s'沒有圖片文件！
+The file '%s' could not be read!	無法讀取文件'%s'！
+The file '%s' does not contain a list of file names!	文件'%s'不包含文件名列表！
+These values will override the values from the INI file located in the program folder of JPEGView!	這些值將覆蓋JPEGView程序文件夾中INI文件的值！
+Transition Effect	過度效果
+off	關閉
+on	打開
+
+// ::: Popup Menu Strings ::: (unsorted to preserve context) //
+Next image	下一張圖片
+Previous image	上一張圖片
+Current View	
+Rotate +90	旋轉 +90°
+Rotate -90	旋轉 -90°
+Mirror horizontally	水平翻轉
+Mirror vertically	垂直翻轉
+Fit to window	
+Window	
+Full screen mode	全屏模式
+Fit window to image	使窗口適合圖片
+Hide window title bar	隱藏窗口標題欄
+Set window always on top	將窗口設置為始終在頂部
+Play folder as slideshow/movie	幻燈片/視頻文件夾
+Pause Slideshow/Movie	
+Waiting time	等待時間
+1 sec	1秒
+2 sec	2秒
+3 sec	3秒
+4 sec	4秒
+5 sec	5秒
+7 sec	7秒
+10 sec	10秒
+20 sec	20秒
+Transition Speed	轉換速度
+Very fast	非常快
+Fast	快
+Normal	一般
+Slow	慢
+Very slow	非常慢
+Movie	視頻
+Playback speed	播放速度
+5 fps	5幀
+10 fps	10幀
+15 fps	
+20 fps	
+25 fps	25幀
+30 fps	30幀
+50 fps	50幀
+60 fps	
+100 fps	100幀
+Reload image	重新加載圖片
+Edit image in default editor	
+Copy scaled image content to clipboard	
+Copy original image content to clipboard	
+Copy file path to clipboard	
+Cut file to clipboard	
+Open containing folder in Explorer	打開圖片所在文件夾
+Folder Mode	
+Sort Order	
+Modification date	修改日期
+Auto Zoom Mode	
+Fit to window (never upsize)	
+Fill with crop (never upsize)	
+Auto Contrast	
+Edit Settings	
+Settings Dialog	
+Exit	退出
+
+// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
+//! Book Mode
+//! Current View
+//! Fit to window
+//! Window
+//! Pause Slideshow/Movie
+//! 15 fps
+//! 20 fps
+//! 60 fps
+//! Edit image in default editor
+//! Copy scaled image content to clipboard
+//! Copy original image content to clipboard
+//! Copy file path to clipboard
+//! Cut file to clipboard
+//! Folder Mode
+//! Sort Order
+//! Auto Zoom Mode
+//! Fit to window (never upsize)
+//! Fill with crop (never upsize)
+//! Auto Contrast
+//! Edit Settings
+//! Settings Dialog
+
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.335086+00:00 //
+//! Translation Progress: 81%
+//! * Total (Strings + Menu) = 113
+//! * Done = 92
+//! * Missing = 21 (19%)

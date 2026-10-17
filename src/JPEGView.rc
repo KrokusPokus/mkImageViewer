@@ -7,7 +7,11 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include "atlres.h"
+#include <winres.h>
+
+#ifndef IDC_STATIC
+#define IDC_STATIC (-1)
+#endif
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -32,7 +36,7 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""atlres.h""\r\n"
+    "#include <winres.h>\r\n"
     "\0"
 END
 
@@ -266,5 +270,3 @@ END
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////
-
-

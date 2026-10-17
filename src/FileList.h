@@ -3,6 +3,8 @@
 
 #include "Helpers.h"
 
+#include <list>
+
 class CDirectoryWatcher;
 
 // Entry in the file list, allowing sorting by different sort criteria

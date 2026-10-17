@@ -2,13 +2,11 @@
 #include "ResizeFilter.h"
 #include "XMMImage.h"
 #include "Helpers.h"
-//#include "WorkThread.h"
 #include "ProcessingThreadPool.h"
-#ifdef _WIN64
 #include "ApplyFilterAVX.h"
-#endif
-#include <math.h>
 #include "LookupTables.h"    // needed for LinRGB12_sRGB8[4096]
+
+#include <cmath>
 
 // This macro allows for aligned definition of a 16 byte value with initialization of the 8 components
 // to a single value
@@ -1419,7 +1417,6 @@ static void* RotateToDIB(const CXMMImage* pSourceImg, int simdPixelsPerRegister,
 // High quality filtering (SSE implementation)
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef _WIN64
 // Apply filter in y direction in SSE
 // No inline assembly is supported in 64 bit mode, thus intrinsics are used instead.
 // nSourceHeight: Height of source image, only here to match interface of C++ implementation
@@ -1539,162 +1536,6 @@ static CXMMImage* ApplyFilter_SSE(int nSourceHeight, int nTargetHeight, int nWid
     return tempImage;
 }
 
-#else
-// Apply filter in y direction in SSE
-// nSourceHeight: Height of source image, only here to match interface of C++ implementation
-// nTargetHeight: Height of target image after resampling
-// nWidth: Width of source image
-// nStartY_FP: 16.16 fixed point number, denoting the y-start subpixel coordinate
-// nStartX: Start of filtering in x-direction (not an FP number)
-// nIncrementY_FP: 16.16 fixed point number, denoting the increment for the y coordinates
-// filter: filter to apply
-// nFilterOffset: Offset into filter (to filter.Indices array)
-// pSourceImg: Source image
-// The filter is applied to 'nTargetHeight' rows of the input image at positions
-// nStartY_FP, nStartY_FP+nIncrementY_FP, ... 
-// In X direction, the filter is applied starting from column /nStartX\ to (including) \nStartX+nWidth-1/
-// where the /\ symbol denotes padding to lower 8 pixel boundary and \/ padding to the upper 8 pixel
-// boundary.
-static CXMMImage* ApplyFilter_SSE(int nSourceHeight, int nTargetHeight, int nWidth,
-                                  int nStartY_FP, int nStartX, int nIncrementY_FP,
-                                  const XMMFilterKernelBlock& filter,
-                                  int nFilterOffset, const CXMMImage* pSourceImg) {
-    
-    int nStartXAligned = nStartX & ~7;
-    int nEndXAligned = (nStartX + nWidth + 7) & ~7;
-    CXMMImage* tempImage = new CXMMImage(nEndXAligned - nStartXAligned, nTargetHeight, 8);
-    if (tempImage->AlignedPtr() == NULL) {
-        delete tempImage;
-        return NULL;
-    }
-    int16* pDest = (int16*) tempImage->AlignedPtr();
-
-    int nCurY = nStartY_FP;
-    int nChannelLenBytes = pSourceImg->GetPaddedWidth()*2;
-    int nRowLenBytes = nChannelLenBytes*3;
-    int nLoopY = 0;
-    int nLoopXStart = (nEndXAligned - nStartXAligned) >> 3;
-    int nLoopX = nLoopXStart;
-    const uint8* pSourceStart = (const uint8*)pSourceImg->AlignedPtr() + nStartXAligned*2;
-    void* pKernelIndexStart = &(filter.Indices[0]);
-    int   nFilterLen;
-    void* pFilterStart;
-    DECLARE_ALIGNED_DQWORD(pFPONE, 16383 - 42);
-
-    _asm {
-        mov ebx, pFPONE
-        movdqa xmm0, [ebx] // this value remains in mm0, it represents 1.0 in fixed point format
-        mov edi, pDest
-        
-startYLoop:
-        mov eax, nCurY
-        shr eax, 16        // integer part of Y
-
-        mov ebx, nLoopY
-        add ebx, nFilterOffset
-        mov ecx, pKernelIndexStart
-        mov ecx, [ecx + 4*ebx] // now the address of the XMM filter kernel to use is in ecx
-        mov ebx, [ecx] // filter length is in ebx
-        mov edx, [ecx + 4] // filter offset is in edx
-        add ecx, 16 // ecx now on first filter element
-
-        sub eax, edx      // subtract the filter offset
-        mul nRowLenBytes
-        add eax, pSourceStart // source start in eax
-
-        // For the row loop, the following register allocations are done.
-        // These registers are not touched in the pixel loop.
-        // EDX: Length of one row per channel, fixed
-        // ESI: Source pixel ptr for row loop
-        // EDI: Target pixel ptr for row loop
-        mov edx, nChannelLenBytes
-        mov esi, eax
-        mov nFilterLen, ebx
-        mov pFilterStart, ecx
-
-startXLoop:
-        // For the pixel loop, the following register allocations are done.
-        // EAX: Source pixel ptr, incremented
-        // EBX: Filter length, decremented
-        // ECX: Filter kernel ptr, incremented
-
-        // pixel loop init, eight pixels are calculated with SSE
-        pxor   xmm4, xmm4   // filter sum R
-        pxor   xmm5, xmm5   // filter sum G
-        pxor   xmm6, xmm6   // filter sum B
-
-FilterKernelLoop:
-        movdqa xmm7, [ecx]  // load kernel element
-        movdqa xmm2, [eax]  // the pixel data RED channel
-        paddw  xmm2, xmm2
-        pmulhw xmm2, xmm7
-        paddw  xmm2, xmm2
-        paddsw xmm4, xmm2
-        add    eax, edx
-        movdqa xmm3, [eax]  // the pixel data GREEN channel
-        paddw  xmm3, xmm3
-        pmulhw xmm3, xmm7
-        paddw  xmm3, xmm3
-        paddsw xmm5, xmm3
-        add    eax, edx
-        movdqa xmm2, [eax]  // the pixel data BLUE channel
-        paddw  xmm2, xmm2
-        pmulhw xmm2, xmm7
-        paddw  xmm2, xmm2
-        paddsw xmm6, xmm2
-        add    eax, edx
-        add    ecx, 16      // next kernel element
-        sub    ebx, 1
-        jnz    FilterKernelLoop
-
-        // min-max to 0, 16383-42
-        pminsw xmm4, xmm0
-        pminsw xmm5, xmm0
-        pminsw xmm6, xmm0
-        pxor   xmm1, xmm1
-        pmaxsw xmm4, xmm1
-        pmaxsw xmm5, xmm1
-        pmaxsw xmm6, xmm1
-
-        // store result in blocks
-        movdqa [edi], xmm4
-        movdqa [edi + 16], xmm5
-        movdqa [edi + 32], xmm6
-        add   edi, 48
-        add   esi, 16
-
-        mov eax, esi  // prepare for next 8 pixels of row
-        mov ebx, nFilterLen
-        mov ecx, pFilterStart
-
-        dec nLoopX
-        jnz startXLoop
-
-        mov eax, nLoopXStart
-        mov nLoopX, eax
-        mov eax, nCurY
-        add eax, nIncrementY_FP
-        mov nCurY, eax
-        mov ecx, nLoopY
-        inc ecx
-        mov nLoopY, ecx
-        cmp ecx, nTargetHeight
-        jl  startYLoop
-    }
-
-    return tempImage;
-}
-
-CXMMImage* ApplyFilter_AVX(int nSourceHeight, int nTargetHeight, int nWidth,
-    int nStartY_FP, int nStartX, int nIncrementY_FP,
-    const AVXFilterKernelBlock& filter,
-    int nFilterOffset, const CXMMImage* pSourceImg) {
-
-    // not supported in 32 bit
-    return NULL;
-}
-
-#endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // High quality down- and up-sampling (SIMD implementation)

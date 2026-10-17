@@ -3,8 +3,6 @@
 #include "ApplyFilterAVX.h"
 #include <immintrin.h>
 
-#ifdef _WIN64
-
 CXMMImage* ApplyFilter_AVX(int nSourceHeight, int nTargetHeight, int nWidth,
     int nStartY_FP, int nStartX, int nIncrementY_FP,
     const AVXFilterKernelBlock& filter,
@@ -87,5 +85,3 @@ CXMMImage* ApplyFilter_AVX(int nSourceHeight, int nTargetHeight, int nWidth,
 
     return tempImage;
 }
-
-#endif

@@ -1,228 +1,230 @@
 #include "EXIFReader.h"
-#include "ImageProcessingTypes.h"
 #include "Helpers.h"
 
 double CEXIFReader::UNKNOWN_DOUBLE_VALUE = 283740261.192864;
 
-static uint32 ReadUInt(void * ptr, bool bLittleEndian) {
-    uint32 nValue = *((uint32*)ptr);
-    if (!bLittleEndian) {
-        return _byteswap_ulong(nValue);
-    } else {
-        return nValue;
-    }
-}
+namespace {
+	uint32 ReadUInt(void * ptr, bool bLittleEndian) {
+		uint32 nValue = *((uint32*)ptr);
+		if (!bLittleEndian) {
+			return _byteswap_ulong(nValue);
+		} else {
+			return nValue;
+		}
+	}
 
-static void WriteUInt(void * ptr, uint32 nValue, bool bLittleEndian) {
-    uint32 nVal = nValue;
-    if (!bLittleEndian) {
-        nVal = _byteswap_ulong(nVal);
-    }
-    *((uint32*)ptr) = nVal;
-}
+	void WriteUInt(void * ptr, uint32 nValue, bool bLittleEndian) {
+		uint32 nVal = nValue;
+		if (!bLittleEndian) {
+			nVal = _byteswap_ulong(nVal);
+		}
+		*((uint32*)ptr) = nVal;
+	}
 
-static uint16 ReadUShort(void * ptr, bool bLittleEndian) {
-    uint16 nValue = *((uint16*)ptr);
-    if (!bLittleEndian) {
-        return _byteswap_ushort(nValue);
-    } else {
-        return nValue;
-    }
-}
+	uint16 ReadUShort(void * ptr, bool bLittleEndian) {
+		uint16 nValue = *((uint16*)ptr);
+		if (!bLittleEndian) {
+			return _byteswap_ushort(nValue);
+		} else {
+			return nValue;
+		}
+	}
 
-static void WriteUShort(void * ptr, uint16 nValue, bool bLittleEndian) {
-    uint16 nVal = nValue;
-    if (!bLittleEndian) {
-        nVal = _byteswap_ushort(nVal);
-    }
-    *((uint16*)ptr) = nVal;
-}
+	void WriteUShort(void * ptr, uint16 nValue, bool bLittleEndian) {
+		uint16 nVal = nValue;
+		if (!bLittleEndian) {
+			nVal = _byteswap_ushort(nVal);
+		}
+		*((uint16*)ptr) = nVal;
+	}
 
-static uint8* FindTag(uint8* ptr, uint8* ptrLast, uint16 nTag, bool bLittleEndian) {
-    while (ptr < ptrLast) {
-        if (ReadUShort(ptr, bLittleEndian) == nTag) {
-            return ptr;
-        }
-        ptr += 12;
-    }
-    return NULL;
-}
+	uint8* FindTag(uint8* ptr, uint8* ptrLast, uint16 nTag, bool bLittleEndian) {
+		while (ptr < ptrLast) {
+			if (ReadUShort(ptr, bLittleEndian) == nTag) {
+				return ptr;
+			}
+			ptr += 12;
+		}
+		return NULL;
+	}
 
-static void ReadStringTag(CString & strOut, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian, bool bTryReadAsUTF8 = false, uint32 maxLength = 65536) {
-    try {
-        if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 2) {
-            uint32 nSize = ReadUInt(ptr + 4, bLittleEndian);
-            if (nSize > maxLength) {
-                strOut.Empty();
-                return;
-            }
-            LPCSTR pString = (nSize <= 4) ? (LPCSTR)(ptr + 8) : (LPCSTR)(pTIFFHeader + ReadUInt(ptr + 8, bLittleEndian));
-            int nMaxChars = std::min<int>(nSize, strlen(pString));
-            if (bTryReadAsUTF8) {
-                CString strUTF8 = Helpers::TryConvertFromUTF8((uint8*)pString, nMaxChars);
-                if (!strUTF8.IsEmpty()) {
-                    strOut = strUTF8;
-                    return;
-                }
-            }
-            strOut = CString(pString, nMaxChars);
-        } else {
-            strOut.Empty();
-        }
-    } catch (...) {
-        // EXIF corrupt?
-        strOut.Empty();
-    }
-}
+	void ReadStringTag(CString & strOut, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian, bool bTryReadAsUTF8 = false, uint32 maxLength = 65536) {
+		try {
+			if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 2) {
+				uint32 nSize = ReadUInt(ptr + 4, bLittleEndian);
+				if (nSize > maxLength) {
+					strOut.Empty();
+					return;
+				}
+				LPCSTR pString = (nSize <= 4) ? (LPCSTR)(ptr + 8) : (LPCSTR)(pTIFFHeader + ReadUInt(ptr + 8, bLittleEndian));
+				int nMaxChars = std::min<int>(nSize, strlen(pString));
+				if (bTryReadAsUTF8) {
+					CString strUTF8 = Helpers::TryConvertFromUTF8((uint8*)pString, nMaxChars);
+					if (!strUTF8.IsEmpty()) {
+						strOut = strUTF8;
+						return;
+					}
+				}
+				strOut = CString(pString, nMaxChars);
+			} else {
+				strOut.Empty();
+			}
+		} catch (...) {
+			// EXIF corrupt?
+			strOut.Empty();
+		}
+	}
 
-static void ReadUserCommentTag(CString & strOut, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
-    try {
-        if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 7) {
-            int nSize = ReadUInt(ptr + 4, bLittleEndian);
-            if (nSize > 10 && nSize <= 4096) {
-                LPCSTR sCodeDesc = (LPCSTR)(pTIFFHeader + ReadUInt(ptr + 8, bLittleEndian));
-                if (strcmp(sCodeDesc, "ASCII") == 0) {
-                    strOut = CString((LPCSTR)(sCodeDesc + 8), nSize - 8);
-                } else if (strcmp(sCodeDesc, "UNICODE") == 0) {
-                    bool bLE = bLittleEndian;
-                    nSize -= 8;
-                    sCodeDesc += 8;
-                    if (sCodeDesc[0] == 0xFF && sCodeDesc[1] == 0xFE) {
-                        bLE = true;
-                        nSize -= 2; sCodeDesc += 2;
-                    } else if (sCodeDesc[0] == 0xFE && sCodeDesc[1] == 0xFF) {
-                        bLE = false;
-                        nSize -= 2; sCodeDesc += 2;
-                    }
-                    if (bLE) {
-                        strOut = CString((LPCWSTR)sCodeDesc, nSize / 2);
-                    } else {
-                        // swap 16 bit characters to little endian
-                        char* pString = new char[nSize];
-                        char* pSwap = pString;
-                        memcpy(pString, sCodeDesc, nSize);
-                        for (int i = 0; i < nSize / 2; i++) {
-                            char t = *pSwap;
-                            *pSwap = pSwap[1];
-                            pSwap[1] = t;
-                            pSwap += 2;
-                        }
-                        strOut = CString((LPCWSTR)pString, nSize / 2);
-                        delete[] pString;
-                    }
-                }
-            } // else comment is corrupt or too big
-        }
-    } catch (...) {
-        // EXIF corrupt?
-        strOut.Empty();
-    }
-}
+	void ReadUserCommentTag(CString & strOut, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
+		try {
+			if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 7) {
+				int nSize = ReadUInt(ptr + 4, bLittleEndian);
+				if (nSize > 10 && nSize <= 4096) {
+					LPCSTR sCodeDesc = (LPCSTR)(pTIFFHeader + ReadUInt(ptr + 8, bLittleEndian));
+					if (strcmp(sCodeDesc, "ASCII") == 0) {
+						strOut = CString((LPCSTR)(sCodeDesc + 8), nSize - 8);
+					} else if (strcmp(sCodeDesc, "UNICODE") == 0) {
+						bool bLE = bLittleEndian;
+						nSize -= 8;
+						sCodeDesc += 8;
+						if (sCodeDesc[0] == 0xFF && sCodeDesc[1] == 0xFE) {
+							bLE = true;
+							nSize -= 2; sCodeDesc += 2;
+						} else if (sCodeDesc[0] == 0xFE && sCodeDesc[1] == 0xFF) {
+							bLE = false;
+							nSize -= 2; sCodeDesc += 2;
+						}
+						if (bLE) {
+							strOut = CString((LPCWSTR)sCodeDesc, nSize / 2);
+						} else {
+							// swap 16 bit characters to little endian
+							char* pString = new char[nSize];
+							char* pSwap = pString;
+							memcpy(pString, sCodeDesc, nSize);
+							for (int i = 0; i < nSize / 2; i++) {
+								char t = *pSwap;
+								*pSwap = pSwap[1];
+								pSwap[1] = t;
+								pSwap += 2;
+							}
+							strOut = CString((LPCWSTR)pString, nSize / 2);
+							delete[] pString;
+						}
+					}
+				} // else comment is corrupt or too big
+			}
+		} catch (...) {
+			// EXIF corrupt?
+			strOut.Empty();
+		}
+	}
 
-static uint32 ReadLongTag(uint8* ptr, bool bLittleEndian) {
-    if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 4) {
-        return ReadUInt(ptr + 8, bLittleEndian);
-    } else {
-        return 0;
-    }
-}
+	uint32 ReadLongTag(uint8* ptr, bool bLittleEndian) {
+		if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 4) {
+			return ReadUInt(ptr + 8, bLittleEndian);
+		} else {
+			return 0;
+		}
+	}
 
-static uint16 ReadShortTag(uint8* ptr, bool bLittleEndian) {
-    if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 3) {
-        return ReadUShort(ptr + 8, bLittleEndian);
-    } else {
-        return 0;
-    }
-}
+	uint16 ReadShortTag(uint8* ptr, bool bLittleEndian) {
+		if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 3) {
+			return ReadUShort(ptr + 8, bLittleEndian);
+		} else {
+			return 0;
+		}
+	}
 
-static uint32 ReadShortOrLongTag(uint8* ptr, bool bLittleEndian) {
-    if (ptr != NULL) {
-        uint16 nType = ReadUShort(ptr + 2, bLittleEndian);
-        if (nType == 3) {
-            return ReadUShort(ptr + 8, bLittleEndian);
-        } else if (nType == 4) {
-            return ReadUInt(ptr + 8, bLittleEndian);
-        }
-    }
-    return 0;
-}
+	uint32 ReadShortOrLongTag(uint8* ptr, bool bLittleEndian) {
+		if (ptr != NULL) {
+			uint16 nType = ReadUShort(ptr + 2, bLittleEndian);
+			if (nType == 3) {
+				return ReadUShort(ptr + 8, bLittleEndian);
+			} else if (nType == 4) {
+				return ReadUInt(ptr + 8, bLittleEndian);
+			}
+		}
+		return 0;
+	}
 
-static void WriteShortTag(uint8* ptr, uint16 nValue, bool bLittleEndian) {
-    if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 3) {
-        WriteUShort(ptr + 8, nValue, bLittleEndian);
-    }
-}
+	void WriteShortTag(uint8* ptr, uint16 nValue, bool bLittleEndian) {
+		if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 3) {
+			WriteUShort(ptr + 8, nValue, bLittleEndian);
+		}
+	}
 
-static void WriteLongTag(uint8* ptr, uint32 nValue, bool bLittleEndian) {
-    if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 4) {
-        WriteUInt(ptr + 8, nValue, bLittleEndian);
-    }
-}
+	void WriteLongTag(uint8* ptr, uint32 nValue, bool bLittleEndian) {
+		if (ptr != NULL && ReadUShort(ptr + 2, bLittleEndian) == 4) {
+			WriteUInt(ptr + 8, nValue, bLittleEndian);
+		}
+	}
 
-static int ReadRationalTag(Rational & rational, uint8* ptr, uint8* pTIFFHeader, int index, bool bLittleEndian) {
-    rational.Numerator = 0;
-    rational.Denominator = 0;
-    if (ptr != NULL) {
-        uint16 nType = ReadUShort(ptr + 2, bLittleEndian);
-        uint16 nCount = ReadUInt(ptr + 4, bLittleEndian);
-        if (index < nCount) {
-            if (nType == 5 || nType == 10) {
-                int nOffset = ReadUInt(ptr + 8, bLittleEndian) + index * 8;
-                rational.Numerator = ReadUInt(pTIFFHeader + nOffset, bLittleEndian);
-                rational.Denominator = ReadUInt(pTIFFHeader + nOffset + 4, bLittleEndian);
-                if (rational.Numerator != 0 && rational.Denominator != 0) {
-                    // Calculate the ggT
-                    uint32 nModulo;
-                    uint32 nA = (nType == 10) ? abs((int)rational.Numerator) : rational.Numerator;
-                    uint32 nB = (nType == 10) ? abs((int)rational.Denominator) : rational.Denominator;
-                    do {
-                        nModulo = nA % nB;
-                        nA = nB;
-                        nB = nModulo;
-                    } while (nB != 0);
-                    // normalize
-                    if (nType == 10) {
-                        rational.Numerator = (int)rational.Numerator / (int)nA;
-                        rational.Denominator = (int)rational.Denominator / (int)nA;
-                    }
-                    else {
-                        rational.Numerator /= nA;
-                        rational.Denominator /= nA;
-                    }
-                }
-            }
-        }
-        return nType;
-    }
-    return 0;
-}
+	int ReadRationalTag(Rational & rational, uint8* ptr, uint8* pTIFFHeader, int index, bool bLittleEndian) {
+		rational.Numerator = 0;
+		rational.Denominator = 0;
+		if (ptr != NULL) {
+			uint16 nType = ReadUShort(ptr + 2, bLittleEndian);
+			uint16 nCount = ReadUInt(ptr + 4, bLittleEndian);
+			if (index < nCount) {
+				if (nType == 5 || nType == 10) {
+					int nOffset = ReadUInt(ptr + 8, bLittleEndian) + index * 8;
+					rational.Numerator = ReadUInt(pTIFFHeader + nOffset, bLittleEndian);
+					rational.Denominator = ReadUInt(pTIFFHeader + nOffset + 4, bLittleEndian);
+					if (rational.Numerator != 0 && rational.Denominator != 0) {
+						// Calculate the ggT
+						uint32 nModulo;
+						uint32 nA = (nType == 10) ? abs((int)rational.Numerator) : rational.Numerator;
+						uint32 nB = (nType == 10) ? abs((int)rational.Denominator) : rational.Denominator;
+						do {
+							nModulo = nA % nB;
+							nA = nB;
+							nB = nModulo;
+						} while (nB != 0);
+						// normalize
+						if (nType == 10) {
+							rational.Numerator = (int)rational.Numerator / (int)nA;
+							rational.Denominator = (int)rational.Denominator / (int)nA;
+						}
+						else {
+							rational.Numerator /= nA;
+							rational.Denominator /= nA;
+						}
+					}
+				}
+			}
+			return nType;
+		}
+		return 0;
+	}
 
-static int ReadRationalTag(Rational & rational, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
-    return ReadRationalTag(rational, ptr, pTIFFHeader, 0, bLittleEndian);
-}
+	int ReadRationalTag(Rational & rational, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
+		return ReadRationalTag(rational, ptr, pTIFFHeader, 0, bLittleEndian);
+	}
 
-static bool ReadSignedRationalTag(SignedRational & rational, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
-    return ReadRationalTag((Rational &)rational, ptr, pTIFFHeader, bLittleEndian);
-}
+	bool ReadSignedRationalTag(SignedRational & rational, uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
+		return ReadRationalTag((Rational &)rational, ptr, pTIFFHeader, bLittleEndian);
+	}
 
-static double ReadDoubleTag(uint8* ptr, uint8* pTIFFHeader, int index, bool bLittleEndian) {
-    Rational rational(0, 0);
-    int nType = ReadRationalTag(rational, ptr, pTIFFHeader, index, bLittleEndian);
-    if (rational.Denominator != 0) {
-        if (nType == 5) {
-            return (double)rational.Numerator / rational.Denominator;
-        } else {
-            int nNum = rational.Numerator;
-            int nDenum = rational.Denominator;
-            return (double)nNum/nDenum;
-        }
-    }
-    return CEXIFReader::UNKNOWN_DOUBLE_VALUE;
-}
+	double ReadDoubleTag(uint8* ptr, uint8* pTIFFHeader, int index, bool bLittleEndian) {
+		Rational rational(0, 0);
+		int nType = ReadRationalTag(rational, ptr, pTIFFHeader, index, bLittleEndian);
+		if (rational.Denominator != 0) {
+			if (nType == 5) {
+				return (double)rational.Numerator / rational.Denominator;
+			} else {
+				int nNum = rational.Numerator;
+				int nDenum = rational.Denominator;
+				return (double)nNum/nDenum;
+			}
+		}
+		return CEXIFReader::UNKNOWN_DOUBLE_VALUE;
+	}
 
-static double ReadDoubleTag(uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
-    return ReadDoubleTag(ptr, pTIFFHeader, 0, bLittleEndian);
-}
+	double ReadDoubleTag(uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
+		return ReadDoubleTag(ptr, pTIFFHeader, 0, bLittleEndian);
+	}
+
+} // namespace
 
 bool CEXIFReader::ParseDateString(SYSTEMTIME & date, const CString& str) {
     int nYear, nMonth, nDay, nHour, nMin, nSec;

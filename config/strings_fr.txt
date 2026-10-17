@@ -1,0 +1,192 @@
+﻿//! This file must be encoded with UTF-8 (e.g. with Windows Notepad)
+//! LICENSE: This localization file is part of JPEGView <https://github.com/sylikc/jpegview> and distributed under the same license.  See <https://github.com/sylikc/jpegview/blob/master/LICENSE.txt> for more info.
+
+//! Standard  Filename Convention: 'strings_%languagecode%.txt' where %languagecode% is the ISO 639-1 language code e.g. 'en' for English (See <https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes>)
+//! Alternate Filename Convention: 'strings_%languagecode%-%countrycode%.txt' where %countrycode% is the ISO 3166-1 country code e.g. 'US' for United States (See <https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes>)
+//!    Use the alternate filename convention only when the standard filename already exist (e.g. specifying a country-specific dialect for an existing language)
+
+////////////////////
+// ::: Translation Info ::: //
+//: ISO 639-1 code: fr
+//: ISO 3166-1 code:
+//: Language: French (Français)
+//: Translator(s) - Name <Contact Info/URL>: Ronan Plantec <rplantec@laposte.net>
+//: Last Updated: 2023-03-09
+//: Additional Notes:
+//old French translator Laurent Grenet <https://github.com/LaurentGrenet> until 2023-02-09
+////////////////////
+
+////////////////////
+// ::: Instructions / Help ::: (help for translators only, does not need to be translated) //
+
+//? Line Format:    English string<tab>Translated string<newline>
+//? * Lines beginning with "//" (comments) are ignored
+//? * Blank lines are ignored
+//? * Lines without a <tab> are ignored
+//? * Lines with no text after the <tab> are ignored
+//? * Multiple tabs are permitted between English and Translated string, e.g. this is valid:    English string<tab><tab><tab>Translated string<newline>
+
+//? NOTE: %s %d have special meanings in the strings, so make sure they appear somewhere in the translated string!
+
+//? For the strings below which are short and have no context:
+//?   "in"        in context: is shorthand for "inch"
+//?   "cm"        in context: is shorthand for "centimeter"
+//?   "C - R"     in context: is "Cyan Red" colors
+//?   "M - G"     in context: is "Magenta Green" colors
+//?   "Y - B"     in context: is "Yellow Blue" colors
+//?   "yes"/"no"  in context: is for showing EXIF flags
+//?   "on"/"off"  in context: is for showing a setting active or not
+//?   "Filter"    in context: is used in Resize image, "sampling filter"
+//?   "Box"       in context: is used in Resize image sampling filter "Box filter"
+////////////////////
+
+
+// ::: Program Strings ::: (sorted alphabetically) //
+Ascending	Ordre croissant
+Auto contrast and color correction	Corrections automatique des couleurs et du contraste
+Auto zoom mode	mode zoom automatique
+Blend	Mélanger les calques
+Book Mode	
+Brightness	Gamma
+Confirm	Confirmer
+Confirm save default parameters	Confirmer la sauvegarde des réglages par défaut dans le fichier INI
+Contrast	Contraste
+Decoding this format requires the Microsoft Visual C++ Redistributable.	Décoder ce format requiert que le Redistributable Microsoft Visual C++ soit installé.
+Descending	Ordre décroissant
+Do you really want to save the following parameters as default to the INI file	Souhaitez-vous vraiment enregistrer les paramètres suivants par défaut dans le fichier INI
+File name	Nom du fichier
+File size	Taille du fichier
+Fill with crop	Remplir la fenêtre et rogner l'image
+Fill with crop (no zoom)	Remplir la fenêtre et rogner l'image (sans agrandir)
+Fit to screen	Ajuster l'image à l'écran
+Fit to screen (no zoom)	Ajuster l'image à l'écran (sans agrandir)
+High quality resampling	Réechantillonnage de haute qualité
+Keep parameters	Garder le traitement entre les images
+Last modification date/time	Date de dernière modification
+Loop folder	Parcourir le dossier courant
+Loop recursively	Parcourir le dossier et ses sous-dossiers
+Loop siblings	Parcourir le dossier et ses dossiers frères
+Navigation	Dossiers
+No image loaded!	Aucune image chargée !
+No user INI file exists yet. Create user INI file from INI file template?	Le fichier INI utilisateur n'existe pas encore. En créer un depuis le fichier INI modèle ?
+None	Aucun
+Not enough memory available	mémoire insuffisante
+Order files by	Tri des fichiers par
+Press ESC to exit...	Appuyez sur Échap pour quitter...
+Press any key to search the subdirectories for image files.	Appuyez sur une touche pour rechercher des fichiers images dans les sous-répertoires.
+Random	Aléatoire
+Reason:	Raison:
+Roll from bottom	Dérouler depuis le bas
+Roll from left	Dérouler depuis la gauche
+Roll from right	Dérouler depuis la droite
+Roll from top	Dérouler depuis le haut
+Saturation	Saturation
+Scroll from bottom	Faire défiler depuis le bas
+Scroll from left	Faire défiler depuis la gauche
+Scroll from right	Faire défiler depuis la droite
+Scroll from top	Faire défiler depuis le haut
+Slide from bottom	Faire glisser depuis le bas
+Slide from left	Faire glisser depuis la gauche
+Slide from right	Faire glisser depuis la droite
+Slide from top	Faire glisser depuis le haut
+Slideshow	Diaporama
+The directory '%s' does not contain any image files!	Le répertoire '%s' ne contient aucun fichier image !
+The file '%s' could not be read!	Le fichier '%s' n'a pas pu être lu !
+The file '%s' does not contain a list of file names!	Le fichier '%s' ne contient pas de liste de noms de fichiers !
+These values will override the values from the INI file located in the program folder of JPEGView!	Ce fichier INI utilisateur aura priorité sur le fichier INI du dossier programme de JPEGView !
+Transition Effect	Effet de transition
+off	Inactif
+on	Actif
+
+// ::: Popup Menu Strings ::: (unsorted to preserve context) //
+Next image	Image suivante
+Previous image	Image précédente
+Current View	
+Rotate +90	Rotation +90
+Rotate -90	Rotation -90
+Mirror horizontally	Inversion horizontale
+Mirror vertically	Inversion verticale
+Fit to window	
+Window	
+Full screen mode	Mode plein écran
+Fit window to image	Ajuster la fenêtre à l'image
+Hide window title bar	Cacher la barre de titre
+Set window always on top	Positionner la fenêtre toujours au premier plan
+Play folder as slideshow/movie	Jouer le dossier comme diaporama/film
+Pause Slideshow/Movie	
+Waiting time	Temps d'attente
+1 sec	1 s
+2 sec	2 s
+3 sec	3 s
+4 sec	4 s
+5 sec	5 s
+7 sec	7 s
+10 sec	10 s
+20 sec	20 s
+Transition Speed	Vitesse de transition
+Very fast	Très rapide
+Fast	Rapide
+Normal	Normal
+Slow	Lent
+Very slow	Très lent
+Movie	Film
+Playback speed	Vitesse d'animation
+5 fps	5 ips
+10 fps	10 ips
+15 fps	
+20 fps	
+25 fps	25 ips
+30 fps	30 ips
+50 fps	50 ips
+60 fps	
+100 fps	100 ips
+Reload image	Recharger l'image
+Edit image in default editor	
+Copy scaled image content to clipboard	
+Copy original image content to clipboard	
+Copy file path to clipboard	
+Cut file to clipboard	
+Open containing folder in Explorer	Afficher le fichier dans l'explorateur
+Folder Mode	
+Sort Order	
+Modification date	Date de modification
+Auto Zoom Mode	
+Fit to window (never upsize)	
+Fill with crop (never upsize)	
+Auto Contrast	
+Edit Settings	
+Settings Dialog	
+Exit	Quitter
+
+// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
+//! Book Mode
+//! Current View
+//! Fit to window
+//! Window
+//! Pause Slideshow/Movie
+//! 15 fps
+//! 20 fps
+//! 60 fps
+//! Edit image in default editor
+//! Copy scaled image content to clipboard
+//! Copy original image content to clipboard
+//! Copy file path to clipboard
+//! Cut file to clipboard
+//! Folder Mode
+//! Sort Order
+//! Auto Zoom Mode
+//! Fit to window (never upsize)
+//! Fill with crop (never upsize)
+//! Auto Contrast
+//! Edit Settings
+//! Settings Dialog
+
+// ::: INFO: Same Translations [2] ::: (Summary to assist translators: All strings which are known not to need translation [String == Translation]) - Auto-generated by script //
+//! Saturation
+//! Normal
+
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.303653+00:00 //
+//! Translation Progress: 81%
+//! * Total (Strings + Menu) = 113
+//! * Done = 92
+//! * Missing = 21 (19%)

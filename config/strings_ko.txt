@@ -1,0 +1,195 @@
+﻿//! This file must be encoded with UTF-8 (e.g. with Windows Notepad)
+//! LICENSE: This localization file is part of JPEGView <https://github.com/sylikc/jpegview> and distributed under the same license.  See <https://github.com/sylikc/jpegview/blob/master/LICENSE.txt> for more info.
+
+//! Standard  Filename Convention: 'strings_%languagecode%.txt' where %languagecode% is the ISO 639-1 language code e.g. 'en' for English (See <https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes>)
+//! Alternate Filename Convention: 'strings_%languagecode%-%countrycode%.txt' where %countrycode% is the ISO 3166-1 country code e.g. 'US' for United States (See <https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes>)
+//!    Use the alternate filename convention only when the standard filename already exist (e.g. specifying a country-specific dialect for an existing language)
+
+////////////////////
+// ::: Translation Info ::: //
+//: ISO 639-1 code: ko
+//: ISO 3166-1 code:
+//: Language: Korean (한국어)
+//: Translator(s) - Name <Contact Info/URL>: VenusGirl (비너스걸)💋 <https://github.com/VenusGirl>
+//: Last Updated: 2023-03-05
+//: Additional Notes:
+////////////////////
+
+////////////////////
+// ::: Instructions / Help ::: (help for translators only, does not need to be translated) //
+
+//? Line Format:    English string<tab>Translated string<newline>
+//? * Lines beginning with "//" (comments) are ignored
+//? * Blank lines are ignored
+//? * Lines without a <tab> are ignored
+//? * Lines with no text after the <tab> are ignored
+//? * Multiple tabs are permitted between English and Translated string, e.g. this is valid:    English string<tab><tab><tab>Translated string<newline>
+
+//? NOTE: %s %d have special meanings in the strings, so make sure they appear somewhere in the translated string!
+
+//? For the strings below which are short and have no context:
+//?   "in"        in context: is shorthand for "inch"
+//?   "cm"        in context: is shorthand for "centimeter"
+//?   "C - R"     in context: is "Cyan Red" colors
+//?   "M - G"     in context: is "Magenta Green" colors
+//?   "Y - B"     in context: is "Yellow Blue" colors
+//?   "yes"/"no"  in context: is for showing EXIF flags
+//?   "on"/"off"  in context: is for showing a setting active or not
+//?   "Filter"    in context: is used in Resize image, "sampling filter"
+//?   "Box"       in context: is used in Resize image sampling filter "Box filter"
+////////////////////
+
+
+// ::: Program Strings ::: (sorted alphabetically) //
+Ascending	오름차순
+Auto contrast and color correction	자동 대비 및 색상 보정
+Auto zoom mode	자동 확대/축소 모드
+Blend	혼합
+Book Mode	
+Brightness	밝기
+Confirm	확인
+Confirm save default parameters	기본 매개변수 저장 확인
+Contrast	대비
+Decoding this format requires the Microsoft Visual C++ Redistributable.	이 형식을 디코딩하려면 Microsoft Visual C++ 재배포 가능 파일이 필요합니다.
+Descending	내림차순
+Do you really want to save the following parameters as default to the INI file	다음 매개변수를 INI 파일에 기본값으로 저장하시겠습니까
+File name	파일 이름
+File size	파일 크기
+Fill with crop	자르기로 채우기
+Fill with crop (no zoom)	자르기로 채우기 (확대/축소 없음)
+Fit to screen	화면에 맞추기
+Fit to screen (no zoom)	화면에 맞추기 (확대/축소 없음)
+High quality resampling	고품질 리샘플링
+Keep parameters	매개변수 유지
+Last modification date/time	마지막 수정한 날짜/시각
+Loop folder	폴더 순환
+Loop recursively	반복 순환
+Loop siblings	동기 순환
+Navigation	탐색
+No image loaded!	이미지가 로드되지 않았습니다!
+No user INI file exists yet. Create user INI file from INI file template?	사용자 INI 파일이 아직 없습니다. INI 파일 템플릿에서 사용자 INI 파일을 생성하시겠습니까?
+None	없음
+Not enough memory available	사용 가능한 메모리가 부족합니다
+Order files by	파일 정렬
+Press ESC to exit...	종료하려면 ESC를 누르십시오...
+Press any key to search the subdirectories for image files.	하위 디렉터리에서 이미지 파일을 검색하려면 아무 키나 누릅니다.
+Random	무작위
+Reason:	이유:
+Roll from bottom	아래에서 굴리기
+Roll from left	왼쪽에서 굴리기
+Roll from right	오른쪽에서 굴리기
+Roll from top	위에서 굴리기
+Saturation	채도
+Scroll from bottom	아래에서 스크롤
+Scroll from left	왼쪽에서 스크롤
+Scroll from right	오른쪽에서 스크롤
+Scroll from top	위에서 스크롤
+Slide from bottom	아래에서 슬라이드
+Slide from left	아래에서 슬라이드
+Slide from right	오른쪽에서 슬라이드
+Slide from top	위에서 슬라이드
+Slideshow	슬라이드 쇼
+The directory '%s' does not contain any image files!	'%s' 디렉터리에 이미지 파일이 없습니다!
+The file '%s' could not be read!	'%s' 파일을 읽을 수 없습니다!
+The file '%s' does not contain a list of file names!	''%s' 파일에 파일 이름 목록이 없습니다!
+These values will override the values from the INI file located in the program folder of JPEGView!	이러한 값은 JPEG View의 프로그램 폴더에 있는 INI 파일의 값을 재정의합니다!
+Transition Effect	전환 효과
+off	끄기
+on	켜기
+
+// ::: Popup Menu Strings ::: (unsorted to preserve context) //
+Next image	다음 이미지
+Previous image	이전 이미지
+Current View	
+Rotate +90	+90도 회전
+Rotate -90	-90도 회전
+Mirror horizontally	수평으로 대칭
+Mirror vertically	수직으로 대칭
+Fit to window	
+Window	
+Full screen mode	전체 화면 모드
+Fit window to image	이미지에 창 맞춤
+Hide window title bar	창 제목 표시줄 숨기기
+Set window always on top	창을 항상 맨 위에 설정
+Play folder as slideshow/movie	슬라이드 쇼/동영상으로 재생
+Pause Slideshow/Movie	
+Waiting time	대기 시간
+1 sec	1초
+2 sec	2초
+3 sec	3초
+4 sec	4초
+5 sec	5초
+7 sec	7초
+10 sec	10초
+20 sec	20초
+Transition Speed	전환 속도
+Very fast	매우 빠름
+Fast	빠름
+Normal	보통
+Slow	느리
+Very slow	매우 느림
+Movie	동영상
+Playback speed	재생 속도
+5 fps	5 fps
+10 fps	10 fps
+15 fps	
+20 fps	
+25 fps	25 fps
+30 fps	30 fps
+50 fps	50 fps
+60 fps	
+100 fps	100 fps
+Reload image	이미지 다시 불러오기
+Edit image in default editor	
+Copy scaled image content to clipboard	
+Copy original image content to clipboard	
+Copy file path to clipboard	
+Cut file to clipboard	
+Open containing folder in Explorer	탐색기에서 포함된 폴더 열기
+Folder Mode	
+Sort Order	
+Modification date	수정 날짜
+Auto Zoom Mode	
+Fit to window (never upsize)	
+Fill with crop (never upsize)	
+Auto Contrast	
+Edit Settings	
+Settings Dialog	
+Exit	종료
+
+// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
+//! Book Mode
+//! Current View
+//! Fit to window
+//! Window
+//! Pause Slideshow/Movie
+//! 15 fps
+//! 20 fps
+//! 60 fps
+//! Edit image in default editor
+//! Copy scaled image content to clipboard
+//! Copy original image content to clipboard
+//! Copy file path to clipboard
+//! Cut file to clipboard
+//! Folder Mode
+//! Sort Order
+//! Auto Zoom Mode
+//! Fit to window (never upsize)
+//! Fill with crop (never upsize)
+//! Auto Contrast
+//! Edit Settings
+//! Settings Dialog
+
+// ::: INFO: Same Translations [6] ::: (Summary to assist translators: All strings which are known not to need translation [String == Translation]) - Auto-generated by script //
+//! 5 fps
+//! 10 fps
+//! 25 fps
+//! 30 fps
+//! 50 fps
+//! 100 fps
+
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.310977+00:00 //
+//! Translation Progress: 81%
+//! * Total (Strings + Menu) = 113
+//! * Done = 92
+//! * Missing = 21 (19%)

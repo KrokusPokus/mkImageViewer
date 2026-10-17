@@ -1,4 +1,3 @@
-
 #include "wrapperHEIF.h"
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"

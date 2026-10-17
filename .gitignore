@@ -1,6 +1,6 @@
 .git/
-src/build/
-src/.qtcreator/
+build/
+.qtcreator/
 
 # Compiled Object files
 *.slo

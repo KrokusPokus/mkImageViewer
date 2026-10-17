@@ -1,7 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(JPEGView LANGUAGES C CXX RC)
 
-# C++17 Standard erzwingen
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    message(FATAL_ERROR "This project only supports 64-bit systems.")
+endif()
+
+# Optional: Explizit Makros für den gesamten Code definieren
+add_compile_definitions(PROJECT_IS_64BIT=1)
+# C++20 Standard erzwingen
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -54,47 +60,52 @@ set(CMAKE_AUTORCC ON)
 
 # Quelldateien definieren
 set(SOURCES
-    ApplyFilterAVX.cpp
-    BasicProcessing.cpp
-    Clipboard.cpp
-    DirectoryWatcher.cpp
-    EXIFReader.cpp
-    FileList.cpp
-    Helpers.cpp
-    HelpersGUI.cpp
-    HistogramCorr.cpp
-    ICCProfileTransform.cpp
-    ImageLoadThread.cpp
-    JPEGImage.cpp
-    JPEGProvider.cpp
-    main.cpp
-    KeyMap.cpp
-    LocalDensityCorr.cpp
-    MainDlg.cpp
-    MultiMonitorSupport.cpp
-    NLS.cpp
+    src/ApplyFilterAVX.cpp
+    src/BasicProcessing.cpp
+    src/Clipboard.cpp
+    src/DirectoryWatcher.cpp
+    src/EXIFReader.cpp
+    src/FileList.cpp
+    src/Helpers.cpp
+    src/HelpersGUI.cpp
+    src/HistogramCorr.cpp
+    src/ICCProfileTransform.cpp
+    src/ImageLoadThread.cpp
+    src/JPEGImage.cpp
+    src/JPEGProvider.cpp
+    src/main.cpp
+    src/KeyMap.cpp
+    src/LocalDensityCorr.cpp
+    src/MainDlg.cpp
+    src/MultiMonitorSupport.cpp
+    src/NLS.cpp
 
-    ProcessingThreadPool.cpp
-    ReaderBMP.cpp
-    ReaderTGA.cpp
-    ResizeFilter.cpp
-    SettingsProvider.cpp
-    stdafx.cpp
-    WorkThread.cpp
+    src/ProcessingThreadPool.cpp
+    src/ReaderBMP.cpp
+    src/ReaderTGA.cpp
+    src/ResizeFilter.cpp
+    src/SettingsProvider.cpp
+    src/stdafx.cpp
+    src/WorkThread.cpp
     
-    wrapperAVIF.cpp
-    wrapperHEIF.cpp
-    wrapperJXL.cpp
-    wrapperPNG.cpp
-    wrapperPSD.cpp
-    wrapperQOI.cpp
-    wrapperTJPEG.cpp
-    wrapperWEBP.cpp
+    src/wrapperAVIF.cpp
+    src/wrapperHEIF.cpp
+    src/wrapperJXL.cpp
+    src/wrapperPNG.cpp
+    src/wrapperPSD.cpp
+    src/wrapperQOI.cpp
+    src/wrapperTJPEG.cpp
+    src/wrapperWEBP.cpp
     
-    XMMImage.cpp
-    zip/zip.c
-    JPEGView.rc
+    src/XMMImage.cpp
+    src/zip/zip.c
 )
+
+# Windows-spezifische Ressourcen (.rc)
+if(WIN32)
+    enable_language(RC)
+    list(APPEND SOURCES src/JPEGView.rc)
+endif()
 
 add_executable(JPEGView WIN32 ${SOURCES})
 
@@ -107,29 +118,29 @@ target_compile_definitions(JPEGView PRIVATE
     $<$<CONFIG:Release>:NDEBUG>
 )
 
-# Header-Suchpfade
+# Header-Suchpfade (mit src/ erweitert)
 target_include_directories(JPEGView PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/WTL-sf/Include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libpng/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libjxl/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libheif/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libwebp/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libavif/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/lcms2/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/bit7z/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/WTL-sf/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/bit7z/include
 )
 
-# Bibliothekspfade
+# Bibliothekspfade (mit src/ erweitert)
 target_link_directories(JPEGView PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/libjpeg-turbo/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libpng/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libjxl/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libheif/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libwebp/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/libavif/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/lcms2/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/bit7z/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjpeg-turbo/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/${ARCH_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/bit7z/${ARCH_DIR}
 )
 
 # Bibliotheken verknuepfen
@@ -155,16 +166,16 @@ target_link_libraries(JPEGView PRIVATE
     bit7z
 )
 
-# Precompiled Header (PCH)
-target_precompile_headers(JPEGView PRIVATE stdafx.h)
+# Precompiled Header (PCH) - Pfad auf src/stdafx.h angepasst
+target_precompile_headers(JPEGView PRIVATE src/stdafx.h)
 
-# C-Datei zip/zip.c von PCH ausschliessen
-set_source_files_properties(zip/zip.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+# C-Datei src/zip/zip.c von PCH ausschliessen
+set_source_files_properties(src/zip/zip.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 # Spezifische Einstellungen fuer den MSVC-Compiler
 if(MSVC)
     # AVX2 fuer ApplyFilterAVX.cpp aktivieren
-    set_source_files_properties(ApplyFilterAVX.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
+    set_source_files_properties(src/ApplyFilterAVX.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
 
     # Linker-Optionen: PDB-Warnung unterdruecken & konfligierende Release-Bibliothek LIBCMT im Debug-Build ausschliessen
     target_link_options(JPEGView PRIVATE

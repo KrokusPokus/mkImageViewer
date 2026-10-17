@@ -119,7 +119,6 @@ private:
     QWidget* createSlideshowTab();
 
     void pickColor(QColor& target, QPushButton* button);
-    static void updateButtonColor(QPushButton* button, const QColor& color);
 };
 
 // INI settings
@@ -174,7 +173,7 @@ public:
     double ZoomPauseFactor() const { return m_zoomPauseFactor; }  // while internally this is represented in doubles, using a whole number percent simplifies it for the user... configuring doubles is not user friendly at all
 
     EFilterType DownsamplingFilter() const { return m_eDownsamplingFilter; }
-    float* ColorCorrectionAmounts(); // can't be declared inline due to compiler bug...sad but true
+    const float* ColorCorrectionAmounts(); // can't be declared inline due to compiler bug...sad but true
     Helpers::CPUType AlgorithmImplementation() const { return m_eCPUAlgorithm; }
     Helpers::EAutoZoomMode AutoZoomMode() const { return m_eAutoZoomMode; }
     Helpers::EAutoZoomMode AutoZoomModeFullscreen() const { return m_eAutoZoomModeFullscreen; }
@@ -312,16 +311,11 @@ private:
     QSize GetSize(const QString& sKey, const QSize& defaultSize) const;
     QColor GetColor(const QString& sKey, const QColor& defaultColor) const;
     Helpers::EAutoZoomMode GetAutoZoomMode(const QString& sKey, Helpers::EAutoZoomMode defaultZoomMode) const;
-    QString GetAutoZoomModeString(Helpers::EAutoZoomMode autoZoomMode) const;
 
     void WriteString(const QString& sKey, const QString& sString);
     void WriteDouble(const QString& sKey, double dValue);
     void WriteBool(const QString& sKey, bool bValue);
     void WriteInt(const QString& sKey, int nValue);
-
-    // Converts the transition effect from string (as in INI or command line parameter) to enum
-    static Helpers::ETransitionEffect ConvertTransitionEffectFromString(QStringView str);
-    static QString ConvertTransitionEffectToString(Helpers::ETransitionEffect effect);
 
     CSettingsProvider();
 };

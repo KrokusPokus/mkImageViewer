@@ -1,9 +1,8 @@
-
 #include "wrapperPNG.h"
 
-#ifndef WINXP
 #include "png.h"
 #include "MaxImageDef.h"
+
 #include <stdexcept>
 
 // Uncomment to build without APNG support
@@ -178,7 +177,7 @@ bool PngReader::BeginReading(void* buffer, size_t sizebytes, bool& outOfMemory)
         if (setjmp(png_jmpbuf(png_ptr)))
         {
             PngReader::DeleteCache();
-            throw std::runtime_error::runtime_error("Image contains errors.");
+            throw std::runtime_error("Image contains errors.");
         }
         // skip png signature since we already checked it
         png_set_sig_bytes(png_ptr, 8);
@@ -412,9 +411,6 @@ bool PngReader::MustUseLibpng(const void* bufferIn, size_t sizebytes) {
     }
     return false;
 }
-#else
-#define PNG_UINT_31_MAX (0x7fffffff)
-#endif
 
 void* PngReader::GetEXIFBlock(void* buffer, size_t sizebytes) {
     size_t offset = 8; // skip PNG signature

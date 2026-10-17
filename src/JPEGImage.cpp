@@ -1,15 +1,15 @@
 #include "JPEGImage.h"
 #include "BasicProcessing.h"
-//#include "XMMImage.h"
+
 #include "Helpers.h"
 #include "SettingsProvider.h"
 #include "HistogramCorr.h"
 #include "LocalDensityCorr.h"
 #include "EXIFReader.h"
-//#include "MaxImageDef.h"
 #include "libjpeg-turbo\include\turbojpeg.h"
-#include <math.h>
-#include <assert.h>
+
+#include <cmath>
+#include <cassert>
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Static helpers
@@ -132,8 +132,8 @@ CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_bIsProcessedNoParamDB = false;
     m_bRotationByEXIF = false;
     m_bFirstReprocessing = true;
-    m_dLastOpTickCount = 0;
-    m_dLoadTickCount = 0;
+    m_dibLoadDelayMs = 0;
+    m_fileLoadDelayMs = 0;
     m_FullTargetSize = CSize(0, 0);
     m_ClippingSize = CSize(0, 0);
     m_TargetOffset = CPoint(0, 0);
@@ -376,8 +376,6 @@ bool CJPEGImage::VerifyRotation(const CRotationParams& rotationParams) {
 }
 
 bool CJPEGImage::Rotate(int nRotation) {
-    double dStartTickCount = Helpers::GetExactTickCount();
-
     // Rotation can only be done in 32 bpp
     if (!ConvertSrcTo4Channels()) {
         return false;
@@ -395,14 +393,10 @@ bool CJPEGImage::Rotate(int nRotation) {
         m_nOrigHeight = nTemp;
     }
     m_rotationParams.Rotation = (m_rotationParams.Rotation + nRotation) % 360;
-
-    m_dLastOpTickCount = Helpers::GetExactTickCount() - dStartTickCount;
     return true;
 }
 
 bool CJPEGImage::Mirror(bool bHorizontally) {
-    double dStartTickCount = Helpers::GetExactTickCount();
-
     // Rotation can only be done in 32 bpp
     if (!ConvertSrcTo4Channels()) {
         return false;
@@ -415,8 +409,6 @@ bool CJPEGImage::Mirror(bool bHorizontally) {
     m_pOrigPixels = pNewOriginalPixels;
     MarkAsDestructivelyProcessed();
     m_bIsProcessedNoParamDB = true;
-
-    m_dLastOpTickCount = Helpers::GetExactTickCount() - dStartTickCount;
     return true;
 }
 
@@ -514,12 +506,12 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
     m_ClippingSize = clippingSize;
     m_TargetOffset = targetOffset;
 
-    double dStartTickCount = Helpers::GetExactTickCount();
+    UINT startTimeMs = Helpers::GetTimeMs();
 
     // Check if only the LUT must be reapplied but no resampling (resampling is much slower than the LUTs)
     void * pDIB = NULL;
     if (!bMustResampleQuality && !bMustResampleGeometry) {
-        // no resizing needed (maybe even nothing must be done)
+        // Check if we can reused the existing DIB (bOnlyCheck = true)
         bool bNoChangesLDCandLUTs = ApplyCorrectionLUTandLDC(imageProcParams, eProcFlags, m_pDIBPixelsLUTProcessed, 
             fullTargetSize, targetOffset, m_pDIBPixels, clippingSize, bMustResampleGeometry, true, false) != NULL;
 
@@ -564,9 +556,9 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
         }
     }
 
-    double dLastOpTickCount = Helpers::GetExactTickCount() - dStartTickCount; 
-    if (dLastOpTickCount > 1) {
-        m_dLastOpTickCount = dLastOpTickCount;
+    UINT dibLoadDelayMs = Helpers::GetTimeMs() - startTimeMs; 
+    if (dibLoadDelayMs > 1) {
+        m_dibLoadDelayMs = dibLoadDelayMs;
     }
 
     m_eProcFlags = eProcFlags;

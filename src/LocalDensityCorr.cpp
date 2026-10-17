@@ -2,25 +2,23 @@
 #include "HistogramCorr.h"
 #include "JPEGImage.h"
 #include "Helpers.h"
-#include <math.h>
-#include <assert.h>
 
-/////////////////////////////////////////////////////////////////////////////////////////////
-// static helpers
-/////////////////////////////////////////////////////////////////////////////////////////////
+#include <cmath>
+#include <cassert>
 
-// Calculates the LDC response LUT used to map mean brightness values to LDC correction
-// values. The curve is piecewise polynominal and has the form of a saddle.
-static void CalculateLDCResponseLUT(uint8* pLUT) {
-    const float fExp = 2.5f;
-    float fDivisor = powf(127.5f, fExp - 1);
-    for (int i = 0; i < 128; i++) {
-        float fVal = powf(i + 0.5f, fExp)/fDivisor;
-        pLUT[127-i] = (uint8) (127.0f + fVal + 0.49f);
-        pLUT[128+i] = (uint8) (127.0f - fVal + 0.49f);
+namespace {
+    // Calculates the LDC response LUT used to map mean brightness values to LDC correction
+    // values. The curve is piecewise polynominal and has the form of a saddle.
+    static void CalculateLDCResponseLUT(uint8* pLUT) {
+        const float fExp = 2.5f;
+        float fDivisor = powf(127.5f, fExp - 1);
+        for (int i = 0; i < 128; i++) {
+            float fVal = powf(i + 0.5f, fExp)/fDivisor;
+            pLUT[127-i] = (uint8) (127.0f + fVal + 0.49f);
+            pLUT[128+i] = (uint8) (127.0f - fVal + 0.49f);
+        }
     }
-}
-
+} // namespace
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Public

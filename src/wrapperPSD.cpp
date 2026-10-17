@@ -164,15 +164,15 @@ CJPEGImage* PsdReader::ReadImage(LPCTSTR strFileName, Helpers::ETransparencyMode
         switch (nColorMode) {
             case MODE_Grayscale:
             case MODE_Duotone:
-                nChannels = std::min<ushort>(nRealChannels, 1);
+                nChannels = std::min<unsigned short>(nRealChannels, 1);
                 break;
             case MODE_Multichannel:
-                nChannels = std::min<ushort>(nRealChannels, 3);
+                nChannels = std::min<unsigned short>(nRealChannels, 3);
                 break;
             case MODE_Lab:
             case MODE_RGB:
             case MODE_CMYK:
-                nChannels = std::min<ushort>(nRealChannels, 4);
+                nChannels = std::min<unsigned short>(nRealChannels, 4);
                 break;
         }
         if (nChannels == 2) {
@@ -291,7 +291,7 @@ CJPEGImage* PsdReader::ReadImage(LPCTSTR strFileName, Helpers::ETransparencyMode
         ReadFromFile(pBuffer, hFile, nImageDataSize);
 
         if (!bUseAlpha && nColorMode != MODE_CMYK) {
-            nChannels = std::min<ushort>(nChannels, 3);
+            nChannels = std::min<unsigned short>(nChannels, 3);
         }
 
         // Apply ICC Profile
@@ -300,7 +300,7 @@ CJPEGImage* PsdReader::ReadImage(LPCTSTR strFileName, Helpers::ETransparencyMode
                 transform = ICCProfileTransform::CreateLabTransform(nChannels == 4 ? ICCProfileTransform::FORMAT_LabA : ICCProfileTransform::FORMAT_Lab);
                 if (transform == NULL) {
                     // If we can't convert Lab to sRGB then just use the Lightness channel as grayscale
-                    nChannels = std::min<ushort>(nChannels, 1);
+                    nChannels = std::min<unsigned short>(nChannels, 1);
                 }
             } else if (nColorMode == MODE_RGB) {
                 transform = ICCProfileTransform::CreateTransform(pICCProfile, nICCProfileSize, nChannels == 4 ? ICCProfileTransform::FORMAT_BGRA : ICCProfileTransform::FORMAT_BGR);

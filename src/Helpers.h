@@ -1,8 +1,7 @@
 #ifndef HELPERS_H
 #define HELPERS_H
 
-#include <QString>
-#include "ImageProcessingTypes.h"
+#include "ImageProcessingTypes.h" // defines int8, uint8, int16, uint16, int32, uint32, EFilterType, EImageFormat
 
 class CJPEGImage;
 class CFileList;
@@ -98,15 +97,12 @@ namespace Helpers {
 
     // this is specified all over the code as the maximum image dimension that one side can be
     // this particular variable will have limited usage, but is used to reflect that limitation.  DO NOT CHANGE
-    const int MAX_IMAGE_DIMENSION = 65535;
+    //const int MAX_IMAGE_DIMENSION = 65535;
 
     // Round to integer
     inline int RoundToInt(double d) {
         return (d < 0) ? (int)(d - 0.5) : (int)(d + 0.5);
     }
-
-    // Exact tick count in milliseconds using the high resolution timer
-    double GetExactTickCount();
 
     // Based on: https://github.com/sdneon/jpegview.git
     // COLORREF is 0x00bbggrr. 0xFF00000 signals we don't use an override color
@@ -115,8 +111,7 @@ namespace Helpers {
     // pixel is ARGB, backgroundColor is BGR. Returns ARGB
     // [GF] Note: PsdReader::ReadImage() still calls this directly for "blending the K channel in CMYK images".
     //        Anything else is going through BlendAlpha().
-    static inline uint32 AlphaBlendBackground(uint32 pixel, COLORREF backgroundColor, bool bUseCheckerboard = false, int x = -1, int y = -1)
-    {
+    static inline uint32 AlphaBlendBackground(uint32 pixel, COLORREF backgroundColor, bool bUseCheckerboard = false, int x = -1, int y = -1) {
         uint32 alpha = pixel & 0xFF000000;
         if (alpha == 0xFF000000)
             return pixel;
@@ -167,7 +162,7 @@ namespace Helpers {
                 (((vg + 128 + ((vg + 128) >> 8)) >> 8) <<  8) |
                 (((vb + 128 + ((vb + 128) >> 8)) >> 8)      );
         }
-}
+	}
 
     // Gets the image size to be used when fitting the image to screen, either using 'fit to screen'
     // or 'fill with crop' method. If 'fill with crop' is used, the bLimitAR can be set to avoid
@@ -180,34 +175,9 @@ namespace Helpers {
     // Gets the image size to be used when fitting the image to screen according to the auto zoom mode given
     CSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom);
 
-    // If dZoom > 0: Gets the virtual image size when applying the given zoom factor
-    // If dZoom < 0: Gets the image size to fit the image to the given screen size, using the given auto zoom mode.
-    //               dZoom is filled with the used zoom factor to resize to this new size in this case.
-    // The returned size is limited to 65535 in cx and cy
-    CSize GetVirtualImageSize(CSize originalImageSize, CSize screenSize, EAutoZoomMode eAutoZoomMode, double & dZoom);
-
-    // Limits the given center based offsets so that the rectangle created by the offset and the given rectSize is totally inside of outerRect
-    // outerRect has top,left coordinates 0/0
-    CPoint LimitOffsets(const CPoint& offsets, const CSize & rectSize, const CSize & outerRect);
-
-    // Gets a window rectangle (in screen coordinates) that fits the given image
-    CRect GetWindowRectMatchingImageSize(HWND hWnd, CSize minSize, CSize maxSize, double& dZoom, CJPEGImage* pImage, bool bForceCenterWindow, bool bKeepAspectRatio, bool bWindowBorderless, EAutoZoomMode eAutoZoomMode);
-
-    // Gets if the given image can be displayed without sampling down the image.
-    bool CanDisplayImageWithoutResize(HWND hWnd, CJPEGImage* pImage);
-
-    // Gets the maximum client size for a framed window that fits into the working area of the screen the given window is placed on
-    CSize GetMaxClientSize(HWND hWnd);
-
-    // gets the size from GetSystemMetrics() for SM_CYCAPTION
-    int GetWindowCaptionSize();
-
     // Gets the total border size of a window. This includes the frame sizes and the size of the window caption area.
     // The window size equals the client area size plus this border size
     CSize GetTotalBorderSize();
-
-    // Tests if the CPU supports AVX2, SSE, MMX(2)
-    CPUType ProbeCPU(void);
 
     // Gets the path where JPEGView stores its application data, including a trailing backslash
     LPCTSTR JPEGViewAppDataPath();
@@ -215,18 +185,6 @@ namespace Helpers {
     // Sets the path where JPEGView stores its application data, including a trailing backslash.
     // Default if not set is CSIDL_APPDATA/JPEGView/
     void SetJPEGViewAppDataPath(LPCTSTR sPath);
-
-    // Checks if the given string matches the pattern definition given.
-    // Pattern: * - will be matched by any number of characters
-    //          ; - separates patterns
-    //          other chars - must match (ignoring case)
-    // In sMatchingPattern, the matching pattern is returned (ended with a ; or a null character)
-    bool PatternMatch(LPCTSTR & sMatchingPattern, LPCTSTR sString, LPCTSTR sPattern);
-
-    // Given two matching patterns as returned by PatternMatch() method, finds the more specific
-    // pattern, e.g. C:\images\jan\* is more specific than C:\images\*
-    // Returns 0 if equal patterns, 1 if pattern 1 is more specific and -1 if pattern 2 is more specific
-    int FindMoreSpecificPattern(LPCTSTR sPattern1, LPCTSTR sPattern2);
 
     // Pad the given value to the next multiple of padvalue. padvalue must be a power of 2.
     inline int DoPadding(int value, int padvalue) {
@@ -254,41 +212,15 @@ namespace Helpers {
     // Gets the content of the JPEG comment tag, empty string if no comment
     CString GetJPEGComment(void* pJPEGStream, int nStreamLength);
 
-    // Gets the image format given a file name (uses the file extension)
-    EImageFormat GetImageFormat(LPCTSTR sFileName);
-
-    // search string in string (as strstr()) ignoring case
-    LPTSTR stristr(LPCTSTR szStringToBeSearched, LPCTSTR szSubstringToSearchFor);
-    
-    // file size for file with path
-    __int64 GetFileSize(LPCTSTR sPath);
-
     // file size for file with handle
     __int64 GetFileSize(HANDLE hFile);
 
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
     int GetFrameIndex(CJPEGImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage);
 
-    // Returns the windows version in the format Major * 100 + Minor, e.g. 602 for Windows 8
-    int GetWindowsVersion();
-
-    // Conversion class that replaces the | by null character in a string.
-    // Caution: Uses a static buffer and therefore only one string can be replaced concurrently
-    const int MAX_SIZE_REPLACE_PIPE = 1024;
-
-    class CReplacePipe {
-    public:
-        CReplacePipe(LPCTSTR sText);
-
-        operator LPCTSTR() const {
-            return sm_buffer;
-        }
-
-    private:
-        static TCHAR sm_buffer[MAX_SIZE_REPLACE_PIPE];
-    };
+	uint32_t GetTimeMs();
+	
     //------------------------------------------------------------------------------------------------
-
 
     // Critical section that is acquired on construction and freed on destruction
     class CAutoCriticalSection {
@@ -304,8 +236,6 @@ namespace Helpers {
     private:
         CRITICAL_SECTION & m_cs;
     };
-
-/*GF*/  uint32_t GetTimeMs();
 
 } // namespace Helpers
 

@@ -2,14 +2,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 
-#include <QFileInfo>
-#include <QMessageBox>
-#include <regex>        // used in regex matching language tags like [en], [de]
-
 #include "MainDlg.h"
 #include "FileList.h"
 #include "JPEGProvider.h"
 #include "JPEGImage.h"
+#include "MaxImageDef.h"
 #include "SettingsProvider.h"
 #include "MultiMonitorSupport.h"
 #include "HistogramCorr.h"
@@ -21,6 +18,12 @@
 #include "ProcessingThreadPool.h"
 #include "KeyMap.h"
 #include "DirectoryWatcher.h"
+
+#include <regex>        // used in regex matching language tags like [en], [de]
+
+#include <QFileInfo>
+#include <QMessageBox>
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -97,7 +100,136 @@ static void InitFromProcessingFlags(EProcessingFlags eFlags, bool& bHQResampling
 
 // Define function pointer type for wine_get_version
 typedef const char* (__cdecl* pwine_get_version)(void);
-    
+
+namespace {
+
+    // If dZoom > 0: Gets the virtual image size when applying the given zoom factor
+    // If dZoom < 0: Gets the image size to fit the image to the given screen size, using the given auto zoom mode.
+    //               dZoom is filled with the used zoom factor to resize to this new size in this case.
+    // The returned size is limited to 65535 in cx and cy
+    CSize GetVirtualImageSize(CSize originalImageSize, CSize screenSize, Helpers::EAutoZoomMode eAutoZoomMode, double & dZoom) {
+		CSize newSize;
+
+		if (dZoom < 0.0) {
+			// zoom not set, interpret as 'fit to screen'
+			// ---------------------------------------------
+			newSize = Helpers::GetImageRect(originalImageSize.cx, originalImageSize.cy, screenSize.cx, screenSize.cy, eAutoZoomMode, dZoom);
+		} else {
+			// zoom set, use this value for the new size
+			// ---------------------------------------------
+			newSize = CSize((int)(originalImageSize.cx * dZoom + 0.5), (int)(originalImageSize.cy * dZoom + 0.5));
+		}
+
+		if (newSize.cx > 65535 || newSize.cy > 65535) {
+			double dFac = 65535.0/std::max(newSize.cx,newSize.cy);
+			dZoom = dZoom*dFac;
+			newSize.cx = (int)(originalImageSize.cx * dZoom + 0.5);
+			newSize.cy = (int)(originalImageSize.cy * dZoom + 0.5);
+		}
+
+		return newSize;
+	}
+
+    // Limits the given center based offsets so that the rectangle created by the offset and the given rectSize is totally inside of outerRect
+    // outerRect has top,left coordinates 0/0
+	CPoint LimitOffsets(const CPoint& offsets, const CSize & rectSize, const CSize & outerRect) {
+		int nMaxOffsetX = (outerRect.cx - rectSize.cx)/2;
+		nMaxOffsetX = std::max(0, nMaxOffsetX);
+		int nMaxOffsetY = (outerRect.cy - rectSize.cy)/2;
+		nMaxOffsetY = std::max(0, nMaxOffsetY);
+		return CPoint(std::max<long>(-nMaxOffsetX, std::min<int>(+nMaxOffsetX, offsets.x)), std::max<long>(-nMaxOffsetY, std::min<int>(+nMaxOffsetY, offsets.y)));
+	}
+
+
+    // Gets a window rectangle (in screen coordinates) that fits the given image
+    CRect GetWindowRectMatchingImageSize(HWND hWnd, CSize minSize, CSize maxSize, double& dZoom, CJPEGImage* pImage, bool bForceCenterWindow, bool bKeepAspectRatio, bool bWindowBorderless, Helpers::EAutoZoomMode eAutoZoomMode) {
+		int nOrigWidth = (pImage == NULL) ? ::GetSystemMetrics(SM_CXSCREEN) / 2 : pImage->OrigWidth();
+		int nOrigWidthUnzoomed = nOrigWidth;
+		int nOrigHeight = (pImage == NULL) ? ::GetSystemMetrics(SM_CYSCREEN) / 2 : pImage->OrigHeight();
+        if (dZoom == Helpers::ZoomMax) {
+			// NOTE: somewhat hacky, but the original code did not account for ZoomMax == DBL_MAX, causing overflows
+			//       This workaround artificially calculates an image that is == the maximum allowed dimensions,
+			//       so as to not overflow int or double
+			//
+			// when dZoom was unbounded to DBL_MAX in 1.1.44, doing any arithmetic would cause the nOrig* to overflow
+			// So just set to scaled maximum allowed image dimension on one side
+			// the math below will not overflow, and it stays within the bounds of an integer
+			if (nOrigWidth == nOrigHeight) {
+				// ratio is 1:1
+				nOrigWidth = nOrigHeight = MAX_IMAGE_DIMENSION;
+			} else if (nOrigWidth > nOrigHeight) {
+				// wider than high
+				nOrigHeight = (int)((double)nOrigHeight / nOrigWidth * MAX_IMAGE_DIMENSION);  // max * height/width ratio
+				nOrigWidth = MAX_IMAGE_DIMENSION;
+			} else {
+				// higher than wide
+				nOrigWidth = (int)((double)nOrigWidth / nOrigHeight * MAX_IMAGE_DIMENSION);  // max * width/height ratio
+				nOrigHeight = MAX_IMAGE_DIMENSION;
+			}
+		} else if (dZoom > 0) {
+			nOrigWidth = (int)(nOrigWidth * dZoom + 0.5);
+			nOrigHeight = (int)(nOrigHeight * dZoom + 0.5);
+		}
+
+		CSize borderSize;
+		if (!bWindowBorderless) {
+            borderSize = Helpers::GetTotalBorderSize();
+		} else {
+			borderSize = { 0, 0 };
+		}
+
+		int nRequiredWidth = borderSize.cx + nOrigWidth;
+		int nRequiredHeight = borderSize.cy + nOrigHeight;
+		CRect workingArea = CMultiMonitorSupport::GetWorkingRect(hWnd);
+		if (bKeepAspectRatio && (nRequiredWidth > workingArea.Width() || nRequiredHeight > workingArea.Height())) {
+			double dZoom;
+			CSize imageRect = Helpers::GetImageRect(nOrigWidth, nOrigHeight, 
+				std::min(maxSize.cx, workingArea.Width() - borderSize.cx),
+				std::min(maxSize.cy, workingArea.Height() - borderSize.cy),
+				false, false, false, eAutoZoomMode, dZoom);
+			nRequiredWidth = imageRect.cx + borderSize.cx;
+			nRequiredHeight = imageRect.cy + borderSize.cy;
+		} else {
+			nRequiredWidth = std::min<int>(maxSize.cx, std::min(workingArea.Width(), nRequiredWidth));
+			nRequiredHeight = std::min<int>(maxSize.cy, std::min(workingArea.Height(), nRequiredHeight));
+		}
+		nRequiredWidth = std::max<int>(minSize.cx, nRequiredWidth);
+		nRequiredHeight = std::max<int>(minSize.cy, nRequiredHeight);
+		dZoom = ((double)(nRequiredWidth - borderSize.cx)) / nOrigWidthUnzoomed;
+		CRect wndRect;
+		::GetWindowRect(hWnd, reinterpret_cast<LPRECT>(&wndRect));
+		int nNewLeft = (wndRect.left + wndRect.right - nRequiredWidth) / 2;
+		int nNewTop = (wndRect.top + wndRect.bottom - nRequiredHeight) / 2;
+		nNewLeft = std::max<int>(workingArea.left, std::min<int>(workingArea.right - nRequiredWidth, nNewLeft));
+		nNewTop = std::max<int>(workingArea.top, std::min<int>(workingArea.bottom - nRequiredHeight, nNewTop));
+
+		if (!bForceCenterWindow) {
+			return CRect(CPoint(nNewLeft, nNewTop), CSize(nRequiredWidth, nRequiredHeight));
+		} else {
+			return CRect(CPoint(workingArea.left + (workingArea.Width() - nRequiredWidth) / 2, workingArea.top + (workingArea.Height() - nRequiredHeight) / 2), CSize(nRequiredWidth, nRequiredHeight));
+		}
+	}
+	
+    // Gets if the given image can be displayed without sampling down the image.
+	bool CanDisplayImageWithoutResize(HWND hWnd, CJPEGImage* pImage) {
+		if (pImage == NULL) {
+			return true;
+		}
+		CRect workingArea = CMultiMonitorSupport::GetWorkingRect(hWnd);
+        CSize borderSize = Helpers::GetTotalBorderSize();
+		return pImage->OrigWidth() + borderSize.cx <= workingArea.Width() && pImage->OrigHeight() + borderSize.cy <= workingArea.Height();
+	}
+
+    // Gets the maximum client size for a framed window that fits into the working area of the screen the given window is placed on
+	CSize GetMaxClientSize(HWND hWnd) {
+		CRect workingArea = CMultiMonitorSupport::GetWorkingRect(hWnd);
+        CSize borderSize = Helpers::GetTotalBorderSize();
+		return CSize(workingArea.Width() - borderSize.cx, workingArea.Height() - borderSize.cy);
+	}
+
+
+} // namespace
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Public
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -456,7 +588,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         }
 
         // find out the new vitual image size and the size of the bitmap to request
-        CSize newSize = Helpers::GetVirtualImageSize(m_pCurrentImage->OrigSize(),
+        CSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
             m_clientRect.Size(),
             IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : (m_isUserFitToScreen ? m_autoZoomFitToScreen : GetAutoZoomMode()),
             m_dZoom);
@@ -464,7 +596,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         m_virtualImageSize = newSize;
         m_dRealizedZoom = (double)newSize.cx / m_pCurrentImage->OrigSize().cx;
         CPoint unlimitedOffsets = m_offsets;
-        m_offsets = Helpers::LimitOffsets(m_offsets, m_clientRect.Size(), newSize);
+        m_offsets = LimitOffsets(m_offsets, m_clientRect.Size(), newSize);
         m_DIBOffsets = m_bZoomMode ? static_cast<CPoint>(unlimitedOffsets - m_offsets) : CPoint(0, 0);
 
         // Clip to client rectangle and request the DIB
@@ -525,8 +657,9 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 
             if (sFullPath != NULL && sFullPath[0] != _T('\0')) {
                 QString sPath = QString::fromWCharArray(sFullPath);
-                QString sFileSize = FormatFileSize(Helpers::GetFileSize(sFullPath));
-
+			    QFileInfo fileInfo(sPath);
+				QString sFileSize = FormatFileSize(fileInfo.size());
+					
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     if (m_bIsAnimationPlaying) {
                         infoText = QString(
@@ -557,8 +690,8 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        .arg(iNumThreads)
                                        .arg(sCPU)
                                        .arg(sFilter)
-                                       .arg(m_pCurrentImage->GetLoadTickCount(), 0, 'f', 2)
-                                       .arg(m_pCurrentImage->LastOpTickCount(), 0, 'f', 2);
+                                       .arg(m_pCurrentImage->GetFileLoadDelayMs())
+                                       .arg(m_pCurrentImage->GetDIBLoadDelayMs());
                     } else {
                         infoText = QString(
                                        "%1\n"
@@ -587,8 +720,8 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        .arg(iNumThreads)
                                        .arg(sCPU)
                                        .arg(sFilter)
-                                       .arg(m_pCurrentImage->GetLoadTickCount(), 0, 'f', 2)
-                                       .arg(m_pCurrentImage->LastOpTickCount(), 0, 'f', 2);
+                                       .arg(m_pCurrentImage->GetFileLoadDelayMs())
+                                       .arg(m_pCurrentImage->GetDIBLoadDelayMs());
                     }
                 } else {
                     infoText = QString(
@@ -615,8 +748,8 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                    .arg(iNumThreads)
                                    .arg(sCPU)
                                    .arg(sFilter)
-                                   .arg(m_pCurrentImage->GetLoadTickCount(), 0, 'f', 2)
-                                   .arg(m_pCurrentImage->LastOpTickCount(), 0, 'f', 2);
+                                   .arg(m_pCurrentImage->GetFileLoadDelayMs())
+                                   .arg(m_pCurrentImage->GetDIBLoadDelayMs());
                 }
             } else {
                 infoText = QString(
@@ -640,8 +773,8 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                .arg(iNumThreads)
                                .arg(sCPU)
                                .arg(sFilter)
-                               .arg(m_pCurrentImage->GetLoadTickCount(), 0, 'f', 2)
-                               .arg(m_pCurrentImage->LastOpTickCount(), 0, 'f', 2);
+                               .arg(m_pCurrentImage->GetFileLoadDelayMs())
+                               .arg(m_pCurrentImage->GetDIBLoadDelayMs());
             }
 
             HFONT hFont = CreateFont(25, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FF_DONTCARE, TEXT("CONSOLAS"));
@@ -699,8 +832,8 @@ void CMainDlg::PaintToDC(CDC& dc) {
 
         // find out the new virtual image size and the size of the bitmap to request
         double dZoom = m_dZoom;
-        CSize newSize = Helpers::GetVirtualImageSize(pCurrentImage->OrigSize(), m_clientRect.Size(), GetAutoZoomMode(), dZoom);
-        CPoint offsets = Helpers::LimitOffsets(GetOffsets(), m_clientRect.Size(), newSize);
+        CSize newSize = GetVirtualImageSize(pCurrentImage->OrigSize(), m_clientRect.Size(), GetAutoZoomMode(), dZoom);
+        CPoint offsets = LimitOffsets(GetOffsets(), m_clientRect.Size(), newSize);
         m_dRealizedZoom = (double)newSize.cx / m_pCurrentImage->OrigSize().cx;
 
         // Clip to client rectangle and request the DIB
@@ -961,7 +1094,7 @@ LRESULT CMainDlg::OnLButtonDblClk(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lPara
             return 0;
         }
         double dZoom = -1.0;
-        CSize sizeAutoZoom = Helpers::GetVirtualImageSize(m_pCurrentImage->OrigSize(),
+        CSize sizeAutoZoom = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
             m_clientRect.Size(), IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : GetAutoZoomMode(), dZoom);
         if (sizeAutoZoom != m_virtualImageSize) {
             ExecuteCommand(GetAutoZoomMode() * 10 + IDM_AUTO_ZOOM_NONE);
@@ -1538,10 +1671,7 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
         ::EnableMenuItem(hMenuTrackPopup, IDM_COPY_PATH, MF_BYCOMMAND | MF_GRAYED);
         ::EnableMenuItem(hMenuTrackPopup, SUBMENU_POS_ZOOM, MF_BYPOSITION  | MF_GRAYED);
         ::EnableMenuItem(hMenuTrackPopup, SUBMENU_POS_TRANSFORM, MF_BYPOSITION  | MF_GRAYED);
-    } else {
-        int windowsVersion = Helpers::GetWindowsVersion();
     }
-
 
     int nMenuCmd = TrackPopupMenu(CPoint(nX, nY), hMenuTrackPopup);
     ExecuteCommand(nMenuCmd);
@@ -1979,7 +2109,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 double dZoom = -1;
                 windowRect = sp.ExplicitWindowRect() ?
                     defaultWindowRect :
-                    Helpers::GetWindowRectMatchingImageSize(
+                    GetWindowRectMatchingImageSize(
                         m_hWnd,
                         CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT),
                         defaultWindowRect.Size(),
@@ -2017,9 +2147,9 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 SetCurrentWindowStyle();
 
                 // get the size of the border to shift the window pos downwards
-                int windowCaptionHeight = Helpers::GetWindowCaptionSize();
+                int windowCaptionHeight = ::GetSystemMetrics(SM_CYCAPTION);
                 double dZoom = -1;
-                CRect windowRect = Helpers::GetWindowRectMatchingImageSize(
+                CRect windowRect = GetWindowRectMatchingImageSize(
                     m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, dZoom, m_pCurrentImage, false, true, m_bWindowBorderless, GetAutoZoomMode());
 
                 // don't try to adjust for an image that isn't loaded!
@@ -3080,7 +3210,7 @@ void CMainDlg::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool
     if (m_pCurrentImage != NULL) {
         if (bAdjustWindowSize && !m_bFullScreenMode && !IsZoomed() && m_bAutoFitWndToImage) {
             m_dZoom = bAllowEnlarge ? Helpers::ZoomMax : 1;
-            CRect wndRect = Helpers::GetWindowRectMatchingImageSize(m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, m_dZoom, m_pCurrentImage, false, true, m_bWindowBorderless, GetAutoZoomMode());
+            CRect wndRect = GetWindowRectMatchingImageSize(m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, m_dZoom, m_pCurrentImage, false, true, m_bWindowBorderless, GetAutoZoomMode());
             if (m_dZoom <= 1) {
                 m_dZoom = -1;
             }
@@ -3125,7 +3255,7 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
     }
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
     if (IsAdjustWindowToImage() && !bNoProcessingAfterLoad) {
-        CSize maxClientSize = Helpers::GetMaxClientSize(m_hWnd);
+        CSize maxClientSize = GetMaxClientSize(m_hWnd);
         nClientWidth = maxClientSize.cx;
         nClientHeight = maxClientSize.cy;
         eAutoZoomMode = Helpers::ZM_FitToScreenNoZoom;
@@ -3346,7 +3476,7 @@ void CMainDlg::AdjustWindowToImage(bool bAfterStartup) {
     if (IsAdjustWindowToImage() && (m_pCurrentImage != NULL || bAfterStartup)) {
         // window size shall be adjusted to image size (at least keep aspect ratio)
         double dZoom = m_dZoom;
-        CRect windowRect = Helpers::GetWindowRectMatchingImageSize(m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, dZoom, m_pCurrentImage, bAfterStartup, dZoom < 0, m_bWindowBorderless , GetAutoZoomMode());
+        CRect windowRect = GetWindowRectMatchingImageSize(m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, dZoom, m_pCurrentImage, bAfterStartup, dZoom < 0, m_bWindowBorderless , GetAutoZoomMode());
         CRect defaultRect = CMultiMonitorSupport::GetDefaultWindowRect();
         if (bAfterStartup && CSettingsProvider::This().ExplicitWindowRect()) {
             windowRect = CRect(defaultRect.TopLeft(), windowRect.Size());
@@ -3361,7 +3491,7 @@ void CMainDlg::AdjustWindowToImage(bool bAfterStartup) {
 
 void CMainDlg::CheckIfApplyAutoFitWndToImage(bool bInInitDialog) {
     if (CSettingsProvider::This().AutoFullScreen()) {
-        if (!Helpers::CanDisplayImageWithoutResize(m_hWnd, m_pCurrentImage)) {
+        if (!CanDisplayImageWithoutResize(m_hWnd, m_pCurrentImage)) {
             if (!bInInitDialog) {
                 ExecuteCommand(IDM_FULL_SCREEN_MODE);
             }
@@ -3646,9 +3776,9 @@ int CMainDlg::GetLoadErrorAfterOpenFile() {
 void CMainDlg::PrefetchDIB(const CRect& clientRect) {
     if (m_pCurrentImage == NULL) return;
 
-    CSize newSize = Helpers::GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.Size(), GetAutoZoomMode(), m_dZoom);
+    CSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.Size(), GetAutoZoomMode(), m_dZoom);
     CSize clippedSize(std::min<long>(clientRect.Width(), newSize.cx), std::min<long>(clientRect.Height(), newSize.cy));
-    CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, Helpers::LimitOffsets(m_offsets, clientRect.Size(), newSize));
+    CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, LimitOffsets(m_offsets, clientRect.Size(), newSize));
     m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, *m_pImageProcParams, CreateDefaultProcessingFlags());
 }
 

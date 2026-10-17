@@ -1,8 +1,6 @@
-
 #include "wrapperAVIF.h"
 #include "avif/avif.h"
 #include "BasicProcessing.h"
-#include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 
 struct AvifReader::avif_cache {

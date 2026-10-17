@@ -1,6 +1,7 @@
 #include "HistogramCorr.h"
 #include "JPEGImage.h"
 #include "Helpers.h"
+
 #include <math.h>
 
 float CHistogramCorr::sm_ContrastCorrectionStrength = 0.5f;

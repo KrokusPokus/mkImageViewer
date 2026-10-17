@@ -1,4 +1,3 @@
-
 #include "wrapperJXL.h"
 #include "jxl/decode.h"
 #include "jxl/decode_cxx.h"

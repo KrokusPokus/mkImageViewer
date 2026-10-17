@@ -1,0 +1,198 @@
+﻿//! This file must be encoded with UTF-8 (e.g. with Windows Notepad)
+//! LICENSE: This localization file is part of JPEGView <https://github.com/sylikc/jpegview> and distributed under the same license.  See <https://github.com/sylikc/jpegview/blob/master/LICENSE.txt> for more info.
+
+//! Standard  Filename Convention: 'strings_%languagecode%.txt' where %languagecode% is the ISO 639-1 language code e.g. 'en' for English (See <https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes>)
+//! Alternate Filename Convention: 'strings_%languagecode%-%countrycode%.txt' where %countrycode% is the ISO 3166-1 country code e.g. 'US' for United States (See <https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes>)
+//!    Use the alternate filename convention only when the standard filename already exist (e.g. specifying a country-specific dialect for an existing language)
+
+////////////////////
+// ::: Translation Info ::: //
+//: ISO 639-1 code: ja
+//: ISO 3166-1 code:
+//: Language: Japanese (日本語)
+//: Translator(s) - Name <Contact Info/URL>: Hiroyuki Matenokoji, maboroshin
+//: Last Updated: 2023-03-04
+//: Additional Notes:
+//TranslatorURL=https://pc.genkaku.in/
+// 1st Japanese translation : by Hiroyuki Matenokoji. (2015)
+// 2nd translator: Japanese by maboroshin (2019-2023, Adjustment, and translate little new part)
+////////////////////
+
+////////////////////
+// ::: Instructions / Help ::: (help for translators only, does not need to be translated) //
+
+//? Line Format:    English string<tab>Translated string<newline>
+//? * Lines beginning with "//" (comments) are ignored
+//? * Blank lines are ignored
+//? * Lines without a <tab> are ignored
+//? * Lines with no text after the <tab> are ignored
+//? * Multiple tabs are permitted between English and Translated string, e.g. this is valid:    English string<tab><tab><tab>Translated string<newline>
+
+//? NOTE: %s %d have special meanings in the strings, so make sure they appear somewhere in the translated string!
+
+//? For the strings below which are short and have no context:
+//?   "in"        in context: is shorthand for "inch"
+//?   "cm"        in context: is shorthand for "centimeter"
+//?   "C - R"     in context: is "Cyan Red" colors
+//?   "M - G"     in context: is "Magenta Green" colors
+//?   "Y - B"     in context: is "Yellow Blue" colors
+//?   "yes"/"no"  in context: is for showing EXIF flags
+//?   "on"/"off"  in context: is for showing a setting active or not
+//?   "Filter"    in context: is used in Resize image, "sampling filter"
+//?   "Box"       in context: is used in Resize image sampling filter "Box filter"
+////////////////////
+
+
+// ::: Program Strings ::: (sorted alphabetically) //
+Ascending	順増
+Auto contrast and color correction	自動でコントラストと色を補正
+Auto zoom mode	自動拡大の方法
+Blend	ブレンド
+Book Mode	
+Brightness	明るさ
+Confirm	確認
+Confirm save default parameters	既定のパラメーターの保存を確認
+Contrast	コントラスト
+Decoding this format requires the Microsoft Visual C++ Redistributable.	この形式をデコードするには Microsoft Visual C++ Redistributable が必要です。
+Descending	順減
+Do you really want to save the following parameters as default to the INI file	以下のパラメーターを規定としてINIファイルに保存しますか？
+File name	ファイル名
+File size	ファイルサイズ
+Fill with crop	黒枠を切り抜いてフィット
+Fill with crop (no zoom)	黒枠を切り抜いてフィット (拡大なし)
+Fit to screen	画面にフィット
+Fit to screen (no zoom)	画面にフィット (拡大なし)
+High quality resampling	高品質表示
+Keep parameters	パラメーターを保持
+Last modification date/time	最終更新日時
+Loop folder	フォルダ内を巡回
+Loop recursively	下位フォルダも巡回
+Loop siblings	同列のフォルダも巡回
+Navigation	巡回先
+No image loaded!	画像なし
+No user INI file exists yet. Create user INI file from INI file template?	個人用のINIがありません。テンプレートから新規のINIファイルを作成しますか？
+None	なし
+Not enough memory available	メモリー不足
+Order files by	ファイルの順序
+Press ESC to exit...	F1: ヘルプ, ESC で終了...
+Press any key to search the subdirectories for image files.	サブフォルダ内の画像を探索するには何かキーを押します。
+Random	ランダム
+Reason:	原因:
+Roll from bottom	下からロール
+Roll from left	左からロール
+Roll from right	右からロール
+Roll from top	上からロール
+Saturation	彩度
+Scroll from bottom	下からスクロール
+Scroll from left	左からスクロール
+Scroll from right	右からスクロール
+Scroll from top	上からスクロール
+Slide from bottom	下からスライド
+Slide from left	左からスライド
+Slide from right	右からスライド
+Slide from top	上からスライド
+Slideshow	スライドショー
+The directory '%s' does not contain any image files!	このフォルダに画像ファイルはありません。 %s
+The file '%s' could not be read!	このファイルを読み込めません。 %s
+The file '%s' does not contain a list of file names!	このファイル内にファイル名の一覧はありません。 %s
+These values will override the values from the INI file located in the program folder of JPEGView!	このパラメーターはJPEGViewフォルダ内のINIファイルの設定よりも優先されます
+Transition Effect	遷移時の視覚効果
+off	オフ
+on	オン
+
+// ::: Popup Menu Strings ::: (unsorted to preserve context) //
+Next image	次の画像
+Previous image	前の画像
+Current View	
+Rotate +90	+90度回転
+Rotate -90	-90度回転
+Mirror horizontally	横に反転
+Mirror vertically	縦に反転
+Fit to window	
+Window	
+Full screen mode	全画面表示
+Fit window to image	画像にウィンドウをフィット
+Hide window title bar	ウィンドウのタイトルバーを隠す
+Set window always on top	常に手前に表示
+Play folder as slideshow/movie	スライドショー/動画でフォルダを表示
+Pause Slideshow/Movie	
+Waiting time	待ち時間
+1 sec	1秒
+2 sec	2秒
+3 sec	3秒
+4 sec	4秒
+5 sec	5秒
+7 sec	7秒
+10 sec	10秒
+20 sec	20秒
+Transition Speed	遷移時間
+Very fast	速い
+Fast	速め
+Normal	標準
+Slow	遅め
+Very slow	遅い
+Movie	動画
+Playback speed	再生速度
+5 fps	5 fps
+10 fps	10 fps
+15 fps	
+20 fps	
+25 fps	25 fps
+30 fps	30 fps
+50 fps	50 fps
+60 fps	
+100 fps	100 fps
+Reload image	画像を再読み込み
+Edit image in default editor	
+Copy scaled image content to clipboard	
+Copy original image content to clipboard	
+Copy file path to clipboard	
+Cut file to clipboard	
+Open containing folder in Explorer	エクスプローラーでこのフォルダを開く
+Folder Mode	
+Sort Order	
+Modification date	更新日時
+Auto Zoom Mode	
+Fit to window (never upsize)	
+Fill with crop (never upsize)	
+Auto Contrast	
+Edit Settings	
+Settings Dialog	
+Exit	終了
+
+// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
+//! Book Mode
+//! Current View
+//! Fit to window
+//! Window
+//! Pause Slideshow/Movie
+//! 15 fps
+//! 20 fps
+//! 60 fps
+//! Edit image in default editor
+//! Copy scaled image content to clipboard
+//! Copy original image content to clipboard
+//! Copy file path to clipboard
+//! Cut file to clipboard
+//! Folder Mode
+//! Sort Order
+//! Auto Zoom Mode
+//! Fit to window (never upsize)
+//! Fill with crop (never upsize)
+//! Auto Contrast
+//! Edit Settings
+//! Settings Dialog
+
+// ::: INFO: Same Translations [6] ::: (Summary to assist translators: All strings which are known not to need translation [String == Translation]) - Auto-generated by script //
+//! 5 fps
+//! 10 fps
+//! 25 fps
+//! 30 fps
+//! 50 fps
+//! 100 fps
+
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.309093+00:00 //
+//! Translation Progress: 81%
+//! * Total (Strings + Menu) = 113
+//! * Done = 92
+//! * Missing = 21 (19%)

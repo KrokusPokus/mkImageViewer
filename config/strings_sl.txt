@@ -1,0 +1,187 @@
+﻿//! This file must be encoded with UTF-8 (e.g. with Windows Notepad)
+//! LICENSE: This localization file is part of JPEGView <https://github.com/sylikc/jpegview> and distributed under the same license.  See <https://github.com/sylikc/jpegview/blob/master/LICENSE.txt> for more info.
+
+//! Standard  Filename Convention: 'strings_%languagecode%.txt' where %languagecode% is the ISO 639-1 language code e.g. 'en' for English (See <https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes>)
+//! Alternate Filename Convention: 'strings_%languagecode%-%countrycode%.txt' where %countrycode% is the ISO 3166-1 country code e.g. 'US' for United States (See <https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes>)
+//!    Use the alternate filename convention only when the standard filename already exist (e.g. specifying a country-specific dialect for an existing language)
+
+////////////////////
+// ::: Translation Info ::: //
+//: ISO 639-1 code: sl
+//: ISO 3166-1 code: SI
+//: Language: Slovenian (Slovenščina)
+//: Translator(s) - Name <Contact Info/URL>: Jadran Rudec <jrudec@gmail.com>
+//: Last Updated: 10.03.2023
+//: Additional Notes:
+////////////////////
+
+////////////////////
+// ::: Instructions / Help ::: (help for translators only, does not need to be translated) //
+
+//? Line Format:    English string<tab>Translated string<newline>
+//? * Lines beginning with "//" (comments) are ignored
+//? * Blank lines are ignored
+//? * Lines without a <tab> are ignored
+//? * Lines with no text after the <tab> are ignored
+//? * Multiple tabs are permitted between English and Translated string, e.g. this is valid:    English string<tab><tab><tab>Translated string<newline>
+
+//? NOTE: %s %d have special meanings in the strings, so make sure they appear somewhere in the translated string!
+
+//? For the strings below which are short and have no context:
+//?   "in"        in context: is shorthand for "inch"
+//?   "cm"        in context: is shorthand for "centimeter"
+//?   "C - R"     in context: is "Cyan Red" colors
+//?   "M - G"     in context: is "Magenta Green" colors
+//?   "Y - B"     in context: is "Yellow Blue" colors
+//?   "yes"/"no"  in context: is for showing EXIF flags
+//?   "on"/"off"  in context: is for showing a setting active or not
+//?   "Filter"    in context: is used in Resize image, "sampling filter"
+//?   "Box"       in context: is used in Resize image sampling filter "Box filter"
+////////////////////
+
+
+// ::: Program Strings ::: (sorted alphabetically) //
+Ascending	Naraščajoče
+Auto contrast and color correction	Samodejni popravek kontrasta in barv
+Auto zoom mode	Način samodejne povečave
+Blend	Mešaj
+Book Mode	
+Brightness	Svetloba
+Confirm	Potrdi
+Confirm save default parameters	Potrdi shranjevanje privzetih parametrov
+Contrast	Kontrast
+Decoding this format requires the Microsoft Visual C++ Redistributable.	Za dekodiranje tega formata je potreben Microsoft Visual C++ Redistributable.
+Descending	Padajoče
+Do you really want to save the following parameters as default to the INI file	Ali res želite shraniti naslednje parametre kot privzete v datoteko INI?
+File name	Ime datoteke
+File size	Velikost datoteke
+Fill with crop	Zapolni z obrezom
+Fill with crop (no zoom)	Zapolni z obrezom (brez povečave)
+Fit to screen	Prilagodi zaslonu
+Fit to screen (no zoom)	Prilagodi zaslonu (brez povečave)
+High quality resampling	Visokokakovostno ponovno vzorčenje
+Keep parameters	Ohrani parametre
+Last modification date/time	Datum/čas zadnje spremembe
+Loop folder	Išči mapo
+Loop recursively	Išči rekurzivno
+Loop siblings	Išči sorodne
+Navigation	Usmerjanje
+No image loaded!	Nobena slika ni naložena!
+No user INI file exists yet. Create user INI file from INI file template?	Uporabniška datoteka INI še ne obstaja. Želite ustvariti uporabniško datoteko INI iz predloge datoteke INI?
+None	Brez
+Not enough memory available	Ni dovolj razpoložljivega pomnilnika
+Order files by	Razvrsti datoteke po
+Press ESC to exit...	Pritisnite ESC za izhod...
+Press any key to search the subdirectories for image files.	Pritisnite katero koli tipko za iskanje slikovnih datotek v podmapah.
+Random	Naključno
+Reason:	Razlog:
+Roll from bottom	Zavij od spodaj
+Roll from left	Zavij z leve
+Roll from right	Zavij z desne
+Roll from top	Zavij od zgoraj
+Saturation	Nasičenost
+Scroll from bottom	Pomik od spodaj
+Scroll from left	Pomik z leve
+Scroll from right	Pomik z desne
+Scroll from top	Pomik od zgoraj
+Slide from bottom	Slika od spodaj
+Slide from left	Slika z leve
+Slide from right	Slika z desne
+Slide from top	Slika od zgoraj
+Slideshow	Prikaz več slik
+The directory '%s' does not contain any image files!	Mapa '%s' ne vsebuje slikovnih datotek!
+The file '%s' could not be read!	Datoteke '%s' ni bilo mogoče prebrati!
+The file '%s' does not contain a list of file names!	Datoteka '%s' ne vsebuje seznama imen datotek!
+These values will override the values from the INI file located in the program folder of JPEGView!	Te vrednosti bodo preglasile vrednosti iz datoteke INI, ki se nahaja v programski mapi JPEGView!
+Transition Effect	Učinek prehoda
+off	izkl.
+on	vkl.
+
+// ::: Popup Menu Strings ::: (unsorted to preserve context) //
+Next image	Naslednja slika
+Previous image	Prejšnja slika
+Current View	
+Rotate +90	Obrni za 90 stopinj
+Rotate -90	Obrni za -90 stopinj
+Mirror horizontally	Zrcali vodoravno
+Mirror vertically	Zrcali navpično
+Fit to window	
+Window	
+Full screen mode	Celozaslonski način
+Fit window to image	Prilagodi okno sliki
+Hide window title bar	Skrij naslovno vrstico okna
+Set window always on top	Nastavi okno vedno na zaslonu
+Play folder as slideshow/movie	Predvajaj mapo kot Prikaz več slik/film
+Pause Slideshow/Movie	
+Waiting time	Čakalni čas
+1 sec	1 sek.
+2 sec	2 sek.
+3 sec	3 sek.
+4 sec	4 sek.
+5 sec	5 sek.
+7 sec	7 sek.
+10 sec	10 sek.
+20 sec	20 sek.
+Transition Speed	Hitrost prehoda
+Very fast	Zelo hitro
+Fast	Hitro
+Normal	Običajno
+Slow	Počasno
+Very slow	Zelo počasno
+Movie	Film
+Playback speed	Hitrost predvajanja
+5 fps	5 sličic/sek.
+10 fps	10 sličic/sek.
+15 fps	
+20 fps	
+25 fps	25 sličic/sek.
+30 fps	30 sličic/sek.
+50 fps	50 sličic/sek.
+60 fps	
+100 fps	100 sličic/sek.
+Reload image	Znova naloži sliko
+Edit image in default editor	
+Copy scaled image content to clipboard	
+Copy original image content to clipboard	
+Copy file path to clipboard	
+Cut file to clipboard	
+Open containing folder in Explorer	Odpri mapo v Raziskovalcu
+Folder Mode	
+Sort Order	
+Modification date	Datum spremembe
+Auto Zoom Mode	
+Fit to window (never upsize)	
+Fill with crop (never upsize)	
+Auto Contrast	
+Edit Settings	
+Settings Dialog	
+Exit	Izhod
+
+// ::: INFO: Missing Translations [21] ::: (Summary to assist translators: All missing strings which require translation) - Auto-generated by script //
+//! Book Mode
+//! Current View
+//! Fit to window
+//! Window
+//! Pause Slideshow/Movie
+//! 15 fps
+//! 20 fps
+//! 60 fps
+//! Edit image in default editor
+//! Copy scaled image content to clipboard
+//! Copy original image content to clipboard
+//! Copy file path to clipboard
+//! Cut file to clipboard
+//! Folder Mode
+//! Sort Order
+//! Auto Zoom Mode
+//! Fit to window (never upsize)
+//! Fill with crop (never upsize)
+//! Auto Contrast
+//! Edit Settings
+//! Settings Dialog
+
+// ::: STATUS: Last Checked/Updated by Script ::: 2026-10-17T13:50:40.323690+00:00 //
+//! Translation Progress: 81%
+//! * Total (Strings + Menu) = 113
+//! * Done = 92
+//! * Missing = 21 (19%)

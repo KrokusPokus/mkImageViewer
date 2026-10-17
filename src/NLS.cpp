@@ -1,7 +1,8 @@
 #include "NLS.h"
 #include "SettingsProvider.h"
+
+#include <cstring>
 #include <unordered_map>
-#include <string>
 
 // Neudefinition der statischen Member-Variablen mit std::unordered_map und std::wstring
 std::unordered_map<std::wstring, std::wstring> CNLS::sm_texts;

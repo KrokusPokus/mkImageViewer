@@ -1,33 +1,32 @@
-//
-#include <QStringView>
-#include <gdiplus.h>
-#include <algorithm>
-
 #include "ImageLoadThread.h"
-#include "JPEGImage.h"
-#include "MessageDef.h"
+#include "BasicProcessing.h"
 #include "Helpers.h"
-#include "SettingsProvider.h"
+#include "JPEGImage.h"
+#include "MaxImageDef.h"
+#include "MessageDef.h"
 #include "ReaderBMP.h"
 #include "ReaderTGA.h"
-#include "BasicProcessing.h"
-#include "wrapperTJPEG.h"
-#include "wrapperPNG.h"
-#ifndef WINXP
-#include "wrapperJXL.h"
-#include "wrapperHEIF.h"
+#include "SettingsProvider.h"
 #include "wrapperAVIF.h"
-#endif
-#include "wrapperWEBP.h"
-#include "wrapperQOI.h"
+#include "wrapperHEIF.h"
+#include "wrapperJXL.h"
+#include "wrapperPNG.h"
 #include "wrapperPSD.h"
-#include "MaxImageDef.h"
+#include "wrapperQOI.h"
+#include "wrapperTJPEG.h"
+#include "wrapperWEBP.h"
 #include "zip/zip.h"
+
+#include <algorithm>
+#include <cwctype> // für std::towlower
+#include <filesystem>
+#include <string>
+
+#include <gdiplus.h>
 
 using namespace Gdiplus;
 
 using namespace bit7z;
-//#include "bit7z/include/bitfileextractor.hpp"
 #include "bit7z/include/bitarchivereader.hpp"
 
 // static initializers
@@ -37,183 +36,240 @@ volatile int CImageLoadThread::m_curHandle = 0;
 // static helpers
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-// find image format from an in-memory 16-byte header, with sFileName used only
-// as a fallback for the extension-based check (Helpers::GetImageFormat) and the
-// magic-byte checks that must run after it. sFileName does not need to point to
-// an actual file on disk - only its name/extension is used here.
-static EImageFormat GetImageFormatInMemory(const unsigned char* pHeader, LPCTSTR sFileName) {
+namespace {
 
-    if (pHeader[0] == 0x42 && pHeader[1] == 0x4d) {
-        return IF_WindowsBMP;
-    } else if (pHeader[0] == 0xff && pHeader[1] == 0xd8) {
-        return IF_JPEG;
-    } else if (pHeader[0] == 0x89 && pHeader[1] == 'P' && pHeader[2] == 'N' && pHeader[3] == 'G' &&
-        pHeader[4] == 0x0d && pHeader[5] == 0x0a && pHeader[6] == 0x1a && pHeader[7] == 0x0a) {
-        return IF_PNG;
-    } else if (pHeader[0] == 'G' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == '8' &&
-        (pHeader[4] == '7' || pHeader[4] == '9') && pHeader[5] == 'a') {
-        return IF_GIF;
-    } else if (pHeader[0] == 'R' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == 'F' &&
-        pHeader[8] == 'W' && pHeader[9] == 'E' && pHeader[10] == 'B' && pHeader[11] == 'P') {
-        return IF_WEBP;
-    } else if ((pHeader[0] == 0xff && pHeader[1] == 0x0a) ||
-        memcmp(pHeader, "\x00\x00\x00\x0cJXL\x20\x0d\x0a\x87\x0a", 12) == 0) {
-        return IF_JXL;
-    } else if (!memcmp(pHeader + 4, "ftyp", 4)) {
-        // https://github.com/strukturag/libheif/issues/83
-        // https://github.com/strukturag/libheif/blob/ce1e4586b6222588c5afcd60c7ba9caa86bcc58c/libheif/heif.h#L602-L805
+	EImageFormat GetImageFormatFromName(LPCTSTR sFileName) {
+		LPCTSTR sEnding = _tcsrchr(sFileName, _T('.'));
+		if (sEnding != NULL) {
+			sEnding += 1;
+			if (_tcsicmp(sEnding, _T("JPG")) == 0 || _tcsicmp(sEnding, _T("JPEG")) == 0 || _tcsicmp(sEnding, _T("JFIF")) == 0) {
+				return IF_JPEG;
+			} else if (_tcsicmp(sEnding, _T("BMP")) == 0) {
+				return IF_WindowsBMP;
+			} else if (_tcsicmp(sEnding, _T("PNG")) == 0) {
+				return IF_PNG;
+			} else if (_tcsicmp(sEnding, _T("TIF")) == 0 || _tcsicmp(sEnding, _T("TIFF")) == 0) {
+				return IF_TIFF;
+			} else if (_tcsicmp(sEnding, _T("WEBP")) == 0) {
+				return IF_WEBP;
+			} else if (_tcsicmp(sEnding, _T("JXL")) == 0) {
+				return IF_JXL;
+			} else if (_tcsicmp(sEnding, _T("AVIF")) == 0) {
+				return IF_AVIF;
+			} else if (_tcsicmp(sEnding, _T("HEIF")) == 0 || _tcsicmp(sEnding, _T("HEIC")) == 0 || _tcsicmp(sEnding, _T("HIF")) == 0) {
+				return IF_HEIF;
+			} else if (_tcsicmp(sEnding, _T("TGA")) == 0) {
+				return IF_TGA;
+			} else if ((_tcsicmp(sEnding, _T("ZIP")) == 0) || (_tcsicmp(sEnding, _T("CBZ")) == 0)
+				|| (_tcsicmp(sEnding, _T("7Z")) == 0) || (_tcsicmp(sEnding, _T("CB7")) == 0)) {
+				return IF_ZIP;
+			} else if (_tcsicmp(sEnding, _T("QOI")) == 0) {
+				return IF_QOI;
+			} else if (_tcsicmp(sEnding, _T("PSD")) == 0) {
+				return IF_PSD;
+			}
+		}
+		return IF_Unknown;
+	}
+	
+	// find image format from an in-memory 16-byte header, with sFileName used only
+	// as a fallback for the extension-based check (Helpers::GetImageFormat) and the
+	// magic-byte checks that must run after it. sFileName does not need to point to
+	// an actual file on disk - only its name/extension is used here.
+	EImageFormat GetImageFormatInMemory(const unsigned char* pHeader, LPCTSTR sFileName) {
 
-        // AV1: avif, avis
-        if (!memcmp(pHeader + 8, "avi", 3))
-            return IF_AVIF;
-        // H265: heic, heix, hevc, hevx, heim, heis, hevm, hevs
-        if (!memcmp(pHeader + 8, "hei", 3) || !memcmp(pHeader + 8, "hev", 3))
-            return IF_HEIF;
-    } else if (pHeader[0] == 'q' && pHeader[1] == 'o' && pHeader[2] == 'i' && pHeader[3] == 'f') {
-        return IF_QOI;
-    } else if (pHeader[0] == '8' && pHeader[1] == 'B' && pHeader[2] == 'P' && pHeader[3] == 'S') {
-        return IF_PSD;
-    } else if (pHeader[0] == 'P' && pHeader[1] == 'K' && pHeader[2] == 0x03 && pHeader[3] == 0x04) {
-        return IF_ZIP;
+		if (pHeader[0] == 0x42 && pHeader[1] == 0x4d) {
+			return IF_WindowsBMP;
+		} else if (pHeader[0] == 0xff && pHeader[1] == 0xd8) {
+			return IF_JPEG;
+		} else if (pHeader[0] == 0x89 && pHeader[1] == 'P' && pHeader[2] == 'N' && pHeader[3] == 'G' &&
+			pHeader[4] == 0x0d && pHeader[5] == 0x0a && pHeader[6] == 0x1a && pHeader[7] == 0x0a) {
+			return IF_PNG;
+		} else if (pHeader[0] == 'G' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == '8' &&
+			(pHeader[4] == '7' || pHeader[4] == '9') && pHeader[5] == 'a') {
+			return IF_GIF;
+		} else if (pHeader[0] == 'R' && pHeader[1] == 'I' && pHeader[2] == 'F' && pHeader[3] == 'F' &&
+			pHeader[8] == 'W' && pHeader[9] == 'E' && pHeader[10] == 'B' && pHeader[11] == 'P') {
+			return IF_WEBP;
+		} else if ((pHeader[0] == 0xff && pHeader[1] == 0x0a) ||
+			memcmp(pHeader, "\x00\x00\x00\x0cJXL\x20\x0d\x0a\x87\x0a", 12) == 0) {
+			return IF_JXL;
+		} else if (!memcmp(pHeader + 4, "ftyp", 4)) {
+			// https://github.com/strukturag/libheif/issues/83
+			// https://github.com/strukturag/libheif/blob/ce1e4586b6222588c5afcd60c7ba9caa86bcc58c/libheif/heif.h#L602-L805
+
+			// AV1: avif, avis
+			if (!memcmp(pHeader + 8, "avi", 3))
+				return IF_AVIF;
+			// H265: heic, heix, hevc, hevx, heim, heis, hevm, hevs
+			if (!memcmp(pHeader + 8, "hei", 3) || !memcmp(pHeader + 8, "hev", 3))
+				return IF_HEIF;
+		} else if (pHeader[0] == 'q' && pHeader[1] == 'o' && pHeader[2] == 'i' && pHeader[3] == 'f') {
+			return IF_QOI;
+		} else if (pHeader[0] == '8' && pHeader[1] == 'B' && pHeader[2] == 'P' && pHeader[3] == 'S') {
+			return IF_PSD;
+		} else if (pHeader[0] == 'P' && pHeader[1] == 'K' && pHeader[2] == 0x03 && pHeader[3] == 0x04) {
+			return IF_ZIP;
+		}
+
+		// default fallback if no matches based on magic bytes
+		EImageFormat eImageFormat = GetImageFormatFromName(sFileName);
+
+		if (eImageFormat != IF_Unknown) {
+			return eImageFormat;
+		} else if (!memcmp(pHeader + 4, "ftyp", 4)) {
+			// Unspecified encoding (possibly AVIF or HEIF): mif1, mif2, msf1, miaf, 1pic
+			return IF_AVIF;
+		} else if (!memcmp(pHeader, "II*\0", 4) || !memcmp(pHeader, "MM\0*", 4)) {
+			// Must be checked after file extension to avoid classifying RAW as TIFF
+			// A few RAW image formats use TIFF as the container
+			// ex: CR2 - http://lclevy.free.fr/cr2/#key_info
+			// ex: DNG - https://www.adobe.com/creativecloud/file-types/image/raw/dng-file.html#dng
+			return IF_TIFF;
+		} else if (pHeader[0] == 0x00 && pHeader[1] == 0x00 && pHeader[2] == 0x01 && pHeader[3] == 0x00) {
+			return IF_ICO;
+		}
+		return IF_Unknown;
+	}
+
+	// opens the file, reads up to 16 header bytes, and determines the image format
+	EImageFormat GetImageFormat(LPCTSTR sFileName) {
+		FILE *fptr;
+		if ((fptr = _tfopen(sFileName, _T("rb"))) == NULL) {
+			return IF_Unknown;
+		}
+		unsigned char header[16] = { 0 };
+		int nSize = (int)fread((void*)header, 1, 16, fptr);
+		fclose(fptr);
+		if (nSize < 2) {
+			return IF_Unknown;
+		}
+
+		return GetImageFormatInMemory(header, sFileName);
+	}
+
+	EImageFormat GetBitmapFormat(Gdiplus::Bitmap * pBitmap) {
+		GUID guid{ 0 };
+		pBitmap->GetRawFormat(&guid);
+		if (guid == Gdiplus::ImageFormatBMP) {
+			return IF_WindowsBMP;
+		} else if (guid == Gdiplus::ImageFormatPNG) {
+			return IF_PNG;
+		} else if (guid == Gdiplus::ImageFormatGIF) {
+			return IF_GIF;
+		} else if (guid == Gdiplus::ImageFormatTIFF) {
+			return IF_TIFF;
+		} else if (guid == Gdiplus::ImageFormatJPEG || guid == Gdiplus::ImageFormatEXIF) {
+			return IF_JPEG;
+		} else {
+			return IF_Unknown;
+		}
+	}
+
+	CJPEGImage* ConvertGDIPlusBitmapToJPEGImage(Gdiplus::Bitmap* pBitmap, int nFrameIndex, void* pEXIFData, 
+		__int64 nJPEGHash, bool &isOutOfMemory, bool &isAnimatedGIF, Helpers::ETransparencyMode nTransparencyMode) {
+
+		isOutOfMemory = false;
+		isAnimatedGIF = false;
+		if (pBitmap == NULL) {
+			return NULL;
+		}
+		Gdiplus::Status lastStatus = pBitmap->GetLastStatus();
+		if (lastStatus != Gdiplus::Ok) {
+			isOutOfMemory = lastStatus == Gdiplus::OutOfMemory;
+			return NULL;
+		}
+
+		if (pBitmap->GetWidth() > MAX_IMAGE_DIMENSION || pBitmap->GetHeight() > MAX_IMAGE_DIMENSION)
+		{
+			return NULL;
+		}
+		if ((double)pBitmap->GetWidth() * pBitmap->GetHeight() > MAX_IMAGE_PIXELS)
+		{
+			isOutOfMemory = true;
+			return NULL;
+		}
+
+		EImageFormat eImageFormat = GetBitmapFormat(pBitmap);
+
+		// Handle multiframe images.
+		// Note that only the first frame dimension is looked at, it is unclear if GDI+ anyway supports image formats with more dimensions
+		UINT nDimensions = pBitmap->GetFrameDimensionsCount();
+		GUID* pDimensionIDs = new GUID[nDimensions];
+		pBitmap->GetFrameDimensionsList(pDimensionIDs, nDimensions);
+		int nFrameCount = (nDimensions == 0) ? 1 : pBitmap->GetFrameCount(&pDimensionIDs[0]);
+		nFrameIndex = std::clamp(nFrameIndex, 0, nFrameCount - 1);
+		int nFrameTimeMs = 100;
+		if (nFrameCount > 1) {
+			isAnimatedGIF = eImageFormat == IF_GIF;
+			int nTagFrameDelaySize = pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
+			if (nTagFrameDelaySize > 0) {
+				PropertyItem* pPropertyItem = (PropertyItem*)new char[nTagFrameDelaySize];
+				if (pBitmap->GetPropertyItem(PropertyTagFrameDelay, nTagFrameDelaySize, pPropertyItem) == Gdiplus::Ok) {
+					nFrameTimeMs = ((long*)pPropertyItem->value)[nFrameIndex] * 10;
+				}
+				delete[] pPropertyItem;
+			}
+			GUID pageGuid = (eImageFormat == IF_TIFF) ? FrameDimensionPage : FrameDimensionTime;
+			pBitmap->SelectActiveFrame(&pageGuid, nFrameIndex);
+		}
+		delete[] pDimensionIDs;
+
+		// If there is an alpha channel in the original file we must blit the image onto a background color offscreen
+		// bitmap first to achieve proper rendering.
+		CJPEGImage* pJPEGImage = NULL;
+		Gdiplus::PixelFormat pixelFormat = pBitmap->GetPixelFormat();
+		bool bHasAlphaChannel = (pixelFormat & (PixelFormatAlpha | PixelFormatPAlpha));
+		Gdiplus::Bitmap* pBmTarget = NULL;
+		Gdiplus::Graphics* pBmGraphics = NULL;
+
+		Gdiplus::Rect bmRect(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight());
+		Gdiplus::BitmapData bmData;
+		lastStatus = pBitmap->LockBits(&bmRect, Gdiplus::ImageLockModeRead, PixelFormat32bppRGB, &bmData);
+		if (lastStatus == Gdiplus::Ok) {
+			assert(bmData.PixelFormat == PixelFormat32bppRGB);
+			void* pDIB = CBasicProcessing::ConvertGdiplus32bppRGB(bmRect.Width, bmRect.Height, bmData.Stride, bmData.Scan0, !bHasAlphaChannel);
+			if (bHasAlphaChannel == true)
+				Helpers::BlendAlpha((uint32*)pDIB, bmRect.Width, bmRect.Height, nTransparencyMode);
+			if (pDIB != NULL) {
+				pJPEGImage = new CJPEGImage(bmRect.Width, bmRect.Height, pDIB, pEXIFData, 4, nJPEGHash, eImageFormat,
+					eImageFormat == IF_GIF && nFrameCount > 1, nFrameIndex, nFrameCount, nFrameTimeMs);
+			}
+			pBitmap->UnlockBits(&bmData);
+		} else if (lastStatus == Gdiplus::ValueOverflow) {
+			isOutOfMemory = true;
+		}
+
+		if (pBmGraphics != NULL && pBmTarget != NULL) {
+			delete pBmGraphics;
+			delete pBmTarget;
+		}
+
+		pBitmap->GetLastStatus(); // reset status
+
+		return pJPEGImage;
+	}
+
+    // Wandelt eine Extension in einen Lower-Case wstring um
+    std::wstring get_lowercase_extension(const wchar_t* sFileName) {
+        if (!sFileName) return L"";
+
+        // fs::path akzeptiert const wchar_t* direkt
+        std::filesystem::path filePath(sFileName);
+
+        // .wstring() gibt die Extension als std::wstring zurück (z. B. L".CBZ")
+        std::wstring ext = filePath.extension().wstring();
+
+        // Case-Insensitive Transformation für Wide-Characters
+        std::ranges::transform(ext, ext.begin(), [](wchar_t c) {
+            return static_cast<wchar_t>(std::towlower(c));
+        });
+
+        return ext;
     }
 
-    // default fallback if no matches based on magic bytes
-    EImageFormat eImageFormat = Helpers::GetImageFormat(sFileName);
+} // namespace
 
-    if (eImageFormat != IF_Unknown) {
-        return eImageFormat;
-    } else if (!memcmp(pHeader + 4, "ftyp", 4)) {
-        // Unspecified encoding (possibly AVIF or HEIF): mif1, mif2, msf1, miaf, 1pic
-        return IF_AVIF;
-    } else if (!memcmp(pHeader, "II*\0", 4) || !memcmp(pHeader, "MM\0*", 4)) {
-        // Must be checked after file extension to avoid classifying RAW as TIFF
-        // A few RAW image formats use TIFF as the container
-        // ex: CR2 - http://lclevy.free.fr/cr2/#key_info
-        // ex: DNG - https://www.adobe.com/creativecloud/file-types/image/raw/dng-file.html#dng
-        return IF_TIFF;
-    } else if (pHeader[0] == 0x00 && pHeader[1] == 0x00 && pHeader[2] == 0x01 && pHeader[3] == 0x00) {
-        return IF_ICO;
-    }
-    return IF_Unknown;
-}
-
-// opens the file, reads up to 16 header bytes, and determines the image format
-static EImageFormat GetImageFormat(LPCTSTR sFileName) {
-    FILE *fptr;
-    if ((fptr = _tfopen(sFileName, _T("rb"))) == NULL) {
-        return IF_Unknown;
-    }
-    unsigned char header[16] = { 0 };
-    int nSize = (int)fread((void*)header, 1, 16, fptr);
-    fclose(fptr);
-    if (nSize < 2) {
-        return IF_Unknown;
-    }
-
-    return GetImageFormatInMemory(header, sFileName);
-}
-
-static EImageFormat GetBitmapFormat(Gdiplus::Bitmap * pBitmap) {
-    GUID guid{ 0 };
-    pBitmap->GetRawFormat(&guid);
-    if (guid == Gdiplus::ImageFormatBMP) {
-        return IF_WindowsBMP;
-    } else if (guid == Gdiplus::ImageFormatPNG) {
-        return IF_PNG;
-    } else if (guid == Gdiplus::ImageFormatGIF) {
-        return IF_GIF;
-    } else if (guid == Gdiplus::ImageFormatTIFF) {
-        return IF_TIFF;
-    } else if (guid == Gdiplus::ImageFormatJPEG || guid == Gdiplus::ImageFormatEXIF) {
-        return IF_JPEG;
-    } else {
-        return IF_Unknown;
-    }
-}
-
-static CJPEGImage* ConvertGDIPlusBitmapToJPEGImage(Gdiplus::Bitmap* pBitmap, int nFrameIndex, void* pEXIFData, 
-    __int64 nJPEGHash, bool &isOutOfMemory, bool &isAnimatedGIF, Helpers::ETransparencyMode nTransparencyMode) {
-
-    isOutOfMemory = false;
-    isAnimatedGIF = false;
-    if (pBitmap == NULL) {
-        return NULL;
-    }
-    Gdiplus::Status lastStatus = pBitmap->GetLastStatus();
-    if (lastStatus != Gdiplus::Ok) {
-        isOutOfMemory = lastStatus == Gdiplus::OutOfMemory;
-        return NULL;
-    }
-
-    if (pBitmap->GetWidth() > MAX_IMAGE_DIMENSION || pBitmap->GetHeight() > MAX_IMAGE_DIMENSION)
-    {
-        return NULL;
-    }
-    if ((double)pBitmap->GetWidth() * pBitmap->GetHeight() > MAX_IMAGE_PIXELS)
-    {
-        isOutOfMemory = true;
-        return NULL;
-    }
-
-    EImageFormat eImageFormat = GetBitmapFormat(pBitmap);
-
-    // Handle multiframe images.
-    // Note that only the first frame dimension is looked at, it is unclear if GDI+ anyway supports image formats with more dimensions
-    UINT nDimensions = pBitmap->GetFrameDimensionsCount();
-    GUID* pDimensionIDs = new GUID[nDimensions];
-    pBitmap->GetFrameDimensionsList(pDimensionIDs, nDimensions);
-    int nFrameCount = (nDimensions == 0) ? 1 : pBitmap->GetFrameCount(&pDimensionIDs[0]);
-    nFrameIndex = std::clamp(nFrameIndex, 0, nFrameCount - 1);
-    int nFrameTimeMs = 100;
-    if (nFrameCount > 1) {
-        isAnimatedGIF = eImageFormat == IF_GIF;
-        int nTagFrameDelaySize = pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
-        if (nTagFrameDelaySize > 0) {
-            PropertyItem* pPropertyItem = (PropertyItem*)new char[nTagFrameDelaySize];
-            if (pBitmap->GetPropertyItem(PropertyTagFrameDelay, nTagFrameDelaySize, pPropertyItem) == Gdiplus::Ok) {
-                nFrameTimeMs = ((long*)pPropertyItem->value)[nFrameIndex] * 10;
-            }
-            delete[] pPropertyItem;
-        }
-        GUID pageGuid = (eImageFormat == IF_TIFF) ? FrameDimensionPage : FrameDimensionTime;
-        pBitmap->SelectActiveFrame(&pageGuid, nFrameIndex);
-    }
-    delete[] pDimensionIDs;
-
-    // If there is an alpha channel in the original file we must blit the image onto a background color offscreen
-    // bitmap first to achieve proper rendering.
-    CJPEGImage* pJPEGImage = NULL;
-    Gdiplus::PixelFormat pixelFormat = pBitmap->GetPixelFormat();
-    bool bHasAlphaChannel = (pixelFormat & (PixelFormatAlpha | PixelFormatPAlpha));
-    Gdiplus::Bitmap* pBmTarget = NULL;
-    Gdiplus::Graphics* pBmGraphics = NULL;
-
-    Gdiplus::Rect bmRect(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight());
-    Gdiplus::BitmapData bmData;
-    lastStatus = pBitmap->LockBits(&bmRect, Gdiplus::ImageLockModeRead, PixelFormat32bppRGB, &bmData);
-    if (lastStatus == Gdiplus::Ok) {
-        assert(bmData.PixelFormat == PixelFormat32bppRGB);
-        void* pDIB = CBasicProcessing::ConvertGdiplus32bppRGB(bmRect.Width, bmRect.Height, bmData.Stride, bmData.Scan0, !bHasAlphaChannel);
-        if (bHasAlphaChannel == true)
-            Helpers::BlendAlpha((uint32*)pDIB, bmRect.Width, bmRect.Height, nTransparencyMode);
-        if (pDIB != NULL) {
-            pJPEGImage = new CJPEGImage(bmRect.Width, bmRect.Height, pDIB, pEXIFData, 4, nJPEGHash, eImageFormat,
-                eImageFormat == IF_GIF && nFrameCount > 1, nFrameIndex, nFrameCount, nFrameTimeMs);
-        }
-        pBitmap->UnlockBits(&bmData);
-    } else if (lastStatus == Gdiplus::ValueOverflow) {
-        isOutOfMemory = true;
-    }
-
-    if (pBmGraphics != NULL && pBmTarget != NULL) {
-        delete pBmGraphics;
-        delete pBmTarget;
-    }
-
-    pBitmap->GetLastStatus(); // reset status
-
-    return pJPEGImage;
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Public
@@ -292,7 +348,7 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
     }
 
     CRequest& rq = (CRequest&)request;
-    double dStartTime = Helpers::GetExactTickCount(); 
+    UINT startTimeMs = Helpers::GetTimeMs(); 
     // Get image format and read the image
     switch (GetImageFormat(rq.FileName)) {
         case IF_JPEG :
@@ -338,7 +394,6 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
             DeleteCachedZip();
             ProcessReadPNGRequest(&rq);
             break;
-#ifndef WINXP
         case IF_JXL:
             DeleteCachedGDIBitmap();
             DeleteCachedWebpDecoder();
@@ -373,7 +428,6 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
             DeleteCachedZip();
             ProcessReadPSDRequest(&rq);
             break;
-#endif
         case IF_QOI:
             DeleteCachedGDIBitmap();
             DeleteCachedWebpDecoder();
@@ -399,7 +453,7 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
     }
     // then process the image if read was successful
     if (rq.Image != NULL) {
-        rq.Image->SetLoadTickCount(Helpers::GetExactTickCount() - dStartTime); 
+		rq.Image->SetFileLoadDelayMs(Helpers::GetTimeMs() - startTimeMs); 
         if (!ProcessImageAfterLoad(&rq)) {
             delete rq.Image;
             rq.Image = NULL;
@@ -448,21 +502,16 @@ void CImageLoadThread::DeleteCachedWebpDecoder() {
 }
 
 void CImageLoadThread::DeleteCachedPngDecoder() {
-#ifndef WINXP
     PngReader::DeleteCache();
     m_sLastPngFileName.Empty();
-#endif
 }
 
 void CImageLoadThread::DeleteCachedJxlDecoder() {
-#ifndef WINXP
     JxlReader::DeleteCache();
     m_sLastJxlFileName.Empty();
-#endif
 }
 
 void CImageLoadThread::DeleteCachedAvifDecoder() {
-#ifndef WINXP
     // prevent crashing when libavif/dav1d fail or missing
     UINT nPrevErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
     try {
@@ -470,7 +519,6 @@ void CImageLoadThread::DeleteCachedAvifDecoder() {
     } catch (...) {}
     SetErrorMode(nPrevErrorMode);
     m_sLastAvifFileName.Empty();
-#endif
 }
 
 void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
@@ -628,7 +676,6 @@ void CImageLoadThread::ProcessReadWEBPRequest(CRequest * request) {
     }
 }
 
-#ifndef WINXP
 void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
     bool bUseCachedDecoder = false;
     const wchar_t* sFileName;
@@ -677,12 +724,10 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
             uint8* pPixelData = NULL;
             void* pEXIFData = NULL;
 
-#ifndef WINXP
             // If UseEmbeddedColorProfiles is true and the image isn't animated, we should use GDI+ for better color management
             bool bUseGDIPlus = CSettingsProvider::This().UseEmbeddedColorProfiles();
             if (bUseCachedDecoder || !bUseGDIPlus || PngReader::MustUseLibpng(pBuffer, nFileSize))
                 pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
-#endif
 
             if (pPixelData != NULL) {
                 if (bHasAnimation)
@@ -720,7 +765,6 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
         if (hFileBuffer) ::GlobalFree(hFileBuffer);
     }
 }
-#endif
 
 void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
     bool bUseCachedDecoder = false;
@@ -797,7 +841,6 @@ void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
     }
 }
 
-#ifndef WINXP
 void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
     bool bSuccess = false;
     bool bUseCachedDecoder = false;
@@ -869,9 +912,7 @@ void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
     if (!bSuccess)
         return ProcessReadHEIFRequest(request);
 }
-#endif
 
-#ifndef WINXP
 void CImageLoadThread::ProcessReadHEIFRequest(CRequest* request) {
     HANDLE hFile;
     hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
@@ -929,8 +970,6 @@ void CImageLoadThread::ProcessReadPSDRequest(CRequest* request) {
         request->Image = PsdReader::ReadThumb(request->FileName, request->OutOfMemory);
     }
 }
-
-#endif
 
 void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
     HANDLE hFile;
@@ -1116,13 +1155,16 @@ Note on "request->FrameIndex":
 
     }
 
-    QStringView str(sFileName);
-    bool use7z = !(str.endsWith(u".cbz", Qt::CaseInsensitive) ||
-                   str.endsWith(u".zip", Qt::CaseInsensitive));
+    std::wstring ext = get_lowercase_extension(sFileName);
+    bool use7z = !(ext == L".cbz" || ext == L".zip");
 
-    int bufFilenameLen = request->FileName.GetLength() + 1;
-    char* bufFilename = new char[bufFilenameLen];
-    wcstombs(bufFilename, request->FileName.GetString(), bufFilenameLen);
+    // std::filesystem::path akzeptiert wchar_t* / std::wstring direkt
+    std::filesystem::path filePath(request->FileName.GetString());
+
+    // .u8string() gibt unter C++20 einen std::u16string/std::u8string zurück
+    // .string() wandelt den Pfad nativ & sicher in den UTF-8 String um
+    std::string bufFilename = filePath.string();
+
     struct zip_t* zip = NULL;
     BitArchiveReader* zip7 = NULL;
 
@@ -1144,12 +1186,11 @@ Note on "request->FrameIndex":
             catch (const BitException& ex) {
                 delete zip7;
                 zip7 = NULL;
-                delete[] bufFilename;
                 return;
             }
         }
         else {
-            zip = zip_open(bufFilename, 0, 'r');
+            zip = zip_open(bufFilename.c_str(), 0, 'r');
             int n = zip_entries_total(zip);
             for (int i = 0; i < n; ++i) {
                 zip_entry_openbyindex(zip, i);
@@ -1170,7 +1211,6 @@ Note on "request->FrameIndex":
                 delete zip7;
                 zip7 = NULL;
             }
-            delete[] bufFilename;
             return;
         }
         
@@ -1209,13 +1249,12 @@ Note on "request->FrameIndex":
                 catch (const BitException& ex) {
                     delete zip7;
                     zip7 = NULL;
-                    delete[] bufFilename;
                     return;
                 }
             }
             else {
                 if (!zip) {
-                    zip = zip_open(bufFilename, 0, 'r');
+                    zip = zip_open(bufFilename.c_str(), 0, 'r');
                 }
                 
                 zip_entry_openbyindex(zip, z.index);
@@ -1279,7 +1318,6 @@ Note on "request->FrameIndex":
                         if (nFileSize > MAX_PNG_FILE_SIZE) {
                             request->OutOfMemory = true;
                             delete[] pBuffer;
-                            delete[] bufFilename;
                             return;
                         }
                         int nWidth, nHeight, nBPP, nFrameCount, nFrameTimeMs;
@@ -1434,8 +1472,6 @@ Note on "request->FrameIndex":
             //continue: try next file in archive
         }
     } while (!bSuccess);
-    
-    delete[] bufFilename;
 }
 
 void CImageLoadThread::DeleteCachedZip()
