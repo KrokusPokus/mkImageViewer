@@ -1862,10 +1862,10 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
     
     if (m_bAutoContrast) ::CheckMenuItem(hMenuTrackPopup, IDM_AUTO_CORRECTION, MF_CHECKED);
 
-    HMENU hMenuNavigation = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_NAVIGATION);
+    HMENU hMenuNavigation = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_FOLDERS);
     ::CheckMenuItem(hMenuNavigation,  m_pFileList->GetNavigationMode()*10 + IDM_LOOP_FOLDER, MF_CHECKED);
     
-    HMENU hMenuOrdering = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_DISPLAY_ORDER);
+    HMENU hMenuOrdering = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_SORTMODE);
     ::CheckMenuItem(hMenuOrdering,  
         (m_pFileList->GetSorting() == Helpers::FS_LastModTime) ? IDM_SORT_MOD_DATE :
         (m_pFileList->GetSorting() == Helpers::FS_FileName) ? IDM_SORT_NAME :
@@ -1890,7 +1890,7 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
     ::EnableMenuItem(hMenuMovie, IDM_SLIDESHOW_START, MF_BYCOMMAND | MF_GRAYED);
     ::EnableMenuItem(hMenuMovie, IDM_MOVIE_START_FPS, MF_BYCOMMAND | MF_GRAYED);
     
-    HMENU hMenuZoom = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_ZOOM);
+    HMENU hMenuZoom = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_WINDOW);
     if (m_bSpanVirtualDesktop) ::CheckMenuItem(hMenuZoom,  IDM_SPAN_SCREENS, MF_CHECKED);
     if (m_bFullScreenMode) ::CheckMenuItem(hMenuZoom,  IDM_FULL_SCREEN_MODE, MF_CHECKED);
     if (m_bWindowBorderless) ::CheckMenuItem(hMenuZoom, IDM_HIDE_TITLE_BAR, MF_CHECKED);
@@ -1909,7 +1909,7 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
         ::EnableMenuItem(hMenuTrackPopup, IDM_COPY, MF_BYCOMMAND | MF_GRAYED);
         ::EnableMenuItem(hMenuTrackPopup, IDM_COPY_FULL, MF_BYCOMMAND | MF_GRAYED);
         ::EnableMenuItem(hMenuTrackPopup, IDM_COPY_PATH, MF_BYCOMMAND | MF_GRAYED);
-        ::EnableMenuItem(hMenuTrackPopup, SUBMENU_POS_ZOOM, MF_BYPOSITION  | MF_GRAYED);
+        ::EnableMenuItem(hMenuTrackPopup, SUBMENU_POS_WINDOW, MF_BYPOSITION  | MF_GRAYED);
         ::EnableMenuItem(hMenuTrackPopup, SUBMENU_POS_TRANSFORM, MF_BYPOSITION  | MF_GRAYED);
     }
 
@@ -4355,7 +4355,6 @@ void CMainDlg::SaveBookmark() {
                 if ((lstrcmpi(sFileExt,_T(".cbz")) == 0) || (lstrcmpi(sFileExt,_T(".cbr")) == 0) || (lstrcmpi(sFileExt,_T(".cb7")) == 0)) {
                     // In a cbz/cbr/cb7 archive, the new ini value equals the position in the archive
                     if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-                        int numFrames = m_pCurrentImage->NumberOfFrames();
                         int nCurrentFrame = m_pCurrentImage->FrameIndex();
                         if ((nCurrentFrame > 0) && (nCurrentFrame < m_pCurrentImage->NumberOfFrames() - 1))
                             bIsEndpoint = false;

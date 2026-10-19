@@ -91,7 +91,7 @@ namespace Helpers {
         INI_Custom
     };
 
-    static float DPIScalingFactor = -1.0f; // is set to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
+    inline float DPIScalingFactor = -1.0f; // is updated to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
 	
     static TCHAR buffAppPath[MAX_PATH + 32] = _T("");
 

@@ -147,11 +147,11 @@
 
 // in the main menu, these position MUST be changed if menu items are inserted/removed
 #define SUBMENU_POS_TRANSFORM 2
-#define SUBMENU_POS_ZOOM 3
+#define SUBMENU_POS_WINDOW 3
 #define SUBMENU_POS_MOVIE 5
-#define SUBMENU_POS_NAVIGATION 15
-#define SUBMENU_POS_DISPLAY_ORDER 16
-#define SUBMENU_POS_AUTOZOOMMODE 17
+#define SUBMENU_POS_FOLDERS 14
+#define SUBMENU_POS_SORTMODE 15
+#define SUBMENU_POS_AUTOZOOMMODE 16
 
 // Next default values for new objects
 // 
