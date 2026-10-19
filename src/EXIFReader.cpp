@@ -59,9 +59,9 @@ namespace {
 				LPCSTR pString = (nSize <= 4) ? (LPCSTR)(ptr + 8) : (LPCSTR)(pTIFFHeader + ReadUInt(ptr + 8, bLittleEndian));
 				int nMaxChars = std::min<int>(nSize, strlen(pString));
 				if (bTryReadAsUTF8) {
-					CString strUTF8 = Helpers::TryConvertFromUTF8((uint8*)pString, nMaxChars);
-					if (!strUTF8.IsEmpty()) {
-						strOut = strUTF8;
+                    QString strUTF8 = Helpers::TryConvertFromUTF8((uint8*)pString, nMaxChars);
+                    if (!strUTF8.isEmpty()) {
+                        strOut = reinterpret_cast<LPCWSTR>(strUTF8.utf16());
 						return;
 					}
 				}

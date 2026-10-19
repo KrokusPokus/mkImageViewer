@@ -1,35 +1,35 @@
 #ifndef DIRECTORYWATCHER_H
 #define DIRECTORYWATCHER_H
 
-// Watcher thread for a directory. Sends the two messages WM_DISPLAYED_FILE_CHANGED_ON_DISK and WM_ACTIVE_DIRECTORY_FILELIST_CHANGED
-// to the specified window.
+#include <QString>
+#include <QDateTime>
+
 class CDirectoryWatcher {
 public:
-    // The messages are sent to the specified target window.
-    CDirectoryWatcher(HWND hTargetWindow);
-    virtual ~CDirectoryWatcher(void);
+    explicit CDirectoryWatcher(HWND hTargetWindow);
+    virtual ~CDirectoryWatcher();
 
-    void SetCurrentFile(LPCTSTR fileName);
-    void SetCurrentDirectory(LPCTSTR directoryName);
+    void SetCurrentFile(const QString& fileName);
+    void SetCurrentDirectory(const QString& directoryName);
 
     // First tries to terminate the thread by setting m_terminateEvent, when no reaction -> kills the thread
     void Abort();
 
 private:
     CRITICAL_SECTION m_lock;
-    HANDLE m_terminateEvent; // Event to terminate the thread
-    HANDLE m_newDirectoryEvent; // New directory needs to be watched
-    HANDLE m_hThread; // watchdog thread
-    HWND m_hTargetWindow;
-    bool m_bTerminate;
+    HANDLE m_terminateEvent{ NULL };
+    HANDLE m_newDirectoryEvent{ NULL };
+    HANDLE m_hThread{ NULL };
+    HWND m_hTargetWindow{ NULL };
 
-    CString m_sCurrentDirectory;
-    CString m_sCurrentFile;
-    BOOL m_bModificationTimeValid;
-    FILETIME m_modificationTimeCurrentFile;
+    QString m_sCurrentDirectory;
+    QString m_sCurrentFile;
 
-    static void  __cdecl ThreadFunc(void* arg);
+    bool m_bModificationTimeValid{ false };
+    QDateTime m_modificationTimeCurrentFile;
+
+    static QDateTime GetLastModificationTime(const QString& fileName);
+    static void __cdecl ThreadFunc(void* arg);
 };
-
 
 #endif // DIRECTORYWATCHER_H

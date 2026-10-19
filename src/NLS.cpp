@@ -29,7 +29,7 @@ CString CNLS::GetLocalizedFileName(LPCTSTR sPath, LPCTSTR sPrefixName, LPCTSTR s
 }
 
 CString CNLS::GetStringTableFileName(LPCTSTR sLanguageCode) {
-    return GetLocalizedFileName(CSettingsProvider::This().GetEXEPath(), _T("strings"), _T("txt"), sLanguageCode);
+    return GetLocalizedFileName(reinterpret_cast<LPCTSTR>(CSettingsProvider::This().GetEXEPath().utf16()), _T("strings"), _T("txt"), sLanguageCode);
 }
 
 // Ignores newlines, ignores invalid lines

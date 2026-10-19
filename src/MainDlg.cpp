@@ -21,40 +21,52 @@
 
 #include <regex>        // used in regex matching language tags like [en], [de]
 
+#include <QDesktopServices>
+#include <QDir>
 #include <QFileInfo>
+#include <QList>
 #include <QMessageBox>
-
+#include <QMessageBox>
+#include <QPainter>
+#include <QProcess>
+#include <QRect>
+#include <QRegularExpression>
+#include <QString>
+#include <QUrl>
+#include <QtGlobal>
 
 namespace {
 
-    static const int MIN_WND_WIDTH = 320;
-    static const int MIN_WND_HEIGHT = 240;
+    const int MIN_WND_WIDTH = 320;
+    const int MIN_WND_HEIGHT = 240;
 
-    static const int NUM_THREADS = 1; // number of readahead threads to use. Use "1" since the ImageLoaders aren't thread save and JxlReader/PngReaderer/WebpReaderWriter can't do out of order frame access!
-    static const int ZOOM_TIMEOUT = 50; // refinement done after this many milliseconds
-    static const int ZOOM_TEXT_TIMEOUT = 1000; // zoom label disappears after this many milliseconds
+    const int NUM_THREADS = 1; // number of readahead threads to use. Use "1" since the ImageLoaders aren't thread save and JxlReader/PngReaderer/WebpReaderWriter can't do out of order frame access!
+    const int ZOOM_TIMEOUT = 50; // refinement done after this many milliseconds
+    const int ZOOM_TEXT_TIMEOUT = 1000; // zoom label disappears after this many milliseconds
 
-    static const int ZOOM_TEXT_RECT_WIDTH = 70; // zoom label width
-    static const int ZOOM_TEXT_RECT_HEIGHT = 25; // zoom label height
-    static const int ZOOM_TEXT_RECT_OFFSET_X = 30; // zoom label offset from right border
-    static const int ZOOM_TEXT_RECT_OFFSET_Y = 20; // zoom label offset from bottom border
+    const int ZOOM_TEXT_RECT_WIDTH = 70; // zoom label width
+    const int ZOOM_TEXT_RECT_HEIGHT = 25; // zoom label height
+    const int ZOOM_TEXT_RECT_OFFSET_X = 30; // zoom label offset from right border
+    const int ZOOM_TEXT_RECT_OFFSET_Y = 20; // zoom label offset from bottom border
 
-    static const int TOAST_TEXT_RECT_OFFSET_X = 30;
-    static const int TOAST_TEXT_RECT_OFFSET_Y = 20;
-    static const int TOAST_TEXT_RECT_HEIGHT = 60;
+    const int TOAST_TEXT_RECT_OFFSET_X = 30;
+    const int TOAST_TEXT_RECT_OFFSET_Y = 20;
+    const int TOAST_TEXT_RECT_HEIGHT = 60;
 
-    static const int PAN_STEP = 48; // number of pixels to pan if pan with cursor keys (SHIFT+up/down/left/right)
+    const int PAN_STEP = 48; // number of pixels to pan if pan with cursor keys (SHIFT+up/down/left/right)
 
-    static const int NO_REQUEST = 1; // used in GotoImage() method
-    static const int NO_REMOVE_KEY_MSG = 2; // used in GotoImage() method
-    static const int KEEP_PARAMETERS = 4; // used in GotoImage() method
-    static const int NO_UPDATE_WINDOW = 8; // used in GotoImage() method
+    const int NO_REQUEST = 1; // used in GotoImage() method
+    const int NO_REMOVE_KEY_MSG = 2; // used in GotoImage() method
+    const int KEEP_PARAMETERS = 4; // used in GotoImage() method
+    const int NO_UPDATE_WINDOW = 8; // used in GotoImage() method
 
-    static const CSize HUGE_SIZE = CSize(99999999, 99999999);
+    const CSize HUGE_SIZE = CSize(99999999, 99999999);
 
     HFONT DefaultGUIFont = NULL;
     HFONT SystemFont = NULL;
     HFONT DefaultZoomFactorFont = NULL;
+
+    typedef const char* (__cdecl* pwine_get_version)(void); // Define function pointer type for wine_get_version
 
     // Errors that occur during loading a file
     enum EFileLoadError {
@@ -71,50 +83,76 @@ namespace {
     // Creates a font from the INI file description:
     // "Font face" fontSizePoints [bold]
     // Returns NULL if default font shall be used
-    static HFONT CreateFontFromINIDescription(HDC dc, LPCTSTR sIniFileDescription)
+    HFONT CreateFontFromINIDescription(HDC dc, const QString& sIniFileDescription)
     {
-        CString sIniDesc(sIniFileDescription);
-        sIniDesc.TrimLeft(); sIniDesc.TrimRight();
+        QString sIniDesc = sIniFileDescription.trimmed();
 
-        CString sFontName;
+        QString sFontName;
         float fFontSize = 9.0f;
         bool isBold = false;
-        if (sIniDesc.CompareNoCase(_T("default")) != 0) {
-            if (sIniDesc.Find(_T(' ')) == -1) {
-                sIniDesc.TrimLeft(_T('"')); sIniDesc.TrimRight(_T('"'));
-                sFontName = sIniDesc;
+
+        if (sIniDesc.compare(QStringLiteral("default"), Qt::CaseInsensitive) != 0) {
+            if (!sIniDesc.contains(QLatin1Char(' '))) {
+                // Entspricht TrimLeft('"') und TrimRight('"')
+                if (sIniDesc.startsWith(QLatin1Char('"')) && sIniDesc.endsWith(QLatin1Char('"'))) {
+                    sFontName = sIniDesc.mid(1, sIniDesc.length() - 2);
+                } else {
+                    sFontName = sIniDesc;
+                }
             } else {
-                TCHAR delimiter = (sIniDesc.GetAt(0) == _T('"')) ? _T('"') : _T(' ');
-                sIniDesc.TrimLeft(_T('"'));
-                if (delimiter != _T('"') && sIniDesc.FindOneOf(_T("0123456789")) == -1) {
+                const QChar delimiter = (sIniDesc.startsWith(QLatin1Char('"'))) ? QLatin1Char('"') : QLatin1Char(' ');
+
+                if (sIniDesc.startsWith(QLatin1Char('"'))) {
+                    sIniDesc.remove(0, 1); // Entspricht TrimLeft('"')
+                }
+
+                // Prüfen, ob Ziffern im String vorkommen (FindOneOf("0123456789"))
+                static const QRegularExpression digitRx(QStringLiteral(R"(\d)"));
+
+                if (delimiter != QLatin1Char('"') && !sIniDesc.contains(digitRx)) {
                     sFontName = sIniDesc;
                 } else {
-                    int indexEndOfFilename = sIniDesc.Find(delimiter);
+                    const int indexEndOfFilename = sIniDesc.indexOf(delimiter);
                     if (indexEndOfFilename < 0) {
                         sFontName = sIniDesc;
                     } else {
-                        sFontName =  sIniDesc.Left(indexEndOfFilename);
-                        sIniDesc = sIniDesc.Mid(indexEndOfFilename + 1);
-                        fFontSize = (float)_ttof(sIniDesc);
-                        if (fFontSize <= 0.0)
-                            fFontSize = 9.0;
-                        fFontSize = std::max(7.0f, std::min(30.0f, fFontSize));
-                        isBold = sIniDesc.Find(_T("bold")) != -1;
+                        sFontName = sIniDesc.left(indexEndOfFilename);
+                        sIniDesc = sIniDesc.mid(indexEndOfFilename + 1);
+
+                        bool ok = false;
+                        // String in float umwandeln (ersetzt _ttof)
+                        fFontSize = sIniDesc.toFloat(&ok);
+                        if (!ok || fFontSize <= 0.0f) {
+                            fFontSize = 9.0f;
+                        }
+                        fFontSize = std::clamp(fFontSize, 7.0f, 30.0f);
+
+                        isBold = sIniDesc.contains(QStringLiteral("bold"), Qt::CaseInsensitive);
                     }
                 }
             }
         }
 
-        if (sFontName.IsEmpty())
-            return (HFONT)NULL;
+        if (sFontName.isEmpty()) {
+            return nullptr;
+        }
 
-        int nHeight = - (int)(0.5f + fFontSize * ::GetDeviceCaps(dc, LOGPIXELSY) / 72);
-        return ::CreateFont(nHeight, 0, 0, 0, isBold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
-                            CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, VARIABLE_PITCH, sFontName);
+        const int nHeight = -static_cast<int>(0.5f + fFontSize * ::GetDeviceCaps(dc, LOGPIXELSY) / 72.0f);
+
+        // CreateFontW explizit mit LPCWSTR aufrufen
+        return ::CreateFontW(
+            nHeight, 0, 0, 0,
+            isBold ? FW_BOLD : FW_NORMAL,
+            FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+            CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+            VARIABLE_PITCH,
+            reinterpret_cast<LPCWSTR>(sFontName.utf16())
+        );
     }
 
     // Gets default image processing parameters as set in INI file
-    static CImageProcessingParams GetDefaultProcessingParams() {
+    CImageProcessingParams GetDefaultProcessingParams() {
         CSettingsProvider& sp = CSettingsProvider::This();
         return CImageProcessingParams(
             sp.Contrast(),
@@ -125,12 +163,12 @@ namespace {
     }
 
     // Gets hardcoded processing parameters, turning off all processing
-    static CImageProcessingParams GetNoProcessingParams() {
+    CImageProcessingParams GetNoProcessingParams() {
         return CImageProcessingParams(0.0, 1.0, 1.0, 0.0, 0.5);
     }
 
     // Gets default image processing flags as set in INI file
-    static EProcessingFlags GetDefaultProcessingFlags() {
+    EProcessingFlags GetDefaultProcessingFlags() {
         CSettingsProvider& sp = CSettingsProvider::This();
         EProcessingFlags eProcFlags = PFLAG_None;
         eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, sp.HighQualityResampling());
@@ -139,7 +177,7 @@ namespace {
     }
 
     // Create processing flags from literal boolean values
-    static EProcessingFlags CreateProcessingFlags(bool bHQResampling, bool bAutoContrast, bool bKeepParams) {
+    EProcessingFlags CreateProcessingFlags(bool bHQResampling, bool bAutoContrast, bool bKeepParams) {
         EProcessingFlags eProcFlags = PFLAG_None;
         eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling, bHQResampling);
         eProcFlags = SetProcessingFlag(eProcFlags, PFLAG_AutoContrast, bAutoContrast);
@@ -148,13 +186,10 @@ namespace {
     }
 
     // Initialize boolean processing values from flag bitfield
-    static void InitFromProcessingFlags(EProcessingFlags eFlags, bool& bHQResampling, bool& bAutoContrast) {
+    void InitFromProcessingFlags(EProcessingFlags eFlags, bool& bHQResampling, bool& bAutoContrast) {
         bHQResampling = GetProcessingFlag(eFlags, PFLAG_HighQualityResampling);
         bAutoContrast = GetProcessingFlag(eFlags, PFLAG_AutoContrast);
     }
-
-    // Define function pointer type for wine_get_version
-    typedef const char* (__cdecl* pwine_get_version)(void);
 
     // If dZoom > 0: Gets the virtual image size when applying the given zoom factor
     // If dZoom < 0: Gets the image size to fit the image to the given screen size, using the given auto zoom mode.
@@ -281,48 +316,55 @@ namespace {
 	}
 
     // Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
-    void DrawImageLoadErrorText(CDC& dc, const CRect& clientRect, LPCTSTR sFailedFileName, int nFileLoadError, int nLoadErrorDetail) {
-        bool bOutOfMemory = nLoadErrorDetail & FileLoad_OutOfMemory;
-        bool bExceptionError = nLoadErrorDetail & FileLoad_ExceptionError;
+    void DrawImageLoadErrorText(CDC& dc, const CRect& clientRect, const QString& failedFileName, int nFileLoadError, int nLoadErrorDetail) {
+        const bool bOutOfMemory = (nLoadErrorDetail & FileLoad_OutOfMemory) != 0;
+        const bool bExceptionError = (nLoadErrorDetail & FileLoad_ExceptionError) != 0;
 
-        const int BUF_LEN = 512;
-        TCHAR buff[BUF_LEN];
-        buff[0] = 0;
-        CRect rectText(0, clientRect.Height()/2 - Helpers::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
+        QString message;
+
         switch (nFileLoadError) {
-        case FileLoad_LoadError:
-            _stprintf_s(buff, BUF_LEN, CNLS::GetString(_T("The file '%s' could not be read!")), sFailedFileName);
-            break;
-        case FileLoad_SlideShowListInvalid:
-            _stprintf_s(buff, BUF_LEN, CNLS::GetString(_T("The file '%s' does not contain a list of file names!")), sFailedFileName);
-            break;
-        case FileLoad_NoFilesInDirectory:
-            _stprintf_s(buff, BUF_LEN, CString(CNLS::GetString(_T("The directory '%s' does not contain any image files!")))  + _T('\n') +
-                                           CNLS::GetString(_T("Press any key to search the subdirectories for image files.")), sFailedFileName);
-            break;
-        default:
-            return;
-        }
-        if (bOutOfMemory) {
-            _tcscat_s(buff, BUF_LEN, _T("\n"));
-            _tcscat_s(buff, BUF_LEN, CString(CNLS::GetString(_T("Reason:"))) + _T(" ") + CNLS::GetString(_T("Not enough memory available")));
-        } else if (nFileLoadError == FileLoad_LoadError) {
-            LPCTSTR sEnding = _tcsrchr(sFailedFileName, _T('.'));
-            if (sEnding != NULL) {
-                sEnding += 1;
-                if (_tcsicmp(sEnding, _T("JXL")) == 0 ||
-                    _tcsicmp(sEnding, _T("HEIF")) == 0 ||
-                    _tcsicmp(sEnding, _T("HEIC")) == 0 ||
-                    _tcsicmp(sEnding, _T("AVIF")) == 0) {
+            case FileLoad_LoadError:
+                message = QStringLiteral("The file '%1' could not be read!").arg(failedFileName);
+                break;
 
-                    if (bExceptionError) {
-                        _tcscat_s(buff, BUF_LEN, _T("\n"));
-                        _tcscat_s(buff, BUF_LEN, CNLS::GetString(_T("Decoding this format requires the Microsoft Visual C++ Redistributable.")));
-                    }
+            case FileLoad_SlideShowListInvalid:
+                message = QStringLiteral("The file '%1' does not contain a list of file names!").arg(failedFileName);
+                break;
+
+            case FileLoad_NoFilesInDirectory:
+                message = QStringLiteral("The directory '%1' does not contain any image files!").arg(failedFileName) +
+                        QLatin1Char('\n') +
+                        QStringLiteral("Press any key to search the subdirectories for image files.");
+                break;
+
+            default:
+                return;
+        }
+
+        if (bOutOfMemory) {
+            message += QLatin1Char('\n');
+            message += QStringLiteral("Reason:") + QLatin1Char(' ') +
+                       QStringLiteral("Not enough memory available");
+        }
+        else if (nFileLoadError == FileLoad_LoadError) {
+            const QString ext = QFileInfo(failedFileName).suffix();
+
+            if (ext.compare(QStringLiteral("JXL"), Qt::CaseInsensitive) == 0 ||
+                ext.compare(QStringLiteral("HEIF"), Qt::CaseInsensitive) == 0 ||
+                ext.compare(QStringLiteral("HEIC"), Qt::CaseInsensitive) == 0 ||
+                ext.compare(QStringLiteral("AVIF"), Qt::CaseInsensitive) == 0) {
+
+                if (bExceptionError) {
+                    message += QLatin1Char('\n');
+                    message += QStringLiteral("Decoding this format requires the Microsoft Visual C++ Redistributable.");
                 }
             }
         }
-        dc.DrawText(buff, -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+
+        CRect rectText(0, clientRect.Height()/2 - Helpers::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
+        dc.DrawText(reinterpret_cast<LPCTSTR>(message.utf16()), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+        //QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), clientRect.height());
+        //painter.drawText(rectText, Qt::AlignHCenter | Qt::TextWordWrap, message);
     }
 
     void SelectDefaultGUIFont(HDC dc) {
@@ -336,7 +378,7 @@ namespace {
 
     void SelectDefaultSystemFont(HDC dc) {
         if (SystemFont == NULL) {
-            SystemFont = CreateFontFromINIDescription(dc, _T("\"Arial\" 12.0 bold"));
+            SystemFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 12.0 bold"));
         }
         ::SelectObject(dc, SystemFont);
     }
@@ -345,7 +387,7 @@ namespace {
         if (DefaultZoomFactorFont == NULL) {
             DefaultZoomFactorFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().ZoomFactorFont());
             if (DefaultZoomFactorFont == NULL)
-                DefaultZoomFactorFont = CreateFontFromINIDescription(dc, _T("\"Arial\" 10.0 bold"));
+                DefaultZoomFactorFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 10.0 bold"));
         }
         ::SelectObject(dc, DefaultZoomFactorFont);
     }
@@ -479,7 +521,7 @@ namespace {
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 CMainDlg::CMainDlg(LPCTSTR sStartupFile) {
-    m_sStartupFile = sStartupFile;
+    m_sStartupFile = QString::fromWCharArray(sStartupFile);
 
     CSettingsProvider& sp = CSettingsProvider::This();
 
@@ -577,7 +619,6 @@ CMainDlg::CMainDlg(LPCTSTR sStartupFile) {
 
     m_eTransparencyMode = sp.TransparencyMode();
     m_bUseEmbeddedColorProfiles = sp.UseEmbeddedColorProfiles();
-    m_strToast = _T("");
 
     /*############################################*/
     /* Custom variables of the linear scaling mod */
@@ -670,7 +711,7 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
     int nFrameIndex = 0;    // Will stay zero if no bookmarks are found.
 
     // [GF] Same code as in OpenFile(). Todo: combine into function?
-    if (!m_sStartupFile.IsEmpty()) {
+    if (!m_sStartupFile.isEmpty()) {
         if (IsBookModeFile(m_sStartupFile)) {
             m_eAutoZoomModeFullscreen = Helpers::ZM_BookMode;
             m_eAutoZoomModeWindowed = Helpers::ZM_BookMode;
@@ -678,22 +719,22 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
                 m_bFullScreenMode = true;
             }
 
-            CString sBookmark = LoadBookmark(m_sStartupFile);
-            if (!sBookmark.IsEmpty()) {
-                std::wregex regexNeedle(_T("^\\d+$"));
-                if (std::regex_match(sBookmark.GetString(), regexNeedle)) {
+            QString sBookmark = LoadBookmark(m_sStartupFile);
+            if (!sBookmark.isEmpty()) {
+                bool isNumeric = false;
+                // Wandelt den String in ein int um und prüft gleichzeitig, ob er ausschließlich eine Zahl ist
+                const int frameNum = sBookmark.toInt(&isNumeric);
+
+                if (isNumeric) {
                     // Bookmark is a pure number, so wasn't derived from a file name but from a container's FrameIndex()
-                    nFrameIndex = _wtoi(sBookmark) - 1;
+                    nFrameIndex = frameNum - 1;
                 } else {
                     // Bookmark point to an image file. Check if exits and ask the user if the launch that instead.
-                            
-                    TCHAR sParentDir[MAX_PATH];
-                    lstrcpy(sParentDir,m_sStartupFile);
-                    PathRemoveFileSpec(sParentDir);
-                    
-                    CString sBookmarkPath = sParentDir + CString(_T("\\")) + sBookmark;
-                    if (::PathFileExists(sBookmarkPath)) {
-                        //m_sStartupFile = sBookmarkPath;
+                    const QString parentDir = QFileInfo(m_sStartupFile).path();
+                    const QString sBookmarkPath = QDir(parentDir).filePath(sBookmark);
+
+                    if (QFileInfo::exists(sBookmarkPath)) {
+                        // m_sStartupFile = sBookmarkPath;
                     }
                 }
             }
@@ -736,12 +777,9 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
     // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
     m_pJPEGProvider = new CJPEGProvider(m_hWnd, NUM_THREADS, nReadAheadBuffers);
 
-    LPCTSTR pRawFileName = m_pFileList->Current();
-    std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
-
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
                                                     CJPEGProvider::FORWARD,
-                                                    strFileName,
+                                                    m_pFileList->Current(),
                                                     nFrameIndex,
                                                     CreateProcessParams(!m_bFullScreenMode),
                                                     m_bOutOfMemoryLastImage,
@@ -802,8 +840,9 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         return 0;
     }
 
-/*GF*/ if (m_DynDwmFlush)
-/*GF*/     m_DynDwmFlush();    // Waits for vsync
+    if (m_DynDwmFlush) {
+        m_DynDwmFlush();    // Waits for vsync
+    }
 
     CPaintDC dc(m_hWnd);
     m_dRealizedZoom = 1.0;
@@ -812,13 +851,6 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 
     CBrush backBrush;
     backBrush.CreateSolidBrush(CSettingsProvider::This().ColorBackground());
-
-#ifdef DEBUG
-    CString a; a.Format(_T("client rect w/h pix: %d %d = %d\n"), m_clientRect.Width(), m_clientRect.Height(), m_clientRect.Width() * m_clientRect.Height());
-    //::OutputDebugString(a);
-#endif
-
-    std::list<CRect> excludedClippingRects;
 
     if (m_pCurrentImage == NULL) {
         dc.FillRect(&m_clientRect, backBrush);
@@ -857,11 +889,10 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         // Paint the DIB
         if (pDIBData != NULL) {
             BITMAPINFO bmInfo{ 0 };
-            CPoint ptDIBStart = DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, m_DIBOffsets);
+            DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, m_DIBOffsets);
         }
-        if (m_bZoomMode) m_offsets = unlimitedOffsets;
 
-        UINT timeNow = Helpers::GetTimeMs();
+        if (m_bZoomMode) m_offsets = unlimitedOffsets;
 
         if (m_bShowInfo) {
             CSettingsProvider& sp = CSettingsProvider::This();
@@ -897,11 +928,10 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
             unsigned int iRealHeight = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigHeight()));
 
             QString infoText;
-            LPCTSTR sFullPath = CurrentFileName(false);
+            QString sFullPath = CurrentFileName(false);
 
-            if (sFullPath != NULL && sFullPath[0] != _T('\0')) {
-                QString sPath = QString::fromWCharArray(sFullPath);
-			    QFileInfo fileInfo(sPath);
+            if (!sFullPath.isEmpty()) {
+                QFileInfo fileInfo(sFullPath);
 				QString sFileSize = FormatFileSize(fileInfo.size());
 					
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
@@ -919,7 +949,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        "Loading Image:  %16 ms\n"
                                        "Scaling Image:  %17 ms"
                                        )
-                                       .arg(sPath)
+                                       .arg(sFullPath)
                                        .arg(m_pCurrentImage->FrameIndex() + 1)
                                        .arg(m_pCurrentImage->NumberOfFrames())
                                        .arg(m_pCurrentImage->FrameTimeMs())
@@ -950,7 +980,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        "Loading Image:  %15 ms\n"
                                        "Scaling Image:  %16 ms"
                                        )
-                                       .arg(sPath)
+                                       .arg(sFullPath)
                                        .arg(m_pCurrentImage->FrameIndex() + 1)
                                        .arg(m_pCurrentImage->NumberOfFrames())
                                        .arg(sFileSize)
@@ -980,7 +1010,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                    "Loading Image:  %13 ms\n"
                                    "Scaling Image:  %14 ms"
                                    )
-                                   .arg(sPath)
+                                   .arg(sFullPath)
                                    .arg(sFileSize)
                                    .arg(m_pCurrentImage->OrigWidth())
                                    .arg(m_pCurrentImage->OrigHeight())
@@ -1047,11 +1077,11 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
         DrawTextBordered(dc, formatOutputZoomFactor(m_dZoom).toStdWString().c_str(), GetZoomTextRect(), DT_RIGHT);
     }
 
-    if (!m_strToast.IsEmpty())
+    if (!m_strToast.isEmpty())
     {
         dc.SetTextColor(CSettingsProvider::This().ColorGUI());
         SelectDefaultSystemFont(dc);
-        DrawTextBordered(dc, m_strToast.GetString(), GetToastTextRect(), DT_RIGHT);
+        DrawTextBordered(dc, reinterpret_cast<LPCTSTR>(m_strToast.utf16()), GetToastTextRect(), DT_RIGHT);
     }
 
     SetCursorForMoveSection();
@@ -1089,7 +1119,7 @@ void CMainDlg::PaintToDC(CDC& dc) {
                 CreateDefaultProcessingFlags());
         if (pDIBData != NULL) {
             BITMAPINFO bmInfo{ 0 };
-            CPoint ptDIBStart = DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, CPoint(0, 0));
+            DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, CPoint(0, 0));
         }
 
         DisplayErrors(pCurrentImage, m_clientRect, dc);
@@ -1103,11 +1133,12 @@ void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const CRect& clientRect,
     }
         
     dc.SetTextColor(CSettingsProvider::This().ColorGUI());
-    if (m_sStartupFile.IsEmpty() && m_pCurrentImage == NULL) {
+    if (m_sStartupFile.isEmpty() && m_pCurrentImage == NULL) {
         CRect rectText(0, clientRect.Height()/2 - Helpers::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
-        dc.DrawText(CString(CNLS::GetString(_T("No image loaded!"))) + _T("\n\n")  + CNLS::GetString(_T("Press ESC to exit...")), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
+        QString message = QStringLiteral("No image loaded!\n\nPress ESC to exit...");
+        dc.DrawText(reinterpret_cast<LPCWSTR>(message.utf16()), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
     } else if (pCurrentImage == NULL) {
-        CString sFileName;
+        QString sFileName;
         if (m_nLastLoadError == FileLoad_SlideShowListInvalid) {
             sFileName = m_sStartupFile;
         } else if (m_nLastLoadError == FileLoad_NoFilesInDirectory) {
@@ -1168,54 +1199,60 @@ LRESULT CMainDlg::OnGetMinMaxInfo(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lPara
 // The hidden assumption being that if the WM_COPYDATA came from newly launched instance, that instance will,
 // upon receiving KEY_MAGIC, dutifully close itself, since we answered it "I got this" by returning KEY_MAGIC.
 // If we return NULL, the new instance is free to do as it pleases and show the image itself or whatever.
+#include <QString>
+#include <QFileInfo>
+#include <QtGlobal>
+
 LRESULT CMainDlg::OnAnotherInstanceStarted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& bHandled) {
     bHandled = FALSE;
-    COPYDATASTRUCT* pData = (COPYDATASTRUCT*)lParam;
+    auto* pData = reinterpret_cast<COPYDATASTRUCT*>(lParam);
 
-    if (pData != NULL) {
+    if (pData != nullptr) {
         if (pData->dwData == KEY_MAGIC && pData->cbData > 0) {
             bool bSameImageFolder = false;
-            CString sCopyDataFile = CString((LPCTSTR)pData->lpData, pData->cbData / sizeof(TCHAR) - 1);
 
+            // Puffer aus COPYDATASTRUCT in QString umwandeln (Länge in Anzahl wchar_t/TCHAR)
+            const auto* pWCharData = static_cast<const wchar_t*>(pData->lpData);
+            const int charCount = static_cast<int>((pData->cbData / sizeof(wchar_t)) - 1);
+            const QString sCopyDataFile = QString::fromWCharArray(pWCharData, charCount);
 
-            LPCTSTR sCurrentFile = CurrentFileName(false);
-            
-            if (sCurrentFile != NULL) {
+            const QString sCurrentFile = CurrentFileName(false);
+
+            if (!sCurrentFile.isEmpty()) {
                 if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-                    if (lstrcmpi(sCopyDataFile, sCurrentFile) == 0) {
-                        // Same comic book archive. Don't do anything, but tell the new instance we are handling it anyway
-                        // Reason: We don't want the same book to be opened twice (this would cause unpredictable bookmark behaviour)
+                    if (sCopyDataFile.compare(sCurrentFile, Qt::CaseInsensitive) == 0) {
+                        // Gleiches Comic-Archiv. Nichts tun, aber der neuen Instanz mitteilen,
+                        // dass wir es verarbeiten (verhindert doppeltes Öffnen desselben Buchs).
                         bHandled = TRUE;
                         this->ShowWindow(SW_RESTORE);
                         SetForegroundWindow(m_hWnd);
                         return KEY_MAGIC;
                     } else {
-                        // Different comic book archive. We won't handle that. We already have one open. Let the other instance open it.
+                        // Anderes Comic-Archiv: Nicht verarbeiten, damit die andere Instanz es öffnet.
                         return 0;
                     }
                 } else {
-                    TCHAR sCopyDataPath[MAX_PATH];
-                    lstrcpy(sCopyDataPath,sCopyDataFile);
-                    PathRemoveFileSpec(sCopyDataPath);
+                    // Verzeichnisse mit QFileInfo vergleichen (vollständig ohne PathRemoveFileSpec / TCHAR)
+                    const QString copyDataPath = QFileInfo(sCopyDataFile).path();
+                    const QString currentPath  = QFileInfo(sCurrentFile).path();
 
-                    TCHAR sCurrentPath[MAX_PATH];
-                    lstrcpy(sCurrentPath,sCurrentFile);
-                    PathRemoveFileSpec(sCurrentPath);    
-
-                    bSameImageFolder = (lstrcmpi(sCopyDataPath, sCurrentPath) == 0);
+                    bSameImageFolder = (copyDataPath.compare(currentPath, Qt::CaseInsensitive) == 0);
                 }
             }
 
-            if ((sCurrentFile == NULL) || (m_bFullScreenMode && CSettingsProvider::This().SingleFullScreenInstance()) || (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_Always) || ((CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_PerFolder) && bSameImageFolder)) {
-                m_sStartupFile = sCopyDataFile;
+            const bool bNoCurrentFile = sCurrentFile.isEmpty();
+            const bool bSingleFullScreen = m_bFullScreenMode && CSettingsProvider::This().SingleFullScreenInstance();
+            const bool bSingleInstanceAlways = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_Always);
+            const bool bSingleInstancePerFolder = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_PerFolder) && bSameImageFolder;
 
+            if (bNoCurrentFile || bSingleFullScreen || bSingleInstanceAlways || bSingleInstancePerFolder) {
+                m_sStartupFile = sCopyDataFile;
 
                 ::PostMessage(m_hWnd, WM_LOAD_FILE_ASYNCH, 0, KEY_MAGIC);
                 bHandled = TRUE;
                 this->ShowWindow(SW_RESTORE);
                 SetForegroundWindow(m_hWnd);
                 return KEY_MAGIC;
-            } else {
             }
         }
     }
@@ -1228,11 +1265,7 @@ LRESULT CMainDlg::OnLoadFileAsynch(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lPar
         StopMovieMode();
         StopAnimation();
         MouseOn();
-        if (m_sStartupFile.IsEmpty()) {
-            OpenFile(nullptr, false);
-        } else {
-            OpenFile(m_sStartupFile, false);
-        }
+        OpenFile(m_sStartupFile, false);
     }
     return 0;
 }
@@ -1504,7 +1537,7 @@ LRESULT CMainDlg::OnKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOOL& /
     bool bAlt = (::GetKeyState(VK_MENU) & 0x8000) != 0;
 
     //bool bHandled = false;
-    if (!bCtrl && wParam != VK_ESCAPE && m_nLastLoadError == FileLoad_NoFilesInDirectory && !m_sStartupFile.IsEmpty()) {
+    if (!bCtrl && wParam != VK_ESCAPE && m_nLastLoadError == FileLoad_NoFilesInDirectory && !m_sStartupFile.isEmpty()) {
         // search in subfolders if initial directory has no images
         //bHandled = true;
         m_pFileList->SetNavigationMode(Helpers::NM_LoopSubDirectories);
@@ -1589,7 +1622,7 @@ LRESULT CMainDlg::OnDropFiles(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, B
             if (::GetFileAttributes(buff) & FILE_ATTRIBUTE_DIRECTORY) {
                 _tcsncat_s(buff, BUFF_SIZE, _T("\\"), BUFF_SIZE);
             }
-            OpenFile(buff, false);
+            OpenFile(QString::fromWCharArray(buff), false);
         }
         ::DragFinish(hDrop);
     }
@@ -1976,34 +2009,33 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_COPY:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CopyImageToClipboard(this->m_hWnd, m_pCurrentImage, m_pFileList->Current());
+                CClipboard::CopyImageToClipboard(this->m_hWnd, m_pCurrentImage, reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
             }
             break;
         case IDM_COPY_FULL:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CopyFullImageToClipboard(this->m_hWnd, m_pCurrentImage, *m_pImageProcParams, CreateDefaultProcessingFlags(), m_pFileList->Current());
+                CClipboard::CopyFullImageToClipboard(this->m_hWnd, m_pCurrentImage, *m_pImageProcParams, CreateDefaultProcessingFlags(), reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
                 this->Invalidate(FALSE);
             }
             break;
         case IDM_COPY_PATH:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CopyPathToClipboard(this->m_hWnd, m_pCurrentImage, m_pFileList->Current());
+                CClipboard::CopyPathToClipboard(this->m_hWnd, m_pCurrentImage, reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
             }
             break;
         case IDM_CUT_FILE:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CutFileToClipboard(this->m_hWnd, m_pFileList->Current());
+                CClipboard::CutFileToClipboard(this->m_hWnd, reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
             }
             break;
         case IDM_DELETE_FILE:
             MouseOn();
             if (m_pCurrentImage != NULL && m_pFileList != NULL) {
-                LPCTSTR pRawFileName = CurrentFileName(false);
-                if (pRawFileName == nullptr || pRawFileName[0] == _T('\0')) {
+                QString currentFileName = CurrentFileName(false);
+                if (currentFileName.isEmpty()) {
                     break;
                 }
 
-                QString currentFileName = QString::fromWCharArray(pRawFileName);
                 bool allowDelete = false;
 
                 Helpers::EDeleteConfirmation confirmationPolicy = CSettingsProvider::This().DeleteConfirmation();
@@ -2039,8 +2071,11 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                         GotoImage(POS_Current);
                     } else {
                         Invalidate();
-                        if (m_pFileList->Current() == NULL) GotoImage(POS_First);
-                        else GotoImage(POS_Previous);
+                        if (m_pFileList->Current().isEmpty()) {
+                            GotoImage(POS_First);
+                        } else {
+                            GotoImage(POS_Previous);
+                        }
                     }
                 }
             }
@@ -2061,28 +2096,28 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             GotoImage(POS_Previous);
             break;
         case IDM_FIRST:
-            SetToast(_T("Jump: First image"));
+            SetToast(QStringLiteral("Jump: First image"));
             GotoImage(POS_First);
             break;
         case IDM_LAST:
-            SetToast(_T("Jump: Last image"));
+            SetToast(QStringLiteral("Jump: Last image"));
             GotoImage(POS_Last);
             break;
         case IDM_PLAYPAUSE:
             if (m_bIsAnimationPlaying) {
-                SetToast(_T("Animation Paused"));
+                SetToast(QStringLiteral("Animation Paused"));
                 StopAnimation(); // stop any running animation
             } else if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
-                SetToast(_T("Animation Continued"));
+                SetToast(QStringLiteral("Animation Continued"));
                 StartAnimation();
             }
             break;
         case IDM_PLAYPAUSENEXT:
             if (m_bIsAnimationPlaying) {
-                SetToast(_T("Animation Paused"));
+                SetToast(QStringLiteral("Animation Paused"));
                 StopAnimation(); // stop any running animation
             } else if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
-                SetToast(_T("Animation Continued"));
+                SetToast(QStringLiteral("Animation Continued"));
                 StartAnimation();
             } else {
                 GotoImage(POS_Next);
@@ -2121,14 +2156,13 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             m_pFileList->SetSorting(m_pFileList->GetSorting(), nCommand == IDM_SORT_ASCENDING);
             break;
         case IDM_STOP_MOVIE:
-            SetToast(_T("Slideshow Paused"));
+            SetToast(QStringLiteral("Slideshow Paused"));
             StopMovieMode();
             break;
         case IDM_SLIDESHOW_RESUME:
             {
-            TCHAR sToastText[1024];
-            swprintf(sToastText,1024,TEXT("Slideshow Resumed (Timer %d s)"), (int)(1.0/m_dMovieFPS));
-            SetToast(sToastText);
+            const int timerSec = static_cast<int>(1.0 / m_dMovieFPS);
+            SetToast(QStringLiteral("Slideshow Resumed (Timer %1 s)").arg(timerSec));
             StartMovieMode(m_dMovieFPS);
             }
             break;
@@ -2145,20 +2179,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
         case IDM_SLIDESHOW_20:
             {
             int nValue = nCommand - IDM_SLIDESHOW_START;
-            /*
-            bool bCtrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
-            bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
-            if (bCtrl && bShift) {
-                nValue *= 10; // 1/100 seconds
-            } else if (bCtrl) {
-                nValue *= 100; // 1/10 seconds
-            } else {
-                nValue *= 1000; // seconds
-            }
-            */
-            TCHAR sToastText[1024];
-            swprintf(sToastText,1024,TEXT("Starting Slideshow (Timer %d s)"), nValue);
-            SetToast(sToastText);
+            SetToast(QStringLiteral("Starting Slideshow (Timer %d s)").arg(nValue));
             StartMovieMode(1.0/nValue);
             }
             break;
@@ -2195,23 +2216,25 @@ void CMainDlg::ExecuteCommand(int nCommand) {
         case IDM_MOVIE_60_FPS:
         case IDM_MOVIE_100_FPS:
             {
-                TCHAR sToastText[1024];
-                int nValue = nCommand - IDM_MOVIE_START_FPS;
+                QString toastText;
+                const int nValue = nCommand - IDM_MOVIE_START_FPS;
 
-                if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
-                    
-                    if (m_customAnimationFrameTime == 1000/nValue) {
+                if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation()) {
+                    const int targetFrameTime = 1000 / nValue;
+
+                    if (m_customAnimationFrameTime == targetFrameTime) {
                         m_customAnimationFrameTime = 1000;
-                        swprintf(sToastText,1024,TEXT("Default Playback Speed: %d fps"), 1000 / m_pCurrentImage->FrameTimeMs());
+                        const int defaultFps = 1000 / m_pCurrentImage->FrameTimeMs();
+                        toastText = QStringLiteral("Default Playback Speed: %1 fps").arg(defaultFps);
                     } else {
-                        m_customAnimationFrameTime = 1000/nValue;
-                        swprintf(sToastText,1024,TEXT("Custom Playback Speed: %d fps"), nValue);
+                        m_customAnimationFrameTime = targetFrameTime;
+                        toastText = QStringLiteral("Custom Playback Speed: %1 fps").arg(nValue);
                     }
-                    SetToast(sToastText);
+                    SetToast(toastText);
                 } else {
-                    swprintf(sToastText,1024,TEXT("Starting Playback (%d fps)"), nValue);
-                    SetToast(sToastText);
-                    StartMovieMode(nCommand - IDM_MOVIE_START_FPS);
+                    toastText = QStringLiteral("Starting Playback (%1 fps)").arg(nValue);
+                    SetToast(toastText);
+                    StartMovieMode(nValue);
                 }
             }
             break;
@@ -2238,7 +2261,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_AUTO_CORRECTION:
             m_bAutoContrast = !m_bAutoContrast;
-            SetToast(m_bAutoContrast? _T("Auto Contrast: ON") : _T("Auto Contrast: OFF"));
+            SetToast(m_bAutoContrast ? QStringLiteral("Auto Contrast: ON") : QStringLiteral("Auto Contrast: OFF"));
             this->Invalidate(FALSE);
             break;
         case IDM_KEEP_PARAMETERS:
@@ -2269,9 +2292,9 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             // which changes the view size only for the current image.
                 bool bIsBookModeFile = false;
                 Helpers::EAutoZoomMode eAutoZoomMode = Helpers::ZM_FitToScreen;
-                LPCTSTR sFilePath = CurrentFileName(false);
+                QString sFilePath = CurrentFileName(false);
 
-                if (sFilePath != NULL) {
+                if (!sFilePath.isEmpty()) {
                     if (IsBookModeFile(sFilePath)) {
                         bIsBookModeFile = true;
                     }
@@ -2429,7 +2452,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_ALWAYS_ON_TOP:
             ToggleAlwaysOnTop();
-            SetToast(m_bAlwaysOnTop? _T("Always on Top: enabled"): _T("Always on Top: disabled"));
+            SetToast(m_bAlwaysOnTop? QStringLiteral("Always on Top: enabled") : QStringLiteral("Always on Top: disabled"));
             break;
         case IDM_FIT_WINDOW_TO_IMAGE:
             // Note: If auto fit is on but the window size does not match the image size (due to manual window resizing), restore window to image
@@ -2490,14 +2513,15 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 if (m_bAutoExit) {
                     CleanupAndTerminate();
                 } else {
-                    SetToast(_T("Slideshow Paused"));
+                    SetToast(QStringLiteral("Slideshow Paused"));
+
                     StopMovieMode(); // stop any running movie/slideshow
                 }
             } else if (m_bIsAnimationPlaying) {
                 if (m_bAutoExit) {
                     CleanupAndTerminate();
                 } else {
-                    SetToast(_T("Animation Paused"));
+                    SetToast(QStringLiteral("Animation Paused"));
                     StopAnimation(); // stop any running animation
                 }
             } else if (m_bShowInfo == true) {
@@ -2529,17 +2553,17 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             if (m_eTransparencyMode == Helpers::TP_BLEND)
             {
                 m_eTransparencyMode = Helpers::TP_CHECKERBOARD;
-                SetToast(_T("Transparency: Checkerboard"));
+                SetToast(QStringLiteral("Transparency: Checkerboard"));
             }
             else if (m_eTransparencyMode == Helpers::TP_CHECKERBOARD)
             {
                 m_eTransparencyMode = Helpers::TP_BLEND_INVERSE;
-                SetToast(_T("Transparency: Inverse Blend"));
+                SetToast(QStringLiteral("Transparency: Inverse Blend"));
             }
             else //if (m_eTransparencyMode == Helpers::TP_BLEND_INVERSE)
             {
                 m_eTransparencyMode = Helpers::TP_BLEND;
-                SetToast(_T("Transparency: Blend"));
+                SetToast(QStringLiteral("Transparency: Blend"));
             }
             m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
             m_pJPEGProvider->ClearAllRequests();
@@ -2550,9 +2574,9 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             m_bUseEmbeddedColorProfiles = !m_bUseEmbeddedColorProfiles;
             CSettingsProvider::This().SetUseEmbeddedColorProfiles(m_bUseEmbeddedColorProfiles);
             if (m_bUseEmbeddedColorProfiles == false) {
-                SetToast(_T("Embedded Color Profiles: ignored"));
+                SetToast(QStringLiteral("Embedded Color Profiles: ignored"));
             } else {
-                SetToast(_T("Embedded Color Profiles: used"));
+                SetToast(QStringLiteral("Embedded Color Profiles: used"));
             }
             m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
             m_pJPEGProvider->ClearAllRequests();
@@ -2561,7 +2585,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_TOGGLE_RESAMPLING_QUALITY:
             m_bHQResampling = !m_bHQResampling;
-            SetToast(m_bHQResampling? _T("Resampling: enabled"): _T("Resampling: disabled"));
+            SetToast(m_bHQResampling? QStringLiteral("Resampling: enabled"): QStringLiteral("Resampling: disabled"));
             this->Invalidate(FALSE);
             break;
         case IDM_TOGGLE_MONITOR:
@@ -2698,189 +2722,125 @@ void CMainDlg::ExecuteCommand(int nCommand) {
 }
 
 void CMainDlg::ChangeFolderLanguage() {
-    LPCTSTR sCurrentFileName = CurrentFileName(false);
-    if (sCurrentFileName != NULL) {
-        TCHAR sFullPath[MAX_PATH];
-        lstrcpy(sFullPath,sCurrentFileName);
-        
-        TCHAR sFNameNoExt[MAX_PATH];
-        _wsplitpath(sFullPath,NULL,NULL,sFNameNoExt,NULL);
+    const QString sCurrentFileName = CurrentFileName(false);
+    if (sCurrentFileName.isEmpty()) {
+        return;
+    }
 
-        TCHAR sParentDir[MAX_PATH];
-        lstrcpy(sParentDir,sFullPath);
-        PathRemoveFileSpec(sParentDir);
+    const QFileInfo fileInfo(sCurrentFileName);
+    const QString fileNameNoExt = fileInfo.completeBaseName(); // Dateiname ohne Endung
+    const QDir parentDir = fileInfo.dir();                    // Übergeordneter Ordner
 
-        TCHAR sParentDir2[MAX_PATH];
-        lstrcpy(sParentDir2,sParentDir);
-        PathRemoveFileSpec(sParentDir2);
+    QDir parentDir2 = parentDir;
+    parentDir2.cdUp();                                        // Ein Verzeichnis höher
 
-        TCHAR sParentDirName[MAX_PATH];
-        lstrcpy(sParentDirName,sParentDir);
-        PathStripPath(sParentDirName);
+    const QString parentDirName = parentDir.dirName();
 
-        TCHAR sTestFile[MAX_PATH] = TEXT("");
-        TCHAR sTestPath[MAX_PATH] = TEXT("");
-        TCHAR sTargetFile[MAX_PATH] = TEXT("");
-        BOOL bMatchFound=FALSE;
+    // 2. Sprach-Tags
+    static const QList<QString> langTags = { QStringLiteral("en"), QStringLiteral("de"), QStringLiteral("ch"), QStringLiteral("ko") };
 
-        std::wstring wexpr = TEXT("^(.+)\\s+\\[(en|de|ch|ko)\\]$");
-        std::wregex we(wexpr);
-        std::wsmatch wsMatch;
-        std::wstring wtest = sParentDirName;
-        if(std::regex_search(wtest, wsMatch, we)) {
-            // wsMatch.str(1).c_str()    contains the release title without language tag
-            // wsMatch.str(2).c_str()    contains the language tag without brackets
-            
-            
-            if (lstrcmpi(wsMatch.str(2).c_str(),TEXT("en")) == 0) {
-                //::OutputDebugStringW(TEXT("A1a"));
-                wsprintf(sTestPath,TEXT("%s\\%s [de]"),sParentDir2,wsMatch.str(1).c_str());
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("A1b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
-            }
+    // Regex: Erkennt Muster wie "Ordnername [de]"
+    static const QRegularExpression rx(QStringLiteral(R"(^(.+)\s+\[(en|de|ch|ko)\]$)"));
+    const QRegularExpressionMatch match = rx.match(parentDirName);
 
-            if ((bMatchFound==FALSE) || (lstrcmpi(wsMatch.str(2).c_str(),TEXT("de")) == 0)) {
-                //::OutputDebugStringW(TEXT("A2a"));
-                wsprintf(sTestPath,TEXT("%s\\%s [ch]"),sParentDir2,wsMatch.str(1).c_str());
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("A2b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
-            }
+    QString baseFolder;
+    QString currentLang;
 
-            if ((bMatchFound==FALSE) || (lstrcmpi(wsMatch.str(2).c_str(),TEXT("ch")) == 0)) {
-                //::OutputDebugStringW(TEXT("A3a"));
-                wsprintf(sTestPath,TEXT("%s\\%s [ko]"),sParentDir2,wsMatch.str(1).c_str());
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("A3b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
-            }
+    if (match.hasMatch()) {
+        baseFolder = match.captured(1);
+        currentLang = match.captured(2);
+    } else {
+        baseFolder = parentDirName;
+    }
 
-            if ((bMatchFound==FALSE) || (lstrcmpi(wsMatch.str(2).c_str(),TEXT("ko")) == 0)) {
-                //::OutputDebugStringW(TEXT("A4a"));
-                wsprintf(sTestPath,TEXT("%s\\%s"),sParentDir2,wsMatch.str(1).c_str());
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("A4b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
-            }
+    // 3. Relevante Sprachen/Ordner in Suchreihenfolge ermitteln
+    QList<QString> searchLangs;
 
-            if (bMatchFound==FALSE) {
-                //::OutputDebugStringW(TEXT("A5a"));
-                wsprintf(sTestPath,TEXT("%s\\%s [en]"),sParentDir2,wsMatch.str(1).c_str());
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("A5b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
-            }
-        } else {
-            //::OutputDebugStringW(TEXT("B1a"));
-            wsprintf(sTestPath,TEXT("%s\\%s [en]"),sParentDir2,sParentDirName);
-            if (::PathFileExists(sTestPath)) {
-                //::OutputDebugStringW(TEXT("B1b"));
-                wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                bMatchFound = TRUE;
-            }
-            
-            if (bMatchFound==FALSE) {
-                //::OutputDebugStringW(TEXT("B2a"));
-                wsprintf(sTestPath,TEXT("%s\\%s [de]"),sParentDir2,sParentDirName);
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("B2b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
-            }
-
-            if (bMatchFound==FALSE) {
-                //::OutputDebugStringW(TEXT("B3a"));
-                wsprintf(sTestPath,TEXT("%s\\%s [ch]"),sParentDir2,sParentDirName);
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("B3b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
-            }
-
-            if (bMatchFound==FALSE) {
-                //::OutputDebugStringW(TEXT("B4a"));
-                wsprintf(sTestPath,TEXT("%s\\%s [ko]"),sParentDir2,sParentDirName);
-                if (::PathFileExists(sTestPath)) {
-                    //::OutputDebugStringW(TEXT("B4b"));
-                    wsprintf(sTestFile,TEXT("%s\\%s"),sTestPath,sFNameNoExt);
-                    bMatchFound = TRUE;
-                }
+    if (!currentLang.isEmpty()) {
+        // Fall A: Ordner hat bereits ein Sprach-Tag -> Nächste Sprachen rotieren
+        const int currentIndex = langTags.indexOf(currentLang);
+        if (currentIndex != -1) {
+            for (int i = 1; i <= langTags.size(); ++i) {
+                searchLangs.append(langTags[(currentIndex + i) % langTags.size()]);
             }
         }
+        // Zuletzt den Ordner OHNE Tag prüfen
+        searchLangs.append(QString());
+    } else {
+        // Fall B: Ordner hat kein Tag -> Versuche der Reihe nach [en], [de], [ch], [ko]
+        searchLangs = langTags;
+    }
 
-        if (bMatchFound==TRUE) {
-            //::OutputDebugStringW(TEXT("C1"));
+    // 4. Zielordner suchen
+    QString targetFileBasePath;
 
-            wsprintf(sTargetFile,TEXT("%s.jpg"),sTestFile);
-            if (::PathFileExists(sTargetFile)) {
-                OpenFile(sTargetFile,false);
-            } else {
-                wsprintf(sTargetFile,TEXT("%s.png"),sTestFile);
-                if (::PathFileExists(sTargetFile)) {
-                    OpenFile(sTargetFile,false);
-                } else {
-                    wsprintf(sTargetFile,TEXT("%s.jpeg"),sTestFile);
-                    if (::PathFileExists(sTargetFile)) {
-                        OpenFile(sTargetFile,false);
-                    } else {
-                        wsprintf(sTargetFile,TEXT("%s.bmp"),sTestFile);
-                        if (::PathFileExists(sTargetFile))
-                            OpenFile(sTargetFile,false);
-                    }
-                }
+    for (const QString& lang : std::as_const(searchLangs)) {
+        const QString testFolderName = lang.isEmpty()
+            ? baseFolder
+            : QStringLiteral("%1 [%2]").arg(baseFolder, lang);
+
+        const QDir testDir(parentDir2.filePath(testFolderName));
+
+        if (testDir.exists()) {
+            targetFileBasePath = testDir.filePath(fileNameNoExt);
+            break;
+        }
+    }
+
+    // 5. Bilddatei mit passender Endung suchen
+    if (!targetFileBasePath.isEmpty()) {
+        static constexpr std::array<QLatin1StringView, 4> extensions = {
+            QLatin1StringView(".jpg"),
+            QLatin1StringView(".png"),
+            QLatin1StringView(".jpeg"),
+            QLatin1StringView(".bmp")
+        };
+
+        for (const auto& ext : extensions) {
+            const QString candidatePath = targetFileBasePath + ext;
+            if (QFileInfo::exists(candidatePath)) {
+                OpenFile(candidatePath, false);
+                break;
             }
         }
     }
 }
 
 void CMainDlg::OpenDefaultEditor() {
-    LPCTSTR sCurrentFileName = CurrentFileName(false);
-    if (sCurrentFileName != NULL) {
-        if (m_bFullScreenMode) {
-            m_bFullScreenMode = !m_bFullScreenMode;
-            CRect windowRect;
-            this->SetWindowLongW(GWL_STYLE, this->GetWindowLongW(GWL_STYLE) | WS_OVERLAPPEDWINDOW | WS_VISIBLE);
-            if (::IsRectEmpty(&(m_storedWindowPlacement2.rcNormalPosition))) {
-                // never set to window mode before, use default position
-                windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
-                this->SetWindowPos(HWND_TOP, windowRect.left, windowRect.top, windowRect.Width(), windowRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
-            } else {
-                m_storedWindowPlacement2.flags = this->SetWindowPlacement(&m_storedWindowPlacement2);
-            }
-            this->MouseOn();
+    const QString sCurrentFileName = CurrentFileName(false);
+    if (sCurrentFileName.isEmpty()) {
+        return;
+    }
 
-            m_dZoom = -1;
-            m_bInZooming = true;
-            StartLowQTimer(ZOOM_TIMEOUT);
-            this->SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_FRAMECHANGED);
+    if (m_bFullScreenMode) {
+        m_bFullScreenMode = !m_bFullScreenMode;
+        CRect windowRect;
+        this->SetWindowLongW(GWL_STYLE, this->GetWindowLongW(GWL_STYLE) | WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+        if (::IsRectEmpty(&(m_storedWindowPlacement2.rcNormalPosition))) {
+            // never set to window mode before, use default position
+            windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
+            this->SetWindowPos(HWND_TOP, windowRect.left, windowRect.top, windowRect.Width(), windowRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
+        } else {
+            m_storedWindowPlacement2.flags = this->SetWindowPlacement(&m_storedWindowPlacement2);
         }
+        this->MouseOn();
 
-        if (m_bIsRunningInWine) {
-            CString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
+        m_dZoom = -1;
+        m_bInZooming = true;
+        StartLowQTimer(ZOOM_TIMEOUT);
+        this->SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_FRAMECHANGED);
+    }
 
-            if (!sUnixPath.IsEmpty()) {
-                CString sParams;
-                sParams.Format(_T("/unix /usr/bin/gimp \"%s\""), (LPCTSTR)sUnixPath);
+    if (m_bIsRunningInWine) {
+        QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
 
-                ::ShellExecute(m_hWnd, NULL, _T("start.exe"), sParams, NULL, SW_SHOW);
-            }
+        if (!sUnixPath.isEmpty()) {
+            const QString sParams = QStringLiteral("/unix /usr/bin/gimp \"%1\"").arg(sUnixPath);
+            ::ShellExecuteW(m_hWnd, nullptr, L"start.exe", reinterpret_cast<LPCWSTR>(sParams.utf16()), nullptr, SW_SHOW );
         }
-        else {
-            ::ShellExecute(m_hWnd, _T("edit"), sCurrentFileName, NULL, NULL, SW_SHOW);
-        }
+    }
+    else {
+        ::ShellExecuteW(m_hWnd, _T("edit"), reinterpret_cast<LPCWSTR>(sCurrentFileName.utf16()), NULL, NULL, SW_SHOW);
     }
 }
 
@@ -2896,43 +2856,46 @@ LONG CMainDlg::SetCurrentWindowStyle() {
 }
 
 void CMainDlg::ExploreFile() {
-    LPCTSTR sCurrentFileName = CurrentFileName(false);
-    if (sCurrentFileName != NULL) {
-        if (m_bIsRunningInWine) {
-            CString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
-            if (!sUnixPath.IsEmpty()) {
-                CString sParams;
 
-                if (IsLinuxBinaryAvailable(_T("~/.local/bin/mkFolderWidget"))) {
-                    sParams.Format(_T("/unix /bin/sh -c \"mkFolderWidget -f \\\"%s\\\"\""), (LPCTSTR)sUnixPath);
-                    ::ShellExecute(m_hWnd, NULL, _T("start.exe"), sParams, NULL, SW_SHOW);
-                }
-                else if (IsLinuxBinaryAvailable(_T("/usr/bin/dolphin"))) {
-                    sParams.Format(_T("/unix /usr/bin/dolphin --new-window --select \"%s\""), (LPCTSTR)sUnixPath);
-                    ::ShellExecute(m_hWnd, NULL, _T("start.exe"), sParams, NULL, SW_SHOW);
-                }
-                else {
-                    CString sFolderPath = sCurrentFileName;
-                    int nPos = sFolderPath.ReverseFind(_T('\\'));
-                    if (nPos != -1) {
-                        sFolderPath = sFolderPath.Left(nPos);
-                    }
-                    ::ShellExecute(m_hWnd, NULL, _T("winebrowser.exe"), sFolderPath, NULL, SW_SHOW);
-                }
+    const QString sCurrentFileName = CurrentFileName(false);
+    if (sCurrentFileName.isEmpty()) {
+        return;
+    }
+
+    if (m_bIsRunningInWine) {
+        // GetUnixPathFromWine nimmt nun direkt QString entgegen
+        const QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
+
+        if (!sUnixPath.isEmpty()) {
+            QString sParams;
+
+            if (IsLinuxBinaryAvailable(QStringLiteral("~/.local/bin/mkFolderWidget"))) {
+                sParams = QStringLiteral("/unix /bin/sh -c \"mkFolderWidget -f \\\"%1\\\"\"").arg(sUnixPath);
+                ::ShellExecute(m_hWnd, nullptr, TEXT("start.exe"), reinterpret_cast<LPCWSTR>(sParams.utf16()), nullptr, SW_SHOW);
+            }
+            else if (IsLinuxBinaryAvailable(QStringLiteral("/usr/bin/dolphin"))) {
+                sParams = QStringLiteral("/unix /usr/bin/dolphin --new-window --select \"%1\"").arg(sUnixPath);
+                ::ShellExecute(m_hWnd, nullptr, TEXT("start.exe"), reinterpret_cast<LPCWSTR>(sParams.utf16()), nullptr, SW_SHOW);
+            }
+            else {
+                // Ordnerpfad mit QFileInfo::path() ermitteln (erzielt denselben Effekt wie ReverseFind('\\') + Left)
+                const QString sFolderPath = QFileInfo(sCurrentFileName).path();
+
+                ::ShellExecute(m_hWnd, nullptr, TEXT("winebrowser.exe"), reinterpret_cast<LPCWSTR>(sFolderPath.utf16()), nullptr, SW_SHOW);
             }
         }
-        else {
-            PIDLIST_ABSOLUTE pidl = ILCreateFromPath(CurrentFileName(false));
-            if (pidl != nullptr) {
-                // https://docs.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shopenfolderandselectitems
-                SHOpenFolderAndSelectItems(pidl, 0, 0, 0);
-                ILFree(pidl);
-            }
+    }
+    else {
+        PIDLIST_ABSOLUTE pidl = ILCreateFromPath(reinterpret_cast<LPCWSTR>(CurrentFileName(false).utf16()));
+        if (pidl != nullptr) {
+            // https://docs.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shopenfolderandselectitems
+            SHOpenFolderAndSelectItems(pidl, 0, 0, 0);
+            ILFree(pidl);
         }
     }
 }
 
-void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
+void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
     StopMovieMode();
     StopAnimation();
 
@@ -2946,26 +2909,26 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
 
     // [GF] Recognize Book type sources & load bookmark and adjust zoom mode accordingly.
     int nFrameIndex = 0;
-    if (sFileName != NULL) {
-        if (IsBookModeFile(sFileName)) {
+    if (!fileName.isEmpty()) {
+        if (IsBookModeFile(fileName)) {
             m_eAutoZoomModeFullscreen = Helpers::ZM_BookMode;
             m_eAutoZoomModeWindowed = Helpers::ZM_BookMode;
 
-            CString sBookmark = LoadBookmark(sFileName);
-            if (!sBookmark.IsEmpty()) {
-                std::wregex regexNeedle(_T("^\\d+$"));
-                if (std::regex_match(sBookmark.GetString(), regexNeedle)) {
+            const QString sBookmark = LoadBookmark(fileName);
+            if (!sBookmark.isEmpty()) {
+                bool isNumeric = false;
+                // Wandelt den String in ein int um und prüft gleichzeitig, ob er ausschließlich eine Zahl ist
+                const int frameNum = sBookmark.toInt(&isNumeric);
+
+                if (isNumeric) {
                     // Bookmark is a pure number, so wasn't derived from a file name but from a container's FrameIndex()
-                    nFrameIndex = _wtoi(sBookmark) - 1;
+                    nFrameIndex = frameNum - 1;
                 } else {
                     // Bookmark point to an image file. Check if exits and ask the user if the launch that instead.
-                            
-                    TCHAR sParentDir[MAX_PATH];
-                    lstrcpy(sParentDir,sFileName);
-                    PathRemoveFileSpec(sParentDir);
-                    
-                    CString sBookmarkPath = sParentDir + CString(_T("\\")) + sBookmark;
-                    if (::PathFileExists(sBookmarkPath)) {
+                    const QString parentDir = QFileInfo(fileName).path();
+                    const QString sBookmarkPath = QDir(parentDir).filePath(sBookmark);
+
+                    if (QFileInfo::exists(sBookmarkPath)) {
                         //sFileName = sBookmarkPath;
                     }
                 }
@@ -2977,7 +2940,7 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
         }
     }
 
-    m_sStartupFile = sFileName;
+    m_sStartupFile = fileName;
 
     m_pFileList = new CFileList(m_sStartupFile,
                                 *m_pDirectoryWatcher,
@@ -2990,12 +2953,9 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
     m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
     m_pJPEGProvider->ClearAllRequests();
 
-    LPCTSTR pRawFileName = m_pFileList->Current();
-    std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
-
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
                                                     CJPEGProvider::FORWARD,
-                                                    strFileName,
+                                                    m_pFileList->Current(),
                                                     nFrameIndex,
                                                     CreateProcessParams(!m_bFullScreenMode && (bAfterStartup || IsAdjustWindowToImage())),
                                                     m_bOutOfMemoryLastImage,
@@ -3008,7 +2968,6 @@ void CMainDlg::OpenFile(LPCTSTR sFileName, bool bAfterStartup) {
         StartAnimation();
     }
     m_startMouse.x = m_startMouse.y = -1;
-    m_sSaveDirectory = _T("");
     MouseOff();
     this->Invalidate(FALSE);
 }
@@ -3128,14 +3087,17 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
                 m_pFileList = m_pFileList->Next();
 
-                LPCTSTR sFileName = m_pFileList->Current();
-                if ((sFileName != NULL) && IsBookModeFile(sFileName)) {
-                    CString sBookmark = LoadBookmark(sFileName);
-                    if (!sBookmark.IsEmpty()) {
-                        std::wregex regexNeedle(_T("^\\d+$"));
-                        if (std::regex_match(sBookmark.GetString(), regexNeedle)) {
-                            // Bookmark is a pure number, so wasn't derived from a file name but from a container's FrameIndex()
-                            nFrameIndex = _wtoi(sBookmark) - 1;
+                const QString sFileName = m_pFileList->Current();
+                if ((!sFileName.isEmpty()) && IsBookModeFile(sFileName)) {
+                    const QString sBookmark = LoadBookmark(sFileName);
+                    if (!sBookmark.isEmpty()) {
+                        bool isNumeric = false;
+                        // Wandelt den String in ein int um und prüft gleichzeitig, ob er ausschließlich eine Zahl ist
+                        const int frameNum = sBookmark.toInt(&isNumeric);
+
+                        if (isNumeric) {
+                            // Bookmark ist eine reine Zahl (FrameIndex)
+                            nFrameIndex = frameNum - 1;
                         }
                     }
                 }
@@ -3150,14 +3112,17 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                 m_pFileList = m_pFileList->Prev();
                 eDirection = CJPEGProvider::BACKWARD;
 
-                LPCTSTR sFileName = m_pFileList->Current();
-                if ((sFileName != NULL) && IsBookModeFile(sFileName)) {
-                    CString sBookmark = LoadBookmark(sFileName);
-                    if (!sBookmark.IsEmpty()) {
-                        std::wregex regexNeedle(_T("^\\d+$"));
-                        if (std::regex_match(sBookmark.GetString(), regexNeedle)) {
-                            // Bookmark is a pure number, so wasn't derived from a file name but from a container's FrameIndex()
-                            nFrameIndex = _wtoi(sBookmark) - 1;
+                const QString sFileName = m_pFileList->Current();
+                if ((!sFileName.isEmpty()) && IsBookModeFile(sFileName)) {
+                    const QString sBookmark = LoadBookmark(sFileName);
+                    if (!sBookmark.isEmpty()) {
+                        bool isNumeric = false;
+                        // Wandelt den String in ein int um und prüft gleichzeitig, ob er ausschließlich eine Zahl ist
+                        const int frameNum = sBookmark.toInt(&isNumeric);
+
+                        if (isNumeric) {
+                            // Bookmark ist eine reine Zahl (FrameIndex)
+                            nFrameIndex = frameNum - 1;
                         }
                     }
                 }
@@ -3226,21 +3191,18 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         procParams.ProcFlags = SetProcessingFlag(procParams.ProcFlags, PFLAG_KeepParams, true);
     }
 
-
 //* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage()->RequestImage()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
 //* Debugging */    ::OutputDebugStringW(debugtext);
 
-    LPCTSTR pRawFileName = m_pFileList->Current();
-    std::wstring strFileName = (pRawFileName != nullptr) ? pRawFileName : L"";
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
                                                     (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
-                                                    strFileName,
+                                                    m_pFileList->Current(),
                                                     nFrameIndex,
                                                     procParams,
                                                     m_bOutOfMemoryLastImage,
                                                     m_bExceptionErrorLastImage);
 
-    m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current() == NULL) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
+    m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current().isEmpty()) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
 
 //* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
 //* Debugging */    ::OutputDebugStringW(debugtext);
@@ -3339,11 +3301,6 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, boo
         nNewXSize = (int)(m_pCurrentImage->OrigWidth() * m_dZoom + 0.5);
         nNewYSize = (int)(m_pCurrentImage->OrigHeight() * m_dZoom + 0.5);
     }
-
-#ifdef DEBUG
-    CString a; a.Format(_T("dZoom dOldZoom: %f %f\n"), m_dZoom, dOldZoom);
-    ::OutputDebugString(a);
-#endif
 
     // because we've increased/decreased to the maximum zoom allowed,
     // only actually perform the zoom if the old and new dimensions differ
@@ -3761,11 +3718,11 @@ void CMainDlg::SaveParameters() {
 }
 
 // Get current filename or filepath
-LPCTSTR CMainDlg::CurrentFileName(bool bFileNameOnly) {
-    if (m_pFileList != NULL) {
+QString CMainDlg::CurrentFileName(bool bFileNameOnly) {
+    if (m_pFileList != nullptr) {
         return bFileNameOnly ? m_pFileList->CurrentFileTitle() : m_pFileList->Current();
     } else {
-        return NULL;
+        return QString();
     }
 }
 
@@ -3821,107 +3778,123 @@ CRect CMainDlg::GetToastTextRect() {
 }
 
 void CMainDlg::EditINIFile(bool bGlobalINI) {
-    LPCTSTR sINIFileName = bGlobalINI ? CSettingsProvider::This().GetGlobalINIFileName() : CSettingsProvider::This().GetUserINIFileName();
-    if (!bGlobalINI) {
-        if (!CSettingsProvider::This().ExistsUserINI()) {
-            // No user INI file, ask if global INI shall be copied
-            if (IDYES == ::MessageBox(m_hWnd, CNLS::GetString(_T("No user INI file exists yet. Create user INI file from INI file template?")), _T(JPEGVIEW_TITLE), MB_YESNO | MB_ICONQUESTION)) {
-                CSettingsProvider::This().CopyUserINIFromTemplate();
-            } else {
-                return;
-            }
+    const QString sINIFileName = bGlobalINI
+        ? CSettingsProvider::This().GetGlobalINIFileName()
+        : CSettingsProvider::This().GetUserINIFileName();
+
+    if (!bGlobalINI && !CSettingsProvider::This().ExistsUserINI()) {
+        // Natürlicher Qt Dialog anstelle von ::MessageBox
+        const auto result = QMessageBox::question(
+            nullptr, // Später "this" (QWidget*), sobald CMainDlg von QWidget erbt
+            QStringLiteral(JPEGVIEW_TITLE),
+            QStringLiteral("No user INI file exists yet. Create user INI file from INI file template?"),
+            QMessageBox::Yes | QMessageBox::No
+        );
+
+        if (result == QMessageBox::Yes) {
+            CSettingsProvider::This().CopyUserINIFromTemplate();
+        } else {
+            return;
         }
     }
 
-    Helpers::EIniEditor iniEditor = CSettingsProvider::This().IniEditor();
-    CString command;
-    LPCTSTR argument;
+    const Helpers::EIniEditor iniEditor = CSettingsProvider::This().IniEditor();
+
     if (iniEditor == Helpers::INI_Notepad) {
-        command = _T("notepad.exe");
-        argument = sINIFileName;
-    } else if (iniEditor == Helpers::INI_System) {
-        command = sINIFileName;
-        argument = NULL;
-    } else {
-        command = CSettingsProvider::This().CustomIniEditor();
-        command.Replace(_T("%exepath%"), CSettingsProvider::This().GetEXEPath());    
-        argument = sINIFileName;
+        // Notepad explizit mit der INI-Datei starten
+        QProcess::startDetached(QStringLiteral("notepad.exe"), { sINIFileName });
     }
-    ::ShellExecute(m_hWnd, _T("open"), command, argument, NULL, SW_SHOW);
+    else if (iniEditor == Helpers::INI_System) {
+        // Plattformunabhängiges Öffnen der Datei mit der Standard-Systemanwendung
+        QDesktopServices::openUrl(QUrl::fromLocalFile(sINIFileName));
+    }
+    else {
+        // Benutzerdefinierter Editor mit Ersetzung von %exepath%
+        QString command = CSettingsProvider::This().CustomIniEditor();
+        command.replace(QStringLiteral("%exepath%"), CSettingsProvider::This().GetEXEPath(), Qt::CaseInsensitive);
+
+        // Aufruf von externem Prozess mit Argument
+        QProcess::startDetached(command, { sINIFileName });
+    }
 }
 
 void CMainDlg::UpdateWindowTitle(bool bForce) {
-    static TCHAR s_PrevFileExt[MAX_PATH];
-    static TCHAR s_PrevTitleText[MAX_PATH];
+    static QString s_PrevFileExt;
+    static QString s_PrevTitleText;
 
-    bool bShowFullPathInTitle = CSettingsProvider::This().ShowFullPathInTitle();
-    LPCTSTR sCurrentFileName = CurrentFileName(!bShowFullPathInTitle);
+    const bool bShowFullPathInTitle = CSettingsProvider::This().ShowFullPathInTitle();
+    const QString sCurrentFileName = CurrentFileName(!bShowFullPathInTitle);
 
-    if (sCurrentFileName == NULL || m_pCurrentImage == NULL) {
-        if ((lstrcmpi(_T(JPEGVIEW_TITLE), s_PrevTitleText) != 0) || (bForce == true)) {
-            _stprintf_s(s_PrevTitleText, MAX_PATH, _T("%s"), _T(JPEGVIEW_TITLE));
-            this->SetWindowText(_T(JPEGVIEW_TITLE));
+    if (sCurrentFileName.isEmpty() || m_pCurrentImage == nullptr) {
+        const QString defaultTitle = QStringLiteral(JPEGVIEW_TITLE);
+
+        if ((s_PrevTitleText != defaultTitle) || bForce) {
+            s_PrevTitleText = defaultTitle;
+            this->SetWindowText(reinterpret_cast<LPCWSTR>(defaultTitle.utf16()));
         }
     } else {
-        CString sWindowText = sCurrentFileName;
-        sWindowText += GetMultiframeIndex(m_pCurrentImage);
-        sWindowText += " - " + CString(JPEGVIEW_TITLE);
+        QString sWindowText = sCurrentFileName
+        + QString(GetMultiframeIndex(m_pCurrentImage))
+        + QStringLiteral(" - ")
+        + QStringLiteral(JPEGVIEW_TITLE);
 
-        if (lstrcmpi(sWindowText, s_PrevTitleText) != 0) {
-            _tcscpy_s(s_PrevTitleText, MAX_PATH, sWindowText);
-            this->SetWindowText(sWindowText);
+        if ((s_PrevTitleText != sWindowText) || bForce) {
+            s_PrevTitleText = sWindowText;
+            this->SetWindowText(reinterpret_cast<LPCWSTR>(sWindowText.utf16()));
         }
     }
 
     // Update title bar icon
     if (CSettingsProvider::This().TitleBarUseFileIcon()) {
-        LPCTSTR sCurrentFilePath = CurrentFileName(false);
-        QString cacheKey = "__default__";
-        TCHAR currentCheckExt[MAX_PATH];
+        const QString sCurrentFilePath = CurrentFileName(false);
+        QString cacheKey = QStringLiteral("__default__");
+        QString currentCheckExt = QStringLiteral("__default__");
 
-        if (sCurrentFileName == NULL || m_pCurrentImage == NULL || sCurrentFilePath == NULL) {
-            _tcscpy_s(currentCheckExt, MAX_PATH, _T("__default__"));
-            cacheKey = "__default__";
-        } else {
-            LPCTSTR pExt = PathFindExtension(sCurrentFilePath);
-            if (*pExt != '\0') {
-                _tcscpy_s(currentCheckExt, MAX_PATH, pExt);
-                cacheKey = QString::fromWCharArray(pExt).toLower();
+        if (!sCurrentFilePath.isEmpty() && m_pCurrentImage != nullptr) {
+            const QFileInfo fileInfo(sCurrentFilePath);
+            const QString ext = fileInfo.suffix(); // Endung ohne Punkt (z.B. "jpg")
+
+            if (!ext.isEmpty()) {
+                currentCheckExt = QStringLiteral(".") + ext; // ".jpg" für SHGetFileInfo
+                cacheKey = currentCheckExt.toLower();
             } else {
-                _tcscpy_s(currentCheckExt, MAX_PATH, _T(""));
-                cacheKey = "__default__";
+                currentCheckExt = QString();
+                cacheKey = QStringLiteral("__default__");
             }
         }
 
-        if ((lstrcmpi(currentCheckExt, s_PrevFileExt) != 0) || (bForce == true)) {
-            _tcscpy_s(s_PrevFileExt, MAX_PATH, currentCheckExt);
+        if ((s_PrevFileExt != currentCheckExt) || bForce) {
+            s_PrevFileExt = currentCheckExt;
 
             HICON hBig = nullptr;
             HICON hSmall = nullptr;
+
             if (s_iconCache.contains(cacheKey)) {
                 hBig = s_iconCache[cacheKey].hBig;
                 hSmall = s_iconCache[cacheKey].hSmall;
             } else {
-                /* Debugging */ UINT timeStart = Helpers::GetTimeMs();
+                /* Debugging */ const UINT timeStart = Helpers::GetTimeMs();
 
                 IconResult result;
-                std::wstring wExt = cacheKey.toStdWString();
 
-                if (cacheKey == "__default__") {
-                    HINSTANCE hInst = ::GetModuleHandle(0);
-                    int cxIcon = ::GetSystemMetrics(SM_CXICON);
-                    int cyIcon = ::GetSystemMetrics(SM_CYICON);
-                    int cxSmIcon = ::GetSystemMetrics(SM_CXSMICON);
-                    int cySmIcon = ::GetSystemMetrics(SM_CYSMICON);
+                if (cacheKey == QStringLiteral("__default__")) {
+                    HINSTANCE hInst = ::GetModuleHandle(nullptr);
+                    const int cxIcon = ::GetSystemMetrics(SM_CXICON);
+                    const int cyIcon = ::GetSystemMetrics(SM_CYICON);
+                    const int cxSmIcon = ::GetSystemMetrics(SM_CXSMICON);
+                    const int cySmIcon = ::GetSystemMetrics(SM_CYSMICON);
 
                     result.hBig = (HICON)::LoadImage(hInst, MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, cxIcon, cyIcon, LR_VGACOLOR);
                     result.hSmall = (HICON)::LoadImage(hInst, MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, cxSmIcon, cySmIcon, LR_VGACOLOR);
                 } else {
-                    SHFILEINFO shfi;
-                    if (SHGetFileInfo(wExt.c_str(), FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_USEFILEATTRIBUTES)) {
+                    SHFILEINFO shfi{};
+                    // punktuelle Umwandlung von QString zu LPCTSTR/LPCWSTR für Win32 SHGetFileInfo
+                    const auto* pExtWStr = reinterpret_cast<LPCWSTR>(cacheKey.utf16());
+
+                    if (::SHGetFileInfo(pExtWStr, FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_USEFILEATTRIBUTES)) {
                         result.hBig = shfi.hIcon;
                     }
-                    if (SHGetFileInfo(wExt.c_str(), FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES)) {
+                    if (::SHGetFileInfo(pExtWStr, FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES)) {
                         result.hSmall = shfi.hIcon;
                     }
                 }
@@ -3932,17 +3905,18 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
                     hSmall = result.hSmall;
                 }
 
-                /* Debugging */TCHAR debugtext[1024];
-                /* Debugging */swprintf(debugtext, 1024, TEXT("async icon loading for '%s' took %d ms"), wExt.c_str(), Helpers::GetTimeMs() - timeStart);
-                /* Debugging */::OutputDebugStringW(debugtext);
+                /* Debugging */ const QString debugText = QStringLiteral("async icon loading for '%1' took %2 ms")
+                .arg(cacheKey)
+                .arg(Helpers::GetTimeMs() - timeStart);
+                /* Debugging */ ::OutputDebugStringW(reinterpret_cast<LPCWSTR>(debugText.utf16()));
             }
 
-            if (hBig != NULL) {
-                ::SendMessage(m_hWnd, WM_SETICON, ICON_BIG, (LPARAM)hBig);
+            if (hBig != nullptr) {
+                ::SendMessage(m_hWnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hBig));
             }
 
-            if (hSmall != NULL) {
-                ::SendMessage(m_hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hSmall);
+            if (hSmall != nullptr) {
+                ::SendMessage(m_hWnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hSmall));
             }
         }
     }
@@ -3958,7 +3932,7 @@ int CMainDlg::TrackPopupMenu(CPoint pos, HMENU hMenu) {
 
 int CMainDlg::GetLoadErrorAfterOpenFile() {
     if (m_pCurrentImage == NULL) {
-        if (CurrentFileName(false) == NULL) {
+        if (CurrentFileName(false).isEmpty()) {
             if (m_pFileList->IsSlideShowList()) {
                 return FileLoad_SlideShowListInvalid;
             }
@@ -3980,11 +3954,21 @@ void CMainDlg::PrefetchDIB(const CRect& clientRect) {
 
 double CMainDlg::GetZoomMultiplier(CJPEGImage* pImage, const CRect& clientRect) {
     double dZoomToFit;
-    CSize fittedSize = Helpers::GetImageRect(pImage->OrigWidth(), pImage->OrigHeight(), 
-        clientRect.Width(), clientRect.Height(), true, false, false, GetAutoZoomMode(), dZoomToFit);
-    // Zoom multiplier (zoom step) should be around 1.1 but reach the value 1.0 after an integral number
-    // of zooming steps
+
+    Helpers::GetImageRect(pImage->OrigWidth(),
+                          pImage->OrigHeight(),
+                          clientRect.Width(),
+                          clientRect.Height(),
+                          true,
+                          false,
+                          false,
+                          GetAutoZoomMode(),
+                          dZoomToFit);
+
+    // Zoom multiplier (zoom step) should be around 1.1 but
+    // reach the value 1.0 after an integral number of zooming steps
     int n = Helpers::RoundToInt(log(1/dZoomToFit)/log(1.1));
+
     return (n == 0) ? 1.1 : exp(log(1/dZoomToFit)/n);
 }
 
@@ -4259,144 +4243,160 @@ LRESULT CMainDlg::OnRefreshView(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam,
     return 0;
 }
 
-// Used in custom SaveBookmark()
-CString CMainDlg::ReplaceNoCase(LPCTSTR instr,LPCTSTR oldstr,LPCTSTR newstr) {
-    CString output( instr );
-
-    // lowercase-versions to search in.
-    CString input_lower( instr );
-    CString oldone_lower( oldstr );
-    input_lower.MakeLower();
-    oldone_lower.MakeLower();
-
-    // search in the lowercase versions,
-    // replace in the original-case version.
-    int pos=0;
-    while ((pos=input_lower.Find(oldone_lower,pos)) != -1) {
-
-        // need for empty "newstr" cases.
-        input_lower.Delete( pos, lstrlen(oldstr) );    
-        input_lower.Insert( pos, newstr );
-
-        // actually replace.
-        output.Delete( pos, lstrlen(oldstr) );
-        output.Insert( pos, newstr );
+QString CMainDlg::LoadBookmark(const QString& filePath) {
+    if (filePath.isEmpty()) {
+        return QString();
     }
 
-    return output;
-}
+    const QString appDataPath = QString::fromWCharArray(Helpers::JPEGViewAppDataPath());
+    const QString bookmarkFilePath = QDir(appDataPath).filePath(QStringLiteral("Bookmarks.ini"));
 
-CString CMainDlg::LoadBookmark(LPCTSTR sFilePath) {
-    CString BookmarkFilePath = CString(Helpers::JPEGViewAppDataPath()) + TEXT("Bookmarks.ini");
-    if (::PathFileExists(BookmarkFilePath) == false)
-        return _T("");
-
-    LPCTSTR sFileExt = PathFindExtension(sFilePath);
-
-    TCHAR sKeyname[MAX_PATH];
-    lstrcpy(sKeyname,sFilePath);
-
-    if ((lstrcmpi(sFileExt,_T(".cbz")) == 0) || (lstrcmpi(sFileExt,_T(".cbr")) == 0) || (lstrcmpi(sFileExt,_T(".cb7")) == 0)) {
-        PathRemoveExtension(sKeyname);    // Removes the file name extension from a path, if one is present.
-        PathStripPath(sKeyname);
-    } else {
-        PathRemoveFileSpec(sKeyname);    // Removes the last element in a path string, whether that element is a file name or a directory name. The element's leading backslash is also removed.
-        PathStripPath(sKeyname);
+    if (!QFileInfo::exists(bookmarkFilePath)) {
+        return QString();
     }
 
-    CString sKeynameCleaned = ReplaceNoCase(sKeyname,TEXT(" [en]"),TEXT(""));
-    sKeynameCleaned.Replace('[','<');
-    sKeynameCleaned.Replace(']','>');
+    const QFileInfo fileInfo(filePath);
+    const QString fileExt = fileInfo.suffix().toLower();
+    const bool isArchive = (fileExt == QStringLiteral("cbz") ||
+                            fileExt == QStringLiteral("cbr") ||
+                            fileExt == QStringLiteral("cb7"));
 
-    TCHAR sValueOld[1024];
-    sValueOld[1023] = 0;
-    ::GetPrivateProfileString(_T("JPEGView"),sKeynameCleaned,_T(""),sValueOld,1023,BookmarkFilePath);
-    
-    CString sValueOldRestored = CString(sValueOld);
-    sValueOldRestored.Replace('[','<');
-    sValueOldRestored.Replace(']','>');
+    QString keyName = isArchive ? fileInfo.completeBaseName()
+                                : fileInfo.dir().dirName();
 
-    return sValueOldRestored;
+    // 1. Universelles Entfernen von Sprach-Tags ([en], [de], [ch], [ko], etc.) am Ende
+    static const QRegularExpression langTagRx(
+        QStringLiteral(R"(\s+\[(en|de|ch|ko)\]$)"),
+        QRegularExpression::CaseInsensitiveOption
+    );
+    keyName.remove(langTagRx);
+
+    // 2. Sonderzeichen anpassen
+    keyName.replace(QLatin1Char('['), QLatin1Char('<'));
+    keyName.replace(QLatin1Char(']'), QLatin1Char('>'));
+
+    // Auslesen der INI-Datei
+    QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
+    iniSettings.beginGroup(QStringLiteral("JPEGView"));
+
+    QString value = iniSettings.value(keyName, QString()).toString();
+    iniSettings.endGroup();
+
+    value.replace(QLatin1Char('['), QLatin1Char('<'));
+    value.replace(QLatin1Char(']'), QLatin1Char('>'));
+
+    return value;
 }
 
 void CMainDlg::SaveBookmark() {
-    LPCTSTR sFilePath = CurrentFileName(false);
+    const QString filePath = CurrentFileName(false);
     bool bIsEndpoint = true;
 
-    if (sFilePath != NULL) {
-        if (IsBookModeFile(sFilePath)) {
-            CString BookmarkFolderPath = CString(Helpers::JPEGViewAppDataPath());
-            CString BookmarkFilePath = CString(Helpers::JPEGViewAppDataPath()) + TEXT("Bookmarks.ini");
+    if (filePath.isEmpty() || !IsBookModeFile(filePath)) {
+        return;
+    }
 
-            if (::PathFileExists(BookmarkFolderPath) == false) {
-                if (::CreateDirectory(BookmarkFolderPath, NULL) == false) {
-                    return;
-                }
-            }
+    // 1. Pfade konfigurieren (QDir erstellt fehlende Pfade bei Bedarf automatisch)
+    const QString appDataPath = QString::fromWCharArray(Helpers::JPEGViewAppDataPath());
+    const QDir bookmarkDir(appDataPath);
 
-            // Now we know the path of the bookmark file for JPEGView
-            if (::PathFileExists(BookmarkFolderPath)) {
-                TCHAR sKeyname[MAX_PATH];
-                lstrcpy(sKeyname,sFilePath);
-                LPCTSTR sFileExt = PathFindExtension(sFilePath);
-                if ((lstrcmpi(sFileExt,_T(".cbz")) == 0) || (lstrcmpi(sFileExt,_T(".cbr")) == 0) || (lstrcmpi(sFileExt,_T(".cb7")) == 0)) {
-                    PathRemoveExtension(sKeyname);    // Removes the file name extension from a path, if one is present.
-                    PathStripPath(sKeyname);
-                } else {
-                    PathRemoveFileSpec(sKeyname);    // Removes the last element in a path string, whether that element is a file name or a directory name. The element's leading backslash is also removed.
-                    PathStripPath(sKeyname);
-                }
-
-                CString sKeynameCleaned = ReplaceNoCase(sKeyname,TEXT(" [en]"),TEXT(""));    // store bookmark independent of language tag. Todo: Add more tags.
-                sKeynameCleaned.Replace('[','<');
-                sKeynameCleaned.Replace(']','>');
-
-                TCHAR sValueNew[MAX_PATH];
-                if ((lstrcmpi(sFileExt,_T(".cbz")) == 0) || (lstrcmpi(sFileExt,_T(".cbr")) == 0) || (lstrcmpi(sFileExt,_T(".cb7")) == 0)) {
-                    // In a cbz/cbr/cb7 archive, the new ini value equals the position in the archive
-                    if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-                        int nCurrentFrame = m_pCurrentImage->FrameIndex();
-                        if ((nCurrentFrame > 0) && (nCurrentFrame < m_pCurrentImage->NumberOfFrames() - 1))
-                            bIsEndpoint = false;
-                        swprintf(sValueNew,MAX_PATH,TEXT("%d"), nCurrentFrame+1);
-                    }
-                } else {
-                    // In a comic book folder, the new ini value equals the image file name.
-                    lstrcpy(sValueNew,sFilePath);
-                    PathStripPath(sValueNew);
-                    bIsEndpoint = m_pFileList->IsEndpoint();
-                }
-
-                CString sValueNewCS = CString(sValueNew);
-                sValueNewCS.Replace('[','<');
-                sValueNewCS.Replace(']','>');
-
-                // We try to read the value of the same name
-                TCHAR sValueOld[1024];
-                sValueOld[1023] = 0;
-                ::GetPrivateProfileString(_T("JPEGView"),sKeynameCleaned,_T(""),sValueOld,1023,BookmarkFilePath);
-                
-                // continue only if the existant value is different, or if no value exists
-                if ((sValueOld[0] == 0) || (lstrcmpi(sValueOld,sValueNewCS) != 0)) {
-                    if (bIsEndpoint == true) { // On first or last page -> delete entry
-                        ::WritePrivateProfileString(_T("JPEGView"),sKeynameCleaned,NULL,BookmarkFilePath);
-                    } else {
-                        ::WritePrivateProfileString(_T("JPEGView"),sKeynameCleaned,sValueNewCS,BookmarkFilePath);
-                    }
-                }
-            }
+    if (!bookmarkDir.exists()) {
+        if (!bookmarkDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
+            return;
         }
     }
 
-    return;
+    const QString bookmarkFilePath = bookmarkDir.filePath(QStringLiteral("Bookmarks.ini"));
+
+    // 2. Pfadanalyse mit QFileInfo & QString-Methoden
+    const QFileInfo fileInfo(filePath);
+    const QString fileExt = fileInfo.suffix().toLower(); // z.B. "cbz"
+    const bool isArchive = (fileExt == QStringLiteral("cbz") ||
+                            fileExt == QStringLiteral("cbr") ||
+                            fileExt == QStringLiteral("cb7"));
+
+    QString keyName;
+
+    if (isArchive) {
+        // Bei Archivdateien: Name der Archivdatei ohne Endung
+        keyName = fileInfo.completeBaseName();
+    } else {
+        // Bei normalen Dateien: Name des übergeordneten Ordners
+        keyName = fileInfo.dir().dirName();
+    }
+
+    // Sprach-Tag entfernen und Sonderzeichen ersetzen ([ -> <, ] -> >)
+    QString keyNameCleaned = keyName;
+    keyNameCleaned.remove(QStringLiteral(" [en]"), Qt::CaseInsensitive);
+    keyNameCleaned.replace(QLatin1Char('['), QLatin1Char('<'));
+    keyNameCleaned.replace(QLatin1Char(']'), QLatin1Char('>'));
+
+    // 3. Neuen Wert für das Lesezeichen bestimmen
+    QString newValueStr;
+
+    if (isArchive) {
+        // In Archiven: 1-basierter Frame-Index
+        if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
+            const int nCurrentFrame = m_pCurrentImage->FrameIndex();
+            if (nCurrentFrame > 0 && nCurrentFrame < m_pCurrentImage->NumberOfFrames() - 1) {
+                bIsEndpoint = false;
+            }
+            newValueStr = QString::number(nCurrentFrame + 1);
+        }
+    } else {
+        // In Ordnern: Reiner Dateiname der aktuellen Bilddatei
+        newValueStr = fileInfo.fileName();
+        if (m_pFileList) {
+            bIsEndpoint = m_pFileList->IsEndpoint();
+        }
+    }
+
+    newValueStr.replace(QLatin1Char('['), QLatin1Char('<'));
+    newValueStr.replace(QLatin1Char(']'), QLatin1Char('>'));
+
+    // 4. INI-Datei mit QSettings verarbeiten (Ersetzt Get/WritePrivateProfileString)
+    QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
+    iniSettings.beginGroup(QStringLiteral("JPEGView"));
+
+    const QString oldValueStr = iniSettings.value(keyNameCleaned, QString()).toString();
+
+    // Nur schreiben/löschen, wenn sich der Wert geändert hat
+    if (oldValueStr != newValueStr) {
+        if (bIsEndpoint) {
+            // Am Anfang oder Ende des Buches -> Lesezeichen-Eintrag löschen
+            iniSettings.remove(keyNameCleaned);
+        } else {
+            // Sonst -> Neuen Wert im Key speichern
+            iniSettings.setValue(keyNameCleaned, newValueStr);
+        }
+    }
+
+    iniSettings.endGroup();
 }
 
-bool CMainDlg::IsBookModeFile(LPCTSTR sFilePath) {
-    LPCTSTR pExt = PathFindExtension(sFilePath);
-    if (StrStrI(sFilePath,TEXT("\\manga\\")) || StrStrI(sFilePath,TEXT("\\comics\\")) || (lstrcmpi(pExt,_T(".cbz")) == 0) || (lstrcmpi(pExt,_T(".cbr")) == 0) || (lstrcmpi(pExt,_T(".cb7")) == 0)) {
+bool CMainDlg::IsBookModeFile(const QString& filePath) {
+    if (filePath.isEmpty()) {
+        return false;
+    }
+
+    // 1. Dateiendung mit QFileInfo ermitteln (ohne führenden Punkt)
+    const QString fileExt = QFileInfo(filePath).suffix().toLower();
+
+    // 2. Prüfen auf Archiv-Endungen (.cbz, .cbr, .cb7)
+    const bool isArchive = (fileExt == QStringLiteral("cbz") ||
+                            fileExt == QStringLiteral("cbr") ||
+                            fileExt == QStringLiteral("cb7"));
+
+    if (isArchive) {
         return true;
     }
-    return false;
+
+    // 3. Pfad-Teilstrings prüfen (Groß-/Kleinschreibung ignorieren)
+    // Verwende den Qt-konformen Slash '/' oder Backslash '\'
+    return filePath.contains(QStringLiteral("/manga/"), Qt::CaseInsensitive)  ||
+           filePath.contains(QStringLiteral("\\manga\\"), Qt::CaseInsensitive) ||
+           filePath.contains(QStringLiteral("/comics/"), Qt::CaseInsensitive) ||
+           filePath.contains(QStringLiteral("\\comics\\"), Qt::CaseInsensitive);
 }
 
 float CMainDlg::MaxRatio(float valA, float valB) {
@@ -4406,11 +4406,11 @@ float CMainDlg::MaxRatio(float valA, float valB) {
     return dRatio;
 }
 
-void CMainDlg::SetToast(LPCTSTR a_strToast, DWORD a_nDurationMs)
+void CMainDlg::SetToast(const QString& strToast, DWORD nDurationMs)
 {
     ::KillTimer(this->m_hWnd, TOAST_EXPIRY_TIMER_EVENT_ID);
-    ::SetTimer(this->m_hWnd, TOAST_EXPIRY_TIMER_EVENT_ID, a_nDurationMs, NULL);
-    m_strToast = a_strToast;
+    ::SetTimer(this->m_hWnd, TOAST_EXPIRY_TIMER_EVENT_ID, nDurationMs, NULL);
+    m_strToast = strToast;
     this->Invalidate(FALSE);
 }
 
@@ -4419,27 +4419,29 @@ void CMainDlg::SetToast(LPCTSTR a_strToast, DWORD a_nDurationMs)
 */
 void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
 {
-    const wchar_t* sSortModes[] = {
-        _T("Sorting: Modification Time"),
-        _T("Sorting: Creation Time"),
-        _T("Sorting: Name"),
-        _T("Sorting: Random"),
-        _T("Sorting: Size")
+    static const QString sSortModes[] = {
+        QStringLiteral("Sorting: Name"),
+        QStringLiteral("Sorting: Modification Time"),
+        QStringLiteral("Sorting: Size"),
+        QStringLiteral("Sorting: Random")
     };
-    CString sSortMode = sSortModes[(int)nSortMode];
-    //sSortMode += (bUpCounting ? _T(" ^") : _T(" v"));
+
+    QString sSortMode = sSortModes[static_cast<int>(nSortMode)];
+    // sSortMode += (bUpCounting ? QStringLiteral(" ^") : QStringLiteral(" v"));
     SetToast(sSortMode);
 }
 
 // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
-CString CMainDlg::GetMultiframeIndex(CJPEGImage* pImage) {
-    bool isMultiFrame = pImage != NULL && pImage->NumberOfFrames() > 1;
+QString CMainDlg::GetMultiframeIndex(CJPEGImage* pImage) {
+    const bool isMultiFrame = (pImage != nullptr) && (pImage->NumberOfFrames() > 1);
+    
     if (isMultiFrame && !pImage->IsAnimation()) {
-        CString s;
-        s.Format(_T(" [%d/%d]"), pImage->FrameIndex() + 1, pImage->NumberOfFrames());
-        return s;
+        return QStringLiteral(" [%1/%2]")
+            .arg(pImage->FrameIndex() + 1)
+            .arg(pImage->NumberOfFrames());
     }
-    return CString(_T(""));
+    
+    return QString();
 }
 
 QString CMainDlg::FormatFileSize(qint64 nFileSize) {
@@ -4523,60 +4525,71 @@ bool CMainDlg::isRunningInWine() {
     return false;
 }
 
-// Checks if a linux file exists on host
-bool CMainDlg::IsLinuxBinaryAvailable(LPCTSTR szUnixPath) {
-    if (szUnixPath == NULL || szUnixPath[0] == _T('\0')) return false;
+bool CMainDlg::IsLinuxBinaryAvailable(const QString& unixPath) {
+    if (unixPath.isEmpty()) {
+        return false;
+    }
 
-    CString sDosPath;
+    QString dosPath;
 
-    if (szUnixPath[0] == _T('~')) {
-        // Within wine, %USERNAME% contains the Linux host user name
-        TCHAR szUser[256] = { 0 };
-        DWORD dwLen = ::GetEnvironmentVariable(_T("USERNAME"), szUser, 256);
-        if (dwLen == 0) {
-            dwLen = ::GetEnvironmentVariable(_T("USER"), szUser, 256);
+    if (unixPath.startsWith(QLatin1Char('~'))) {
+        // Unter Wine enthält USERNAME (oder USER) den Linux-Host-Benutzernamen
+        QString user = qEnvironmentVariable("USERNAME");
+        if (user.isEmpty()) {
+            user = qEnvironmentVariable("USER");
         }
 
-        if (dwLen > 0) {
-            // '~' zu 'Z:\home\<username>\...' auflösen
-            sDosPath.Format(_T("Z:\\home\\%s%s"), szUser, szUnixPath + 1);
-        }
-        else {
+        if (!user.isEmpty()) {
+            // '~' zu 'Z:\home\<username>\...' auflösen (mit mid(1) für den Restpfad)
+            dosPath = QStringLiteral("Z:\\home\\%1%2").arg(user, unixPath.mid(1));
+        } else {
             return false;
         }
     }
-    else if (szUnixPath[0] == _T('/')) {
-        // Absolute Unix-Pfade wie /usr/bin/... auf Z:\ mappen
-        sDosPath.Format(_T("Z:%s"), szUnixPath);
+    else if (unixPath.startsWith(QLatin1Char('/'))) {
+        // Absolute Unix-Pfade wie /usr/bin/... auf Laufwerk Z:\ mappen
+        dosPath = QStringLiteral("Z:%1").arg(unixPath);
     }
     else {
-        sDosPath = szUnixPath;
+        dosPath = unixPath;
     }
 
-    sDosPath.Replace(_T('/'), _T('\\'));
+    // Unix-Slashes '/' in Windows-Backslashes '\' umwandeln
+    dosPath.replace(QLatin1Char('/'), QLatin1Char('\\'));
 
-    // Checks for existence of file on drive Z
-    DWORD dwAttr = ::GetFileAttributes(sDosPath);
-    return (dwAttr != INVALID_FILE_ATTRIBUTES && !(dwAttr & FILE_ATTRIBUTE_DIRECTORY));
+    // Existenz als reguläre Datei prüfen (plattformunabhängig und ohne GetFileAttributes)
+    const QFileInfo fileInfo(dosPath);
+    return fileInfo.exists() && fileInfo.isFile();
 }
 
 
 // Konvertiert einen Windows-Pfad (z.B. Z:\home\...) in einen Unix-Pfad (/home/...)
-CString CMainDlg::GetUnixPathFromWine(LPCTSTR szDosPath) {
-    HMODULE hKernel32 = GetModuleHandle(_T("kernel32.dll"));
-    if (!hKernel32) return _T("");
+#include <QString>
+#include <windows.h>
+QString CMainDlg::GetUnixPathFromWine(const QString& szDosPath) {
+    if (szDosPath.isEmpty()) {
+        return QString();
+    }
+
+    HMODULE hKernel32 = GetModuleHandle(TEXT("kernel32.dll"));
+    if (!hKernel32) {
+        return QString();
+    }
 
     // Wine-Signatur: Nimmt LPCWSTR (UTF-16), liefert char* (UTF-8 POSIX-Pfad)
-    typedef char* (__cdecl* pwine_get_unix_file_name)(LPCWSTR);
-    pwine_get_unix_file_name wine_get_unix_file_name =
-        (pwine_get_unix_file_name)GetProcAddress(hKernel32, "wine_get_unix_file_name");
+    using pwine_get_unix_file_name = char* (__cdecl*)(LPCWSTR);
+    auto wine_get_unix_file_name = reinterpret_cast<pwine_get_unix_file_name>(
+        GetProcAddress(hKernel32, "wine_get_unix_file_name")
+    );
 
     if (wine_get_unix_file_name) {
-        // Wine nimmt direkt den Unicode-Pfad entgegen (szDosPath)
-        char* unixPathUtf8 = wine_get_unix_file_name(szDosPath);
+        // QString sicher als LPCWSTR (const wchar_t*) an Wine übergeben
+        const auto* pwszDosPath = reinterpret_cast<LPCWSTR>(szDosPath.utf16());
+        char* unixPathUtf8 = wine_get_unix_file_name(pwszDosPath);
+
         if (unixPathUtf8) {
-            // Konvertiert den UTF-8 char* Stream von Linux direkt in einen Unicode-CString
-            CString sResult(CA2W(unixPathUtf8, CP_UTF8));
+            // UTF-8 char* Stream direkt in einen Qt6 QString umwandeln
+            QString sResult = QString::fromUtf8(unixPathUtf8);
 
             // Den von Wine auf dem Prozess-Heap allokierten Speicher freigeben
             HeapFree(GetProcessHeap(), 0, unixPathUtf8);
@@ -4584,5 +4597,6 @@ CString CMainDlg::GetUnixPathFromWine(LPCTSTR szDosPath) {
             return sResult;
         }
     }
-    return _T("");
+
+    return QString();
 }

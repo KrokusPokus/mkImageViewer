@@ -2,7 +2,7 @@
 #define JPEGPROVIDER_H
 
 #include <list>
-#include <string>
+#include <QString>
 
 class CJPEGImage;
 class CImageLoadThread;
@@ -42,7 +42,7 @@ public:
     // When the requested image is already cached, it is returned immediately. Otherwise the method
     // blocks until the image is ready. If not specified otherwise, a read-ahead request for the next image is
     // created automatically so that the next image will be ready immediately when requested in the future.
-    CJPEGImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const std::wstring& sFileName, int nFrameIndex,
+    CJPEGImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const QString& sFileName, int nFrameIndex,
         const CProcessParams & processParams, bool& bOutOfMemory, bool& bExceptionError);
 
     // Notifies that the specified image is no longer used and its memory can be freed.
@@ -69,7 +69,7 @@ public:
     //     m_pMainDlg->GetFileList()->FileHasRenamed(sCurFileName, sNewFileName);
     //     m_pMainDlg->GetJPEGProvider()->FileHasRenamed(sCurFileName, sNewFileName);
     /*
-    void FileHasRenamed(const std::wstring& oldFileName, const std::wstring& newFileName);
+    void FileHasRenamed(const QString& oldFileName, const QString& newFileName);
     */
 
     // Must be called by the message handler window (see constructor) when the WM_IMAGE_LOAD_COMPLETED
@@ -79,7 +79,7 @@ public:
 private:
     // stores a request for loading and processing a JPEG image
     struct CImageRequest {
-        std::wstring FileName; // file name with path of image
+        QString FileName; // file name with path of image
         int FrameIndex; // zero based frame index for multiframe images
         CJPEGImage* Image; // loaded image
         bool Ready; // true if the request has finished loading and the image is ready (if NULL, loading failed)
@@ -93,7 +93,7 @@ private:
         CImageLoadThread* HandlingThread; // thread that is loading the image, NULL when image is ready
         HANDLE EventFinished; // event fired when image has finished loading
 
-        CImageRequest(LPCTSTR fileName, int nFrameIndex) {
+        CImageRequest(const QString& fileName, int nFrameIndex) {
             FileName = fileName;
             FrameIndex = nFrameIndex;
             Image = NULL;
@@ -126,10 +126,10 @@ private:
     void GetLoadedImageFromWorkThread(CImageRequest* pRequest);
     CImageLoadThread* SearchThreadForNewRequest(void);
     void RemoveUnusedImages(bool bRemoveAlsoReadAhead);
-    CImageRequest* StartRequestAndWaitUntilReady(const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams);
-    CImageRequest* StartNewRequest(const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams);
+    CImageRequest* StartRequestAndWaitUntilReady(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams);
+    CImageRequest* StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams);
     void StartNewRequestBundle(CFileList* pFileList, EReadAheadDirection eDirection, const CProcessParams & processParams, int nNumRequests, CImageRequest* pLastReadyRequest);
-    CImageRequest* FindRequest(const std::wstring& sFileName, int nFrameIndex);
+    CImageRequest* FindRequest(const QString& sFileName, int nFrameIndex);
     std::list<CJPEGProvider::CImageRequest*>::iterator DeleteElementAt(std::list<CImageRequest*>::iterator iteratorAt); // also deletes the request and the image in the request
     void DeleteElement(CImageRequest* pRequest);
     bool IsDestructivelyProcessed(CJPEGImage* pImage);

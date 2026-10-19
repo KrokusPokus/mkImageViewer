@@ -3,22 +3,24 @@
 
 #include "ProcessParams.h"
 #include "WorkThread.h"
+#include "bit7z/include/bittypes.hpp"
+
 #include <gdiplus.h>
 #include <vector>
-#include <map>
-#include "bit7z/include/bittypes.hpp"
+
+#include <QString>
 
 class CJPEGImage;
 class ZipEntry
 {
 public:
-    CString name;
-    CString ext;
+    QString name;
+    QString ext;
     unsigned int index;
     unsigned long long size;
 
     ZipEntry(const char* a_pchName, unsigned int a_index, unsigned long long a_size);
-    ZipEntry(bit7z::tstring a_name, unsigned int a_index, unsigned long long a_size);
+    ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned long long a_size);
 };
 
 // returned image data by CImageLoadThread.GetLoadedImage() method
@@ -52,7 +54,7 @@ public:
     // received or the event has been signaled.
     // The file to load is given by its filename (with path) and the frame index (for multiframe images). The
     // frame index needs to be zero when the image only has one frame.
-    int AsyncLoad(LPCTSTR strFileName, int nFrameIndex, const CProcessParams & processParams, HWND targetWnd, HANDLE eventFinished);
+    int AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, HWND targetWnd, HANDLE eventFinished);
 
     // Get loaded image, CImageData::Image is null if not (yet) available - use handle returned by AsyncLoad().
     // Call after having received the WM_IMAGE_LOAD_COMPLETED message to retrieve the loaded image.
@@ -60,14 +62,14 @@ public:
     CImageData GetLoadedImage(int nHandle);
 
     // Releases the cached image file if an image of the specified name is cached
-    void ReleaseFile(LPCTSTR strFileName);
+    void ReleaseFile(const QString& strFileName);
 
 private:
 
     // Request for loading an image
     class CRequest : public CRequestBase {
     public:
-        CRequest(LPCTSTR strFileName, int nFrameIndex, HWND wndTarget, const CProcessParams& processParams, HANDLE eventFinished) 
+        CRequest(const QString& strFileName, int nFrameIndex, HWND wndTarget, const CProcessParams& processParams, HANDLE eventFinished)
             : CRequestBase(eventFinished), ProcessParams(processParams) {
             FileName = strFileName;
             FrameIndex = nFrameIndex;
@@ -78,7 +80,7 @@ private:
             ExceptionError = false;
         }
 
-        CString FileName;
+        QString FileName;
         int FrameIndex;
         HWND TargetWnd;
         int RequestHandle;
@@ -91,25 +93,25 @@ private:
     // Request to release image file
     class CReleaseFileRequest : public CRequestBase {
     public:
-        CReleaseFileRequest(LPCTSTR strFileName) : CRequestBase() {
+        CReleaseFileRequest(const QString& strFileName) : CRequestBase() {
             FileName = strFileName;
             Type = ReleaseFileRequest;
         }
 
         enum { ReleaseFileRequest = 1 };
 
-        CString FileName;
+        QString FileName;
     };
 
     static volatile int m_curHandle; // Request handle returned by AsyncLoad()
 
     Gdiplus::Bitmap* m_pLastBitmap; // Last read GDI+ bitmap, cached to speed up GIF animations
-    CString m_sLastFileName; // Only for GDI+ files
-    CString m_sLastWebpFileName; // Only for animated WebP files
-    CString m_sLastPngFileName; // Only for animated PNG files
-    CString m_sLastJxlFileName; // Only for animated JPEG XL files
-    CString m_sLastAvifFileName; // Only for animated AVIF files
-    CString m_sLastZipFileName; // Only for ZIP files
+    QString m_sLastFileName; // Only for GDI+ files
+    QString m_sLastWebpFileName; // Only for animated WebP files
+    QString m_sLastPngFileName; // Only for animated PNG files
+    QString m_sLastJxlFileName; // Only for animated JPEG XL files
+    QString m_sLastAvifFileName; // Only for animated AVIF files
+    QString m_sLastZipFileName; // Only for ZIP files
     int m_nZipCount;
     std::vector<ZipEntry> zipEntries;
 

@@ -3,17 +3,20 @@
 
 #include "Helpers.h"
 
+#include <QString>
+#include <QDateTime>
 #include <list>
+#include <memory>
 
 class CDirectoryWatcher;
 
 // Entry in the file list, allowing sorting by different sort criteria
-class CFileDesc 
+class CFileDesc
 {
 public:
-    CFileDesc(const CString & sName, const FILETIME* lastModTime, const FILETIME* creationTime, __int64 fileSize);
+    CFileDesc(const QString& sName, const QDateTime& lastModTime, const QDateTime& creationTime, qint64 fileSize);
 
-    // STL sort only needs this operator to order CFileDesc objects
+    // STL / C++20 sort operator
     bool operator < (const CFileDesc& other) const;
     bool SortAscending(const CFileDesc& other) const;
 
@@ -23,36 +26,30 @@ public:
     static void SetSorting(Helpers::ESorting eSorting, bool bAscending) { sm_eSorting = eSorting; sm_bSortAscending = bAscending; }
 
     // Full name of file
-    const CString& GetName() const { return m_sName; }
-
-    // Only use after a rename of a file, respectively changing its modification date
-    /*
-    void SetName(LPCTSTR sNewName);
-    void SetModificationDate(const FILETIME& lastModDate);
-    */
+    const QString& GetName() const { return m_sName; }
 
     // File title (without path)
-    LPCTSTR GetTitle() const { return m_sTitle; }
+    const QString& GetTitle() const { return m_sTitle; }
 
     // Gets last modification time
-    const FILETIME& GetLastModTime() const { return m_lastModTime; }
+    const QDateTime& GetLastModTime() const { return m_lastModTime; }
 
     // Gets creation time
-    //const FILETIME& GetCreationTime() const { return m_creationTime; }
+    const QDateTime& GetCreationTime() const { return m_creationTime; }
 
     // Gets file size in bytes
-    //__int64 GetFileSize() const { return m_fileSize; }
+    qint64 GetFileSize() const { return m_fileSize; }
 
 private:
     static Helpers::ESorting sm_eSorting;
     static bool sm_bSortAscending;
 
-    CString m_sName;
-    LPCTSTR m_sTitle;
-    FILETIME m_lastModTime;
-    FILETIME m_creationTime;
-    int m_nRandomOrderNumber;
-    __int64 m_fileSize;
+    QString m_sName;
+    QString m_sTitle;
+    QDateTime m_lastModTime;
+    QDateTime m_creationTime;
+    int m_nRandomOrderNumber{ 0 };
+    qint64 m_fileSize{ 0 };
 };
 
 
@@ -61,33 +58,18 @@ class CFileList
 {
 public:
     // sInitialFile is the initial file to show with path. It can either be an image file, a directory
-    // (must end with backslash in this case) or a text file containing file names to display.
-    // Supported text file encodings are ANSI, Unicode or UTF-8.
-    // nLevel is increased when recursively create lists for sub-folders
-    CFileList(const CString & sInitialFile, CDirectoryWatcher & directoryWatcher, 
-        Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel = 0, bool forceSorting = false);
+    // or a text file containing file names to display.
+    CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWatcher,
+              Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel = 0, bool forceSorting = false);
     ~CFileList();
 
-    // Reload file list for given file, if NULL for current file
-    void Reload(LPCTSTR sFileName = NULL, bool clearForwardHistory = true);
+    // Reload file list for given file, if empty for current file
+    void Reload(const QString& sFileName = QString(), bool clearForwardHistory = true);
 
-    // Tells the file list that a file has been renamed externally
-    // Used by the internal rename capability inside ImageProcPanel:
-    //     CString sCurFileName(sCurrentFileName);
-    //     m_pMainDlg->GetFileList()->FileHasRenamed(sCurFileName, sNewFileName);
-    //     m_pMainDlg->GetJPEGProvider()->FileHasRenamed(sCurFileName, sNewFileName);
-    /*
-    void FileHasRenamed(LPCTSTR sOldFileName, LPCTSTR sNewFileName);
-    */
-
-    // Tells that the modification date of the current file has changed
-    //void ModificationTimeChanged();
-
-    // Move to next file in list, wrap according to navigation mode. The filelist object
-    // of the next item is returned (in most situation the same object)
+    // Move to next file in list, wrap according to navigation mode.
     CFileList* Next();
 
-    // Move to previous file in list. The filelist object of the prev item is returned.
+    // Move to previous file in list.
     CFileList* Prev();
 
     // Move to first file in current folder (according to sort order)
@@ -99,26 +81,20 @@ public:
     // Move away from current image, either forward or backward (if on last image)
     CFileList* AwayFromCurrent();
 
-    // Filename (with path) of the current item in the list, NULL if none
-    LPCTSTR Current() const;
+    // Filename (with path) of the current item in the list, empty QString if none
+    QString Current() const;
 
-    // File title of the current item in the list, NULL if none
-    LPCTSTR CurrentFileTitle() const;
+    // File title of the current item in the list, empty QString if none
+    QString CurrentFileTitle() const;
 
-    // Current directory without file name, NULL if none
-    LPCTSTR CurrentDirectory() const;
-
-    // Modification time of current file
-    //const FILETIME* CurrentModificationTime() const;
+    // Current directory without file name, empty QString if none
+    QString CurrentDirectory() const;
 
     // Get the n-next file, does not change the internal state
-    LPCTSTR PeekNextPrev(int nIndex, bool bForward);
+    QString PeekNextPrev(int nIndex, bool bForward);
 
     // Number of files in file list (for current directory)
-    //int Size() const { return (int)m_fileList.size(); }
-
-    // Index of current file in file list (zero based)
-    //int CurrentIndex() const;
+    int Size() const { return static_cast<int>(m_fileList.size()); }
 
     // Sets the sorting of the file list and resorts the list
     void SetSorting(Helpers::ESorting eSorting, bool sortAscending);
@@ -137,7 +113,7 @@ public:
     void SetCheckpoint() { m_iterCheckPoint = m_iter; }
 
     // Check if we are now on another image since the last checkpoint was set
-    bool ChangedSinceCheckpoint() { return m_iterCheckPoint != m_iter; }
+    bool ChangedSinceCheckpoint() const { return m_iterCheckPoint != m_iter; }
 
     // Returns if the current file list is based on a slide show text file
     bool IsSlideShowList() const { return m_bIsSlideShowList; }
@@ -148,47 +124,44 @@ public:
     // Returns if the current file exists and can be opened for reading
     bool CanOpenCurrentFileForReading() const;
 
-    // Returns the raw file list of the current folder
-    //std::list<CFileDesc> & GetFileList() { return m_fileList; }
-
     // delete the chain of CFileLists forward and backward and only leave the current node alive
     void DeleteHistory(bool onlyForward = false);
 
-/*GF*/    bool IsEndpoint();    // Check if at the beginning or end of the file list. Used by custom function SaveBookmark()
+    bool IsEndpoint(); // Check if at the beginning or end of the file list.
 
 private:
     static Helpers::ENavigationMode sm_eMode;
 
-    bool m_bDeleteHistory;
-    bool m_bIsSlideShowList;
-    bool m_bWrapAroundFolder;
-    int m_nLevel;
-    CString m_sInitialFile;
-    CString m_sDirectory;
+    bool m_bDeleteHistory{ true };
+    bool m_bIsSlideShowList{ false };
+    bool m_bWrapAroundFolder{ false };
+    int m_nLevel{ 0 };
+    QString m_sInitialFile;
+    QString m_sDirectory;
+
     // filelists for several folders are chained
-    CFileList* m_next;
-    CFileList* m_prev;
+    CFileList* m_next{ nullptr };
+    CFileList* m_prev{ nullptr };
     std::list<CFileDesc> m_fileList;
-    std::list<CFileDesc>::iterator m_iter; // current position in m_fileList
-    std::list<CFileDesc>::iterator m_iterStart; // start of iteration in m_fileList
+    std::list<CFileDesc>::iterator m_iter;          // current position in m_fileList
+    std::list<CFileDesc>::iterator m_iterStart;     // start of iteration in m_fileList
     std::list<CFileDesc>::iterator m_iterCheckPoint;
 
-    CDirectoryWatcher & m_directoryWatcher;
+    CDirectoryWatcher& m_directoryWatcher;
 
     void MoveIterToLast();
     void NextInFolder();
     CFileList* GotoFirstShown();
-    std::list<CFileDesc>::iterator FindFile(const CString& sName);
-    CFileList* FindFileRecursively (const CString& sDirectory, const CString& sFindAfter, 
-        bool bSearchThisFolder, int nLevel, int nRecursion);
-    CFileList* TryCreateFileList(const CString& directory, int nNewLevel);
+    std::list<CFileDesc>::iterator FindFile(const QString& sName);
+    CFileList* FindFileRecursively(const QString& sDirectory, const QString& sFindAfter,
+                                   bool bSearchThisFolder, int nLevel, int nRecursion);
+    CFileList* TryCreateFileList(const QString& directory, int nNewLevel);
     CFileList* WrapToNextImage();
     CFileList* WrapToPrevImage();
     void FindFiles();
     void VerifyFiles();
-    bool IsImageFile(const CString & sEnding);
-    bool TryReadingSlideShowList(const CString & sSlideShowFile);
+    static bool IsImageFile(const QString& sEnding);
+    bool TryReadingSlideShowList(const QString& sSlideShowFile);
 };
-
 
 #endif // FILELIST_H

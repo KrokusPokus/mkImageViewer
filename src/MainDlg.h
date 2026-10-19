@@ -128,7 +128,7 @@ public:
     bool IsKeepParams() { return m_bKeepParams; }
     int GetRotation() { return m_nRotation; }
     CJPEGImage* GetCurrentImage() { return m_pCurrentImage; }
-    LPCTSTR CurrentFileName(bool bFileNameOnly);
+    QString CurrentFileName(bool bFileNameOnly);
     const CRect& WindowRectOnClose() { return m_windowRectOnClose; } // only valid after having closed the window
     double GetZoomMultiplier(CJPEGImage* pImage, const CRect& clientRect);
     Helpers::EAutoZoomMode GetAutoZoomMode() { return m_bFullScreenMode ? m_eAutoZoomModeFullscreen : m_eAutoZoomModeWindowed; }
@@ -157,7 +157,7 @@ public:
 
 private:
 
-    CString m_sStartupFile; // file passed on command line
+    QString m_sStartupFile; // file passed on command line
     int m_nAutoStartSlideShow; // if positive: Auto start slide show with given interval in seconds, passed on command line
     bool m_bAutoExit;
     Helpers::ESorting m_eForcedSorting; // forced sorting mode on command line
@@ -236,7 +236,6 @@ private:
     CRect m_monitorRect;
     CRect m_clientRect;
     CRect m_windowRectOnClose;
-    CString m_sSaveDirectory;
     CKeyMap* m_pKeyMap;
     Helpers::ETransitionEffect m_eTransitionEffect;
     int m_nTransitionTime;
@@ -248,7 +247,7 @@ private:
     bool m_bSelectZoom;  // keeps track of select-to-zoom mode when CTRL+SHIFT+LMouse
 
     void ExploreFile();
-    void OpenFile(LPCTSTR sFileName, bool bAfterStartup);
+    void OpenFile(const QString& fileName, bool bAfterStartup);
     void GotoImage(EImagePosition ePos, int nFlags);
     bool PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, bool bAdjustWindowToImage);
     double GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge);
@@ -305,21 +304,20 @@ private:
     void ChangeFolderLanguage();
     void OpenDefaultEditor();
 
-    CString ReplaceNoCase(LPCTSTR instr,LPCTSTR oldstr,LPCTSTR newstr);
-    CString LoadBookmark(LPCTSTR sFilePath);
+    QString LoadBookmark(const QString& sFilePath);
     void SaveBookmark();
-    bool IsBookModeFile(LPCTSTR sFilePath);
+    bool IsBookModeFile(const QString& filePath);
     float MaxRatio(float valA, float valB);
-    CString GetMultiframeIndex(CJPEGImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
+    QString GetMultiframeIndex(CJPEGImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
     QString FormatFileSize(qint64 nFileSize);
     QString formatOutputZoomFactor(double m_dZoom);
     bool isRunningInWine();
-    bool IsLinuxBinaryAvailable(LPCTSTR szUnixPath);
-    CString GetUnixPathFromWine(LPCTSTR szDosPath);
+    bool IsLinuxBinaryAvailable(const QString& unixPath);
+    QString GetUnixPathFromWine(const QString& szDosPath);
 
     // [sdneon] Toast stuff
-    CString m_strToast;
-    void SetToast(LPCTSTR a_strToast, DWORD a_nDurationMs = 3000);
+    QString m_strToast;
+    void SetToast(const QString& strToast, DWORD nDurationMs = 3000);
     void ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting);
     
     int m_customAnimationFrameTime;

@@ -22,6 +22,10 @@
 #include <filesystem>
 #include <string>
 
+#include <QString>
+#include <QFile>
+#include <QFileInfo>
+
 #include <gdiplus.h>
 
 using namespace Gdiplus;
@@ -38,45 +42,46 @@ volatile int CImageLoadThread::m_curHandle = 0;
 
 namespace {
 
-	EImageFormat GetImageFormatFromName(LPCTSTR sFileName) {
-		LPCTSTR sEnding = _tcsrchr(sFileName, _T('.'));
-		if (sEnding != NULL) {
-			sEnding += 1;
-			if (_tcsicmp(sEnding, _T("JPG")) == 0 || _tcsicmp(sEnding, _T("JPEG")) == 0 || _tcsicmp(sEnding, _T("JFIF")) == 0) {
-				return IF_JPEG;
-			} else if (_tcsicmp(sEnding, _T("BMP")) == 0) {
-				return IF_WindowsBMP;
-			} else if (_tcsicmp(sEnding, _T("PNG")) == 0) {
-				return IF_PNG;
-			} else if (_tcsicmp(sEnding, _T("TIF")) == 0 || _tcsicmp(sEnding, _T("TIFF")) == 0) {
-				return IF_TIFF;
-			} else if (_tcsicmp(sEnding, _T("WEBP")) == 0) {
-				return IF_WEBP;
-			} else if (_tcsicmp(sEnding, _T("JXL")) == 0) {
-				return IF_JXL;
-			} else if (_tcsicmp(sEnding, _T("AVIF")) == 0) {
-				return IF_AVIF;
-			} else if (_tcsicmp(sEnding, _T("HEIF")) == 0 || _tcsicmp(sEnding, _T("HEIC")) == 0 || _tcsicmp(sEnding, _T("HIF")) == 0) {
-				return IF_HEIF;
-			} else if (_tcsicmp(sEnding, _T("TGA")) == 0) {
-				return IF_TGA;
-			} else if ((_tcsicmp(sEnding, _T("ZIP")) == 0) || (_tcsicmp(sEnding, _T("CBZ")) == 0)
-				|| (_tcsicmp(sEnding, _T("7Z")) == 0) || (_tcsicmp(sEnding, _T("CB7")) == 0)) {
-				return IF_ZIP;
-			} else if (_tcsicmp(sEnding, _T("QOI")) == 0) {
-				return IF_QOI;
-			} else if (_tcsicmp(sEnding, _T("PSD")) == 0) {
-				return IF_PSD;
-			}
-		}
-		return IF_Unknown;
-	}
+    EImageFormat GetImageFormatFromName(const QString& sFileName) {
+        const QString sEnding = QFileInfo(sFileName).suffix().toLower();
+        if (sEnding.isEmpty()) {
+            return IF_Unknown;
+        }
+
+        if (sEnding == QStringLiteral("jpg") || sEnding == QStringLiteral("jpeg") || sEnding == QStringLiteral("jfif")) {
+            return IF_JPEG;
+        } else if (sEnding == QStringLiteral("bmp")) {
+            return IF_WindowsBMP;
+        } else if (sEnding == QStringLiteral("png")) {
+            return IF_PNG;
+        } else if (sEnding == QStringLiteral("tif") || sEnding == QStringLiteral("tiff")) {
+            return IF_TIFF;
+        } else if (sEnding == QStringLiteral("webp")) {
+            return IF_WEBP;
+        } else if (sEnding == QStringLiteral("jxl")) {
+            return IF_JXL;
+        } else if (sEnding == QStringLiteral("avif")) {
+            return IF_AVIF;
+        } else if (sEnding == QStringLiteral("heif") || sEnding == QStringLiteral("heic") || sEnding == QStringLiteral("hif")) {
+            return IF_HEIF;
+        } else if (sEnding == QStringLiteral("tga")) {
+            return IF_TGA;
+        } else if (sEnding == QStringLiteral("zip") || sEnding == QStringLiteral("cbz") || sEnding == QStringLiteral("7z") || sEnding == QStringLiteral("cb7")) {
+            return IF_ZIP;
+        } else if (sEnding == QStringLiteral("qoi")) {
+            return IF_QOI;
+        } else if (sEnding == QStringLiteral("psd")) {
+            return IF_PSD;
+        }
+
+        return IF_Unknown;
+    }
 	
 	// find image format from an in-memory 16-byte header, with sFileName used only
 	// as a fallback for the extension-based check (Helpers::GetImageFormat) and the
 	// magic-byte checks that must run after it. sFileName does not need to point to
 	// an actual file on disk - only its name/extension is used here.
-	EImageFormat GetImageFormatInMemory(const unsigned char* pHeader, LPCTSTR sFileName) {
+    EImageFormat GetImageFormatInMemory(const unsigned char* pHeader, const QString& sFileName) {
 
 		if (pHeader[0] == 0x42 && pHeader[1] == 0x4d) {
 			return IF_WindowsBMP;
@@ -133,20 +138,22 @@ namespace {
 	}
 
 	// opens the file, reads up to 16 header bytes, and determines the image format
-	EImageFormat GetImageFormat(LPCTSTR sFileName) {
-		FILE *fptr;
-		if ((fptr = _tfopen(sFileName, _T("rb"))) == NULL) {
-			return IF_Unknown;
-		}
-		unsigned char header[16] = { 0 };
-		int nSize = (int)fread((void*)header, 1, 16, fptr);
-		fclose(fptr);
-		if (nSize < 2) {
-			return IF_Unknown;
-		}
+    EImageFormat GetImageFormat(const QString& sFileName) {
+        QFile file(sFileName);
+        if (!file.open(QIODevice::ReadOnly)) {
+            return IF_Unknown;
+        }
 
-		return GetImageFormatInMemory(header, sFileName);
-	}
+        unsigned char header[16] = { 0 };
+        const qint64 nSize = file.read(reinterpret_cast<char*>(header), sizeof(header));
+        file.close();
+
+        if (nSize < 2) {
+            return IF_Unknown;
+        }
+
+        return GetImageFormatInMemory(header, sFileName);
+    }
 
 	EImageFormat GetBitmapFormat(Gdiplus::Bitmap * pBitmap) {
 		GUID guid{ 0 };
@@ -250,24 +257,6 @@ namespace {
 		return pJPEGImage;
 	}
 
-    // Wandelt eine Extension in einen Lower-Case wstring um
-    std::wstring get_lowercase_extension(const wchar_t* sFileName) {
-        if (!sFileName) return L"";
-
-        // fs::path akzeptiert const wchar_t* direkt
-        std::filesystem::path filePath(sFileName);
-
-        // .wstring() gibt die Extension als std::wstring zurück (z. B. L".CBZ")
-        std::wstring ext = filePath.extension().wstring();
-
-        // Case-Insensitive Transformation für Wide-Characters
-        std::ranges::transform(ext, ext.begin(), [](wchar_t c) {
-            return static_cast<wchar_t>(std::towlower(c));
-        });
-
-        return ext;
-    }
-
 } // namespace
 
 
@@ -288,7 +277,7 @@ CImageLoadThread::~CImageLoadThread(void) {
     DeleteCachedZip();
 }
 
-int CImageLoadThread::AsyncLoad(LPCTSTR strFileName, int nFrameIndex, const CProcessParams & processParams, HWND targetWnd, HANDLE eventFinished) {
+int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, HWND targetWnd, HANDLE eventFinished) {
     CRequest* pRequest = new CRequest(strFileName, nFrameIndex, targetWnd, processParams, eventFinished);
 
     ProcessAsync(pRequest);
@@ -316,7 +305,8 @@ CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
     return CImageData(imageFound, bFailedMemory, bFailedException);
 }
 
-void CImageLoadThread::ReleaseFile(LPCTSTR strFileName) {
+void CImageLoadThread::ReleaseFile(const QString& strFileName) {
+	
     CReleaseFileRequest* pRequest = new CReleaseFileRequest(strFileName);
     ProcessAndWait(pRequest);
 }
@@ -493,22 +483,22 @@ void CImageLoadThread::DeleteCachedGDIBitmap() {
         delete m_pLastBitmap;
     }
     m_pLastBitmap = NULL;
-    m_sLastFileName.Empty();
+    m_sLastFileName.clear();
 }
 
 void CImageLoadThread::DeleteCachedWebpDecoder() {
     WebpReaderWriter::DeleteCache();
-    m_sLastWebpFileName.Empty();
+    m_sLastWebpFileName.clear();
 }
 
 void CImageLoadThread::DeleteCachedPngDecoder() {
     PngReader::DeleteCache();
-    m_sLastPngFileName.Empty();
+    m_sLastPngFileName.clear();
 }
 
 void CImageLoadThread::DeleteCachedJxlDecoder() {
     JxlReader::DeleteCache();
-    m_sLastJxlFileName.Empty();
+    m_sLastJxlFileName.clear();
 }
 
 void CImageLoadThread::DeleteCachedAvifDecoder() {
@@ -518,11 +508,11 @@ void CImageLoadThread::DeleteCachedAvifDecoder() {
         AvifReader::DeleteCache();
     } catch (...) {}
     SetErrorMode(nPrevErrorMode);
-    m_sLastAvifFileName.Empty();
+    m_sLastAvifFileName.clear();
 }
 
 void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
-    HANDLE hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = ::CreateFile(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
         return;
     }
@@ -588,7 +578,7 @@ void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
 
 void CImageLoadThread::ProcessReadBMPRequest(CRequest * request) {
     bool bOutOfMemory;
-    request->Image = CReaderBMP::ReadBmpImage(request->FileName, bOutOfMemory);
+    request->Image = CReaderBMP::ReadBmpImage(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), bOutOfMemory);
     if (bOutOfMemory) {
         request->OutOfMemory = true;
     } else if (request->Image == NULL) {
@@ -599,7 +589,7 @@ void CImageLoadThread::ProcessReadBMPRequest(CRequest * request) {
 
 void CImageLoadThread::ProcessReadTGARequest(CRequest * request) {
     bool bOutOfMemory;
-    request->Image = CReaderTGA::ReadTgaImage(request->FileName, request->ProcessParams.TransparencyMode, bOutOfMemory);
+    request->Image = CReaderTGA::ReadTgaImage(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), request->ProcessParams.TransparencyMode, bOutOfMemory);
     if (bOutOfMemory) {
         request->OutOfMemory = true;
     }
@@ -607,9 +597,7 @@ void CImageLoadThread::ProcessReadTGARequest(CRequest * request) {
 
 void CImageLoadThread::ProcessReadWEBPRequest(CRequest * request) {
     bool bUseCachedDecoder = false;
-    const wchar_t* sFileName;
-    sFileName = (const wchar_t*)request->FileName;
-    if (sFileName != m_sLastWebpFileName) {
+    if (request->FileName != m_sLastWebpFileName) {
         DeleteCachedWebpDecoder();
     }
     else {
@@ -618,7 +606,7 @@ void CImageLoadThread::ProcessReadWEBPRequest(CRequest * request) {
 
     HANDLE hFile;
     if (!bUseCachedDecoder) {
-        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        hFile = ::CreateFile(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
         if (hFile == INVALID_HANDLE_VALUE) {
             return;
         }
@@ -656,7 +644,7 @@ void CImageLoadThread::ProcessReadWEBPRequest(CRequest * request) {
                 Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
 
                 if (bHasAnimation) {
-                    m_sLastWebpFileName = sFileName;
+                    m_sLastWebpFileName = request->FileName;
                 }
                 request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, nBPP, 0, IF_WEBP, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
                 free(pEXIFData);
@@ -678,9 +666,8 @@ void CImageLoadThread::ProcessReadWEBPRequest(CRequest * request) {
 
 void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
     bool bUseCachedDecoder = false;
-    const wchar_t* sFileName;
-    sFileName = (const wchar_t*)request->FileName;
-    if (sFileName != m_sLastPngFileName) {
+
+    if (request->FileName != m_sLastPngFileName) {
         DeleteCachedPngDecoder();
     }
     else {
@@ -689,7 +676,7 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
 
     HANDLE hFile;
     if (!bUseCachedDecoder) {
-        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        hFile = ::CreateFile(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
         if (hFile == INVALID_HANDLE_VALUE) {
             return;
         }
@@ -727,7 +714,7 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
             pPixelData = (uint8*)PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
             if (pPixelData != NULL) {
                 if (bHasAnimation)
-                    m_sLastPngFileName = sFileName;
+                    m_sLastPngFileName = request->FileName;
                 // Multiply alpha value into each AABBGGRR pixel
                 Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
                 request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
@@ -764,11 +751,8 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
 
 void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
     bool bUseCachedDecoder = false;
-    const wchar_t* sFileName;
-    sFileName = (const wchar_t*)request->FileName;
 
-
-    if (sFileName != m_sLastJxlFileName) {
+    if (request->FileName != m_sLastJxlFileName) {
         DeleteCachedJxlDecoder();
     } else {
         bUseCachedDecoder = true;
@@ -776,7 +760,7 @@ void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
     
     HANDLE hFile;
     if (!bUseCachedDecoder) {
-        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        hFile = ::CreateFile(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
         if (hFile == INVALID_HANDLE_VALUE) {
             return;
         }
@@ -809,7 +793,7 @@ void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
             uint8* pPixelData = (uint8*)JxlReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
             if (pPixelData != NULL) {
                 if (bHasAnimation) {
-                    m_sLastJxlFileName = sFileName;
+                    m_sLastJxlFileName = request->FileName;
                     }
                 // Multiply alpha value into each AABBGGRR pixel
                 Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
@@ -840,9 +824,8 @@ void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
 void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
     bool bSuccess = false;
     bool bUseCachedDecoder = false;
-    const wchar_t* sFileName;
-    sFileName = (const wchar_t*)request->FileName;
-    if (sFileName != m_sLastAvifFileName) {
+
+    if (request->FileName != m_sLastAvifFileName) {
         DeleteCachedAvifDecoder();
     } else {
         bUseCachedDecoder = true;
@@ -850,7 +833,7 @@ void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
 
     HANDLE hFile;
     if (!bUseCachedDecoder) {
-        hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        hFile = ::CreateFile(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
         if (hFile == INVALID_HANDLE_VALUE) {
             return;
         }
@@ -884,7 +867,7 @@ void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
                 nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer, nFileSize);
             if (pPixelData != NULL) {
                 if (bHasAnimation)
-                    m_sLastAvifFileName = sFileName;
+                    m_sLastAvifFileName = request->FileName;
                 // Multiply alpha value into each AABBGGRR pixel
                 Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
                 request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_AVIF, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
@@ -911,7 +894,7 @@ void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
 
 void CImageLoadThread::ProcessReadHEIFRequest(CRequest* request) {
     HANDLE hFile;
-    hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    hFile = ::CreateFile(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
         return;
     }
@@ -961,15 +944,15 @@ void CImageLoadThread::ProcessReadHEIFRequest(CRequest* request) {
 }
 
 void CImageLoadThread::ProcessReadPSDRequest(CRequest* request) {
-    request->Image = PsdReader::ReadImage(request->FileName, request->ProcessParams.TransparencyMode, request->OutOfMemory);
+    request->Image = PsdReader::ReadImage(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), request->ProcessParams.TransparencyMode, request->OutOfMemory);
     if (request->Image == NULL && !request->OutOfMemory) {
-        request->Image = PsdReader::ReadThumb(request->FileName, request->OutOfMemory);
+        request->Image = PsdReader::ReadThumb(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), request->OutOfMemory);
     }
 }
 
 void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
     HANDLE hFile;
-    hFile = ::CreateFile(request->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    hFile = ::CreateFile(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
         return;
     }
@@ -1011,16 +994,14 @@ void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
 }
 
 void CImageLoadThread::ProcessReadGDIPlusRequest(CRequest * request) {
-    const wchar_t* sFileName;
-    sFileName = (const wchar_t*)request->FileName;
-
     Gdiplus::Bitmap* pBitmap = NULL;
-    if (sFileName == m_sLastFileName) {
+
+    if (request->FileName == m_sLastFileName) {
         pBitmap = m_pLastBitmap;
     } else {
         DeleteCachedGDIBitmap();
-        m_pLastBitmap = pBitmap = new Gdiplus::Bitmap(sFileName, CSettingsProvider::This().UseEmbeddedColorProfiles());
-        m_sLastFileName = sFileName;
+        m_pLastBitmap = pBitmap = new Gdiplus::Bitmap(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), CSettingsProvider::This().UseEmbeddedColorProfiles());
+        m_sLastFileName = request->FileName;
     }
     bool isOutOfMemory, isAnimatedGIF;
     request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, request->FrameIndex, NULL, 0, isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
@@ -1083,14 +1064,20 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
 // #################################################
 
 ZipEntry::ZipEntry(const char* a_pchName, unsigned int a_index, unsigned long long a_size) :
-    name(a_pchName),
+    name(QString::fromUtf8(a_pchName)),
+    //ext(QFileInfo(name).suffix().toLower()),
     index(a_index),
     size(a_size)
 {
 }
 
-ZipEntry::ZipEntry(bit7z::tstring a_name, unsigned int a_index, unsigned long long a_size) :
-    name(a_name.c_str()),
+ZipEntry::ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned long long a_size) :
+#if defined(BIT7Z_STRING_IS_U16) || defined(_UNICODE)
+    name(QString::fromUtf16(reinterpret_cast<const char16_t*>(a_name.c_str()))),
+#else
+    name(QString::fromLocal8Bit(a_name.c_str())),
+#endif
+    //ext(QFileInfo(name).suffix().toLower()),
     index(a_index),
     size(a_size)
 {
@@ -1104,10 +1091,8 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
     bool bSuccess = false;
     bool bIsSameArchive = false;
     bool bMultipleFiles = false;
-    const wchar_t* sFileName;
     int nArchiveItemIndex = request->FrameIndex;    // For archives, we treat request->FrameIndex as the index of the file in the archive to display
     int nFrameIndexFixed = 0;
-    sFileName = (const wchar_t*)request->FileName;
 
 /*
 Note on "request->FrameIndex":
@@ -1127,7 +1112,7 @@ Note on "request->FrameIndex":
 */
 
 
-    if (sFileName == m_sLastZipFileName) {
+    if (request->FileName == m_sLastZipFileName) {
         if (m_nZipCount <= 0)
             return; //abort as no valid image entries in archive; all marked as non-image
 
@@ -1139,8 +1124,7 @@ Note on "request->FrameIndex":
         request->FrameIndex = nArchiveItemIndex;
         bMultipleFiles = m_nZipCount > 1;
 
-    }
-    else {
+    } else {
         // New ZIP. Delete all cached decoders.
         DeleteCachedGDIBitmap();
         DeleteCachedWebpDecoder();
@@ -1151,15 +1135,10 @@ Note on "request->FrameIndex":
 
     }
 
-    std::wstring ext = get_lowercase_extension(sFileName);
-    bool use7z = !(ext == L".cbz" || ext == L".zip");
+    const QString ext = QFileInfo(request->FileName).suffix().toLower();
+    bool use7z = !(ext == QStringLiteral("cbz") || ext == QStringLiteral("zip"));
 
-    // std::filesystem::path akzeptiert wchar_t* / std::wstring direkt
-    std::filesystem::path filePath(request->FileName.GetString());
-
-    // .u8string() gibt unter C++20 einen std::u16string/std::u8string zurück
-    // .string() wandelt den Pfad nativ & sicher in den UTF-8 String um
-    std::string bufFilename = filePath.string();
+    const std::string bufFilename = request->FileName.toUtf8().constData();
 
     struct zip_t* zip = NULL;
     BitArchiveReader* zip7 = NULL;
@@ -1212,7 +1191,7 @@ Note on "request->FrameIndex":
         
         if (m_nZipCount > 1) {
             bMultipleFiles = true;
-            m_sLastZipFileName = sFileName;
+            m_sLastZipFileName = request->FileName;
         }
         
         if (nArchiveItemIndex >= m_nZipCount)
@@ -1227,7 +1206,7 @@ Note on "request->FrameIndex":
     do {
         try {
             ZipEntry z = zipEntries.at(nArchiveItemIndex);
-            CString& name = z.name;
+            const QString& name = z.name;
             uint64_t nFileSize = z.size;
             
         
@@ -1276,7 +1255,7 @@ Note on "request->FrameIndex":
                         if (pPixelData != NULL) {
                             if (bHasAnimation) {
                                 bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-                                m_sLastJxlFileName = sFileName;
+                                m_sLastJxlFileName = request->FileName;
                             }
 
                             // Multiply alpha value into each AABBGGRR pixel
@@ -1323,7 +1302,7 @@ Note on "request->FrameIndex":
                         if (pPixelData != NULL) {
                             if (bHasAnimation) {
                                 bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-                                m_sLastPngFileName = sFileName;
+                                m_sLastPngFileName = request->FileName;
                             }
                             // Multiply alpha value into each AABBGGRR pixel
                             Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
@@ -1345,7 +1324,7 @@ Note on "request->FrameIndex":
                         if (pPixelData && nBPP == 4) {
                             if (bHasAnimation) {
                                 bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-                                m_sLastWebpFileName = sFileName;
+                                m_sLastWebpFileName = request->FileName;
                             }
                             // Multiply alpha value into each AABBGGRR pixel
                             Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
@@ -1391,7 +1370,7 @@ Note on "request->FrameIndex":
                         if (pPixelData != NULL) {
                             if (bHasAnimation) {
                                 bZipBufferHandedOver = true; // Decoder caches buffer. Don't free.
-                                m_sLastAvifFileName = sFileName;
+                                m_sLastAvifFileName = request->FileName;
                             }
                             // Multiply alpha value into each AABBGGRR pixel
                             Helpers::BlendAlpha((uint32*)pPixelData, nWidth, nHeight, request->ProcessParams.TransparencyMode);
@@ -1457,9 +1436,9 @@ Note on "request->FrameIndex":
         if (!bSuccess) {
             //erase non-image entry
             ZipEntry z = zipEntries.at(nArchiveItemIndex);
-            CString& name = z.name;
+            const QString& name = z.name;
             uint64_t nFileSize = z.size;
-            
+            qDebug() << "ProcessReadZipRequest() Failed to open item index" << nArchiveItemIndex << " name:" << name << " bytes:" << nFileSize;
         
             zipEntries.erase(zipEntries.begin() + nArchiveItemIndex);
             if ((--m_nZipCount <= 0) || (nArchiveItemIndex >= m_nZipCount)) {
@@ -1472,7 +1451,7 @@ Note on "request->FrameIndex":
 
 void CImageLoadThread::DeleteCachedZip()
 {
-    m_sLastZipFileName.Empty();
+    m_sLastZipFileName.clear();
     m_nZipCount = 0;
     zipEntries.clear();
 }

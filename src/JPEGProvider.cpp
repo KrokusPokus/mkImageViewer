@@ -60,9 +60,9 @@ CJPEGProvider::~CJPEGProvider(void) {
 // ---------------------------------------------------------------------------------------------
 
 CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirection eDirection,
-                                        const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams,
+                                        const QString& sFileName, int nFrameIndex, const CProcessParams & processParams,
                                         bool& bOutOfMemory, bool& bExceptionError) {
-    if (sFileName.empty()) {
+    if (sFileName.isEmpty()) {
         bOutOfMemory = false;
         bExceptionError = false;
         return nullptr;
@@ -82,10 +82,8 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
     // Search if we have the requested image already present or in progress
     CImageRequest* pRequest = FindRequest(sFileName, nFrameIndex);
     bool bWasOutOfMemory = false;
-/* Debugging */    TCHAR debugtext[1024];
     if (pRequest == nullptr) {
-/* Debugging */    swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() -> StartNewRequest() Frame %d  of  %s"), nFrameIndex, sFileName.c_str());
-/* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "CJPEGProvider::RequestImage() -> StartNewRequest() Frame" << nFrameIndex << "of" << sFileName;
         // no request pending for this file, add to request queue and start async
         pRequest = StartNewRequest(sFileName, nFrameIndex, processParams);
         // wait with read ahead when direction changed - maybe user just wants to re-see last image
@@ -94,18 +92,13 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
             StartNewRequestBundle(pFileList, eDirection, processParams, m_nNumThread - 1, pRequest);
         }
     }
-/* Debugging */    else {
-/* Debugging */        swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() Retrieving existing request: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
-/* Debugging */        ::OutputDebugStringW(debugtext);
-/* Debugging */    }
+    else {
+/* Debugging */ qDebug() << "CJPEGProvider::RequestImage() Retrieving existing request: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
+    }
 
     // wait for request if not yet ready
     if (!pRequest->Ready) {
-#ifndef NDEBUG
-        std::wcerr << L"Waiting for request: " << pRequest->FileName << L"\n";
-#endif
-/* Debugging */    swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() waiting for image to finish loading from disk: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
-/* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "CJPEGProvider::RequestImage() waiting for image to finish loading from disk: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
         ::WaitForSingleObject(pRequest->EventFinished, INFINITE);
         GetLoadedImageFromWorkThread(pRequest);
     } else {
@@ -113,15 +106,11 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
         if (pImage != nullptr) {
             // make sure the initial parameters are reset as when keep params was on before they are wrong
             EProcessingFlags procFlags = processParams.ProcFlags;
-            pImage->RestoreInitialParameters(sFileName.c_str(), processParams.ImageProcParams, procFlags,
+            pImage->RestoreInitialParameters(sFileName, processParams.ImageProcParams, procFlags,
                 processParams.RotationParams.Rotation, processParams.Zoom, processParams.Offsets, 
                 CSize(processParams.TargetWidth, processParams.TargetHeight), processParams.MonitorSize);
         }
-#ifndef NDEBUG
-        std::wcerr << L"Found in cache: " << pRequest->FileName << L"\n";
-#endif
-/* Debugging */    swprintf(debugtext,1024,TEXT("CJPEGProvider::RequestImage() found in cache: Frame %d  of  %s"), pRequest->FrameIndex, pRequest->FileName.c_str());
-/* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "CJPEGProvider::RequestImage() found in cache: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
     }
 
     // set before removing unused images!
@@ -131,9 +120,6 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
     if (pRequest->OutOfMemory) {
         // The request could not be satisfied because the system is out of memory.
         // Clear all memory and try again - maybe some readahead requests can be deleted
-#ifndef NDEBUG
-        std::wcerr << L"Retrying request because out of memory: " << pRequest->FileName << L"\n";
-#endif
         bWasOutOfMemory = true;
         if (FreeAllPossibleMemory()) {
             DeleteElement(pRequest);
@@ -205,7 +191,7 @@ bool CJPEGProvider::FreeAllPossibleMemory() {
 //     m_pMainDlg->GetFileList()->FileHasRenamed(sCurFileName, sNewFileName);
 //     m_pMainDlg->GetJPEGProvider()->FileHasRenamed(sCurFileName, sNewFileName);
 /*
-void CJPEGProvider::FileHasRenamed(const std::wstring& oldFileName, const std::wstring& newFileName) {
+void CJPEGProvider::FileHasRenamed(const QString& oldFileName, const QString& newFileName) {
     for (auto* request : m_requestList) {
         if (oldFileName == request->FileName) {
             request->FileName = newFileName;
@@ -224,7 +210,7 @@ bool CJPEGProvider::ClearRequest(CJPEGImage* pImage, bool releaseLockedFile) {
     for (iter = m_requestList.begin( ); iter != m_requestList.end( ); iter++ ) {
         if ((*iter)->Image == pImage) {
             if (releaseLockedFile) {
-                m_pWorkThreads[0]->ReleaseFile((*iter)->FileName.c_str());
+                m_pWorkThreads[0]->ReleaseFile((*iter)->FileName);
             }
             // images that are not ready cannot be removed yet
             if ((*iter)->Ready) {
@@ -256,8 +242,8 @@ void CJPEGProvider::OnImageLoadCompleted(int nHandle) {
     }
 }
 
-CJPEGProvider::CImageRequest* CJPEGProvider::FindRequest(const std::wstring& sFileName, int nFrameIndex) {
-    if (sFileName.empty()) {
+CJPEGProvider::CImageRequest* CJPEGProvider::FindRequest(const QString& sFileName, int nFrameIndex) {
+    if (sFileName.isEmpty()) {
         return nullptr;
     }
 
@@ -288,7 +274,7 @@ CJPEGProvider::CImageRequest* CJPEGProvider::FindRequest(const std::wstring& sFi
     return nullptr;
 }
 
-CJPEGProvider::CImageRequest* CJPEGProvider::StartRequestAndWaitUntilReady(const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams) {
+CJPEGProvider::CImageRequest* CJPEGProvider::StartRequestAndWaitUntilReady(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
     CImageRequest* pRequest = StartNewRequest(sFileName, nFrameIndex, processParams);
     ::WaitForSingleObject(pRequest->EventFinished, INFINITE);
     GetLoadedImageFromWorkThread(pRequest);
@@ -339,11 +325,9 @@ void CJPEGProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirect
             nFrameIndex = 0;
         }
 
-        LPCTSTR sFileNameRaw = bSwitchImage ? pFileList->PeekNextPrev((iDistance>0) ? iDistance : -iDistance, eDirection == FORWARD) : pFileList->Current();
+        QString sFileName = bSwitchImage ? pFileList->PeekNextPrev((iDistance>0) ? iDistance : -iDistance, eDirection == FORWARD) : pFileList->Current();
 
-        if (sFileNameRaw != nullptr) {
-            std::wstring sFileName(sFileNameRaw);
-
+        if (!sFileName.isEmpty()) {
             // When precaching, don't try to cache the pLastReadyRequest again.
             // The only situation where we would have to access the same file again is with
             if (pLastReadyRequest->FileName == sFileName && pLastReadyRequest->FrameIndex == nFrameIndex) {
@@ -368,27 +352,18 @@ void CJPEGProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirect
     }
 }
 
-CJPEGProvider::CImageRequest* CJPEGProvider::StartNewRequest(const std::wstring& sFileName, int nFrameIndex, const CProcessParams & processParams) {
-/* Debugging */    TCHAR debugtext[1024];
-/* Debugging */    swprintf(debugtext, 1024, TEXT("StartNewRequest(%s, %d)"), sFileName.c_str(), nFrameIndex);
-/* Debugging */    ::OutputDebugStringW(debugtext);
-
-    CImageRequest* pRequest = new CImageRequest(sFileName.c_str(), nFrameIndex);
-#ifndef NDEBUG
-    std::wcerr << L"Start new request: " << pRequest->FileName << L"\n";
-#endif
+CJPEGProvider::CImageRequest* CJPEGProvider::StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
+/* Debugging */    qDebug() << "StartNewRequest() sFileName:" << sFileName << "nFrameIndex:" << nFrameIndex;
+    CImageRequest* pRequest = new CImageRequest(sFileName, nFrameIndex);
     m_requestList.push_back(pRequest);
     pRequest->HandlingThread = SearchThreadForNewRequest();
-    pRequest->Handle = pRequest->HandlingThread->AsyncLoad(pRequest->FileName.c_str(), nFrameIndex,
+    pRequest->Handle = pRequest->HandlingThread->AsyncLoad(pRequest->FileName, nFrameIndex,
         processParams, m_hHandlerWnd, pRequest->EventFinished);
     return pRequest;
 }
 
 void CJPEGProvider::GetLoadedImageFromWorkThread(CImageRequest* pRequest) {
     if (pRequest->HandlingThread != nullptr) {
-#ifndef NDEBUG
-        std::wcerr << L"Finished request: " << pRequest->FileName << L"\n";
-#endif
         CImageData imageData = pRequest->HandlingThread->GetLoadedImage(pRequest->Handle);
         pRequest->Image = imageData.Image;
         pRequest->OutOfMemory = imageData.IsRequestFailedOutOfMemory;
@@ -445,9 +420,6 @@ void CJPEGProvider::RemoveUnusedImages(bool bRemoveAlsoActiveRequests) {
                 // remove the readahead images - if we get here with read ahead, the strategy was wrong and
                 // the read ahead image is not used.
                 if ((*iter)->AccessTimeStamp == nTimeStampToRemove || IsDestructivelyProcessed((*iter)->Image)) {
-#ifndef NDEBUG
-                    std::wcerr << L"Delete request: " << (*iter)->FileName << L"\n";
-#endif
                     DeleteElementAt(iter);
                     bRemoved = true;
                     break;

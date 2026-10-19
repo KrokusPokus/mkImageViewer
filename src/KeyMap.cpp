@@ -170,7 +170,7 @@ static CString _GetKeyShortcutName(int nShortcut) {
 // if none of those, then (JPEGView root)\KeyMap.txt.default
 CKeyMap::CKeyMap() {
     FILE* fkm_ptr;
-    CString exe_path = CString(CSettingsProvider::This().GetEXEPath());
+    CString exe_path = reinterpret_cast<const TCHAR*>(CSettingsProvider::This().GetEXEPath().utf16());
 
     // TODO: ParseCommandLineForKeyMapFile or something... where you can specify a custom full file path name for a keymap you'd like to use instead of the default search order
 

@@ -2,6 +2,7 @@
 #define JPEGIMAGE_H
 
 #include "ProcessParams.h"
+#include <QString>
 
 class CHistogram;
 class CLocalDensityCorr;
@@ -160,13 +161,13 @@ public:
 
     // Restores the initial parameters to the parameters dependent on the directory (not the file)
     // Outputs the processing flags set for this directory
-    void RestoreInitialParameters(LPCTSTR sFileName, const CImageProcessingParams& imageProcParams, 
+    void RestoreInitialParameters(const QString& sFileName, const CImageProcessingParams& imageProcParams, 
         EProcessingFlags & procFlags, int nRotation, double dZoom, CPoint offsets, CSize targetSize, CSize monitorSize);
 
     // To be called after creation of the object to initialize the initial processing parameters.
     // Input are the global defaults for the processing parameters, output (in pParams) are the
     // processing parameters for this file (maybe different from the global ones)
-    void SetFileDependentProcessParams(LPCTSTR sFileName, CProcessParams* pParams);
+    void SetFileDependentProcessParams(const QString& sFileName, CProcessParams* pParams);
 
     // Gets if the image was found in parameter DB
     bool IsInParamDB() const { return m_bInParamDB; }
@@ -217,8 +218,8 @@ public:
     bool IsRotationByEXIF() const { return m_bRotationByEXIF; }
 
     // Sets and gets the JPEG comment of this image (COM marker).
-    void SetJPEGComment(LPCTSTR sComment) { m_sJPEGComment = CString(sComment); }
-    LPCTSTR GetJPEGComment() { return m_sJPEGComment; }
+    void SetJPEGComment(const QString& sComment) { m_sJPEGComment = sComment; }
+    QString GetJPEGComment() { return m_sJPEGComment; }
 
     // Converts the target offset from 'center of image' based format to pixel coordinate format 
     static CPoint ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset);
@@ -245,7 +246,7 @@ private:
     void* m_pEXIFData;
     int m_nEXIFSize;
     CEXIFReader* m_pEXIFReader;
-    CString m_sJPEGComment;
+    QString m_sJPEGComment;
     int m_nOrigWidth, m_nOrigHeight; // these may changes by rotation
     int m_nInitOrigWidth, m_nInitOrigHeight; // original width of image when constructed (before any rotation and crop)
     int m_nOriginalChannels;

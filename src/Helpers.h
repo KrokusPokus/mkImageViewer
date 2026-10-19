@@ -2,6 +2,7 @@
 #define HELPERS_H
 
 #include "ImageProcessingTypes.h" // defines int8, uint8, int16, uint16, int32, uint32, EFilterType, EImageFormat
+#include <QString>
 
 class CJPEGImage;
 class CFileList;
@@ -203,7 +204,7 @@ namespace Helpers {
 
     // Finds a JPEG marker (beginning with 0xFF) in a JPEG stream. 
     // To find the first non-marker block, set nMarker to zero.
-    void* FindJPEGMarker(void* pJPEGStream, int nStreamLength, unsigned char nMarker);
+    const void* FindJPEGMarker(const void* pJPEGStream, int nStreamLength, unsigned char nMarker);
 
     // Finds the EXIF block in the JPEG bytes stream, NULL if no EXIF block
     void* FindEXIFBlock(void* pJPEGStream, int nStreamLength);
@@ -214,10 +215,10 @@ namespace Helpers {
     __int64 CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength);
 
     // try to convert a string from UTF-8. Returns empty string if no valid UTF-8 encoded string.
-    CString TryConvertFromUTF8(uint8* pComment, int nLengthInBytes);
+    QString TryConvertFromUTF8(const uint8_t* pComment, int nLengthInBytes);
 
     // Gets the content of the JPEG comment tag, empty string if no comment
-    CString GetJPEGComment(void* pJPEGStream, int nStreamLength);
+    QString GetJPEGComment(const void* pJPEGStream, int nStreamLength);
 
     // file size for file with handle
     __int64 GetFileSize(HANDLE hFile);

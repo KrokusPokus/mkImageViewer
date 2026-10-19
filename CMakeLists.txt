@@ -18,12 +18,8 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # Unicode-Unterstuetzung
 add_compile_definitions(UNICODE _UNICODE)
 
-# Plattform dependent folder mapping for libs (x64 -> lib64, x86 -> lib)
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(ARCH_DIR "lib64")
-else()
-    set(ARCH_DIR "lib")
-endif()
+# Plattform dependent folder mapping for libs
+set(ARCH_DIR "lib64")
 
 # --- 1. GLOBALE PERFORMANCE FLAGS & BUILD TYPE ---
 if(NOT CMAKE_BUILD_TYPE)
@@ -40,17 +36,27 @@ if(result)
     else()
         # Unter Linux (GCC/Clang) oder mit MSVC laeuft es sauber durch
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
     endif()
 endif()
 
 if(MSVC)
-    add_compile_options(/O2 /Ot /GL /arch:AVX2)
+    add_compile_options(
+        $<$<NOT:$<CONFIG:Debug>>:/O2>
+        $<$<NOT:$<CONFIG:Debug>>:/Ot>
+        $<$<NOT:$<CONFIG:Debug>>:/GL>
+        /arch:AVX2
+    )
 else()
     # -O3: Aggressive Optimierung
     # -march=native: Nutzt SSE/AVX der aktuellen CPU
     # -flto: Link Time Optimization (removed here, since enabled by "set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)" above
     # -fomit-frame-pointer: Befreit ein Register fuer Daten (statt Stack-Tracking)
-    add_compile_options(-O3 -march=native -fomit-frame-pointer)
+    add_compile_options(
+        $<$<NOT:$<CONFIG:Debug>>:-O3>
+        $<$<NOT:$<CONFIG:Debug>>:-march=native>
+        $<$<NOT:$<CONFIG:Debug>>:-fomit-frame-pointer>
+    )
 endif()
 
 # --- 2. QT & STANDARD SETUP ---
@@ -87,7 +93,7 @@ set(SOURCES
     src/SettingsProvider.cpp
     src/stdafx.cpp
     src/WorkThread.cpp
-    
+
     src/wrapperAVIF.cpp
     src/wrapperHEIF.cpp
     src/wrapperJXL.cpp
@@ -96,7 +102,7 @@ set(SOURCES
     src/wrapperQOI.cpp
     src/wrapperTJPEG.cpp
     src/wrapperWEBP.cpp
-    
+
     src/XMMImage.cpp
     src/zip/zip.c
 )
@@ -180,6 +186,5 @@ if(MSVC)
     # Linker-Optionen: PDB-Warnung unterdruecken & konfligierende Release-Bibliothek LIBCMT im Debug-Build ausschliessen
     target_link_options(JPEGView PRIVATE
         "/IGNORE:4099"
-        "$<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMT>"
     )
 endif()

@@ -10,6 +10,7 @@
 #include <QColor>
 #include <QSettings>
 #include <QDialog>
+
 #include <memory>
 
 // Interne Qt-Typen für Kompatibilität mit bestehenden Signaturen bereitstellen/konvertieren
@@ -192,14 +193,16 @@ public:
     int NumberOfCoresToUse() const { return m_nNumCores; }
     int SlideShowEffectTimeMs() const { return m_nSlideShowEffectTimeMs; }
 
+    const QString DefaultGUIFont() const { return m_defaultGUIFont; }
+    const QString ZoomFactorFont() const { return m_zoomFactorFont; }
+	
+    const QString CustomIniEditor() const { return m_sIniEditor; }
+    const QString GetEXEPath() const { return m_sEXEPath; }
+    const QString GetGlobalINIFileName() const { return m_sIniNameGlobal; }    // Get the file name with path of the global INI file (in EXE path)
+    const QString GetUserINIFileName() const { return m_sIniNameUser; }        // Get the file name with path of the user INI file (in AppData path)
+	
     // LPCTSTR Rückgabe über internen QString mittels utf16()
-    LPCTSTR CustomIniEditor() const { return reinterpret_cast<LPCTSTR>(m_sIniEditor.utf16()); }
-    LPCTSTR DefaultGUIFont() const { return reinterpret_cast<LPCTSTR>(m_defaultGUIFont.utf16()); }
-    LPCTSTR GetEXEPath() const { return reinterpret_cast<LPCTSTR>(m_sEXEPath.utf16()); }
-    LPCTSTR GetGlobalINIFileName() const { return reinterpret_cast<LPCTSTR>(m_sIniNameGlobal.utf16()); }    // Get the file name with path of the global INI file (in EXE path)
-    LPCTSTR GetUserINIFileName() const { return reinterpret_cast<LPCTSTR>(m_sIniNameUser.utf16()); }        // Get the file name with path of the user INI file (in AppData path)
     LPCTSTR Language() const { return reinterpret_cast<LPCTSTR>(m_sLanguage.utf16()); }
-    LPCTSTR ZoomFactorFont() const { return reinterpret_cast<LPCTSTR>(m_zoomFactorFont.utf16()); }
 
     void CopyUserINIFromTemplate();
     void SaveCustomSettings();

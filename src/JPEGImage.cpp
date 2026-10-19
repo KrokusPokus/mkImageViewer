@@ -426,7 +426,7 @@ void CJPEGImage::VerifyDIBPixelsCreated() {
     }
 }
 
-void CJPEGImage::RestoreInitialParameters(LPCTSTR sFileName, const CImageProcessingParams& imageProcParams, 
+void CJPEGImage::RestoreInitialParameters(const QString& sFileName, const CImageProcessingParams& imageProcParams,
                                           EProcessingFlags & procFlags, int nRotation, double dZoom, 
                                           CPoint offsets, CSize targetSize, CSize monitorSize) {
     // zoom and offsets must be initialized in all cases as they may not bo in param DB even when other parameters are
@@ -439,7 +439,7 @@ void CJPEGImage::RestoreInitialParameters(LPCTSTR sFileName, const CImageProcess
     m_imageProcParamsInitial = imageProcParams;
 }
 
-void CJPEGImage::SetFileDependentProcessParams(LPCTSTR sFileName, CProcessParams* pParams) {
+void CJPEGImage::SetFileDependentProcessParams(const QString& sFileName, CProcessParams* pParams) {
     m_bInParamDB = false;
     m_bHasZoomStoredInParamDB = false;
 

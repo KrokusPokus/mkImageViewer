@@ -6,6 +6,10 @@
 #include <chrono>
 #include <cstdint>
 
+#include <QString>
+#include <QStringDecoder>
+#include <QtEndian>
+
 
 namespace Helpers {
 	
@@ -95,36 +99,38 @@ namespace Helpers {
 		 }
 	}
 
-	void* FindJPEGMarker(void* pJPEGStream, int nStreamLength, unsigned char nMarker) {
-		uint8* pStream = (uint8*) pJPEGStream;
-		if (pStream == NULL || nStreamLength < 3 || pStream[0] != 0xFF || pStream[1] != 0xD8) {
-			return NULL; // not a JPEG
+	const void* FindJPEGMarker(const void* pJPEGStream, int nStreamLength, unsigned char nMarker) {
+		const uint8_t* pStream = static_cast<const uint8_t*>(pJPEGStream);
+		if (pStream == nullptr || nStreamLength < 3 || pStream[0] != 0xFF || pStream[1] != 0xD8) {
+			return nullptr; // not a JPEG
 		}
 		int nIndex = 2;
 		do {
 			if (pStream[nIndex] == 0xFF) {
 				// block header found, skip padding bytes
-				while (pStream[nIndex] == 0xFF && nIndex < nStreamLength) nIndex++;
+				while (nIndex < nStreamLength && pStream[nIndex] == 0xFF) nIndex++;
+				if (nIndex >= nStreamLength) break;
+
 				if (pStream[nIndex] == 0 || pStream[nIndex] == nMarker) {
 					break; // 0xFF 0x00 is part of pixel block, break
 				} else {
 					// it's a block marker, read length of block and skip the block
 					nIndex++;
-					if (nIndex+1 < nStreamLength) {
-						nIndex += pStream[nIndex]*256 + pStream[nIndex+1];
+					if (nIndex + 1 < nStreamLength) {
+						nIndex += pStream[nIndex] * 256 + pStream[nIndex + 1];
 					} else {
 						nIndex = nStreamLength;
 					}
 				}
 			} else {
-				break; // block with pixel data found, start hashing from here
+				break; // block with pixel data found
 			}
 		} while (nIndex < nStreamLength);
 
-		if (nMarker == 0 || (pStream[nIndex] == nMarker && pStream[nIndex-1] == 0xFF)) {
-			return &(pStream[nIndex-1]); // place on marker start
+		if (nIndex < nStreamLength && (nMarker == 0 || (pStream[nIndex] == nMarker && pStream[nIndex - 1] == 0xFF))) {
+			return &(pStream[nIndex - 1]); // place on marker start
 		} else {
-			return NULL;
+			return nullptr;
 		}
 	}
 
@@ -138,7 +144,7 @@ namespace Helpers {
 
 	__int64 CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength) {
 		uint8* pStream = (uint8*) pJPEGStream;
-		void* pPixelStart = FindJPEGMarker(pJPEGStream, nStreamLength, 0);
+        const void* pPixelStart = FindJPEGMarker(pJPEGStream, nStreamLength, 0);
 		if (pPixelStart == NULL) {
 			return 0;
 		}
@@ -169,69 +175,80 @@ namespace Helpers {
 		return ((__int64)crcValue << 32) + sumValue;
 	}
 
-	CString TryConvertFromUTF8(uint8* pComment, int nLengthInBytes) {
-		wchar_t* pCommentUnicode = new wchar_t[nLengthInBytes + 1];
-		char* pCommentBack = new char[nLengthInBytes + 1];
-		CString result;
-		int nCharsConverted = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, (LPCSTR)pComment, nLengthInBytes, pCommentUnicode, nLengthInBytes);
-		if (nCharsConverted > 0) {
-			pCommentUnicode[nCharsConverted] = 0;
-			if (::WideCharToMultiByte(CP_UTF8, 0, pCommentUnicode, -1, pCommentBack, nLengthInBytes + 1, NULL , NULL) > 0) {
-				if (memcmp(pComment, pCommentBack, nLengthInBytes) == 0) {
-					result = CString((LPCWSTR)pCommentUnicode);
-				}
-			}
-		}
-		delete[] pCommentUnicode;
-		delete[] pCommentBack;
-		return result;
-	}
 
-	CString GetJPEGComment(void* pJPEGStream, int nStreamLength) {
-		uint8* pCommentSeg = (uint8*)FindJPEGMarker(pJPEGStream, nStreamLength, 0xFE);
-		if (pCommentSeg == NULL) {
-			return CString("");
-		}
-		pCommentSeg += 2;
-		int nCommentLen = pCommentSeg[0]*256 + pCommentSeg[1] - 2;
-		if (nCommentLen <= 0) {
-			return CString("");
-		}
+// Versucht streng als validen UTF-8-String zu dekodieren (entspricht TryConvertFromUTF8)
+QString TryConvertFromUTF8(const uint8_t* pComment, int nLengthInBytes) {
+    auto utf8Decoder = QStringDecoder(QStringDecoder::Utf8, QStringDecoder::Flag::Stateless);
+    
+    // Dekodiert den Puffer als UTF-8
+    QString result = utf8Decoder(QByteArrayView(reinterpret_cast<const char*>(pComment), nLengthInBytes));
 
-		uint8* pComment = &(pCommentSeg[2]);
-		if (nCommentLen > 2 && (nCommentLen & 1) == 0) {
-			if (pComment[0] == 0xFF && pComment[1] == 0xFE) {
-				// UTF16 little endian
-				return CString((LPCWSTR)&(pComment[2]), (nCommentLen - 2) / 2);
-			} else if (pComment[0] == 0xFE && pComment[1] == 0xFF) {
-				// UTF16 big endian -> cannot read
-				return CString("");
-			}
-		}
+    // Falls ungültige Byte-Sequenzen enthalten waren, schlägt die Validierung fehl
+    if (utf8Decoder.hasError()) {
+        return {};
+    }
 
-		CString sConvertedFromUTF8 = TryConvertFromUTF8(pComment, nCommentLen);
-		if (!sConvertedFromUTF8.IsEmpty()) {
-			return (sConvertedFromUTF8.Find(_T("Intel(R) JPEG Library")) != -1) ? CString("") : sConvertedFromUTF8;
-		}
+    return result;
+}
 
-		// check if this is a reasonable string - it must contain enough characters between a and z and A and Z
-		if (nCommentLen < 7) {
-			return CString(""); // cannot check for such short strings, do not use
-		}
-		int nGoodChars = 0;
-		for (int i = 0; i < nCommentLen; i++) {
-			uint8 ch = pComment[i];
-			if (ch >= 'a' && ch <= 'z' ||  ch >= 'A' && ch <= 'Z' || ch == ' ' || ch == ',' || ch == '.' || ch >= '0' && ch <= '9') {
-				nGoodChars++;
-			}
-		}
-		// The Intel lib puts this useless comment into each JPEG it writes - filter this out as nobody is interested in that...
-		if (nCommentLen > 20 && strstr((char*)pComment, "Intel(R) JPEG Library") != NULL) {
-			return CString("");
-		}
+QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
+    const uint8_t* pCommentSeg = static_cast<const uint8_t*>(FindJPEGMarker(pJPEGStream, nStreamLength, 0xFE));
+    if (!pCommentSeg) {
+        return {};
+    }
+    
+    pCommentSeg += 2;
+    const int nCommentLen = pCommentSeg[0] * 256 + pCommentSeg[1] - 2;
+    if (nCommentLen <= 0) {
+        return {};
+    }
 
-		return (nGoodChars > nCommentLen * 8 / 10) ? CString((LPCSTR)pComment, nCommentLen) : CString("");
-	}
+    const uint8_t* pComment = &(pCommentSeg[2]);
+
+    if (nCommentLen > 2 && (nCommentLen & 1) == 0) {
+        // UTF-16 Little Endian (BOM 0xFF 0xFE)
+        if (pComment[0] == 0xFF && pComment[1] == 0xFE) {
+            return QString::fromUtf16(reinterpret_cast<const char16_t*>(&(pComment[2])), (nCommentLen - 2) / 2);
+        } 
+        // UTF-16 Big Endian (BOM 0xFE 0xFF)
+        else if (pComment[0] == 0xFE && pComment[1] == 0xFF) {
+            // Optional: Wenn Big-Endian doch unterstützt werden soll, dank Qt6 sehr einfach:
+            // return QString::fromUcs2(reinterpret_cast<const char16_t*>(&(pComment[2])), (nCommentLen - 2) / 2, QSysInfo::BigEndian);
+            return {};
+        }
+    }
+
+    // 1. Versuch: UTF-8 Dekodierung
+    const QString sConvertedFromUTF8 = TryConvertFromUTF8(pComment, nCommentLen);
+    if (!sConvertedFromUTF8.isEmpty()) {
+        return sConvertedFromUTF8.contains(QStringLiteral("Intel(R) JPEG Library")) ? QString() : sConvertedFromUTF8;
+    }
+
+    // 2. Fallback: ANSI / ASCII Plausibilitätsprüfung
+    if (nCommentLen < 7) {
+        return {};
+    }
+
+    int nGoodChars = 0;
+    for (int i = 0; i < nCommentLen; ++i) {
+        const uint8_t ch = pComment[i];
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || 
+            (ch >= '0' && ch <= '9') || ch == ' ' || ch == ',' || ch == '.') {
+            nGoodChars++;
+        }
+    }
+
+    // Filter für Intel JPEG Library
+    const QByteArrayView commentView(reinterpret_cast<const char*>(pComment), nCommentLen);
+    if (nCommentLen > 20 && commentView.contains("Intel(R) JPEG Library")) {
+        return {};
+    }
+
+    // Latin-1 / ANSI Fallback, falls mehr als 80% der Zeichen lesbar sind
+    return (nGoodChars > nCommentLen * 8 / 10) 
+        ? QString::fromLatin1(reinterpret_cast<const char*>(pComment), nCommentLen) 
+        : QString();
+}
 
 	CSize GetTotalBorderSize() {
 		const int SM_CXP_ADDEDBORDER = 92;  // in MSDN this is SM_CXPADDEDBORDER, but for some reason it's not always available depending on configuration
