@@ -35,13 +35,13 @@ public:
         POS_Previous,
         POS_Current,
         POS_AwayFromCurrent,
-//        POS_Next_Folder,
-//        POS_Previous_Folder,
+//      POS_Next_Folder,
+//      POS_Previous_Folder,
         POS_NextFile,
         POS_PreviousFile
     };
 
-    CMainDlg(LPCTSTR sStartupFile);
+    CMainDlg(const QString& sStartupFile);
     ~CMainDlg();
 
     BEGIN_MSG_MAP(CMainDlg)

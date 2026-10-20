@@ -518,8 +518,8 @@ namespace {
 // Public
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-CMainDlg::CMainDlg(LPCTSTR sStartupFile) {
-    m_sStartupFile = QString::fromWCharArray(sStartupFile);
+CMainDlg::CMainDlg(const QString& sStartupFile) {
+    m_sStartupFile = sStartupFile;
 
     CSettingsProvider& sp = CSettingsProvider::This();
 
@@ -1198,10 +1198,6 @@ LRESULT CMainDlg::OnGetMinMaxInfo(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lPara
 // The hidden assumption being that if the WM_COPYDATA came from newly launched instance, that instance will,
 // upon receiving KEY_MAGIC, dutifully close itself, since we answered it "I got this" by returning KEY_MAGIC.
 // If we return NULL, the new instance is free to do as it pleases and show the image itself or whatever.
-#include <QString>
-#include <QFileInfo>
-#include <QtGlobal>
-
 LRESULT CMainDlg::OnAnotherInstanceStarted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& bHandled) {
     bHandled = FALSE;
     auto* pData = reinterpret_cast<COPYDATASTRUCT*>(lParam);
@@ -4581,8 +4577,6 @@ bool CMainDlg::IsLinuxBinaryAvailable(const QString& unixPath) {
 
 
 // Konvertiert einen Windows-Pfad (z.B. Z:\home\...) in einen Unix-Pfad (/home/...)
-#include <QString>
-#include <windows.h>
 QString CMainDlg::GetUnixPathFromWine(const QString& szDosPath) {
     if (szDosPath.isEmpty()) {
         return QString();
