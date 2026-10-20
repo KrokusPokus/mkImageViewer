@@ -2,6 +2,7 @@
 #define KEYMAP_H
 
 #include <unordered_map>
+#include <QString>
 
 #define VK_LBUTTONDBLCLK 7
 
@@ -16,7 +17,7 @@ public:
     int GetCommandIdForKey(int nVirtualKeyCode, bool bAlt, bool bCtrl, bool bShift);
 
     // Gets the string describing the keyboard shortcut for a given command, empty string if none
-    CString GetKeyStringForCommand(int nCommandId);
+    QString GetKeyStringForCommand(int nCommandId);
 
     // gets a combined key code
     static int GetCombinedKeyCode(int keyCode, bool alt, bool control, bool shift);
@@ -28,6 +29,5 @@ private:
 
     void AddDefaultEscapeHandling();
 };
-
 
 #endif // KEYMAP_H

@@ -62,9 +62,9 @@ namespace {
 
     const CSize HUGE_SIZE = CSize(99999999, 99999999);
 
-    HFONT DefaultGUIFont = NULL;
-    HFONT SystemFont = NULL;
-    HFONT DefaultZoomFactorFont = NULL;
+    HFONT hDefaultGUIFont = nullptr;
+    HFONT hToastFont = nullptr;
+    HFONT hDefaultZoomFactorFont = nullptr;
 
     typedef const char* (__cdecl* pwine_get_version)(void); // Define function pointer type for wine_get_version
 
@@ -87,50 +87,39 @@ namespace {
     {
         QString sIniDesc = sIniFileDescription.trimmed();
 
+        if (sIniDesc.compare(QStringLiteral("default"), Qt::CaseInsensitive) == 0 || sIniDesc.isEmpty()) {
+            return nullptr;
+        }
+
         QString sFontName;
         float fFontSize = 9.0f;
         bool isBold = false;
 
-        if (sIniDesc.compare(QStringLiteral("default"), Qt::CaseInsensitive) != 0) {
-            if (!sIniDesc.contains(QLatin1Char(' '))) {
-                // Entspricht TrimLeft('"') und TrimRight('"')
-                if (sIniDesc.startsWith(QLatin1Char('"')) && sIniDesc.endsWith(QLatin1Char('"'))) {
-                    sFontName = sIniDesc.mid(1, sIniDesc.length() - 2);
-                } else {
-                    sFontName = sIniDesc;
-                }
-            } else {
-                const QChar delimiter = (sIniDesc.startsWith(QLatin1Char('"'))) ? QLatin1Char('"') : QLatin1Char(' ');
+        // RegEx: Sucht optional nach "Font Name" oder FontName, gefolgt von der Schriftgröße und optional "bold"
+        static const QRegularExpression rx(
+            QStringLiteral("(?:\"([^\"]+)\"|(\\S+))\\s+(?:(\\d+(?:\\.\\d+)?)\\s*)?(bold)?"),
+            QRegularExpression::CaseInsensitiveOption
+        );
 
-                if (sIniDesc.startsWith(QLatin1Char('"'))) {
-                    sIniDesc.remove(0, 1); // Entspricht TrimLeft('"')
-                }
+        QRegularExpressionMatch match = rx.match(sIniDesc);
+        if (match.hasMatch()) {
+            // Schriftname (Gruppe 1 bei Anführungszeichen, Gruppe 2 ohne)
+            sFontName = !match.captured(1).isEmpty() ? match.captured(1) : match.captured(2);
 
-                // Prüfen, ob Ziffern im String vorkommen (FindOneOf("0123456789"))
-                static const QRegularExpression digitRx(QStringLiteral(R"(\d)"));
-
-                if (delimiter != QLatin1Char('"') && !sIniDesc.contains(digitRx)) {
-                    sFontName = sIniDesc;
-                } else {
-                    const int indexEndOfFilename = sIniDesc.indexOf(delimiter);
-                    if (indexEndOfFilename < 0) {
-                        sFontName = sIniDesc;
-                    } else {
-                        sFontName = sIniDesc.left(indexEndOfFilename);
-                        sIniDesc = sIniDesc.mid(indexEndOfFilename + 1);
-
-                        bool ok = false;
-                        // String in float umwandeln (ersetzt _ttof)
-                        fFontSize = sIniDesc.toFloat(&ok);
-                        if (!ok || fFontSize <= 0.0f) {
-                            fFontSize = 9.0f;
-                        }
-                        fFontSize = std::clamp(fFontSize, 7.0f, 30.0f);
-
-                        isBold = sIniDesc.contains(QStringLiteral("bold"), Qt::CaseInsensitive);
-                    }
+            // Schriftgröße (Gruppe 3)
+            if (!match.captured(3).isEmpty()) {
+                bool ok = false;
+                float parsedSize = match.captured(3).toFloat(&ok);
+                if (ok && parsedSize > 0.0f) {
+                    fFontSize = std::clamp(parsedSize, 7.0f, 30.0f);
                 }
             }
+
+            // Bold-Flag (Gruppe 4)
+            isBold = !match.captured(4).isEmpty();
+        } else {
+            // Fallback: Nur ein Font-Name ohne Größenangabe
+            sFontName = sIniDesc.trimmed().remove(QLatin1Char('"'));
         }
 
         if (sFontName.isEmpty()) {
@@ -139,7 +128,6 @@ namespace {
 
         const int nHeight = -static_cast<int>(0.5f + fFontSize * ::GetDeviceCaps(dc, LOGPIXELSY) / 72.0f);
 
-        // CreateFontW explizit mit LPCWSTR aufrufen
         return ::CreateFontW(
             nHeight, 0, 0, 0,
             isBold ? FW_BOLD : FW_NORMAL,
@@ -368,79 +356,90 @@ namespace {
     }
 
     void SelectDefaultGUIFont(HDC dc) {
-        if (DefaultGUIFont == NULL) {
-            DefaultGUIFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().DefaultGUIFont());
-            if (DefaultGUIFont == NULL)
-                DefaultGUIFont = (HFONT)::GetStockObject(DEFAULT_GUI_FONT);
+        if (hDefaultGUIFont == nullptr) {
+            hDefaultGUIFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().DefaultGUIFont());
+            if (hDefaultGUIFont == nullptr)
+                hDefaultGUIFont = (HFONT)::GetStockObject(DEFAULT_GUI_FONT);
         }
-        ::SelectObject(dc, DefaultGUIFont);
+        ::SelectObject(dc, hDefaultGUIFont);
     }
 
-    void SelectDefaultSystemFont(HDC dc) {
-        if (SystemFont == NULL) {
-            SystemFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 12.0 bold"));
+    void SelectDefaultToastFont(HDC dc) {
+        if (hToastFont == nullptr) {
+            hToastFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 12.0 bold"));
         }
-        ::SelectObject(dc, SystemFont);
+        ::SelectObject(dc, hToastFont);
     }
 
     void SelectDefaultZoomFactorFont(HDC dc) {
-        if (DefaultZoomFactorFont == NULL) {
-            DefaultZoomFactorFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().ZoomFactorFont());
-            if (DefaultZoomFactorFont == NULL)
-                DefaultZoomFactorFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 10.0 bold"));
+        if (hDefaultZoomFactorFont == nullptr) {
+            hDefaultZoomFactorFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().ZoomFactorFont());
+            if (hDefaultZoomFactorFont == nullptr)
+                hDefaultZoomFactorFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 10.0 bold"));
         }
-        ::SelectObject(dc, DefaultZoomFactorFont);
+        ::SelectObject(dc, hDefaultZoomFactorFont);
     }
 
     void TranslateMenuStrings(HMENU hMenu, CKeyMap* pKeyMap) {
         int nMenuItemCount = ::GetMenuItemCount(hMenu);
         for (int i = 0; i < nMenuItemCount; i++) {
             const int TEXT_BUFF_LEN = 128;
-            TCHAR menuText[TEXT_BUFF_LEN];
-            ::GetMenuString(hMenu, i, (LPTSTR)&menuText, TEXT_BUFF_LEN, MF_BYPOSITION);
-            menuText[TEXT_BUFF_LEN-1] = 0;
-            TCHAR* pTab = _tcschr(menuText, _T('\t'));
-            if (pTab != NULL) {
-                *pTab = 0;
-                pTab++;
+            wchar_t menuText[TEXT_BUFF_LEN];
+            ::GetMenuStringW(hMenu, i, menuText, TEXT_BUFF_LEN, MF_BYPOSITION);
+            menuText[TEXT_BUFF_LEN - 1] = 0;
+
+            QString menuTextStr = QString::fromWCharArray(menuText);
+            QString sBaseMenuText = menuTextStr;
+            QString sTabPart;
+
+            int tabIdx = menuTextStr.indexOf(QChar('\t'));
+            if (tabIdx != -1) {
+                sBaseMenuText = menuTextStr.left(tabIdx);
+                sTabPart = menuTextStr.mid(tabIdx + 1);
             }
-            CString sKeyDesc;
+
+            QString sKeyDesc;
             if (pKeyMap != NULL) {
                 int nMenuItemId = ::GetMenuItemID(hMenu, i);
                 sKeyDesc = pKeyMap->GetKeyStringForCommand(nMenuItemId);
             }
-            CString sNewMenuText = CNLS::GetString(menuText);
-            if (sNewMenuText != menuText || !sKeyDesc.IsEmpty() || pTab != NULL) {
-                if (pTab != NULL && pTab[0] != 0) {
-                    sNewMenuText += _T('\t');
-                    if (pTab[0] == _T('0') && pTab[1] == _T('x')) {
-                        // These hexadecimal mappings force to use the shortcut for the given command id
-                        // instead of the shortcut of the menu item command id.
-                        int nCommand;
-                        _stscanf(pTab, _T("%x"), &nCommand);
+
+            // CNLS::GetString mit dem Basis-Menütext aufrufen.
+            QString sNewMenuText = QString::fromWCharArray(CNLS::GetString(reinterpret_cast<LPCTSTR>(sBaseMenuText.utf16())));
+
+            bool hasTab = !sTabPart.isEmpty();
+            if (sNewMenuText != sBaseMenuText || !sKeyDesc.isEmpty() || hasTab) {
+                if (hasTab) {
+                    sNewMenuText += QLatin1Char('\t');
+                    if (sTabPart.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive)) {
+                        // Hexadezimale Mappings auswerten (äquivalent zu _stscanf)
+                        int nCommand = 0;
+                        swscanf(reinterpret_cast<const wchar_t*>(sTabPart.utf16()), L"%x", &nCommand);
                         if (nCommand == 0xFFFF) {
                             // Exit JPEGView is special
-                            CString shortCutExit = pKeyMap->GetKeyStringForCommand(0xFF);
-                            if (shortCutExit.IsEmpty()) {
+                            QString shortCutExit = pKeyMap ? pKeyMap->GetKeyStringForCommand(0xFF) : QString();
+                            if (shortCutExit.isEmpty() && pKeyMap) {
                                 shortCutExit = pKeyMap->GetKeyStringForCommand(IDM_EXIT);
                             }
                             sNewMenuText += shortCutExit;
-                        } else {
+                        } else if (pKeyMap) {
                             sNewMenuText += pKeyMap->GetKeyStringForCommand(nCommand);
                         }
                     } else {
-                        // if the text after the \t is not a hex code, append it translated
-                        sNewMenuText += CNLS::GetString(pTab);
+                        // Wenn nach dem \t kein Hex-Code steht, diesen Teil übersetzt anhängen
+                        QString translatedTab = QString::fromWCharArray(CNLS::GetString(reinterpret_cast<LPCTSTR>(sTabPart.utf16())));
+                        sNewMenuText += translatedTab;
                     }
-                } else if (!sKeyDesc.IsEmpty()) {
-                    sNewMenuText += _T('\t');
+                } else if (!sKeyDesc.isEmpty()) {
+                    sNewMenuText += QLatin1Char('\t');
                     sNewMenuText += sKeyDesc;
                 }
+
                 MENUITEMINFO menuInfo{ 0 };
                 menuInfo.cbSize = sizeof(MENUITEMINFO);
                 menuInfo.fMask = MIIM_STRING;
-                menuInfo.dwTypeData = (LPTSTR)(LPCTSTR)sNewMenuText;
-                ::SetMenuItemInfo(hMenu, i, TRUE, &menuInfo);
+                menuInfo.dwTypeData = const_cast<LPWSTR>(reinterpret_cast<LPCWSTR>(sNewMenuText.utf16()));
+                ::SetMenuItemInfoW(hMenu, i, TRUE, &menuInfo);
             }
 
             HMENU hSubMenu = ::GetSubMenu(hMenu, i);
@@ -949,7 +948,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        "Loading Image:  %16 ms\n"
                                        "Scaling Image:  %17 ms"
                                        )
-                                       .arg(sFullPath)
+                                       .arg(QDir::toNativeSeparators(sFullPath))
                                        .arg(m_pCurrentImage->FrameIndex() + 1)
                                        .arg(m_pCurrentImage->NumberOfFrames())
                                        .arg(m_pCurrentImage->FrameTimeMs())
@@ -980,7 +979,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        "Loading Image:  %15 ms\n"
                                        "Scaling Image:  %16 ms"
                                        )
-                                       .arg(sFullPath)
+                                       .arg(QDir::toNativeSeparators(sFullPath))
                                        .arg(m_pCurrentImage->FrameIndex() + 1)
                                        .arg(m_pCurrentImage->NumberOfFrames())
                                        .arg(sFileSize)
@@ -1010,7 +1009,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                    "Loading Image:  %13 ms\n"
                                    "Scaling Image:  %14 ms"
                                    )
-                                   .arg(sFullPath)
+                                   .arg(QDir::toNativeSeparators(sFullPath))
                                    .arg(sFileSize)
                                    .arg(m_pCurrentImage->OrigWidth())
                                    .arg(m_pCurrentImage->OrigHeight())
@@ -1052,11 +1051,12 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
             }
 
             HFONT hFont = CreateFont(25, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FF_DONTCARE, TEXT("CONSOLAS"));
+
             dc.SelectFont(hFont);
             dc.SetBkColor(RGB(0, 0, 0));
             dc.SetTextColor(RGB(255, 255, 255));
-
             dc.SetBkMode(OPAQUE); // OPAQUE / TRANSPARENT
+
             ::DrawTextW(dc, reinterpret_cast<LPCWSTR>(infoText.utf16()), infoText.length(), &m_clientRect, DT_LEFT | DT_EXTERNALLEADING | DT_WORDBREAK | DT_NOPREFIX);
 
             // Variant with outlined text
@@ -1080,7 +1080,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
     if (!m_strToast.isEmpty())
     {
         dc.SetTextColor(CSettingsProvider::This().ColorGUI());
-        SelectDefaultSystemFont(dc);
+        SelectDefaultToastFont(dc);
         DrawTextBordered(dc, reinterpret_cast<LPCTSTR>(m_strToast.utf16()), GetToastTextRect(), DT_RIGHT);
     }
 
@@ -2856,14 +2856,12 @@ LONG CMainDlg::SetCurrentWindowStyle() {
 }
 
 void CMainDlg::ExploreFile() {
-
     const QString sCurrentFileName = CurrentFileName(false);
     if (sCurrentFileName.isEmpty()) {
         return;
     }
-
+#if defined(Q_OS_WIN)
     if (m_bIsRunningInWine) {
-        // GetUnixPathFromWine nimmt nun direkt QString entgegen
         const QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
 
         if (!sUnixPath.isEmpty()) {
@@ -2884,17 +2882,29 @@ void CMainDlg::ExploreFile() {
                 ::ShellExecute(m_hWnd, nullptr, TEXT("winebrowser.exe"), reinterpret_cast<LPCWSTR>(sFolderPath.utf16()), nullptr, SW_SHOW);
             }
         }
+    } else {
+        QString nativePath = QDir::toNativeSeparators(sCurrentFileName);
+        QString params = QStringLiteral("/select,\"%1\"").arg(nativePath);
+
+        ::ShellExecuteW(
+            m_hWnd,
+            L"open",
+            L"explorer.exe",
+            reinterpret_cast<LPCWSTR>(params.utf16()),
+            nullptr,
+            SW_SHOW
+            );
     }
-    else {
-        /*
-        PIDLIST_ABSOLUTE pidl = ILCreateFromPath(reinterpret_cast<LPCWSTR>(CurrentFileName(false).utf16()));
-        if (pidl != nullptr) {
-            // https://docs.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shopenfolderandselectitems
-            SHOpenFolderAndSelectItems(pidl, 0, 0, 0);
-            ILFree(pidl);
-        }
-*/
+#elif defined(Q_OS_LINUX)
+    // --- Nativer Linux-Build (ohne Wine / reines Qt6) ---
+    // Hier wird direkt auf Linux-Befehle oder QDesktopServices zurückgegriffen
+    if (QFileInfo(sCurrentFileName).exists()) {
+        // Beispiel für nativen Linux-Dateimanager (z. B. Dolphin mit --select)
+        QStringList args;
+        args << QStringLiteral("--select") << sCurrentFileName;
+        QProcess::startDetached(QStringLiteral("dolphin"), args);
     }
+#endif
 }
 
 void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
@@ -3835,7 +3845,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
             this->SetWindowText(reinterpret_cast<LPCWSTR>(defaultTitle.utf16()));
         }
     } else {
-        QString sWindowText = sCurrentFileName
+        QString sWindowText = QDir::toNativeSeparators(sCurrentFileName)
         + QString(GetMultiframeIndex(m_pCurrentImage))
         + QStringLiteral(" - ")
         + QStringLiteral(JPEGVIEW_TITLE);

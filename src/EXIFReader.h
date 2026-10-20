@@ -2,6 +2,7 @@
 #define EXIFREADER_H
 
 #include "ImageProcessingTypes.h"
+#include <QString>
 
 // Signed rational number: numerator/denominator
 class SignedRational {
@@ -21,8 +22,8 @@ public:
 
 class GPSCoordinate {
 public:
-    GPSCoordinate(LPCTSTR reference, double degrees, double minutes, double seconds) {
-        m_sReference = CString(reference);
+    GPSCoordinate(const QString& reference, double degrees, double minutes, double seconds) {
+        m_sReference = reference;
         if (minutes == 0.0 && seconds == 0.0) {
             minutes = 60 * abs(degrees - (int)degrees);
             degrees = (int)degrees;
@@ -35,12 +36,12 @@ public:
         Minutes = minutes;
         Seconds = seconds;
     }
-    LPCTSTR GetReference() { return m_sReference; }
+    QString GetReference() const { return m_sReference; }
     double Degrees;
     double Minutes;
     double Seconds;
 private:
-    CString m_sReference;
+    QString m_sReference;
 };
 
 // Reads and parses the EXIF data of JPEG images
@@ -53,64 +54,61 @@ public:
     ~CEXIFReader(void);
 
     // Parse date string in the EXIF date/time format
-    static bool ParseDateString(SYSTEMTIME & date, const CString& str);
+    static bool ParseDateString(SYSTEMTIME & date, const QString& str);
 
 public:
-    // Camera model, image comment and description. The returned pointers are valid while the EXIF reader is not deleted.
-    LPCTSTR GetCameraModel() { return m_sModel; }
-    LPCTSTR GetUserComment() { return m_sUserComment; }
-    LPCTSTR GetImageDescription() { return m_sImageDescription; }
-    LPCTSTR GetSoftware() { return m_sSoftware; }
-    bool GetCameraModelPresent() { return !m_sModel.IsEmpty(); }
-    bool GetSoftwarePresent() { return !m_sSoftware.IsEmpty(); }
-    // Date-time the picture was taken
-    const SYSTEMTIME& GetAcquisitionTime() { return m_acqDate; }
-    bool GetAcquisitionTimePresent() { return m_acqDate.wYear > 1600; }
-    // Date-time the picture was saved/modified (used by editing software)
-    const SYSTEMTIME& GetDateTime() { return m_dateTime; }
-    bool GetDateTimePresent() { return m_dateTime.wYear > 1600; }
-    // Exposure time
-    const Rational& GetExposureTime() { return m_exposureTime; }
-    bool GetExposureTimePresent() { return m_exposureTime.Denominator != 0; }
-    // Exposure bias
-    double GetExposureBias() { return m_dExposureBias; }
-    bool GetExposureBiasPresent() { return m_dExposureBias != UNKNOWN_DOUBLE_VALUE; }
-    // Flag if flash fired
-    bool GetFlashFired() { return m_bFlashFired; }
-    bool GetFlashFiredPresent() { return m_bFlashFlagPresent; }
-    // Focal length (mm)
-    double GetFocalLength() { return m_dFocalLength; }
-    bool GetFocalLengthPresent() { return m_dFocalLength != UNKNOWN_DOUBLE_VALUE; }
-    // F-Number
-    double GetFNumber() { return m_dFNumber; }
-    bool GetFNumberPresent() { return m_dFNumber != UNKNOWN_DOUBLE_VALUE; }
-    // ISO speed value
-    int GetISOSpeed() { return m_nISOSpeed; }
-    bool GetISOSpeedPresent() { return m_nISOSpeed > 0; }
-    // Image orientation as detected by sensor, coding according EXIF standard (thus no angle in degrees)
-    int GetImageOrientation() { return m_nImageOrientation; }
-    bool ImageOrientationPresent() { return m_nImageOrientation > 0; }
-    // Thumbnail image information
-    bool HasJPEGCompressedThumbnail() { return m_bHasJPEGCompressedThumbnail; }
-    int GetJPEGThumbStreamLen() { return m_nJPEGThumbStreamLen; }
-    int GetThumbnailWidth() { return m_nThumbWidth; }
-    int GetThumbnailHeight() { return m_nThumbHeight; }
-    // GPS information
-    bool IsGPSInformationPresent() { return m_pLatitude != NULL && m_pLongitude != NULL; }
-    bool IsGPSAltitudePresent() { return m_dAltitude != UNKNOWN_DOUBLE_VALUE; }
-    GPSCoordinate* GetGPSLatitude() { return m_pLatitude; }
-    GPSCoordinate* GetGPSLongitude() { return m_pLongitude; }
-    double GetGPSAltitude() { return m_dAltitude; }
+    QString GetCameraModel() const { return m_sModel; }
+    QString GetUserComment() const { return m_sUserComment; }
+    QString GetImageDescription() const { return m_sImageDescription; }
+    QString GetSoftware() const { return m_sSoftware; }
+    bool GetCameraModelPresent() const { return !m_sModel.isEmpty(); }
+    bool GetSoftwarePresent() const { return !m_sSoftware.isEmpty(); }
 
-public:
-    // unknown double value
+    const SYSTEMTIME& GetAcquisitionTime() const { return m_acqDate; }
+    bool GetAcquisitionTimePresent() const { return m_acqDate.wYear > 1600; }
+
+    const SYSTEMTIME& GetDateTime() const { return m_dateTime; }
+    bool GetDateTimePresent() const { return m_dateTime.wYear > 1600; }
+
+    const Rational& GetExposureTime() const { return m_exposureTime; }
+    bool GetExposureTimePresent() const { return m_exposureTime.Denominator != 0; }
+
+    double GetExposureBias() const { return m_dExposureBias; }
+    bool GetExposureBiasPresent() const { return m_dExposureBias != UNKNOWN_DOUBLE_VALUE; }
+
+    bool GetFlashFired() const { return m_bFlashFired; }
+    bool GetFlashFiredPresent() const { return m_bFlashFlagPresent; }
+
+    double GetFocalLength() const { return m_dFocalLength; }
+    bool GetFocalLengthPresent() const { return m_dFocalLength != UNKNOWN_DOUBLE_VALUE; }
+
+    double GetFNumber() const { return m_dFNumber; }
+    bool GetFNumberPresent() const { return m_dFNumber != UNKNOWN_DOUBLE_VALUE; }
+
+    int GetISOSpeed() const { return m_nISOSpeed; }
+    bool GetISOSpeedPresent() const { return m_nISOSpeed > 0; }
+
+    int GetImageOrientation() const { return m_nImageOrientation; }
+    bool ImageOrientationPresent() const { return m_nImageOrientation > 0; }
+
+    bool HasJPEGCompressedThumbnail() const { return m_bHasJPEGCompressedThumbnail; }
+    int GetJPEGThumbStreamLen() const { return m_nJPEGThumbStreamLen; }
+    int GetThumbnailWidth() const { return m_nThumbWidth; }
+    int GetThumbnailHeight() const { return m_nThumbHeight; }
+
+    bool IsGPSInformationPresent() const { return m_pLatitude != nullptr && m_pLongitude != nullptr; }
+    bool IsGPSAltitudePresent() const { return m_dAltitude != UNKNOWN_DOUBLE_VALUE; }
+    GPSCoordinate* GetGPSLatitude() const { return m_pLatitude; }
+    GPSCoordinate* GetGPSLongitude() const { return m_pLongitude; }
+    double GetGPSAltitude() const { return m_dAltitude; }
+
     static double UNKNOWN_DOUBLE_VALUE;
 
 private:
-    CString m_sModel;
-    CString m_sUserComment;
-    CString m_sImageDescription;
-    CString m_sSoftware;
+    QString m_sModel;
+    QString m_sUserComment;
+    QString m_sImageDescription;
+    QString m_sSoftware;
     SYSTEMTIME m_acqDate;
     SYSTEMTIME m_dateTime;
     Rational m_exposureTime;
@@ -137,8 +135,7 @@ private:
     uint8* m_pLastIFD1;
 
     void ReadGPSData(uint8* pTIFFHeader, uint8* pTagGPSIFD, int nApp1Size, bool bLittleEndian);
-    GPSCoordinate* ReadGPSCoordinate(uint8* pTIFFHeader, uint8* pTagLatOrLong, LPCTSTR reference, bool bLittleEndian);
+    GPSCoordinate* ReadGPSCoordinate(uint8* pTIFFHeader, uint8* pTagLatOrLong, const QString& reference, bool bLittleEndian);
 };
-
 
 #endif // EXIFREADER_H
