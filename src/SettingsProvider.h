@@ -200,9 +200,7 @@ public:
     const QString GetEXEPath() const { return m_sEXEPath; }
     const QString GetGlobalINIFileName() const { return m_sIniNameGlobal; }    // Get the file name with path of the global INI file (in EXE path)
     const QString GetUserINIFileName() const { return m_sIniNameUser; }        // Get the file name with path of the user INI file (in AppData path)
-	
-    // LPCTSTR Rückgabe über internen QString mittels utf16()
-    LPCTSTR Language() const { return reinterpret_cast<LPCTSTR>(m_sLanguage.utf16()); }
+    const QString Language() const { return m_sLanguage; }
 
     void CopyUserINIFromTemplate();
     void SaveCustomSettings();

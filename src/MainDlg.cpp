@@ -404,8 +404,7 @@ namespace {
                 sKeyDesc = pKeyMap->GetKeyStringForCommand(nMenuItemId);
             }
 
-            // CNLS::GetString mit dem Basis-Menütext aufrufen.
-            QString sNewMenuText = QString::fromWCharArray(CNLS::GetString(reinterpret_cast<LPCTSTR>(sBaseMenuText.utf16())));
+            QString sNewMenuText = CNLS::GetString(sBaseMenuText);
 
             bool hasTab = !sTabPart.isEmpty();
             if (sNewMenuText != sBaseMenuText || !sKeyDesc.isEmpty() || hasTab) {
@@ -427,7 +426,7 @@ namespace {
                         }
                     } else {
                         // Wenn nach dem \t kein Hex-Code steht, diesen Teil übersetzt anhängen
-                        QString translatedTab = QString::fromWCharArray(CNLS::GetString(reinterpret_cast<LPCTSTR>(sTabPart.utf16())));
+                        QString translatedTab = CNLS::GetString(sTabPart);
                         sNewMenuText += translatedTab;
                     }
                 } else if (!sKeyDesc.isEmpty()) {
@@ -2055,8 +2054,14 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                                           .arg("Size:")
                                           .arg(fileSizeStr);
 
-                    int ret = ::MessageBox(m_hWnd, reinterpret_cast<LPCWSTR>(message.utf16()), CNLS::GetString(_T("Confirm")), MB_YESNOCANCEL | MB_ICONQUESTION);
-                    if (ret == IDYES) {
+                    // Todo: used 'this' as parent after switching to QWidget derived main window class
+                    auto ret = QMessageBox::question(nullptr,
+                                                     CNLS::GetString("Confirm"),
+                                                     message,
+                                                     QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
+                                                     QMessageBox::Cancel); // Default-Button
+
+                    if (ret == QMessageBox::Yes) {
                         allowDelete = true;
                     }
                 }

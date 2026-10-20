@@ -5,7 +5,7 @@
 #include <clocale>
 #include <gdiplus.h>
 
-#include <QGuiApplication>
+#include <QApplication>
 
 CAppModule _Module;
 
@@ -83,7 +83,7 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
     HRESULT hRes = ::CoInitialize(NULL);
 
     int argc = 0;
-	QGuiApplication app(argc, nullptr); // Notwendig für QClipboard
+    QApplication app(argc, nullptr); // Notwendig für QClipboard
 	
     // use the locale from the operating system, however for numeric input/output always use 'C' locale
     // with the OS locale the INI file can not be read correctly (due to the different decimal point characters)

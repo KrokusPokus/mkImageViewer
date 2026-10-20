@@ -1,103 +1,102 @@
 #include "NLS.h"
 #include "SettingsProvider.h"
 
-#include <cstring>
-#include <unordered_map>
+#include <QFile>
+#include <QTextStream>
+#include <QLocale>
+#include <QDir>
 
-// Neudefinition der statischen Member-Variablen mit std::unordered_map und std::wstring
-std::unordered_map<std::wstring, std::wstring> CNLS::sm_texts;
+QHash<QString, QString> CNLS::sm_texts;
 bool CNLS::sm_bTableRead = false;
 
+QString CNLS::GetLocalizedFileName(const QString& sPath, const QString& sPrefixName, const QString& sExtension, const QString& sLanguageCode) {
+    QString sNLSFile;
+    QString languageCode = sLanguageCode;
 
-CString CNLS::GetLocalizedFileName(LPCTSTR sPath, LPCTSTR sPrefixName, LPCTSTR sExtension, LPCTSTR sLanguageCode) {
-    CString sNLSFile;
-    TCHAR buff[16], buff2[16];
-    if (_tcscmp(sLanguageCode, _T("auto")) == 0) {
-        LCID threadLocale = ::GetThreadLocale();
-        ::GetLocaleInfo(threadLocale, LOCALE_SISO639LANGNAME, (LPTSTR)&buff, sizeof(buff) / sizeof(TCHAR));
-        ::GetLocaleInfo(threadLocale, LOCALE_SISO3166CTRYNAME, (LPTSTR)&buff2, sizeof(buff2) / sizeof(TCHAR));
-        sLanguageCode = buff;
-        sNLSFile = CString(sPath) + sPrefixName + _T("_") + sLanguageCode + _T("-") + buff2 + _T(".") + sExtension;
-        if (::GetFileAttributes(sNLSFile) == INVALID_FILE_ATTRIBUTES) {
-            sNLSFile.Empty();
+    // Automatische Spracherkennung über Qt statt Windows-Thread-Locales
+    if (languageCode.compare(QStringLiteral("auto"), Qt::CaseInsensitive) == 0) {
+        QString sysName = QLocale::system().name(); // z.B. "de_DE"
+        QString langPart = sysName.section(QLatin1Char('_'), 0, 0);
+        QString ctryPart = sysName.section(QLatin1Char('_'), 1, 1);
+
+        QString basePath = sPath;
+        if (!basePath.endsWith('/') && !basePath.endsWith('\\')) {
+            basePath += QLatin1Char('/');
+        }
+
+        if (!langPart.isEmpty() && !ctryPart.isEmpty()) {
+            sNLSFile = basePath + sPrefixName + QStringLiteral("_") + langPart + QLatin1Char('-') + ctryPart + QLatin1Char('.') + sExtension;
+            if (!QFile::exists(sNLSFile)) {
+                sNLSFile.clear();
+            }
+        }
+        if (sNLSFile.isEmpty() && !langPart.isEmpty()) {
+            sNLSFile = basePath + sPrefixName + QStringLiteral("_") + langPart + QLatin1Char('.') + sExtension;
+            if (!QFile::exists(sNLSFile)) {
+                sNLSFile.clear();
+            }
+        }
+        languageCode = langPart;
+    }
+
+    if (sNLSFile.isEmpty()) {
+        QString basePath = sPath;
+        if (!basePath.endsWith('/') && !basePath.endsWith('\\')) {
+            basePath += QLatin1Char('/');
+        }
+        sNLSFile = basePath + sPrefixName + QStringLiteral("_") + languageCode + QLatin1Char('.') + sExtension;
+        if (!QFile::exists(sNLSFile)) {
+            sNLSFile.clear();
         }
     }
-    if (sNLSFile.IsEmpty()) {
-        sNLSFile = CString(sPath) + sPrefixName + _T("_") + sLanguageCode + _T(".") + sExtension;
-    }
+
     return sNLSFile;
 }
 
-CString CNLS::GetStringTableFileName(LPCTSTR sLanguageCode) {
-    return GetLocalizedFileName(reinterpret_cast<LPCTSTR>(CSettingsProvider::This().GetEXEPath().utf16()), _T("strings"), _T("txt"), sLanguageCode);
+QString CNLS::GetStringTableFileName(const QString& sLanguageCode) {
+    return GetLocalizedFileName(CSettingsProvider::This().GetEXEPath(), QStringLiteral("strings"), QStringLiteral("txt"), sLanguageCode);
 }
 
-// Ignores newlines, ignores invalid lines
-void CNLS::ReadStringTable(LPCTSTR sFileName) {
-    FILE *fptr = _tfopen(sFileName, _T("r, ccs=UTF-8"));
-    if (fptr == NULL) {
+// Liest die String-Tabelle plattformunabhängig per QFile und QTextStream (UTF-8) ein
+void CNLS::ReadStringTable(const QString& sFileName) {
+    QFile file(sFileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return;
     }
 
-    const int FILE_BUFF_SIZE = 32000;
-    TCHAR* pLineBuff = new TCHAR[FILE_BUFF_SIZE];
-    memset(pLineBuff, 0, FILE_BUFF_SIZE * sizeof(TCHAR));
+    QTextStream in(&file);
+    in.setEncoding(QStringConverter::Utf8);
 
-    // Puffer einlesen
-    size_t nReadBytes = fread(pLineBuff, sizeof(TCHAR), FILE_BUFF_SIZE, fptr);
-    fclose(fptr);
-
-    TCHAR* pRunning = pLineBuff;
-    while (*pRunning != 0) {
-        if (pRunning[0] == _T('/') && pRunning[1] == _T('/')) {
-            // Kommentarzeile ignorieren
-            while (*pRunning != 0 && *pRunning != _T('\n') && *pRunning != _T('\r')) {
-                pRunning++;
-            }
-        } else {
-            TCHAR* pStartLine = pRunning;
-            while (*pRunning != _T('\t') && *pRunning != _T('\n') && *pRunning != 0) {
-                pRunning++;
-            }
-            if (*pRunning == _T('\t')) {
-                *pRunning = 0;
-                pRunning++;
-                TCHAR* pStartTranslated = pRunning;
-                while (*pRunning != _T('\r') && *pRunning != _T('\n') && *pRunning != 0) {
-                    pRunning++;
-                }
-                bool bIncrement = (*pRunning != 0);
-                *pRunning = 0;
-                if (*pStartTranslated != 0) {
-                    // std::wstring übernimmt das Speichermanagement komplett.
-                    // Kein manuelle 'new TCHAR[]' Speicher-Allocation mehr nötig!
-                    sm_texts[std::wstring(pStartLine)] = std::wstring(pStartTranslated);
-                }
-                if (bIncrement) pRunning++;
-            }
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        QString trimmed = line.trimmed();
+        if (trimmed.isEmpty() || trimmed.startsWith(QStringLiteral("//"))) {
+            continue; // Kommentar- oder Leerzeilen überspringen
         }
-        // Leerzeilen / Newlines überspringen
-        while (*pRunning != 0 && (*pRunning == _T('\n') || *pRunning == _T('\r'))) {
-            pRunning++;
+
+        int tabIdx = line.indexOf(QChar('\t'));
+        if (tabIdx != -1) {
+            QString key = line.left(tabIdx).trimmed();
+            QString translation = line.mid(tabIdx + 1).trimmed();
+            if (!key.isEmpty() && !translation.isEmpty()) {
+                sm_texts[key] = translation;
+            }
         }
     }
 
-    delete[] pLineBuff;
+    file.close();
     sm_bTableRead = true;
 }
 
-LPCTSTR CNLS::GetString(LPCTSTR sString) {
-    if (!sm_bTableRead || sString == NULL) {
-        return sString; // no translation available, use English
+QString CNLS::GetString(const QString& sString) {
+    if (!sm_bTableRead || sString.isEmpty()) {
+        return sString; // Keine Übersetzung geladen, Original zurückgeben
     }
 
-    // Suche in der std::unordered_map
-    auto iter = sm_texts.find(std::wstring(sString));
+    auto iter = sm_texts.find(sString);
     if (iter == sm_texts.end()) {
-        return sString; // not found
+        return sString; // Nicht gefunden, Original zurückgeben
     } else {
-        // c_str() ist über den gesamten Lebenszyklus der Anwendung sicher,
-        // da sm_texts als statische Map nicht geleert wird.
-        return iter->second.c_str();
+        return iter.value();
     }
 }
