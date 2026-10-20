@@ -711,7 +711,7 @@ CSettingsProvider::CSettingsProvider() {
         m_sIniNameUser = appDataPath + m_sIniFileTitle;
         m_bUserINIExists = QFileInfo::exists(m_sIniNameUser);
     } else {
-        Helpers::SetJPEGViewAppDataPath(reinterpret_cast<LPCTSTR>(m_sEXEPath.utf16()));
+        Helpers::SetJPEGViewAppDataPath(m_sEXEPath);
     }
 
     /*

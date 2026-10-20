@@ -65,7 +65,7 @@ public:
 
     // Tells the provider that a file has been renamed externally so that pending requests to read this file can be updated.
     // Used by the internal rename capability inside ImageProcPanel:
-    //     CString sCurFileName(sCurrentFileName);
+    //     QString sCurFileName(sCurrentFileName);
     //     m_pMainDlg->GetFileList()->FileHasRenamed(sCurFileName, sNewFileName);
     //     m_pMainDlg->GetJPEGProvider()->FileHasRenamed(sCurFileName, sNewFileName);
     /*

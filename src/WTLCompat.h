@@ -19,31 +19,6 @@
 
 //-----------------------------------------------------------------
 
-struct DFileTime {
-    std::uint64_t ticks{0}; // Millisekunden seit Unix-Epoche (1970)
-
-    constexpr DFileTime() noexcept = default;
-    constexpr explicit DFileTime(std::uint64_t ms) noexcept : ticks(ms) {}
-
-    // Vergleiche
-    constexpr bool operator==(const DFileTime&) const noexcept = default;
-    constexpr auto operator<=>(const DFileTime&) const noexcept = default;
-
-#if defined(_WIN32) || defined(FILETIME)
-    // Automatische Konvertierung von / zu Win32 FILETIME
-    operator FILETIME() const noexcept {
-        // Umrechnung von Unix-Epoche (1970) auf Windows FILETIME (1601) in 100-Nanoticks
-        std::uint64_t ft = (ticks * 10000ULL) + 116444736000000000ULL;
-        FILETIME result;
-        result.dwLowDateTime = static_cast<unsigned long>(ft & 0xFFFFFFFF);
-        result.dwHighDateTime = static_cast<unsigned long>(ft >> 32);
-        return result;
-    }
-#endif
-};
-
-//-----------------------------------------------------------------
-
 struct DSize {
     int cx{0};
     int cy{0};
@@ -131,9 +106,47 @@ struct DRect {
     constexpr DRect(const DPoint& point, const DSize& size) noexcept
         : left(point.x), top(point.y), right(point.x + size.cx), bottom(point.y + size.cy) {}
 
-#if defined(_WIN32) || defined(POINT)
+#if defined(_WIN32) || defined(POINT) || defined(RECT)
+    // Konvertierungskonstruktor für RECT / tagRECT
+    constexpr DRect(const RECT& rc) noexcept
+        : left(rc.left), top(rc.top), right(rc.right), bottom(rc.bottom) {}
+
+    // Konvertierungskonstruktor für Zeiger (RECT* / LPCRECT)
+    constexpr DRect(LPCRECT lprc) noexcept {
+        if (lprc) {
+            left = lprc->left; top = lprc->top;
+            right = lprc->right; bottom = lprc->bottom;
+        } else {
+            SetRectEmpty();
+        }
+    }
+
     constexpr DRect(const POINT& point, const SIZE& size) noexcept
         : left(point.x), top(point.y), right(point.x + size.cx), bottom(point.y + size.cy) {}
+
+	// Konvertierung nach RECT (Value)
+    constexpr operator RECT() const noexcept {
+        return RECT{ left, top, right, bottom };
+    }
+
+    // Konvertierung nach LPRECT (RECT*)
+    operator LPRECT() noexcept {
+        return reinterpret_cast<LPRECT>(this);
+    }
+
+    // Konvertierung nach LPCRECT (const RECT*)
+    operator LPCRECT() const noexcept {
+        return reinterpret_cast<LPCRECT>(this);
+    }
+
+    LPRECT operator&() noexcept {
+        return reinterpret_cast<LPRECT>(this);
+    }
+
+    LPCRECT operator&() const noexcept {
+        return reinterpret_cast<LPCRECT>(this);
+    }
+
 #endif
 
     // --- C++20 Vergleichsoperatoren ---
@@ -418,209 +431,10 @@ inline DString operator+(const DString& lhs, LPCTSTR rhs) {
 
 //-----------------------------------------------------------------
 
-namespace fs = std::filesystem;
-
-class DFindFile {
-private:
-    std::vector<fs::directory_entry> m_matches;
-    size_t m_currentIndex{0};
-    fs::directory_entry m_currentEntry;
-    bool m_bFound{false};
-
-    // Hilfsmethode für Wildcard-Matching (*.png, *.txt, etc.)
-    static bool MatchPattern(const std::wstring& filename, const std::wstring& pattern) {
-        if (pattern == L"*" || pattern == L"*.*" || pattern.empty()) {
-            return true;
-        }
-
-        // Einfacher Endungs-Match (*.ext)
-        if (pattern.front() == L'*') {
-            std::wstring ext = pattern.substr(1); // z.B. ".png"
-            if (filename.size() >= ext.size()) {
-                return filename.compare(filename.size() - ext.size(), ext.size(), ext) == 0;
-            }
-            return false;
-        }
-
-        return filename == pattern;
-    }
-
-public:
-    DFindFile() = default;
-    ~DFindFile() { Close(); }
-
-    // --- 1. Suchen starten & durchsteigen ---
-    bool FindFile(DString pstrName = L"*.*") {
-        Close();
-
-        fs::path searchPath(pstrName.ToStdWString());
-        fs::path dir = searchPath.parent_path();
-        std::wstring pattern = searchPath.filename().wstring();
-
-        // Wenn kein Ordner angegeben wurde, im aktuellen Verzeichnis suchen
-        if (dir.empty()) {
-            dir = fs::current_path();
-        }
-
-        if (!fs::exists(dir) || !fs::is_directory(dir)) {
-            return false;
-        }
-
-        // Alle passenden Dateien im Ordner einsammeln
-        try {
-            for (const auto& entry : fs::directory_iterator(dir)) {
-                if (MatchPattern(entry.path().filename().wstring(), pattern)) {
-                    m_matches.push_back(entry);
-                }
-            }
-        } catch (...) {
-            return false;
-        }
-
-        if (m_matches.empty()) {
-            return false;
-        }
-
-        m_currentIndex = 0;
-        m_currentEntry = m_matches[0];
-        m_bFound = true;
-        return true;
-    }
-
-    bool FindNextFile() {
-        if (!m_bFound) {
-            return false;
-        }
-
-        m_currentIndex++;
-        if (m_currentIndex < m_matches.size()) {
-            m_currentEntry = m_matches[m_currentIndex];
-            return true;
-        }
-
-        // Ende der Liste erreicht
-        m_bFound = false;
-        return false;
-    }
-
-    void Close() {
-        m_matches.clear();
-        m_currentIndex = 0;
-        m_currentEntry = fs::directory_entry();
-        m_bFound = false;
-    }
-
-    // --- 2. Eigenschaften abfragen (WTL CFindFile Interface) ---
-    DString GetFilePath() const {
-        return DString(m_currentEntry.path().wstring());
-    }
-
-    DString GetFileName() const {
-        return DString(m_currentEntry.path().filename().wstring());
-    }
-
-    DString GetFileTitle() const {
-        return DString(m_currentEntry.path().stem().wstring());
-    }
-
-    DString GetFileURL() const {
-        return DString(L"file://" + m_currentEntry.path().wstring());
-    }
-
-    DString GetRoot() const {
-        return DString(m_currentEntry.path().parent_path().wstring());
-    }
-
-    // --- 3. Attribute & Status ---
-    bool IsDots() const {
-        std::wstring name = m_currentEntry.path().filename().wstring();
-        return name == L"." || name == L"..";
-    }
-
-    bool IsDirectory() const {
-        return m_currentEntry.is_directory();
-    }
-
-    bool IsSystem() const {
-        return false; // Auf nicht-Windows Systemen typischerweise unrelevant
-    }
-
-    bool IsHidden() const {
-        // Unter Linux/macOS beginnen versteckte Dateien mit einem Punkt
-        std::wstring name = m_currentEntry.path().filename().wstring();
-        return !name.empty() && name.front() == L'.';
-    }
-
-    bool IsReadOnly() const {
-        auto perms = m_currentEntry.status().permissions();
-        return (perms & fs::perms::owner_write) == fs::perms::none;
-    }
-
-    uint64_t GetLength() const {
-        if (m_currentEntry.is_regular_file()) {
-            return m_currentEntry.file_size();
-        }
-        return 0;
-    }
-    uint64_t GetFileSize() const {
-        return GetLength();
-    }
-
-    // --- 1. Parameterlose Variante (C++17 Style) ---
-    DFileTime GetLastWriteTime() const {
-        if (m_bFound && m_currentEntry.exists()) {
-            try {
-                auto ftime = m_currentEntry.last_write_time();
-                auto s_tp = std::chrono::time_point_cast<std::chrono::milliseconds>(
-                    ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
-                    );
-                return DFileTime{ static_cast<uint64_t>(s_tp.time_since_epoch().count()) };
-            } catch (...) {}
-        }
-        return DFileTime{0};
-    }
-
-    // --- 2. WTL / MFC Kompatibilitäts-Überladungen mit 1 Argument ---
-
-    // A) Wenn ein Zeiger übergeben wird: finder.GetLastWriteTime(&fileTime)
-    template <typename T>
-    bool GetLastWriteTime(T* pTimeStamp) const {
-        if (!pTimeStamp) return false;
-        *pTimeStamp = static_cast<T>(GetLastWriteTime());
-        return m_bFound;
-    }
-
-    // B) Wenn eine Referenz übergeben wird: finder.GetLastWriteTime(fileTime)
-    template <typename T>
-    bool GetLastWriteTime(T& refTimeStamp) const {
-        refTimeStamp = static_cast<T>(GetLastWriteTime());
-        return m_bFound;
-    }
-
-    // --- 3. Das Gleiche für GetCreationTime ---
-    DFileTime GetCreationTime() const {
-        return GetLastWriteTime();
-    }
-
-    template <typename T>
-    bool GetCreationTime(T* pTimeStamp) const {
-        return GetLastWriteTime(pTimeStamp);
-    }
-
-    template <typename T>
-    bool GetCreationTime(T& refTimeStamp) const {
-        return GetLastWriteTime(refTimeStamp);
-    }
-};
-
-//-----------------------------------------------------------------
-
-using FILETIME_COMPAT = DFileTime;
 using CSize = DSize;
 using CPoint = DPoint;
 using CRect = DRect;
 using CString = DString;
 using CStringW = DString;
-using CFindFile = DFindFile;
 
 #endif // WTLCOMPAT_H

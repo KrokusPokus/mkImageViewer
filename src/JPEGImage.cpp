@@ -358,7 +358,7 @@ void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targ
 CPoint CJPEGImage::ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset) {
     int nStartX = (fullTargetSize.cx - clippingSize.cx)/2 - targetOffset.x;
     int nStartY = (fullTargetSize.cy - clippingSize.cy)/2 - targetOffset.y;
-    return CSize(nStartX, nStartY);
+    return CPoint(nStartX, nStartY);
 }
 
 bool CJPEGImage::VerifyRotation(const CRotationParams& rotationParams) {

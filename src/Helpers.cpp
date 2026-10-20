@@ -9,7 +9,8 @@
 #include <QString>
 #include <QStringDecoder>
 #include <QtEndian>
-
+#include <QStandardPaths>
+#include <QDir>
 
 namespace Helpers {
 	
@@ -17,17 +18,33 @@ namespace Helpers {
     {
         return (int)(value * DPIScalingFactor + 0.5f);
     }
-	
-	LPCTSTR JPEGViewAppDataPath() {
-		if (buffAppPath[0] == 0) {
-			::SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, buffAppPath);
-			_tcscat_s(buffAppPath, MAX_PATH + 32, _T("\\JPEGView\\"));
-		}
-		return buffAppPath;
-	}
 
-	void SetJPEGViewAppDataPath(LPCTSTR sPath) {
-		_tcscpy_s(buffAppPath, MAX_PATH + 32, sPath);
+    QString JPEGViewAppDataPath() {
+
+        if (!buffAppPath.isEmpty()) {
+            return buffAppPath;
+        }
+
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+        // Stellt sicher, dass das Verzeichnis tatsächlich auf dem Dateisystem existiert
+        QDir dir(path);
+        if (!dir.exists()) {
+            dir.mkpath(".");
+        }
+
+        // Qt nutzt intern immer '/', sorgt aber auf allen Betriebssystemen für die Konvertierung
+        if (!path.endsWith('/')) {
+            path += '/';
+        }
+
+        buffAppPath = path;
+
+        return path;
+    }
+
+    void SetJPEGViewAppDataPath(const QString& sPath) {
+        buffAppPath = sPath;
 	}
 
 	CSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, 

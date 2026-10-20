@@ -2009,23 +2009,23 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_COPY:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CopyImageToClipboard(this->m_hWnd, m_pCurrentImage, reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
+                CClipboard::CopyImageToClipboard(m_pCurrentImage, m_pFileList->Current());
             }
             break;
         case IDM_COPY_FULL:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CopyFullImageToClipboard(this->m_hWnd, m_pCurrentImage, *m_pImageProcParams, CreateDefaultProcessingFlags(), reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
+                CClipboard::CopyFullImageToClipboard(m_pCurrentImage, *m_pImageProcParams, CreateDefaultProcessingFlags(), m_pFileList->Current());
                 this->Invalidate(FALSE);
             }
             break;
         case IDM_COPY_PATH:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CopyPathToClipboard(this->m_hWnd, m_pCurrentImage, reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
+                CClipboard::CopyPathToClipboard(m_pCurrentImage, m_pFileList->Current());
             }
             break;
         case IDM_CUT_FILE:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CutFileToClipboard(this->m_hWnd, reinterpret_cast<LPCWSTR>(m_pFileList->Current().utf16()));
+                CClipboard::CutFileToClipboard(m_pFileList->Current());
             }
             break;
         case IDM_DELETE_FILE:
@@ -2886,12 +2886,14 @@ void CMainDlg::ExploreFile() {
         }
     }
     else {
+        /*
         PIDLIST_ABSOLUTE pidl = ILCreateFromPath(reinterpret_cast<LPCWSTR>(CurrentFileName(false).utf16()));
         if (pidl != nullptr) {
             // https://docs.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shopenfolderandselectitems
             SHOpenFolderAndSelectItems(pidl, 0, 0, 0);
             ILFree(pidl);
         }
+*/
     }
 }
 
@@ -4248,7 +4250,7 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
         return QString();
     }
 
-    const QString appDataPath = QString::fromWCharArray(Helpers::JPEGViewAppDataPath());
+    const QString appDataPath = Helpers::JPEGViewAppDataPath();
     const QString bookmarkFilePath = QDir(appDataPath).filePath(QStringLiteral("Bookmarks.ini"));
 
     if (!QFileInfo::exists(bookmarkFilePath)) {
@@ -4297,7 +4299,7 @@ void CMainDlg::SaveBookmark() {
     }
 
     // 1. Pfade konfigurieren (QDir erstellt fehlende Pfade bei Bedarf automatisch)
-    const QString appDataPath = QString::fromWCharArray(Helpers::JPEGViewAppDataPath());
+    const QString appDataPath = Helpers::JPEGViewAppDataPath();
     const QDir bookmarkDir(appDataPath);
 
     if (!bookmarkDir.exists()) {

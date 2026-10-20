@@ -175,7 +175,7 @@ CKeyMap::CKeyMap() {
     // TODO: ParseCommandLineForKeyMapFile or something... where you can specify a custom full file path name for a keymap you'd like to use instead of the default search order
 
     // check if the use directory keymap.txt exists
-    fkm_ptr = _tfopen(CString(Helpers::JPEGViewAppDataPath()) + KEYMAP_USER_FILE_NAME, _T("r"));
+    fkm_ptr = _tfopen(CString(reinterpret_cast<const TCHAR*>(Helpers::JPEGViewAppDataPath().utf16())) + KEYMAP_USER_FILE_NAME, _T("r"));
     if (fkm_ptr == NULL) {
         // the appdata one doesn't exist, try the local directory
         fkm_ptr = _tfopen(exe_path + KEYMAP_USER_FILE_NAME, _T("r"));

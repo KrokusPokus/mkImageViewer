@@ -1,221 +1,124 @@
 #include "Clipboard.h"
 #include "JPEGImage.h"
 #include "Helpers.h"
-#include "BasicProcessing.h"
-#include <gdiplus.h>
 
-// Hilfsfunktion: Wandelt Windows-Pfade (z. B. C:\Bilder\test.jpg) in file://-URIs um,
-// die KDE/Wine verstehen.
-static std::string PathToFileUri(LPCWSTR filename) {
-    // Falls unter Wine ausgefuehrt, optional den echten Unix-Pfad ermitteln
-    typedef char* (__cdecl* pfnWineGetUnixFileName)(LPCWSTR);
-    static pfnWineGetUnixFileName pWineGetUnixFileName =
-        (pfnWineGetUnixFileName)::GetProcAddress(::GetModuleHandle(L"kernel32.dll"), "wine_get_unix_file_name");
+#include <QGuiApplication>
+#include <QClipboard>
+#include <QMimeData>
+#include <QImage>
+#include <QUrl>
+#include <QByteArray>
+#include <QString>
+#include <algorithm>
 
-    std::string unixPath;
-    if (pWineGetUnixFileName) {
-        char* pPath = pWineGetUnixFileName(filename);
-        if (pPath) {
-            unixPath = pPath;
-            ::HeapFree(::GetProcessHeap(), 0, pPath);
-        }
-    }
-
-    // Fallback, falls nicht unter Wine oder Konvertierung fehlgeschlagen:
-    // Erstelle Standard-URI aus Windows-Pfad (z.B. C:/Bilder/test.jpg -> file:///C:/Bilder/test.jpg)
-    if (unixPath.empty()) {
-        int size_needed = ::WideCharToMultiByte(CP_UTF8, 0, filename, -1, NULL, 0, NULL, NULL);
-        std::string utf8Path(size_needed - 1, 0);
-        ::WideCharToMultiByte(CP_UTF8, 0, filename, -1, &utf8Path[0], size_needed, NULL, NULL);
-
-        for (auto& ch : utf8Path) {
-            if (ch == '\\') ch = '/';
-        }
-        unixPath = "/" + utf8Path;
-    }
-
-    return "file://" + unixPath;
-}
-
-static void CopyOriginalFileNameToClipboard(LPCWSTR filename) {
-    int fileNameLength = (int)wcslen(filename);
-    DWORD fileNameLengthBytes = sizeof(wchar_t) * (fileNameLength + 1);
-    DROPFILES df = {sizeof(DROPFILES), {0, 0}, 0, TRUE};
-    HGLOBAL hMem = ::GlobalAlloc(GMEM_ZEROINIT|GMEM_MOVEABLE|GMEM_DDESHARE, sizeof(DROPFILES) + fileNameLengthBytes + sizeof(wchar_t)); // for double NULL char
-    int offset = sizeof(DROPFILES) / sizeof(wchar_t);
-    WCHAR *pGlobal = (WCHAR *) ::GlobalLock(hMem);
-    ::CopyMemory(pGlobal, &df, sizeof(DROPFILES));
-    ::CopyMemory(pGlobal + offset, filename, fileNameLengthBytes); // that's pGlobal + 20 bytes (the size of DROPFILES);
-    pGlobal[offset + fileNameLength + 1] = 0; // add additional NULL character
-    ::GlobalUnlock(hMem);
-    ::SetClipboardData(CF_HDROP, hMem);
-}
-
-static void CopyFileNameTextToClipboard(LPCWSTR filename) {
-    int fileNameLength = (int)wcslen(filename);
-    DWORD fileNameLengthBytes = sizeof(wchar_t) * (fileNameLength + 1);
-    HGLOBAL hMem = ::GlobalAlloc(GMEM_ZEROINIT | GMEM_MOVEABLE | GMEM_DDESHARE, fileNameLengthBytes + sizeof(wchar_t)); // for double NULL char
-    WCHAR* pGlobal = (WCHAR*) ::GlobalLock(hMem);
-    ::CopyMemory(pGlobal, filename, fileNameLengthBytes);
-    pGlobal[fileNameLength + 1] = 0; // add additional NULL character
-    ::GlobalUnlock(hMem);
-    ::SetClipboardData(CF_UNICODETEXT, hMem);
-}
-
-void CClipboard::CopyImageToClipboard(HWND hWnd, CJPEGImage * pImage, LPCTSTR fileName) {
-    if (pImage == NULL || pImage->DIBPixelsLastProcessed(true) == NULL) {
+void CClipboard::CopyImageToClipboard(CJPEGImage* pImage, const QString& fileName) {
+    if (pImage == nullptr || pImage->DIBPixelsLastProcessed(true) == nullptr) {
         return;
     }
 
-    DoCopy(hWnd, pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), fileName);
+    DoCopy(pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), fileName);
 }
 
-void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, LPCTSTR fileName) {
-    CopyFullImageToClipboard(hWnd, pImage, procParams, eFlags, CRect(0, 0, pImage->OrigWidth(), pImage->OrigHeight()), fileName);
+void CClipboard::CopyFullImageToClipboard(CJPEGImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, const QString& fileName) {
+    CopyFullImageToClipboard(pImage, procParams, eFlags, CRect(0, 0, pImage->OrigWidth(), pImage->OrigHeight()), fileName);
 }
 
-void CClipboard::CopyFullImageToClipboard(HWND hWnd, CJPEGImage * pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, CRect clipRect, LPCTSTR fileName) {
-    if (pImage == NULL) {
+void CClipboard::CopyFullImageToClipboard(CJPEGImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, CRect clipRect, const QString& fileName) {
+    if (pImage == nullptr) {
         return;
     }
 
-    clipRect.left = std::max<LONG>(0, clipRect.left);
-    clipRect.top = std::max<LONG>(0, clipRect.top);
-    clipRect.right = std::min<LONG>(pImage->OrigWidth(), clipRect.right);
-    clipRect.bottom = std::min<LONG>(pImage->OrigHeight(), clipRect.bottom);
+    clipRect.left = std::max<int>(0, clipRect.left);
+    clipRect.top = std::max<int>(0, clipRect.top);
+    clipRect.right = std::min<int>(pImage->OrigWidth(), clipRect.right);
+    clipRect.bottom = std::min<int>(pImage->OrigHeight(), clipRect.bottom);
 
     void* pDIB = pImage->GetDIB(pImage->OrigSize(), clipRect.Size(), clipRect.TopLeft(), procParams, eFlags);
-    DoCopy(hWnd, clipRect.Width(), clipRect.Height(), pDIB, fileName);
+    DoCopy(clipRect.Width(), clipRect.Height(), pDIB, fileName);
 }
 
-void CClipboard::CopyPathToClipboard(HWND hWnd, CJPEGImage* pImage, LPCTSTR fileName) {
-    if (pImage == NULL || pImage->DIBPixelsLastProcessed(true) == NULL) {
+void CClipboard::CopyPathToClipboard(CJPEGImage* pImage, const QString& fileName) {
+    if (pImage == nullptr || pImage->DIBPixelsLastProcessed(true) == nullptr) {
         return;
     }
-    DoCopyFileNameText(hWnd, fileName);
+    DoCopyFileNameText(fileName);
 }
 
-void CClipboard::CutFileToClipboard(HWND hWnd, LPCTSTR fileName) {
-    if (!::OpenClipboard(hWnd)) {
+void CClipboard::CutFileToClipboard(const QString& fileName) {
+    if (fileName.isEmpty()) {
         return;
     }
-    ::EmptyClipboard();
 
-    // 1. Dateipfad als HDROP in die Zwischenablage schreiben
-    CopyOriginalFileNameToClipboard(fileName);
-
-    // 2. Preferred Drop Effect auf DROPEFFECT_MOVE setzen (Ausschneiden/Verschieben)
-    UINT uFormat = ::RegisterClipboardFormat(TEXT("Preferred DropEffect"));
-    if (uFormat != 0) {
-        HGLOBAL hMem = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, sizeof(DWORD));
-        if (hMem != NULL) {
-            DWORD* pDropEffect = (DWORD*)::GlobalLock(hMem);
-            if (pDropEffect != NULL) {
-                *pDropEffect = DROPEFFECT_MOVE;
-                ::GlobalUnlock(hMem);
-
-                // Nach SetClipboardData uebernimmt das System die Speicherverwaltung von hMem
-                if (::SetClipboardData(uFormat, hMem) == NULL) {
-                    ::GlobalFree(hMem);
-                }
-            } else {
-                ::GlobalFree(hMem);
-            }
-        }
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    if (!clipboard) {
+        return;
     }
 
-    // 2. Linux / KDE-spezifisches Format (application/x-kde-cutselection = "1")
-    UINT uFormatKdeCut = ::RegisterClipboardFormat(L"application/x-kde-cutselection");
-    if (uFormatKdeCut != 0) {
-        HGLOBAL hMemKde = ::GlobalAlloc(GMEM_MOVEABLE, 1);
-        if (hMemKde != NULL) {
-            char* pData = (char*)::GlobalLock(hMemKde);
-            if (pData != NULL) {
-                pData[0] = '1';
-                ::GlobalUnlock(hMemKde);
-                if (::SetClipboardData(uFormatKdeCut, hMemKde) == NULL) ::GlobalFree(hMemKde);
-            }
-            else {
-                ::GlobalFree(hMemKde);
-            }
-        }
-    }
+    QMimeData* mimeData = new QMimeData();
+    QUrl fileUrl = QUrl::fromLocalFile(fileName);
 
-    // 3. Linux / Freedesktop Standard (x-special/gnome-copied-files)
-    // Format der Nutzdaten: "cut\nfile:///pfad/zur/datei.jpg"
-    UINT uFormatGnomeCut = ::RegisterClipboardFormat(L"x-special/gnome-copied-files");
-    if (uFormatGnomeCut != 0) {
-        std::string fileUri = PathToFileUri(fileName);
-        std::string gnomePayload = "cut\n" + fileUri + "\n";
+    // 1. Standard-Datei-URL Liste (Cross-Platform)
+    mimeData->setUrls({ fileUrl });
 
-        HGLOBAL hMemGnome = ::GlobalAlloc(GMEM_MOVEABLE, gnomePayload.size());
-        if (hMemGnome != NULL) {
-            char* pData = (char*)::GlobalLock(hMemGnome);
-            if (pData != NULL) {
-                ::CopyMemory(pData, gnomePayload.c_str(), gnomePayload.size());
-                ::GlobalUnlock(hMemGnome);
-                if (::SetClipboardData(uFormatGnomeCut, hMemGnome) == NULL) ::GlobalFree(hMemGnome);
-            }
-            else {
-                ::GlobalFree(hMemGnome);
-            }
-        }
-    }
+    // 2. Windows-spezifischer Preferred DropEffect (Ausschneiden/Verschieben)
+    // 0x02 = DROPEFFECT_MOVE
+    QByteArray dropEffect(4, 0);
+    dropEffect[0] = 0x02;
+    mimeData->setData("Preferred DropEffect", dropEffect);
 
-    ::CloseClipboard();
+    // 3. Linux / KDE Cut-Marker
+    mimeData->setData("application/x-kde-cutselection", "1");
+
+    // 4. Linux / Freedesktop Standard (GNOME/Nautilus/Dolphin)
+    // Format: "cut\nfile:///pfad/zur/datei.jpg\n"
+    QByteArray gnomePayload = ("cut\n" + fileUrl.toString() + "\n").toUtf8();
+    mimeData->setData("x-special/gnome-copied-files", gnomePayload);
+
+    // Qt übernimmt die Speicherverwaltung von mimeData
+    clipboard->setMimeData(mimeData);
 }
 
-void CClipboard::DoCopy(HWND hWnd, int nWidth, int nHeight, const void* pSourceImageDIB32, LPCTSTR fileName) {
-    if (!::OpenClipboard(hWnd)) {
+void CClipboard::DoCopy(int nWidth, int nHeight, const void* pSourceImageDIB32, const QString& fileName) {
+    if (pSourceImageDIB32 == nullptr || nWidth <= 0 || nHeight <= 0) {
         return;
     }
-    ::EmptyClipboard();
 
-    // get needed size of memory block
-    uint32 nSizeLinePadded = Helpers::DoPadding(nWidth*3, 4);
-    uint32 nSizeBytes = sizeof(BITMAPINFO) + nSizeLinePadded * nHeight;
-
-    // Allocate memory
-    HGLOBAL hMem = ::GlobalAlloc(GMEM_MOVEABLE, nSizeBytes);
-    if (hMem == NULL) {
-        ::CloseClipboard();
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    if (!clipboard) {
         return;
     }
-    void* pMemory = ::GlobalLock(hMem);
 
-    BITMAPINFO* pBMInfo = (BITMAPINFO*) pMemory;
-    memset(pBMInfo, 0, sizeof(BITMAPINFO));
+    // 1. QImage direkt aus dem 32bpp-DIB-Puffer (ARGB/BGRA) erzeugen
+    // QImage::Format_ARGB32_Premultiplied entspricht standardmäßigen Win32 32bpp DIBs
+    QImage image(static_cast<const uchar*>(pSourceImageDIB32), nWidth, nHeight, nWidth * 4, QImage::Format_ARGB32_Premultiplied);
 
-    pBMInfo->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    pBMInfo->bmiHeader.biWidth = nWidth;
-    pBMInfo->bmiHeader.biHeight = nHeight;
-    pBMInfo->bmiHeader.biPlanes = 1;
-    pBMInfo->bmiHeader.biBitCount = 24;
-    pBMInfo->bmiHeader.biCompression = BI_RGB;
-    pBMInfo->bmiHeader.biXPelsPerMeter = 10000;
-    pBMInfo->bmiHeader.biYPelsPerMeter = 10000;
-    pBMInfo->bmiHeader.biClrUsed = 0;
+    QMimeData* mimeData = new QMimeData();
 
-    uint8* pDIBPixelsTarget = (uint8*)pMemory + sizeof(BITMAPINFO) - sizeof(RGBQUAD);
-    CBasicProcessing::Convert32bppTo24bppDIB(nWidth, nHeight, pDIBPixelsTarget, pSourceImageDIB32, true);
+    // Bild-Daten setzen (Qt erzeugt intern CF_DIB / image/png / image/bmp etc.)
+    mimeData->setImageData(image);
 
-    ::GlobalUnlock(hMem);
-    ::SetClipboardData(CF_DIB, hMem);
-
-    if (fileName != NULL) {
-        CopyOriginalFileNameToClipboard(fileName);
+    // 2. Falls ein Dateiname vorhanden ist, auch als Datei-URL anhängen
+    if (!fileName.isEmpty()) {
+        mimeData->setUrls({ QUrl::fromLocalFile(fileName) });
     }
 
-    ::CloseClipboard();
+    clipboard->setMimeData(mimeData);
 }
 
-void CClipboard::DoCopyFileNameText(HWND hWnd, LPCTSTR fileName) {
-    if (!::OpenClipboard(hWnd)) {
+void CClipboard::DoCopyFileNameText(const QString& fileName) {
+    if (fileName.isEmpty()) {
         return;
     }
-    ::EmptyClipboard();
 
-    CopyFileNameTextToClipboard(fileName);
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    if (!clipboard) {
+        return;
+    }
 
-    ::CloseClipboard();
+    // Setzt sowohl Plain-Text als auch die Datei-URL in der Zwischenablage
+    QMimeData* mimeData = new QMimeData();
+    mimeData->setText(fileName);
+    mimeData->setUrls({ QUrl::fromLocalFile(fileName) });
+
+    clipboard->setMimeData(mimeData);
 }

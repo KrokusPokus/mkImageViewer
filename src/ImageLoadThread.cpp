@@ -540,16 +540,9 @@ void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
             int nWidth, nHeight, nBPP;
             TJSAMP eChromoSubSampling;
             bool bOutOfMemory;
-            // int nTicks = ::GetTickCount();
 
             void* pPixelData = TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bOutOfMemory, pBuffer, nFileSize);
-            
-            /*
-            TCHAR buffer[20];
-            _stprintf_s(buffer, 20, _T("%d"), ::GetTickCount() - nTicks);
-            ::MessageBox(NULL, CString(_T("Elapsed ticks: ")) + buffer, _T("Time"), MB_OK);
-            */
-
+			
             // Color and b/w JPEG is supported
             if (pPixelData != NULL && (nBPP == 3 || nBPP == 1)) {
                 request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, 

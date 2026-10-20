@@ -94,7 +94,7 @@ namespace Helpers {
 
     inline float DPIScalingFactor = -1.0f; // is updated to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
 	
-    static TCHAR buffAppPath[MAX_PATH + 32] = _T("");
+    static QString buffAppPath;
 
     // Maximum and minimum allowed zoom factors for images
     const double ZoomMax = DBL_MAX; // unbound the maximum zoom, previously set at 16.0 (1600%)
@@ -188,11 +188,11 @@ namespace Helpers {
     CSize GetTotalBorderSize();
 
     // Gets the path where JPEGView stores its application data, including a trailing backslash
-    LPCTSTR JPEGViewAppDataPath();
+    QString JPEGViewAppDataPath();
 
     // Sets the path where JPEGView stores its application data, including a trailing backslash.
     // Default if not set is CSIDL_APPDATA/JPEGView/
-    void SetJPEGViewAppDataPath(LPCTSTR sPath);
+    void SetJPEGViewAppDataPath(const QString& sPath);
 
     // Pad the given value to the next multiple of padvalue. padvalue must be a power of 2.
     inline int DoPadding(int value, int padvalue) {

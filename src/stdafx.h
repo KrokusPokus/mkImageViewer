@@ -22,8 +22,8 @@
     // Nur falls WTL/ATL in einzelnen Dateien noch schrittweise abgebaut wird:
     #include <atlbase.h>
     #include <atlapp.h>        // WTL-sf\Include
-    #include <atldlgs.h>    // WTL-sf\Include: DROPFILES
-    #include <atlmisc.h>    // WTL-sf\Include: CSize, CRect, CPoint, CString
+    //#include <atldlgs.h>    // WTL-sf\Include: DROPFILES
+    //#include <atlmisc.h>    // WTL-sf\Include: CSize, CRect, CPoint, CString
 
     extern CAppModule _Module;
 
@@ -33,4 +33,4 @@
     #define VK_MINUS 0x6d
 #endif
 
-//#include "WTLCompat.h"
+#include "WTLCompat.h"
