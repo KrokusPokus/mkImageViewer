@@ -1,14 +1,15 @@
 #ifndef MAINDLG_H
 #define MAINDLG_H
 
-#include <QHash>
-#include <QString>
-
 #include "resource.h"
 #include "MessageDef.h"
 #include "ProcessParams.h"
 #include "Helpers.h"
 
+#include <QCoreApplication>
+#include <QFileIconProvider>
+#include <QHash>
+#include <QString>
 
 class CFileList;
 class CJPEGProvider;
@@ -20,8 +21,9 @@ enum EMouseEvent;
 
 // The main dialog is a full screen modal dialog with no border and no window title.
 // This dialog is the main window of the JPEGView application.
-class CMainDlg : public CDialogImpl<CMainDlg>
-{
+class CMainDlg : public CDialogImpl<CMainDlg> {
+    Q_DECLARE_TR_FUNCTIONS(TableItemDelegate)
+
 public:
     enum { IDD = IDD_MAINDLG };
 
@@ -283,9 +285,6 @@ private:
     void StopAnimation();
     void ToggleAlwaysOnTop();
 
-/*##################################################################*/
-/* Custom private functions and variables of the linear scaling mod */
-/*##################################################################*/
     HMODULE m_hmodDwmapi;
     BOOL m_bDWMenabled;
     typedef HRESULT (WINAPI *MyDwmIsCompositionEnabledType)(BOOL*);
@@ -303,6 +302,7 @@ private:
 
     void ChangeFolderLanguage();
     void OpenDefaultEditor();
+    bool showDeleteConfirmationDialog(const QStringList &pathList, bool bRecycleOnly);
 
     QString LoadBookmark(const QString& sFilePath);
     void SaveBookmark();
@@ -327,6 +327,8 @@ private:
         HICON hSmall = nullptr;
     };
     inline static QHash<QString, IconResult> s_iconCache; // Klassenweiter Cache pro Datei-Endung
+
+    QFileIconProvider m_iconProvider;
 };
 
 

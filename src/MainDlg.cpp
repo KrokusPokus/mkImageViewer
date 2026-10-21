@@ -19,8 +19,7 @@
 #include "KeyMap.h"
 #include "DirectoryWatcher.h"
 
-#include <regex>        // used in regex matching language tags like [en], [de]
-
+#include <QBuffer>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
@@ -29,6 +28,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QProcess>
+#include <QPushButton>
 #include <QRect>
 #include <QRegularExpression>
 #include <QString>
@@ -897,30 +897,30 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
             int iNumThreads = sp.NumberOfCoresToUse();
             Helpers::CPUType cpu = sp.AlgorithmImplementation();
             EFilterType filter = sp.DownsamplingFilter();
-            TCHAR sCPU[64];
-            TCHAR sFilter[64];
+            QString sCPU;
+            QString sFilter;
     
             if (cpu == Helpers::CPU_Unknown)
-                swprintf(sCPU,64,TEXT("%s"), TEXT("Unknown"));
+                sCPU = "Unknown";
             else if (cpu == Helpers::CPU_Generic)
-                swprintf(sCPU,64,TEXT("%s"), TEXT("Generic"));
+                sCPU = "Generic";
             else if (cpu == Helpers::CPU_MMX)
-                swprintf(sCPU,64,TEXT("%s"), TEXT("MMX"));
+                sCPU = "MMX";
             else if (cpu == Helpers::CPU_SSE)
-                swprintf(sCPU,64,TEXT("%s"), TEXT("SSE2 (128 bit)"));
+                sCPU = "SSE2 (128 bit)";
             else if (cpu == Helpers::CPU_AVX2)
-                swprintf(sCPU,64,TEXT("%s"), TEXT("AVX2 (256 bit)"));
+                sCPU = "AVX2 (256 bit)";
     
             if (filter == Filter_Downsampling_None)
-                swprintf(sFilter,64,TEXT("%s"), TEXT("None"));
+                sFilter = "None";
             else if (filter == Filter_Downsampling_Hermite)
-                swprintf(sFilter,64,TEXT("%s"), TEXT("Hermite"));
+                sFilter = "Hermite";
             else if (filter == Filter_Downsampling_Catrom)
-                swprintf(sFilter,64,TEXT("%s"), TEXT("Catrom"));
+                sFilter = "Catrom";
             else if (filter == Filter_Downsampling_Mitchell)
-                swprintf(sFilter,64,TEXT("%s"), TEXT("Mitchell"));
+                sFilter = "Mitchell";
             else if (filter == Filter_Downsampling_Lanczos2)
-                swprintf(sFilter,64,TEXT("%s"), TEXT("Lanczos2"));
+                sFilter = "Lanczos2";
 
             unsigned int iRealWidth = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigWidth()));
             unsigned int iRealHeight = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigHeight()));
@@ -931,7 +931,15 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
             if (!sFullPath.isEmpty()) {
                 QFileInfo fileInfo(sFullPath);
 				QString sFileSize = FormatFileSize(fileInfo.size());
-					
+
+                QString visiblePath = QDir::toNativeSeparators(sFullPath);
+                if (m_bIsRunningInWine) {
+                    QString sUnixPath = GetUnixPathFromWine(sFullPath);
+                    if (!sUnixPath.isEmpty()) {
+                        visiblePath = sUnixPath;
+                    }
+                }
+
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     if (m_bIsAnimationPlaying) {
                         infoText = QString(
@@ -947,7 +955,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        "Loading Image:  %16 ms\n"
                                        "Scaling Image:  %17 ms"
                                        )
-                                       .arg(QDir::toNativeSeparators(sFullPath))
+                                       .arg(visiblePath)
                                        .arg(m_pCurrentImage->FrameIndex() + 1)
                                        .arg(m_pCurrentImage->NumberOfFrames())
                                        .arg(m_pCurrentImage->FrameTimeMs())
@@ -978,7 +986,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                        "Loading Image:  %15 ms\n"
                                        "Scaling Image:  %16 ms"
                                        )
-                                       .arg(QDir::toNativeSeparators(sFullPath))
+                                       .arg(visiblePath)
                                        .arg(m_pCurrentImage->FrameIndex() + 1)
                                        .arg(m_pCurrentImage->NumberOfFrames())
                                        .arg(sFileSize)
@@ -1008,7 +1016,7 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
                                    "Loading Image:  %13 ms\n"
                                    "Scaling Image:  %14 ms"
                                    )
-                                   .arg(QDir::toNativeSeparators(sFullPath))
+                                   .arg(visiblePath)
                                    .arg(sFileSize)
                                    .arg(m_pCurrentImage->OrigWidth())
                                    .arg(m_pCurrentImage->OrigHeight())
@@ -2037,28 +2045,9 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 if (confirmationPolicy == Helpers::DC_Never) {
                     allowDelete = true;
                 } else {
-                    // Need to ask the user
-
-                    // Qt Core (funktioniert auch ohne QApplication!)
-                    QFileInfo fileInfo(currentFileName);
-                    QString fileSizeStr = FormatFileSize(fileInfo.size());
-
-                    // Nachrichtentext mit QString zusammenbauen
-                    QString message = QString("%1\n\n%2\n\n%3 %4")
-                                          .arg("Do you really want to permanently delete this file?")
-                                          .arg(currentFileName)
-                                          .arg("Size:")
-                                          .arg(fileSizeStr);
-
-                    // Todo: used 'this' as parent after switching to QWidget derived main window class
-                    auto ret = QMessageBox::question(nullptr,
-                                                     CNLS::GetString("Confirm"),
-                                                     message,
-                                                     QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
-                                                     QMessageBox::Cancel); // Default-Button
-
-                    if (ret == QMessageBox::Yes) {
-                        allowDelete = true;
+                    bool bRecycleOnly = false;
+                    if (!showDeleteConfirmationDialog({currentFileName}, bRecycleOnly)) {
+                        break;
                     }
                 }
 
@@ -3025,9 +3014,7 @@ void CMainDlg::GotoImage(EImagePosition ePos) {
 }
 
 void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
-//* Debugging */    TCHAR debugtext[1024];
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1"), ePos, nFlags);
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos1";
 
     // Timer handling for slideshows
     if (ePos == POS_Next || ePos == POS_NextSlideShow) {
@@ -3037,16 +3024,14 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         StopAnimation();
         m_customAnimationFrameTime = 1000;
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1a: (ePos == POS_Next || ePos == POS_NextSlideShow)"), ePos, nFlags);
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos1a (ePos == POS_Next || ePos == POS_NextSlideShow)";
 
     } else if (ePos != POS_NextFrame) {
         StopMovieMode();
         StopAnimation();
         m_customAnimationFrameTime = 1000;
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos1b: (ePos != POS_NextFrame)"), ePos, nFlags);
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos1b (ePos != POS_NextFrame)";
     }
 
     // solving a specific "edge" case, pun intended
@@ -3161,15 +3146,13 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
             break;
     }
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex);
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos4 m_offsets.x:" <<  m_offsets.x << "m_offsets.y:" << m_offsets.y << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex;
 
     if (bCheckIfSameImage && (m_pFileList == pOldFileList && (nOldFrameIndex == nFrameIndex || bNoWrapAroundEdgeFrame) && !m_pFileList->ChangedSinceCheckpoint())) {
         if (m_bMovieMode && m_bAutoExit) {
             CleanupAndTerminate();
         } else {
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos4b  bCheckIfSameImage=%d  bNoWrapAroundEdgeFrame=%d  m_pFileList->ChangedSinceCheckpoint()=%d"), ePos, nFlags, bCheckIfSameImage, bNoWrapAroundEdgeFrame, m_pFileList->ChangedSinceCheckpoint());
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos4b  bCheckIfSameImage:" << bCheckIfSameImage << "bNoWrapAroundEdgeFrame:" << bNoWrapAroundEdgeFrame << "m_pFileList->ChangedSinceCheckpoint():" << m_pFileList->ChangedSinceCheckpoint();
             return; // not placed on a new image, don't do anything
         }
     }
@@ -3204,8 +3187,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         procParams.ProcFlags = SetProcessingFlag(procParams.ProcFlags, PFLAG_KeepParams, true);
     }
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage()->RequestImage()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage()->RequestImage()  nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
                                                     (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
@@ -3217,15 +3199,13 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
     m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current().isEmpty()) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos6  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos6  m_offsets.x:" << m_offsets.x << "m_offsets.y:" << m_offsets.y << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
     bool bSynchronize = (nFlags & KEEP_PARAMETERS) == 0;
 
     AfterNewImageLoaded(bSynchronize, false, ePos == POS_Previous);
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos7  m_offsets.x=%d  m_offsets.y=%d  nOldFrameIndex=%d  nFrameIndex=%d of %s"), ePos, nFlags, m_offsets.x, m_offsets.y, nOldFrameIndex, nFrameIndex, m_pFileList->Current());
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos7  m_offsets.x:" << m_offsets.x << "m_offsets.y:" << m_offsets.y << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
     // If current image is animated, start playback
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
@@ -3236,8 +3216,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         }
     }
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage(ePos=%d, nFlags=%d) Pos8  m_offsets.x=%d  m_offsets.y=%d"), ePos, nFlags, m_offsets.x, m_offsets.y);
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos8  m_offsets.x:" << m_offsets.x << "m_offsets.y:" << m_offsets.y;
 
     if (((nFlags & NO_UPDATE_WINDOW) == 0) && !(ePos == POS_NextSlideShow && UseSlideShowTransitionEffect())) {
         this->Invalidate(FALSE);
@@ -3245,8 +3224,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         this->UpdateWindow();
     }
 
-//* Debugging */    swprintf(debugtext,1024,TEXT("GotoImage() after UpdateWindow()  nFrameIndex=%d of %s"), nFrameIndex, m_pFileList->Current());
-//* Debugging */    ::OutputDebugStringW(debugtext);
+/* Debugging */ qDebug() << "GotoImage() Pos9 after UpdateWindow() nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
     // remove key messages accumulated so far
     if (!(nFlags & NO_REMOVE_KEY_MSG)) {
@@ -3846,7 +3824,14 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
             this->SetWindowText(reinterpret_cast<LPCWSTR>(defaultTitle.utf16()));
         }
     } else {
-        QString sWindowText = QDir::toNativeSeparators(sCurrentFileName)
+        QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
+        if (m_bIsRunningInWine && bShowFullPathInTitle) {
+            QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
+            if (!sUnixPath.isEmpty()) {
+                visibleName = sUnixPath;
+            }
+        }
+        QString sWindowText = visibleName
         + QString(GetMultiframeIndex(m_pCurrentImage))
         + QStringLiteral(" - ")
         + QStringLiteral(JPEGVIEW_TITLE);
@@ -4457,42 +4442,32 @@ QString CMainDlg::GetMultiframeIndex(CJPEGImage* pImage) {
     return QString();
 }
 
-QString CMainDlg::FormatFileSize(qint64 nFileSize) {
-    if (nFileSize <= 0) {
-        return QString();
+QString CMainDlg::FormatFileSize(qint64 bytes) {
+    static const QLocale locale = QLocale::system();
+
+    if (bytes < 1024) {
+        return locale.toString(bytes) + " Bytes";
     }
 
-    if (nFileSize <= 1024) {
-        return QString("%1 Bytes").arg(nFileSize);
-    }
+    double size = static_cast<double>(bytes);
+    static const QStringList units = {"Bytes", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"};
+    int unitIndex = 0;
 
-    static const QString units[] = { 
-        QStringLiteral("Bytes"), QStringLiteral("KiB"), QStringLiteral("MiB"), 
-        QStringLiteral("GiB"), QStringLiteral("TiB"), QStringLiteral("PiB"), 
-        QStringLiteral("EiB"), QStringLiteral("ZiB"), QStringLiteral("YiB") 
-    };
-
-    double value = static_cast<double>(nFileSize);
-    int exponent = 0;
-    const int maxExponent = static_cast<int>(std::size(units)) - 1;
-
-    while (value >= 1024.0 && exponent < maxExponent) {
-        value /= 1024.0;
-        exponent++;
+    while (size >= 1024.0 && unitIndex < units.size() - 1) {
+        size /= 1024.0;
+        unitIndex++;
     }
 
     int precision = 0;
-    if (value < 10.0) {
-        precision = 2; // z.B. 1.23 MiB
-    } else if (value < 100.0) {
-        precision = 1; // z.B. 12.3 MiB
+    if (size < 10.0) {
+        precision = 2; // z.B. 1,23 MiB
+    } else if (size < 100.0) {
+        precision = 1; // z.B. 12,3 MiB
     } else {
         precision = 0; // z.B. 123 MiB
     }
 
-    return QString("%1 %2")
-        .arg(value, 0, 'f', precision)
-        .arg(units[exponent]);
+    return locale.toString(size, 'f', precision) + " " + units[unitIndex];
 }
 
 QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
@@ -4610,4 +4585,113 @@ QString CMainDlg::GetUnixPathFromWine(const QString& szDosPath) {
     }
 
     return QString();
+}
+
+bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bRecycleOnly) {
+    QString sTitle;
+    QString sText;
+    QString sWarning;
+    QMessageBox::Icon iIcon;
+
+    if (bRecycleOnly) {
+        iIcon = QMessageBox::Question;
+        sWarning = "";
+        if (pathList.size() == 1) {
+            sTitle = tr("Delete File");
+            sText = tr("Do you really want to move this file into the recycle bin?");
+        } else {
+            sTitle = tr("Delete multiple elements");
+            sText = QString(tr("Do you really want to move these %1 files into the recycle bin?")).arg(pathList.size());
+        }
+    } else {
+        iIcon = QMessageBox::Warning;
+        sWarning = "<p style='color: red;'><i>" + tr("This process cannot be undone.") + "</i></p>";
+        if (pathList.size() == 1) {
+            sTitle = tr("Delete File");
+            sText = tr("Are you sure you want to delete this file permanently?");
+        } else {
+            sTitle = tr("Delete multiple elements");
+            sText = QString(tr("Are you sure you want to delete these %1 files permanently?")).arg(pathList.size());
+        }
+    }
+
+    QMessageBox msgBox(nullptr); // todo: use "this" instead of "nullptr"
+    msgBox.setWindowTitle(sTitle);
+    msgBox.setIcon(iIcon);
+
+    if (pathList.size() == 1) {
+        QFileInfo fileInfo(pathList.first());
+        QString fileName = fileInfo.fileName();
+        QString size = FormatFileSize(fileInfo.size());
+        QString lastModified = fileInfo.lastModified().toString("yyyy-MM-dd  HH:mm:ss");
+
+        QIcon icon = m_iconProvider.icon(fileInfo);
+        QPixmap pix = icon.pixmap(QSize(48, 48));
+        /*
+        if (!Helpers::hasIconExt(fileInfo)) {
+            QPixmap thumb = Helpers::generateThumbnail(fileInfo);
+            if (!thumb.isNull()) {
+                pix = thumb;
+            }
+        }
+        */
+
+        QByteArray ba;
+        QBuffer bu(&ba);
+        pix.save(&bu, "PNG");
+        QString imgBase64 = ba.toBase64();
+
+        msgBox.setText(QString("<h3>%1</h3>").arg(sText));
+
+        const QString htmlTemplate = QStringLiteral(R"(
+            <table width='100%' cellspacing='0' cellpadding='0'>
+                <tr>
+                    <td rowspan='4' width='48' valign='top' style='padding-right: 10px;'>
+                        <img src='data:image/png;base64,%1'>
+                    </td>
+                    <td style='color: #555; padding: 2px 8px;' width='1%'>%2</td>
+                    <td style='color: #555; padding: 2px 8px;'>%3</td>
+                </tr>
+                <tr>
+                    <td style='color: #555; padding: 2px 8px;'>%4</td>
+                    <td style='color: #555; padding: 2px 8px;'>%5</td>
+                </tr>
+                <tr>
+                    <td style='color: #555; padding: 2px 8px;'>%6</td>
+                    <td style='color: #555; padding: 2px 8px;'>%7</td>
+                </tr>
+                <tr>
+                    <td colspan='2' style='padding: 8px 8px 2px 8px;'>%8</td>
+                </tr>
+            </table>
+            )");
+
+
+        msgBox.setInformativeText(htmlTemplate.arg(
+            imgBase64,
+            tr("Name:"),
+            fileName,
+            tr("Size:"),
+            size,
+            tr("Date:"),
+            lastModified,
+            sWarning
+            ));
+    } else {
+        msgBox.setText(QString("<h3>%1</h3>").arg(sText));
+        msgBox.setInformativeText(sWarning);
+    }
+
+    QPushButton *deleteButton = msgBox.addButton(tr("Delete"), QMessageBox::AcceptRole);
+    msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    msgBox.setDefaultButton(deleteButton);
+    deleteButton->setStyleSheet("QPushButton { font-weight: bold; min-width: 80px; }");
+
+    msgBox.exec();
+
+    if (msgBox.clickedButton() != deleteButton) {
+        return false;
+    }
+
+    return true;
 }
