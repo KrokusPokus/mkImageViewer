@@ -5,7 +5,7 @@
 #define ZOOM_TIMER_EVENT_ID 2         // Zoom refinement timer ID
 #define ZOOM_TEXT_TIMER_EVENT_ID 3    // Zoom label timer ID
 #define ANIMATION_TIMER_EVENT_ID 4    // Animation timer ID
-#define PAN_TIMER_EVENT_ID 6          // [GF] Smooth scroll panning timer ID
+#define PAN_TIMER_EVENT_ID 5          // [GF] Smooth scroll panning timer ID
 #define TOAST_EXPIRY_TIMER_EVENT_ID 6 // [sdneon] Toast timer ID
 
 #endif // TIMEREVENTIDS_H
