@@ -99,7 +99,6 @@
 #define IDM_FIT_TO_SCREEN    12000        // :KeyMap: fit image to screen
 #define IDM_FILL_WITH_CROP    12001        // :KeyMap: fit image to fill screen with crop
 #define IDM_FIT_TO_SCREEN_NO_ENLARGE 12002
-#define IDM_FIT_WINDOW_TO_IMAGE 12005        // :KeyMap: toggle fit window automatically to image, avoiding black borders
 #define IDM_FULL_SCREEN_MODE 12011        // :KeyMap: toggle full screen mode
 #define IDM_ZOOM_400        12020        // :KeyMap: zoom to 400 %
 #define IDM_ZOOM_200        12030        // :KeyMap: zoom to 200 %

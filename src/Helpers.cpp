@@ -47,7 +47,7 @@ namespace Helpers {
         buffAppPath = sPath;
 	}
 
-	CSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, 
+	QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, 
 						bool bAllowZoomIn, bool bFillCrop, bool bLimitAR, EAutoZoomMode eAutoZoomMode, double & dZoom) {
 		CSettingsProvider& sp = CSettingsProvider::This();
 		int nBookModePageHeight = sp.BookModePageHeight();
@@ -88,18 +88,18 @@ namespace Helpers {
 			dZoom = std::min(ZoomMax, dZoom);
 		}
 
-		CSize size((int)(nWidth * dZoom + 0.5), (int)(nHeight * dZoom + 0.5));
-
-		return size;
+		return QSize((int)(nWidth * dZoom + 0.5), (int)(nHeight * dZoom + 0.5));
 	}
 
-	CSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom) {
+	QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom) {
+
 		// Do not comment this out! newSize is unused, but GetImageRect() is needed to calculate dZoom!
-		CSize newSize = GetImageRect(nWidth, nHeight, nScreenWidth, nScreenHeight,
+		GetImageRect(nWidth, nHeight, nScreenWidth, nScreenHeight,
 			eAutoZoomMode == ZM_FitToScreen || eAutoZoomMode == ZM_FillScreen,
 			eAutoZoomMode == ZM_FillScreenNoZoom || eAutoZoomMode == ZM_FillScreen,
 			eAutoZoomMode == ZM_FillScreenNoZoom, eAutoZoomMode, dZoom);
-		return CSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
+			
+		return QSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
 	}
 
 	// calculate CRT table
@@ -267,11 +267,11 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
         : QString();
 }
 
-	CSize GetTotalBorderSize() {
+	QSize GetTotalBorderSize() {
 		const int SM_CXP_ADDEDBORDER = 92;  // in MSDN this is SM_CXPADDEDBORDER, but for some reason it's not always available depending on configuration
 		int nBorderWidth = (::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXP_ADDEDBORDER)) * 2;
 		int nBorderHeight = (::GetSystemMetrics(SM_CYSIZEFRAME) + ::GetSystemMetrics(SM_CXP_ADDEDBORDER)) * 2 + ::GetSystemMetrics(SM_CYCAPTION);
-		return CSize(nBorderWidth, nBorderHeight);
+		return QSize(nBorderWidth, nBorderHeight);
 	}
 
 	__int64 GetFileSize(HANDLE hFile) {
@@ -324,12 +324,16 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
 // Based on: https://github.com/sdneon/jpegview.git
     void BlendAlpha(uint32* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode nTransparencyMode) {
 		QColor cT = CSettingsProvider::This().ColorTransparency();
-        COLORREF nTransparency = RGB(cT.red(), cT.green(), cT.blue());
+        QRgb nTransparency = qRgb(cT.red(), cT.green(), cT.blue());
+
+        const size_t totalPixels = static_cast<size_t>(nWidth) * nHeight;
+
         if (nTransparencyMode != Helpers::TP_CHECKERBOARD) {
             if (nTransparencyMode == Helpers::TP_BLEND_INVERSE) {
-                nTransparency = ~(nTransparency & 0xffffff);
+                nTransparency = ~(nTransparency & 0x00FFFFFF);
             }
-            for (int i = 0; i < nWidth * nHeight; ++i) {
+
+            for (size_t i = 0; i < totalPixels; ++i) {
                 *pImage32 = AlphaBlendBackground(*pImage32, nTransparency);
                 pImage32++;
             }

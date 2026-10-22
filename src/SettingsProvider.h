@@ -124,11 +124,9 @@ public:
 
     bool AllowSmoothPanning() const { return m_bSmoothPanning; }
     bool AutoContrastCorrection() const { return m_bAutoContrastCorrection; }
-    bool AutoFullScreen() const { return m_bAutoFullScreen; }
     bool AutoRotateEXIF() const { return m_bAutoRotateEXIF; }
     bool BookModeLaunchFullscreen() const { return m_bBookModeLaunchFullscreen; }
     bool DefaultMaximized() const { return m_bDefaultMaximized; }
-    bool DefaultWndToImage() const { return m_bDefaultWndToImage; }
     bool ExchangeXButtons() const { return m_bExchangeXButtons; }
     bool ExistsUserINI() const;
     bool ExplicitWindowRect() const { return m_bExplicitWindowRect; }
@@ -227,7 +225,6 @@ private:
     bool m_bHQRS{true};
     bool m_bShowFullPathInTitle{false};
     bool m_bShowFullScreen{true};
-    bool m_bAutoFullScreen{false};
     bool m_bKeepParams{false};
     QString m_sLanguage;
     Helpers::CPUType m_eCPUAlgorithm;
@@ -259,7 +256,6 @@ private:
     QRect m_defaultWindowRect;
     QRect m_stickyWindowRect;
     bool m_bDefaultMaximized{false};
-    bool m_bDefaultWndToImage{false};
     bool m_bStickyWindowSize{false};
     bool m_bExplicitWindowRect{false};
     QColor m_colorBackground;

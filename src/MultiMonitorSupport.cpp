@@ -116,15 +116,12 @@ QRect CMultiMonitorSupport::GetDefaultWindowRect() {
     CSettingsProvider& settings = CSettingsProvider::This();
     
     // Ermitteln, welches Basis-Rechteck geladen werden soll
-    QRect windowRect = !defaultWindowRect.isEmpty() 
-        ? defaultWindowRect 
-        : (settings.StickyWindowSize() ? settings.StickyWindowRect() : settings.DefaultWindowRect());
+    QRect windowRect = !defaultWindowRect.isEmpty() ? defaultWindowRect : (settings.StickyWindowSize() ? settings.StickyWindowRect() : settings.DefaultWindowRect());
     
     QRect rectAllScreens = CMultiMonitorSupport::GetVirtualDesktop();
     
-    // Prüfen, ob das Rechteck leer ist oder komplett außerhalb des virtuellen Desktops liegt
+    // If we still have no valid windowRect OR if the windowRect we have is outside the screen rect, reset to a calculated default
     if (windowRect.isEmpty() || !rectAllScreens.intersects(windowRect)) {
-        // Monitor-Rechteck über Qt-Screens ermitteln (ersetzt GetMonitorRect & DisplayMonitor-Logik)
         QRect monitorRect;
         const auto screens = QGuiApplication::screens();
         int displayIndex = settings.DisplayMonitor();
@@ -159,12 +156,7 @@ void CMultiMonitorSupport::SetDefaultWindowRect(QRect rect) {
 }
 
 // Gets the default client rectangle for windowed mode
-QRect CMultiMonitorSupport::GetDefaultClientRectInWindowMode(bool bAutoFitWndToImage) {
-    if (bAutoFitWndToImage) {
-        QRect monitorRect = CMultiMonitorSupport::GetMonitorRect(CSettingsProvider::This().DisplayMonitor());
-        return QRect(0, 0, monitorRect.width(), monitorRect.height());
-    }
-    
+QRect CMultiMonitorSupport::GetDefaultClientRectInWindowMode() {
     QRect wndRect = CMultiMonitorSupport::GetDefaultWindowRect();
     QSize borderSize = Helpers::GetTotalBorderSize();
     

@@ -83,9 +83,6 @@ public:
     void EndDragging();
     void SetCursorForMoveSection();
     void ExecuteCommand(int nCommand);
-    void AdjustWindowToImage(bool bAfterStartup);
-    bool IsAdjustWindowToImage();
-    bool IsImageExactlyFittingWindow();
 
 private:
 
@@ -147,7 +144,6 @@ private:
     int m_nCapturedX, m_nCapturedY;
     int m_nMouseX, m_nMouseY;
     bool m_bFullScreenMode;
-    bool m_bAutoFitWndToImage;
     bool m_bLockPaint;
     int m_nCurrentTimeout;
     POINT m_startMouse;
@@ -178,7 +174,7 @@ private:
     void ExploreFile();
     void OpenFile(const QString& fileName, bool bAfterStartup);
     void GotoImage(EImagePosition ePos, int nFlags);
-    bool PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, bool bAdjustWindowToImage);
+    bool PerformZoom(double dValue, bool bExponent, bool bZoomToMouse);
     double GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge);
     CProcessParams CreateProcessParams(bool bNoProcessingAfterLoad);
     void ResetParamsToDefault();
@@ -196,7 +192,6 @@ private:
     QRect GetToastTextRect();
     void EditINIFile(bool bGlobalINI);
     int GetLoadErrorAfterOpenFile();
-    void CheckIfApplyAutoFitWndToImage(bool bInInitDialog);
     void PrefetchDIB(const QRect& clientRect);
     bool HandleMouseButtonByKeymap(int nMouseButton, bool bExecuteCommand = true);
     bool UseSlideShowTransitionEffect();

@@ -463,10 +463,10 @@ void CImageLoadThread::AfterFinishProcess(CRequestBase& request) {
 // Private
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-static void LimitOffsets(CPoint& offsets, CSize clippingSize, const CSize & imageSize) {
-    int nMaxOffsetX = (imageSize.cx - clippingSize.cx)/2;
+static void LimitOffsets(CPoint& offsets, QSize clippingSize, const QSize & imageSize) {
+    int nMaxOffsetX = (imageSize.width() - clippingSize.width()) / 2;
     nMaxOffsetX = std::max(0, nMaxOffsetX);
-    int nMaxOffsetY = (imageSize.cy - clippingSize.cy)/2;
+    int nMaxOffsetY = (imageSize.height() - clippingSize.height()) / 2;
     nMaxOffsetY = std::max(0, nMaxOffsetY);
     offsets.x = std::max<LONG>(-nMaxOffsetX, std::min<LONG>(+nMaxOffsetX, offsets.x));
     offsets.y = std::max<LONG>(-nMaxOffsetY, std::min<LONG>(+nMaxOffsetY, offsets.y));
@@ -1024,27 +1024,27 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
     int nHeight = request->Image->OrigHeight();
 
     double dZoom = request->ProcessParams.Zoom;
-    CSize newSize;
+    QSize newSize;
     if (dZoom < 0.0) {
-        newSize = Helpers::GetImageRect(nWidth, nHeight, 
-            request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight, request->ProcessParams.AutoZoomMode, dZoom);
+        newSize = Helpers::GetImageRect(nWidth, nHeight,
+                                        request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight, request->ProcessParams.AutoZoomMode, dZoom);
     } else {
-        newSize = CSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
+        newSize = QSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
     }
 
-    newSize.cx = std::max<LONG>(1, std::min<LONG>(65535, newSize.cx));
-    newSize.cy = std::max<LONG>(1, std::min<LONG>(65535, newSize.cy)); // max size must not be bigger than this after zoom
+    newSize.setWidth(std::max<int>(1, std::min<int>(65535, newSize.width())));
+    newSize.setHeight(std::max<int>(1, std::min<int>(65535, newSize.height()))); // max size must not be bigger than this after zoom
 
     // clip to target rectangle
-    CSize clippedSize(std::min<LONG>(request->ProcessParams.TargetWidth, newSize.cx),
-        std::min<LONG>(request->ProcessParams.TargetHeight, newSize.cy));
+    QSize clippedSize(std::min<int>(request->ProcessParams.TargetWidth, newSize.width()),
+                      std::min<int>(request->ProcessParams.TargetHeight, newSize.height()));
 
-    LimitOffsets(request->ProcessParams.Offsets, CSize(request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight), newSize);
+    LimitOffsets(request->ProcessParams.Offsets, QSize(request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight), newSize);
 
     // this will process the image and cache the processed DIB in the CJPEGImage instance
     CPoint offsetInImage = request->Image->ConvertOffset(newSize, clippedSize, request->ProcessParams.Offsets);
     return NULL != request->Image->GetDIB(newSize, clippedSize, offsetInImage,
-        request->ProcessParams.ImageProcParams, request->ProcessParams.ProcFlags);
+                                          request->ProcessParams.ImageProcParams, request->ProcessParams.ProcFlags);
 }
 
 

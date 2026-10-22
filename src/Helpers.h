@@ -3,6 +3,7 @@
 
 #include "ImageProcessingTypes.h" // defines int8, uint8, int16, uint16, int32, uint32, EFilterType, EImageFormat
 #include <QString>
+#include <QRgb>
 
 class CJPEGImage;
 class CFileList;
@@ -113,13 +114,13 @@ namespace Helpers {
     int ScaleWithDPI(int value);
 
     // Based on: https://github.com/sdneon/jpegview.git
-    // COLORREF is 0x00bbggrr. 0xFF00000 signals we don't use an override color
+    // QRgb is 0x00rrggbb. 0xFF00000 signals we don't use an override color
     void BlendAlpha(uint32* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode TransparencyMode);
 
-    // pixel is ARGB, backgroundColor is BGR. Returns ARGB
+    // pixel is ARGB, backgroundColor is QRgb. Returns ARGB
     // [GF] Note: PsdReader::ReadImage() still calls this directly for "blending the K channel in CMYK images".
     //        Anything else is going through BlendAlpha().
-    static inline uint32 AlphaBlendBackground(uint32 pixel, COLORREF backgroundColor, bool bUseCheckerboard = false, int x = -1, int y = -1) {
+    static inline uint32 AlphaBlendBackground(uint32 pixel, QRgb backgroundColor, bool bUseCheckerboard = false, int x = -1, int y = -1) {
         uint32 alpha = pixel & 0xFF000000;
         if (alpha == 0xFF000000)
             return pixel;
@@ -128,32 +129,32 @@ namespace Helpers {
             //ignore configured backgroundColor, and use white and light gray for checkerboard
             if (((x & 0x10) && ((y & 0x10) == 0))
                 || ((y & 0x10) && ((x & 0x10) == 0))) {
-                backgroundColor = 0x00ffffff;
+                backgroundColor = qRgb(255, 255, 255);
             } else {
-                backgroundColor = 0x00c0c0c0;
+                backgroundColor = qRgb(192, 192, 192);
             }
         }
-        
-        uint8 bg_r = GetRValue(backgroundColor);
-        uint8 bg_g = GetGValue(backgroundColor);
-        uint8 bg_b = GetBValue(backgroundColor);
+
+        uint8 bg_r = qRed(backgroundColor);
+        uint8 bg_g = qGreen(backgroundColor);
+        uint8 bg_b = qBlue(backgroundColor);
 
         if (alpha == 0) {
-            return (bg_r << 16) + (bg_g << 8) + (bg_b);
+            return 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
         } else {
-/*
-            uint8 r = (pixel >> 16) & 0xFF;
-            uint8 g = (pixel >>  8) & 0xFF;
-            uint8 b = (pixel      ) & 0xFF;
-            uint8 a = alpha >> 24;
-            uint8 one_minus_a = 255 - a;
-
-            return
-                0xFF000000 + 
-                (  (uint8)(((r * a + bg_r * one_minus_a) / 255.0) + 0.5) << 16) +
-                (  (uint8)(((g * a + bg_g * one_minus_a) / 255.0) + 0.5) <<  8) + 
-                (  (uint8)(((b * a + bg_b * one_minus_a) / 255.0) + 0.5)      );
-*/
+            /*
+             *          uint8 r = (pixel >> 16) & 0xFF;
+             *          uint8 g = (pixel >>  8) & 0xFF;
+             *          uint8 b = (pixel      ) & 0xFF;
+             *          uint8 a = alpha >> 24;
+             *          uint8 one_minus_a = 255 - a;
+             *
+             *          return
+             *              0xFF000000 +
+             *              (  (uint8)(((r * a + bg_r * one_minus_a) / 255.0) + 0.5) << 16) +
+             *              (  (uint8)(((g * a + bg_g * one_minus_a) / 255.0) + 0.5) <<  8) +
+             *              (  (uint8)(((b * a + bg_b * one_minus_a) / 255.0) + 0.5)      );
+             */
             // From https://github.com/aviscaerulea/jpegview-nt.git
             // Integer division by 255: (v + 128 + ((v + 128) >> 8)) >> 8
             // This code performs about 30% faster than the original one above and gives bit-identical results.
@@ -170,22 +171,22 @@ namespace Helpers {
                 (((vg + 128 + ((vg + 128) >> 8)) >> 8) <<  8) |
                 (((vb + 128 + ((vb + 128) >> 8)) >> 8)      );
         }
-	}
+    }
 
     // Gets the image size to be used when fitting the image to screen, either using 'fit to screen'
     // or 'fill with crop' method. If 'fill with crop' is used, the bLimitAR can be set to avoid
     // filling when to less pixels remain visible
     // Outputs also the zoom factor to resize to this new size.
     // nWidth, nHeight are the original image width and height
-    CSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, 
+    QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, 
         bool bAllowZoomIn, bool bFillCrop, bool bLimitAR, EAutoZoomMode eAutoZoomMode, double & dZoom);
 
     // Gets the image size to be used when fitting the image to screen according to the auto zoom mode given
-    CSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom);
+    QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom);
 
     // Gets the total border size of a window. This includes the frame sizes and the size of the window caption area.
     // The window size equals the client area size plus this border size
-    CSize GetTotalBorderSize();
+    QSize GetTotalBorderSize();
 
     // Gets the path where JPEGView stores its application data, including a trailing backslash
     QString JPEGViewAppDataPath();

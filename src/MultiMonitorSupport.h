@@ -33,7 +33,7 @@ public:
     static void SetDefaultWindowRect(QRect rect);
 
     // Gets the default client rectangle for windowed mode
-    static QRect GetDefaultClientRectInWindowMode(bool bAutoFitWndToImage);
+    static QRect GetDefaultClientRectInWindowMode();
 
 private:
     CMultiMonitorSupport() = delete; // Statische Klasse nicht instanziierbar

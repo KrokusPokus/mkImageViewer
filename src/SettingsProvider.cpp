@@ -265,15 +265,15 @@ QWidget* SettingsDialog::createWindowTab() {
     QFormLayout* layout = new QFormLayout(panel);
 
     m_comboShowFullScreen = new QComboBox();
-    m_comboShowFullScreen->addItems({"false", "true", "auto"});
-    m_comboShowFullScreen->setToolTip(tr("Vollbildmodus beim Starten ('auto' wählt modus nach Bildgröße)."));
+    m_comboShowFullScreen->addItems({"false", "true"});
+    m_comboShowFullScreen->setToolTip(tr("Vollbildmodus beim Starten."));
     layout->addRow(tr("Start im Vollbild:"), m_comboShowFullScreen);
 
     m_checkSingleFullScreenInstance = new QCheckBox(tr("Nur eine Vollbild-Instanz erlauben"));
     layout->addRow(m_checkSingleFullScreenInstance);
 
     m_comboDefaultWindowRect = new QComboBox();
-    m_comboDefaultWindowRect->addItems({"sticky", "auto", "max", "image"});
+    m_comboDefaultWindowRect->addItems({"sticky", "auto", "max"});
     m_comboDefaultWindowRect->setToolTip(tr("Standardposition und -größe im Fenster-Modus."));
     layout->addRow(tr("Fenstergröße beim Start:"), m_comboDefaultWindowRect);
 
@@ -518,7 +518,7 @@ void SettingsDialog::loadFromSettings() {
     m_checkStoreToExe->setChecked(settings.m_bStoreToEXEPath);
 
     // Tab 2
-    m_comboShowFullScreen->setCurrentText(settings.m_bAutoFullScreen ? "auto" : (settings.m_bShowFullScreen ? "true" : "false"));
+    m_comboShowFullScreen->setCurrentText(settings.m_bShowFullScreen ? "true" : "false");
     m_checkSingleFullScreenInstance->setChecked(settings.m_bSingleFullScreenInstance);
     m_spinMinWidth->setValue(settings.m_minimalWindowSize.width());
     m_spinMinHeight->setValue(settings.m_minimalWindowSize.height());
@@ -716,8 +716,7 @@ CSettingsProvider::CSettingsProvider() {
     // Read settings that can be written with SaveSettings()
     ReadWriteableINISettings();
 
-    m_bAutoFullScreen = GetString("ShowFullScreen", "").compare("auto", Qt::CaseInsensitive) == 0;
-    m_bShowFullScreen = m_bAutoFullScreen ? true : GetBool("ShowFullScreen", true);
+    m_bShowFullScreen = GetBool("ShowFullScreen", true);
     m_bShowFullPathInTitle = GetBool("ShowFilePathInTitle", false);
 
     QString sCPU = GetString("CPUType", "AutoDetect");
@@ -810,7 +809,6 @@ CSettingsProvider::CSettingsProvider() {
     m_defaultWindowRect = GetRect("DefaultWindowRect", QRect(0, 0, 0, 0));
     m_stickyWindowRect = GetRect("StickyWindowRect", QRect(0, 0, 0, 0));
     m_bDefaultMaximized = false;
-    m_bDefaultWndToImage = false;
     m_bStickyWindowSize = false;
     m_bExplicitWindowRect = false;
 
@@ -818,8 +816,6 @@ CSettingsProvider::CSettingsProvider() {
         QString sAuto = GetString("DefaultWindowRect", "");
         if (sAuto.compare("max", Qt::CaseInsensitive) == 0) {
             m_bDefaultMaximized = true;
-        } else if (sAuto.compare("image", Qt::CaseInsensitive) == 0) {
-            m_bDefaultWndToImage = true;
         } else if (sAuto.compare("sticky", Qt::CaseInsensitive) == 0) {
             m_bStickyWindowSize = true;
             m_bExplicitWindowRect = !m_stickyWindowRect.isEmpty();

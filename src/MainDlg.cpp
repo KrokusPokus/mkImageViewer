@@ -239,9 +239,7 @@ namespace {
         bool bWindowBorderless,
         Helpers::EAutoZoomMode eAutoZoomMode)
     {
-        // Bildschirmgeometrie über das Qt-Fenstersystem ermitteln (ersetzt GetSystemMetrics & MultiMonitorSupport)
-        QScreen* currentScreen = pWidget ? pWidget->screen() : QGuiApplication::primaryScreen();
-        QRect workingArea = currentScreen ? currentScreen->availableGeometry() : QRect(0, 0, 1920, 1080);
+        QRect workingArea = CMultiMonitorSupport::GetWorkingRect(pWidget);
 
         int nOrigWidth = (pImage == nullptr) ? workingArea.width() / 2 : pImage->OrigWidth();
         int nOrigWidthUnzoomed = nOrigWidth;
@@ -262,12 +260,7 @@ namespace {
             nOrigHeight = static_cast<int>(nOrigHeight * dZoom + 0.5);
         }
 
-        QSize borderSize;
-        if (!bWindowBorderless) {
-            borderSize = Helpers::GetTotalBorderSize(); // Angenommen, das liefert ein QSize oder lässt sich mappen
-        } else {
-            borderSize = QSize(0, 0);
-        }
+        QSize borderSize = Helpers::GetTotalBorderSize(); // Angenommen, das liefert ein QSize oder lässt sich mappen
 
         int nRequiredWidth = borderSize.width() + nOrigWidth;
         int nRequiredHeight = borderSize.height() + nOrigHeight;
@@ -310,24 +303,6 @@ namespace {
                 QSize(nRequiredWidth, nRequiredHeight)
                 );
         }
-    }
-	
-    // Gets if the given image can be displayed without sampling down the image.
-    bool CanDisplayImageWithoutResize(const QWidget* pWidget, CJPEGImage* pImage) {
-        if (pImage == nullptr) {
-            return true;
-        }
-
-        // Aktuellen Bildschirm und dessen verfügbaren Arbeitsbereich (ohne Taskleiste) ermitteln
-        QScreen* currentScreen = pWidget ? pWidget->screen() : QGuiApplication::primaryScreen();
-        QRect workingArea = currentScreen ? currentScreen->availableGeometry() : QRect(0, 0, 1920, 1080);
-
-        // Fensterrahmen-Größe abrufen (angenommen, Helpers liefert hier QSize)
-        QSize borderSize = Helpers::GetTotalBorderSize();
-
-        // Prüfen, ob Bildbreite und -höhe inklusive Rahmen in den Arbeitsbereich passen
-        return (pImage->OrigWidth() + borderSize.width() <= workingArea.width()) &&
-               (pImage->OrigHeight() + borderSize.height() <= workingArea.height());
     }
 
     // Gets the maximum client size for a framed window that fits into the working area of the screen the given window is placed on
@@ -607,8 +582,8 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_DIBOffsets = QPoint(0, 0);
     m_nCapturedX = m_nCapturedY = 0;
     m_nMouseX = m_nMouseY = 0;
-    m_bAutoFitWndToImage = sp.DefaultWndToImage();
-    m_bFullScreenMode = (sp.ShowFullScreen() && !sp.AutoFullScreen());
+
+    m_bFullScreenMode = sp.ShowFullScreen();
     m_bLockPaint = true;
     m_nCurrentTimeout = 0;
     m_startMouse.x = m_startMouse.y = -1;
@@ -709,9 +684,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
         }
     }
 
-    m_clientRect = m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultClientRectInWindowMode(sp.AutoFullScreen());
-
-    // Note: With AutoFullScreen, at this point m_clientRect will be monitorRect even when m_bFullScreenMode==0
+    m_clientRect = m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultClientRectInWindowMode();
 
     this->setWindowIcon(QIcon(":/icons/mainframes.ico"));
 
@@ -755,17 +728,12 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     }
 
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
-    CheckIfApplyAutoFitWndToImage(true);
+
     AfterNewImageLoaded(true, true); // synchronize to per image parameters
 
     if (!m_bFullScreenMode) {
-        // Window mode, set correct window size
-        if (!IsAdjustWindowToImage()) {
-            QRect windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
-            this->setGeometry(windowRect);
-        } else {
-            AdjustWindowToImage(true);
-        }
+		QRect windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
+		this->setGeometry(windowRect);
         if (sp.DefaultMaximized()) {
             this->showMaximized();
         }
@@ -816,14 +784,11 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     QPainter painter(this);
     m_dRealizedZoom = 1.0;
 
-    QRect qtClient = rect();
-    m_clientRect = QRect(qtClient.left(), qtClient.top(), qtClient.right(), qtClient.bottom());
+    QRect m_clientRect = rect();
+    m_clientRect = rect();
 
     QColor backColor = CSettingsProvider::This().ColorBackground();
-    if (backColor.rgb() == 0) {
-        backColor = QColor(0, 0, 1); // nVidia Bug-Workaround
-    }
-    painter.fillRect(qtClient, backColor);
+    painter.fillRect(m_clientRect, backColor);
 
     if (m_pCurrentImage != NULL) {
         m_pCurrentImage->VerifyRotation(CRotationParams(m_pCurrentImage->GetRotationParams(), m_nRotation));
@@ -834,7 +799,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
 
         QSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
                                             m_clientRect.size(),
-                                            IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : (m_isUserFitToScreen ? m_autoZoomFitToScreen : GetAutoZoomMode()),
+                                            m_isUserFitToScreen ? m_autoZoomFitToScreen : GetAutoZoomMode(),
                                             m_dZoom);
 
         m_virtualImageSize = newSize;
@@ -929,7 +894,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             painter.setFont(QFont("Consolas", 10));
 
             // Verfügbares Rechteck definieren (mit 10px Abstand zum Rand)
-            QRect textRect = qtClient.adjusted(10, 10, -10, -10);
+            QRect textRect = m_clientRect.adjusted(10, 10, -10, -10);
 
             // 1. Exakte Ausdehnung des Textes (inkl. Wortumbruch) im Vorfeld berechnen
             QRect boundingRect = painter.boundingRect(
@@ -1052,7 +1017,7 @@ void CMainDlg::PaintToDC(QPainter& painter) {
 
         // Virtuelle Bildgröße und Zoom berechnen
         double dZoom = m_dZoom;
-        CSize newSize = GetVirtualImageSize(pCurrentImage->OrigSize(), qClient.size(), GetAutoZoomMode(), dZoom);
+        QSize newSize = GetVirtualImageSize(pCurrentImage->OrigSize(), qClient.size(), GetAutoZoomMode(), dZoom);
         CPoint offsets = LimitOffsets(GetOffsets(), qClient.size(), newSize);
         m_dRealizedZoom = (double)newSize.cx / m_pCurrentImage->OrigSize().cx;
 
@@ -1224,7 +1189,9 @@ void CMainDlg::loadFileAsynch() {
 }
 
 void CMainDlg::closeEvent(QCloseEvent* event) {
-    m_windowRectOnClose = frameGeometry();
+    // geometry() liefert die echten Fensterkoordinaten (ohne Window-Manager-Rahmen),
+    // die setGeometry() beim Start auch fehlerfrei wiederherstellen kann.
+    m_windowRectOnClose = geometry();
     event->accept(); // Erlaubt das Schließen des Fensters (entspricht bHandled = FALSE)
 }
 
@@ -1296,7 +1263,6 @@ void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         if (m_bZoomMode) {
             m_bZoomMode = false;
-            AdjustWindowToImage(false);
             update();
         } else if (m_bDragging) {
             EndDragging();
@@ -1325,8 +1291,7 @@ void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
                 return;
             }
             double dZoom = -1.0;
-            QSize sizeAutoZoom = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
-                                                     m_clientRect.size(), IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : GetAutoZoomMode(), dZoom);
+            QSize sizeAutoZoom = GetVirtualImageSize(m_pCurrentImage->OrigSize(), m_clientRect.size(), GetAutoZoomMode(), dZoom);
             if (sizeAutoZoom != m_virtualImageSize) {
                 ExecuteCommand(GetAutoZoomMode() * 10 + IDM_AUTO_ZOOM_NONE);
             } else {
@@ -1360,7 +1325,7 @@ void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
         int nDX = m_nMouseX - m_nCapturedX;
         double dFactor = 1 + pow(nDX * nDX, 0.8) / 1500;
         if (nDX < 0) dFactor = 1.0/dFactor;
-        PerformZoom(m_dStartZoom * dFactor, false, true, false);
+        PerformZoom(m_dStartZoom * dFactor, false, true);
     } else if (m_bDragging) {
         DoDragging();
     }
@@ -1433,8 +1398,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                 PerformZoom(
                     CSettingsProvider::This().MouseWheelZoomSpeed() * double(nDelta) / WHEEL_DELTA,
                     true,
-                    m_bMouseOn,
-                    true
+                    m_bMouseOn
                     );
             }
         } else if (bShift) { // Pan horizontally
@@ -1466,8 +1430,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
         PerformZoom(
             CSettingsProvider::This().MouseWheelZoomSpeed() * double(nDelta) / WHEEL_DELTA,
             true,
-            m_bMouseOn,
-            true
+            m_bMouseOn
             );
     }
 
@@ -1749,8 +1712,6 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
     
     HMENU hMenuZoom = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_WINDOW);
     if (m_bFullScreenMode) ::CheckMenuItem(hMenuZoom,  IDM_FULL_SCREEN_MODE, MF_CHECKED);
-    if (IsAdjustWindowToImage() && IsImageExactlyFittingWindow()) ::CheckMenuItem(hMenuZoom, IDM_FIT_WINDOW_TO_IMAGE, MF_CHECKED);
-    if (m_bFullScreenMode) ::EnableMenuItem(hMenuZoom, IDM_FIT_WINDOW_TO_IMAGE, MF_BYCOMMAND | MF_GRAYED);
     if (!m_bFullScreenMode) ::EnableMenuItem(hMenuZoom, IDM_SPAN_SCREENS, MF_BYCOMMAND | MF_GRAYED);
     
     HMENU hMenuAutoZoomMode = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_AUTOZOOMMODE);
@@ -2054,10 +2015,9 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_nRotation = (m_nRotation + nRotationDelta) % 360;
                 m_nUserRotation = (m_nUserRotation + nRotationDelta) % 360;
                 m_pCurrentImage->Rotate(nRotationDelta);
-                if (!IsAdjustWindowToImage()) m_dZoom = -1;
+                m_dZoom = -1;
                 m_bUserZoom = false;
                 m_bUserPan = false;
-                AdjustWindowToImage(false);
                 this->update();
             }
             break;
@@ -2078,7 +2038,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             if (m_bKeepParams) {
                 *m_pImageProcParamsKept = *m_pImageProcParams;
                 m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
-                m_dZoomKept = (m_bUserZoom || IsAdjustWindowToImage()) ? m_dZoom : -1;
+                m_dZoomKept = m_bUserZoom ? m_dZoom : -1;
                 m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
             }
             break;
@@ -2138,7 +2098,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_bInZooming = true;
                 StartLowQTimer(ZOOM_TIMEOUT);
                 this->update();
-                AdjustWindowToImage(false);
             }
             break;
         case IDM_TOGGLE_FIT_TO_SCREEN_100_PERCENTS:
@@ -2167,21 +2126,21 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             }
             else {
                 // Vollbild verlassen und normales Fenster wiederherstellen
+                this->showNormal();
+/*
                 if (sp.ExplicitWindowRect()) {
                     QRect defaultWindowRect = CMultiMonitorSupport::GetDefaultWindowRect();
                     double dZoom = -1;
                     // Deine Logik zur Größenberechnung beibehalten
-                    QRect windowRect = GetWindowRectMatchingImageSize(
+                    QRect windowRect = GetWindowRectMatchingImageSize( // Gets a window rectangle (in screen coordinates) that fits the given image
                         this,
                         CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT),
                         defaultWindowRect.size(),
                         dZoom, m_pCurrentImage, false, true, false, GetAutoZoomMode()
                         );
                     this->setGeometry(windowRect.left(), windowRect.top(), windowRect.width(), windowRect.height());
-                    this->showNormal();
-                } else {
-                    this->showNormal();
                 }
+*/
 
                 UpdateWindowTitle(true); // Aktualisiert den Titel / das Icon der Titelleiste
                 this->MouseOn();
@@ -2191,30 +2150,24 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             StartLowQTimer(ZOOM_TIMEOUT);
             break;
         }
-        case IDM_FIT_WINDOW_TO_IMAGE:
-            // Note: If auto fit is on but the window size does not match the image size (due to manual window resizing), restore window to image
-            if (!(m_bAutoFitWndToImage && !IsImageExactlyFittingWindow()))
-                m_bAutoFitWndToImage = !m_bAutoFitWndToImage;
-            AdjustWindowToImage(false);
-            break;
         case IDM_ZOOM_400:
-            PerformZoom(4.0, false, m_bMouseOn, true);
+            PerformZoom(4.0, false, m_bMouseOn);
             break;
         case IDM_ZOOM_200:
-            PerformZoom(2.0, false, m_bMouseOn, true);
+            PerformZoom(2.0, false, m_bMouseOn);
             break;
         case IDM_ZOOM_100:
             ResetZoomTo100Percents(m_bMouseOn);
             break;
         case IDM_ZOOM_50:
-            PerformZoom(0.5, false, m_bMouseOn, true);
+            PerformZoom(0.5, false, m_bMouseOn);
             break;
         case IDM_ZOOM_25:
-            PerformZoom(0.25, false, m_bMouseOn, true);
+            PerformZoom(0.25, false, m_bMouseOn);
             break;
         case IDM_ZOOM_INC:
         case IDM_ZOOM_DEC:
-            PerformZoom((nCommand == IDM_ZOOM_INC) ? 1 : -1, true, m_bMouseOn, true);
+            PerformZoom((nCommand == IDM_ZOOM_INC) ? 1 : -1, true, m_bMouseOn);
             break;
         case IDM_ZOOM_MODE:
             m_bZoomModeOnLeftMouse = !m_bZoomModeOnLeftMouse;
@@ -2236,7 +2189,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_dZoom = -1.0;
                 m_offsets = CPoint(0, 0);
                 this->update();
-                AdjustWindowToImage(false);
                 break;
             }
         case IDM_EDIT_USER_CONFIG:
@@ -2683,12 +2635,12 @@ void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
                                                     CJPEGProvider::FORWARD,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
-                                                    CreateProcessParams(!m_bFullScreenMode && (bAfterStartup || IsAdjustWindowToImage())),
+                                                    CreateProcessParams(!m_bFullScreenMode && bAfterStartup),
                                                     m_bOutOfMemoryLastImage,
                                                     m_bExceptionErrorLastImage);
 
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
-    if (bAfterStartup) CheckIfApplyAutoFitWndToImage(false);
+
     AfterNewImageLoaded(true, false);
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
@@ -2886,7 +2838,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     }
 
     if (nFlags & KEEP_PARAMETERS) {
-        if (!(m_bUserZoom || IsAdjustWindowToImage())) {
+        if (!m_bUserZoom) {
             m_dZoom = -1;
         }
     } else {
@@ -2957,7 +2909,7 @@ void CMainDlg::ReloadImage(bool keepParameters, bool updateWindow) {
 }
 
 // returns true on success, false if nothing was done
-bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, bool bAdjustWindowToImage) {
+bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
     double dOldZoom = m_dZoom;
     m_bUserZoom = true;
     m_isUserFitToScreen = false;
@@ -3052,9 +3004,6 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, boo
     StartLowQTimer(ZOOM_TIMEOUT);
     if (fabs(dOldZoom - m_dZoom) > 0.0001 || m_bZoomMode) {
         this->update();
-        if (bAdjustWindowToImage) {
-            AdjustWindowToImage(false);
-        }
 
         // Recalculate the new m_nBookModePageHeight based on the current zoom m_dZoom
         // Todo: Save changes to user ini
@@ -3114,71 +3063,51 @@ double CMainDlg::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnla
 void CMainDlg::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool bAdjustWindowSize) {
     m_isUserFitToScreen = false;
     if (m_pCurrentImage != NULL) {
-        if (bAdjustWindowSize && !m_bFullScreenMode && !isMaximized() && m_bAutoFitWndToImage) {
-            m_dZoom = bAllowEnlarge ? Helpers::ZoomMax : 1;
-
-            QRect wndRect = GetWindowRectMatchingImageSize(this, QSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, m_dZoom, m_pCurrentImage, false, true, false, GetAutoZoomMode());
-
-            if (m_dZoom <= 1) {
-                m_dZoom = -1;
-            }
-            m_bResizeForNewImage = true;
-
-            // Ersetzung von SetWindowPos durch Qt-Bordmittel (setGeometry)
-            this->setGeometry(wndRect);
-
-            // Client-Rechteck in Qt-Stil aktualisieren
-            m_clientRect = this->rect();
-
-            m_bResizeForNewImage = false;
-            this->update();
-        } else {
-            double dOldZoom = m_dZoom;
-            m_dZoom = GetZoomFactorForFitToScreen(bFillWithCrop, bAllowEnlarge);
-            if (bAllowEnlarge && !IsAdjustWindowToImage()) {
-                m_isUserFitToScreen = true;
-                m_dZoom = -1;
-                m_autoZoomFitToScreen = bFillWithCrop ? Helpers::ZM_FillScreen : Helpers::ZM_FitToScreen;
-            }
-            m_bUserZoom = m_dZoom > 1.0;
-            m_bUserPan = false;
-            if (fabs(dOldZoom - m_dZoom) > 0.01) {
-                //m_bInZooming = true;    // Disabled, since this would trigger a display of the Zoom Factor text at ANY change in zoom (fullscreen, onsize() etc.)
-                StartLowQTimer(ZOOM_TIMEOUT);
-                this->update();
-            }
-        }
+		double dOldZoom = m_dZoom;
+		m_dZoom = GetZoomFactorForFitToScreen(bFillWithCrop, bAllowEnlarge);
+		if (bAllowEnlarge) {
+			m_isUserFitToScreen = true;
+			m_dZoom = -1;
+			m_autoZoomFitToScreen = bFillWithCrop ? Helpers::ZM_FillScreen : Helpers::ZM_FitToScreen;
+		}
+		m_bUserZoom = m_dZoom > 1.0;
+		m_bUserPan = false;
+		if (fabs(dOldZoom - m_dZoom) > 0.01) {
+			//m_bInZooming = true;    // Disabled, since this would trigger a display of the Zoom Factor text at ANY change in zoom (fullscreen, onsize() etc.)
+			StartLowQTimer(ZOOM_TIMEOUT);
+			this->update();
+		}
     }
 }
 
 void CMainDlg::ResetZoomTo100Percents(bool bZoomToMouse) {
     if (m_pCurrentImage != NULL && fabs(m_dZoom - 1) > 0.01) {
         // the current design (unless changed) cursor always shows in windowed mode, so always zoom to cursor when not fullscreen
-        PerformZoom(1.0, false, bZoomToMouse || !m_bFullScreenMode, true);
+        PerformZoom(1.0, false, bZoomToMouse || !m_bFullScreenMode);
     }
 }
 
 CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
     int nClientWidth = m_clientRect.width();
     int nClientHeight = m_clientRect.height();
+	
     if (nClientWidth == 0 && nClientHeight == 0) {
         QRect rect = CMultiMonitorSupport::GetMonitorRect(this);
         nClientWidth = rect.width();
         nClientHeight = rect.height();
     }
+	
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
-    if (IsAdjustWindowToImage() && !bNoProcessingAfterLoad) {
-        CSize maxClientSize = GetMaxClientSize(this);
-        nClientWidth = maxClientSize.cx;
-        nClientHeight = maxClientSize.cy;
-        eAutoZoomMode = Helpers::ZM_FitToScreenNoZoom;
-    }
+	
     if (m_bKeepParams) {
         *m_pImageProcParamsKept = *m_pImageProcParams;
         m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
-        m_dZoomKept = (m_bUserZoom || IsAdjustWindowToImage()) ? m_dZoom : -1;
+        m_dZoomKept = m_bUserZoom ? m_dZoom : -1;
         m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
-        if (m_isUserFitToScreen && !IsAdjustWindowToImage()) { eAutoZoomMode = m_autoZoomFitToScreen; }
+		
+        if (m_isUserFitToScreen) {
+			eAutoZoomMode = m_autoZoomFitToScreen;
+		}
 
         return CProcessParams(nClientWidth, nClientHeight,
             CMultiMonitorSupport::GetMonitorRect(this).size(),
@@ -3325,7 +3254,7 @@ void CMainDlg::MouseOn() {
 void CMainDlg::InitParametersForNewImage() {
     if (!m_bKeepParams) {
         ResetParamsToDefault();
-    } else if (!(m_bUserZoom || IsAdjustWindowToImage())) {
+    } else if (!m_bUserZoom) {
         m_dZoom = -1;
     }
 
@@ -3388,69 +3317,6 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
     
                 m_offsets_custom = m_offsets;
             }
-        }
-
-        if (!bAfterStartup && !m_bIsAnimationPlaying) {
-            AdjustWindowToImage(false);
-        }
-    }
-}
-
-bool CMainDlg::IsAdjustWindowToImage() {
-    return !m_bFullScreenMode && !isMaximized() && m_bAutoFitWndToImage;
-}
-
-bool CMainDlg::IsImageExactlyFittingWindow() {
-    return (m_pCurrentImage != NULL) && m_pCurrentImage->DIBWidth() == m_clientRect.width() && m_pCurrentImage->DIBHeight() == m_clientRect.height();
-}
-
-void CMainDlg::AdjustWindowToImage(bool bAfterStartup) {
-    if (IsAdjustWindowToImage() && (m_pCurrentImage != nullptr || bAfterStartup)) {
-        // Fenstergröße an die Bildgröße anpassen (unter Beibehaltung des Seitenverhältnisses)
-        double dZoom = m_dZoom;
-
-        // Übergabe von 'this' (als QWidget*) an die neue Qt-Signatur
-        QRect windowRect = GetWindowRectMatchingImageSize(
-            this,
-            QSize(MIN_WND_WIDTH, MIN_WND_HEIGHT),
-            HUGE_SIZE,
-            dZoom,
-            m_pCurrentImage,
-            bAfterStartup,
-            dZoom < 0,
-            false,
-            GetAutoZoomMode()
-            );
-
-        QRect defaultRect = CMultiMonitorSupport::GetDefaultWindowRect();
-        if (bAfterStartup && CSettingsProvider::This().ExplicitWindowRect()) {
-            windowRect = QRect(defaultRect.topLeft(), windowRect.size());
-        }
-
-        m_bResizeForNewImage = true;
-        this->update();
-
-        // Ersetzt das alte SetWindowPos durch Qt-Geometrie-Zuweisung
-        this->setGeometry(windowRect);
-
-        // Aktualisiert das Client-Rechteck über Qt-Bordmittel (ersetzt GetClientRect)
-        m_clientRect = this->rect();
-
-        m_bResizeForNewImage = false;
-    }
-}
-
-void CMainDlg::CheckIfApplyAutoFitWndToImage(bool bInInitDialog) {
-    if (CSettingsProvider::This().AutoFullScreen()) {
-        if (!CanDisplayImageWithoutResize(this, m_pCurrentImage)) {
-            if (!bInInitDialog) {
-                ExecuteCommand(IDM_FULL_SCREEN_MODE);
-            }
-            m_bFullScreenMode = true;
-            m_bTemporaryLowQ = false;
-            MouseOff();
-        } else {
-            m_bAutoFitWndToImage = true;
         }
     }
 }
@@ -3646,8 +3512,8 @@ int CMainDlg::GetLoadErrorAfterOpenFile() {
 void CMainDlg::PrefetchDIB(const QRect& clientRect) {
     if (m_pCurrentImage == NULL) return;
 
-    CSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.size(), GetAutoZoomMode(), m_dZoom);
-    CSize clippedSize(std::min<long>(clientRect.width(), newSize.cx), std::min<long>(clientRect.height(), newSize.cy));
+    QSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.size(), GetAutoZoomMode(), m_dZoom);
+    QSize clippedSize(std::min<long>(clientRect.width(), newSize.width()), std::min<long>(clientRect.height(), newSize.height()));
     CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, LimitOffsets(m_offsets, clientRect.size(), newSize));
     m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, *m_pImageProcParams, CreateDefaultProcessingFlags());
 }
@@ -4191,6 +4057,7 @@ QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
 
 
 bool CMainDlg::isRunningInWine() {
+#if defined(Q_OS_WIN)
     // ntdll.dll ist in jedem Windows-Prozess bereits geladen
     HMODULE hNtDll = GetModuleHandleA("ntdll.dll");
     if (!hNtDll) {
@@ -4206,7 +4073,7 @@ bool CMainDlg::isRunningInWine() {
         // const char* version = wine_get_version();
         return true;
     }
-
+#endif
     return false;
 }
 

@@ -105,17 +105,14 @@ BEGIN
             MENUITEM SEPARATOR
             MENUITEM "Fit to window",               IDM_FIT_TO_SCREEN
             MENUITEM "Fill with crop",              IDM_FILL_WITH_CROP
-            MENUITEM SEPARATOR
+			MENUITEM SEPARATOR
             MENUITEM "400 %",                       IDM_ZOOM_400
             MENUITEM "200 %",                       IDM_ZOOM_200
             MENUITEM "100 %",                       IDM_ZOOM_100
             MENUITEM "50 %",                        IDM_ZOOM_50
             MENUITEM "25 %",                        IDM_ZOOM_25
-        END
-        POPUP "Window"
-        BEGIN
+            MENUITEM SEPARATOR
             MENUITEM "Full screen mode",            IDM_FULL_SCREEN_MODE
-            MENUITEM "Fit window to image",         IDM_FIT_WINDOW_TO_IMAGE
         END
         MENUITEM SEPARATOR
         POPUP "Play folder as slideshow/movie"
