@@ -7,8 +7,9 @@
 
 #include <gdiplus.h>
 #include <vector>
-
+#include <functional>
 #include <QString>
+#include <QAtomicInt>
 
 class CJPEGImage;
 class ZipEntry
@@ -23,15 +24,11 @@ public:
     ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned long long a_size);
 };
 
-// returned image data by CImageLoadThread.GetLoadedImage() method
 class CImageData
 {
 public:
-    // Gets the image
     CJPEGImage* Image;
-    // True if the request failed due to memory
     bool IsRequestFailedOutOfMemory;
-    // True if the request failed due to an unhandled exception
     bool IsRequestFailedException;
 
     CImageData(CJPEGImage* pImage, bool isRequestFailedOutOfMemory, bool isRequestFailedException) {
@@ -41,7 +38,6 @@ public:
     }
 };
 
-// Read ahead and processing thread
 class CImageLoadThread : public CWorkThread
 {
 public:
@@ -54,7 +50,7 @@ public:
     // received or the event has been signaled.
     // The file to load is given by its filename (with path) and the frame index (for multiframe images). The
     // frame index needs to be zero when the image only has one frame.
-    int AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, HWND targetWnd, HANDLE eventFinished);
+    int AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, std::function<void(int)> onCompleted);
 
     // Get loaded image, CImageData::Image is null if not (yet) available - use handle returned by AsyncLoad().
     // Call after having received the WM_IMAGE_LOAD_COMPLETED message to retrieve the loaded image.
@@ -69,12 +65,12 @@ private:
     // Request for loading an image
     class CRequest : public CRequestBase {
     public:
-        CRequest(const QString& strFileName, int nFrameIndex, HWND wndTarget, const CProcessParams& processParams, HANDLE eventFinished)
-            : CRequestBase(eventFinished), ProcessParams(processParams) {
+        CRequest(const QString& strFileName, int nFrameIndex, const CProcessParams& processParams, std::function<void(int)> callback)
+            : CRequestBase(nullptr), ProcessParams(processParams) {
             FileName = strFileName;
             FrameIndex = nFrameIndex;
-            TargetWnd = wndTarget;
-            RequestHandle = ::InterlockedIncrement((LONG*)&m_curHandle);
+            CompletedCallback = callback;
+            RequestHandle = ++m_curHandle;
             Image = NULL;
             OutOfMemory = false;
             ExceptionError = false;
@@ -82,18 +78,17 @@ private:
 
         QString FileName;
         int FrameIndex;
-        HWND TargetWnd;
+        std::function<void(int)> CompletedCallback;
         int RequestHandle;
         CJPEGImage* Image;
         CProcessParams ProcessParams;
-        bool OutOfMemory;  // load caused an out of memory condition
-        bool ExceptionError;  // an unhandled exception caused the load to fail
+        bool OutOfMemory;
+        bool ExceptionError;
     };
 
-    // Request to release image file
     class CReleaseFileRequest : public CRequestBase {
     public:
-        CReleaseFileRequest(const QString& strFileName) : CRequestBase() {
+        CReleaseFileRequest(const QString& strFileName) : CRequestBase(nullptr) {
             FileName = strFileName;
             Type = ReleaseFileRequest;
         }
@@ -103,20 +98,21 @@ private:
         QString FileName;
     };
 
-    static volatile int m_curHandle; // Request handle returned by AsyncLoad()
+    // Plattformunabhängiger atomarer Zähler statt Win32 InterlockedIncrement
+    static QAtomicInt m_curHandle;
 
-    Gdiplus::Bitmap* m_pLastBitmap; // Last read GDI+ bitmap, cached to speed up GIF animations
-    QString m_sLastFileName; // Only for GDI+ files
-    QString m_sLastWebpFileName; // Only for animated WebP files
-    QString m_sLastPngFileName; // Only for animated PNG files
-    QString m_sLastJxlFileName; // Only for animated JPEG XL files
-    QString m_sLastAvifFileName; // Only for animated AVIF files
-    QString m_sLastZipFileName; // Only for ZIP files
+    Gdiplus::Bitmap* m_pLastBitmap;
+    QString m_sLastFileName;
+    QString m_sLastWebpFileName;
+    QString m_sLastPngFileName;
+    QString m_sLastJxlFileName;
+    QString m_sLastAvifFileName;
+    QString m_sLastZipFileName;
     int m_nZipCount;
     std::vector<ZipEntry> zipEntries;
 
-    virtual void ProcessRequest(CRequestBase& request);
-    virtual void AfterFinishProcess(CRequestBase& request);
+    virtual void ProcessRequest(CRequestBase& request) override;
+    virtual void AfterFinishProcess(CRequestBase& request) override;
     void DeleteCachedGDIBitmap();
     void DeleteCachedWebpDecoder();
     void DeleteCachedPngDecoder();
@@ -141,6 +137,5 @@ private:
     static void SetFileDependentProcessParams(CRequest * request);
     static bool ProcessImageAfterLoad(CRequest * request);
 };
-
 
 #endif // IMAGELOADTHREAD_H

@@ -72,13 +72,6 @@ public:
     // Applies to original pixels!
     bool Rotate(int nRotation);
 
-    // Rotate original pixels by given angle (in radians). The original pixels are replaced by this operation.
-    // If autocrop is enabled, the maximum rectangular area is cropped, else black borders are added to the image.
-    // If keep aspect ratio is true, the aspect ratio of the cropped area is the same as the aspect ratio of the original image.
-    // In all cases the size of the image in pixels is changed by the rotation.
-    // Returns false if not enough memory is available to perform the operation.
-    bool RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKeepAspectRatio);
-
     // Gets the hash value of the pixels, for JPEGs the hash is on the compressed pixels
     __int64 GetPixelHash() const { return m_nPixelHash; }
 
@@ -342,9 +335,6 @@ private:
 
     // makes sure that the input image (m_pOrigPixels) is a 4 channel BGRA image (converts if necessary)
     bool ConvertSrcTo4Channels();
-
-    // Gets the new size of the image after doing a free rotation
-    static CSize GetSizeAfterFreeRotation(const CSize& sourceSize, double dRotation, bool bAutoCrop, bool bKeepAspectRatio, CPoint & offset);
 
     // Get if from source to target size it is down or upsampling
     EResizeType GetResizeType(CSize targetSize, CSize sourceSize);

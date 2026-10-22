@@ -3,6 +3,7 @@
 
 #include "ImageProcessingTypes.h"
 #include <QString>
+#include <QDateTime>
 
 // Signed rational number: numerator/denominator
 class SignedRational {
@@ -54,7 +55,7 @@ public:
     ~CEXIFReader(void);
 
     // Parse date string in the EXIF date/time format
-    static bool ParseDateString(SYSTEMTIME & date, const QString& str);
+    static bool ParseDateString(QDateTime & date, const QString& str);
 
 public:
     QString GetCameraModel() const { return m_sModel; }
@@ -64,11 +65,11 @@ public:
     bool GetCameraModelPresent() const { return !m_sModel.isEmpty(); }
     bool GetSoftwarePresent() const { return !m_sSoftware.isEmpty(); }
 
-    const SYSTEMTIME& GetAcquisitionTime() const { return m_acqDate; }
-    bool GetAcquisitionTimePresent() const { return m_acqDate.wYear > 1600; }
+    const QDateTime& GetAcquisitionTime() const { return m_acqDate; }
+    bool GetAcquisitionTimePresent() const { return m_acqDate.isValid(); }
 
-    const SYSTEMTIME& GetDateTime() const { return m_dateTime; }
-    bool GetDateTimePresent() const { return m_dateTime.wYear > 1600; }
+    const QDateTime& GetDateTime() const { return m_dateTime; }
+    bool GetDateTimePresent() const { return m_dateTime.isValid(); }
 
     const Rational& GetExposureTime() const { return m_exposureTime; }
     bool GetExposureTimePresent() const { return m_exposureTime.Denominator != 0; }
@@ -109,8 +110,8 @@ private:
     QString m_sUserComment;
     QString m_sImageDescription;
     QString m_sSoftware;
-    SYSTEMTIME m_acqDate;
-    SYSTEMTIME m_dateTime;
+    QDateTime m_acqDate;
+    QDateTime m_dateTime;
     Rational m_exposureTime;
     double m_dExposureBias;
     bool m_bFlashFired;

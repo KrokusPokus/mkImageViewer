@@ -13,12 +13,12 @@
 #include "Clipboard.h"
 #include "ProcessParams.h"
 #include "NLS.h"
-#include "TimerEventIDs.h"
 #include "ResizeFilter.h"
 #include "ProcessingThreadPool.h"
 #include "KeyMap.h"
 #include "DirectoryWatcher.h"
 
+#include <QApplication>
 #include <QBuffer>
 #include <QDesktopServices>
 #include <QDir>
@@ -34,6 +34,11 @@
 #include <QString>
 #include <QUrl>
 #include <QtGlobal>
+#include <QKeyEvent>
+#include <QMimeData>
+#include <QMenu>
+#include <QThread>
+#include <QPainterPath>
 
 namespace {
 
@@ -179,154 +184,188 @@ namespace {
         bAutoContrast = GetProcessingFlag(eFlags, PFLAG_AutoContrast);
     }
 
-    // If dZoom > 0: Gets the virtual image size when applying the given zoom factor
-    // If dZoom < 0: Gets the image size to fit the image to the given screen size, using the given auto zoom mode.
-    //               dZoom is filled with the used zoom factor to resize to this new size in this case.
-    // The returned size is limited to 65535 in cx and cy
-    CSize GetVirtualImageSize(CSize originalImageSize, CSize screenSize, Helpers::EAutoZoomMode eAutoZoomMode, double & dZoom) {
-		CSize newSize;
+    QSize GetVirtualImageSize(QSize originalImageSize, QSize screenSize, Helpers::EAutoZoomMode eAutoZoomMode, double & dZoom) {
+        QSize newSize;
 
-		if (dZoom < 0.0) {
-			// zoom not set, interpret as 'fit to screen'
-			// ---------------------------------------------
-			newSize = Helpers::GetImageRect(originalImageSize.cx, originalImageSize.cy, screenSize.cx, screenSize.cy, eAutoZoomMode, dZoom);
-		} else {
-			// zoom set, use this value for the new size
-			// ---------------------------------------------
-			newSize = CSize((int)(originalImageSize.cx * dZoom + 0.5), (int)(originalImageSize.cy * dZoom + 0.5));
-		}
+        if (dZoom < 0.0) {
+            // zoom not set, interpret as 'fit to screen'
+            // ---------------------------------------------
+            newSize = Helpers::GetImageRect(originalImageSize.width(), originalImageSize.height(),
+                                            screenSize.width(), screenSize.height(),
+                                            eAutoZoomMode, dZoom);
+        } else {
+            // zoom set, use this value for the new size
+            // ---------------------------------------------
+            newSize = QSize(
+                (int)(originalImageSize.width() * dZoom + 0.5),
+                (int)(originalImageSize.height() * dZoom + 0.5)
+                );
+        }
 
-		if (newSize.cx > 65535 || newSize.cy > 65535) {
-			double dFac = 65535.0/std::max(newSize.cx,newSize.cy);
-			dZoom = dZoom*dFac;
-			newSize.cx = (int)(originalImageSize.cx * dZoom + 0.5);
-			newSize.cy = (int)(originalImageSize.cy * dZoom + 0.5);
-		}
+        if (newSize.width() > 65535 || newSize.height() > 65535) {
+            double dFac = 65535.0 / std::max(newSize.width(), newSize.height());
+            dZoom = dZoom * dFac;
+            newSize.setWidth((int)(originalImageSize.width() * dZoom + 0.5));
+            newSize.setHeight((int)(originalImageSize.height() * dZoom + 0.5));
+        }
 
-		return newSize;
-	}
+        return newSize;
+    }
 
     // Limits the given center based offsets so that the rectangle created by the offset and the given rectSize is totally inside of outerRect
     // outerRect has top,left coordinates 0/0
-	CPoint LimitOffsets(const CPoint& offsets, const CSize & rectSize, const CSize & outerRect) {
-		int nMaxOffsetX = (outerRect.cx - rectSize.cx)/2;
-		nMaxOffsetX = std::max(0, nMaxOffsetX);
-		int nMaxOffsetY = (outerRect.cy - rectSize.cy)/2;
-		nMaxOffsetY = std::max(0, nMaxOffsetY);
-		return CPoint(std::max<long>(-nMaxOffsetX, std::min<int>(+nMaxOffsetX, offsets.x)), std::max<long>(-nMaxOffsetY, std::min<int>(+nMaxOffsetY, offsets.y)));
-	}
+    QPoint LimitOffsets(const QPoint& offsets, const QSize & rectSize, const QSize & outerRect) {
+        int nMaxOffsetX = (outerRect.width() - rectSize.width()) / 2;
+        nMaxOffsetX = std::max(0, nMaxOffsetX);
+        int nMaxOffsetY = (outerRect.height() - rectSize.height()) / 2;
+        nMaxOffsetY = std::max(0, nMaxOffsetY);
+
+        return QPoint(
+            std::max<long>(-nMaxOffsetX, std::min<int>(+nMaxOffsetX, offsets.x())),
+            std::max<long>(-nMaxOffsetY, std::min<int>(+nMaxOffsetY, offsets.y()))
+            );
+    }
 
 
     // Gets a window rectangle (in screen coordinates) that fits the given image
-    CRect GetWindowRectMatchingImageSize(HWND hWnd, CSize minSize, CSize maxSize, double& dZoom, CJPEGImage* pImage, bool bForceCenterWindow, bool bKeepAspectRatio, bool bWindowBorderless, Helpers::EAutoZoomMode eAutoZoomMode) {
-		int nOrigWidth = (pImage == NULL) ? ::GetSystemMetrics(SM_CXSCREEN) / 2 : pImage->OrigWidth();
-		int nOrigWidthUnzoomed = nOrigWidth;
-		int nOrigHeight = (pImage == NULL) ? ::GetSystemMetrics(SM_CYSCREEN) / 2 : pImage->OrigHeight();
+    QRect GetWindowRectMatchingImageSize(
+        const QWidget* pWidget,
+        QSize minSize,
+        QSize maxSize,
+        double& dZoom,
+        CJPEGImage* pImage,
+        bool bForceCenterWindow,
+        bool bKeepAspectRatio,
+        bool bWindowBorderless,
+        Helpers::EAutoZoomMode eAutoZoomMode)
+    {
+        // Bildschirmgeometrie über das Qt-Fenstersystem ermitteln (ersetzt GetSystemMetrics & MultiMonitorSupport)
+        QScreen* currentScreen = pWidget ? pWidget->screen() : QGuiApplication::primaryScreen();
+        QRect workingArea = currentScreen ? currentScreen->availableGeometry() : QRect(0, 0, 1920, 1080);
+
+        int nOrigWidth = (pImage == nullptr) ? workingArea.width() / 2 : pImage->OrigWidth();
+        int nOrigWidthUnzoomed = nOrigWidth;
+        int nOrigHeight = (pImage == nullptr) ? workingArea.height() / 2 : pImage->OrigHeight();
+
         if (dZoom == Helpers::ZoomMax) {
-			// NOTE: somewhat hacky, but the original code did not account for ZoomMax == DBL_MAX, causing overflows
-			//       This workaround artificially calculates an image that is == the maximum allowed dimensions,
-			//       so as to not overflow int or double
-			//
-			// when dZoom was unbounded to DBL_MAX in 1.1.44, doing any arithmetic would cause the nOrig* to overflow
-			// So just set to scaled maximum allowed image dimension on one side
-			// the math below will not overflow, and it stays within the bounds of an integer
-			if (nOrigWidth == nOrigHeight) {
-				// ratio is 1:1
-				nOrigWidth = nOrigHeight = MAX_IMAGE_DIMENSION;
-			} else if (nOrigWidth > nOrigHeight) {
-				// wider than high
-				nOrigHeight = (int)((double)nOrigHeight / nOrigWidth * MAX_IMAGE_DIMENSION);  // max * height/width ratio
-				nOrigWidth = MAX_IMAGE_DIMENSION;
-			} else {
-				// higher than wide
-				nOrigWidth = (int)((double)nOrigWidth / nOrigHeight * MAX_IMAGE_DIMENSION);  // max * width/height ratio
-				nOrigHeight = MAX_IMAGE_DIMENSION;
-			}
-		} else if (dZoom > 0) {
-			nOrigWidth = (int)(nOrigWidth * dZoom + 0.5);
-			nOrigHeight = (int)(nOrigHeight * dZoom + 0.5);
-		}
+            if (nOrigWidth == nOrigHeight) {
+                nOrigWidth = nOrigHeight = MAX_IMAGE_DIMENSION;
+            } else if (nOrigWidth > nOrigHeight) {
+                nOrigHeight = static_cast<int>(static_cast<double>(nOrigHeight) / nOrigWidth * MAX_IMAGE_DIMENSION);
+                nOrigWidth = MAX_IMAGE_DIMENSION;
+            } else {
+                nOrigWidth = static_cast<int>(static_cast<double>(nOrigWidth) / nOrigHeight * MAX_IMAGE_DIMENSION);
+                nOrigHeight = MAX_IMAGE_DIMENSION;
+            }
+        } else if (dZoom > 0) {
+            nOrigWidth = static_cast<int>(nOrigWidth * dZoom + 0.5);
+            nOrigHeight = static_cast<int>(nOrigHeight * dZoom + 0.5);
+        }
 
-		CSize borderSize;
-		if (!bWindowBorderless) {
-            borderSize = Helpers::GetTotalBorderSize();
-		} else {
-			borderSize = { 0, 0 };
-		}
+        QSize borderSize;
+        if (!bWindowBorderless) {
+            borderSize = Helpers::GetTotalBorderSize(); // Angenommen, das liefert ein QSize oder lässt sich mappen
+        } else {
+            borderSize = QSize(0, 0);
+        }
 
-		int nRequiredWidth = borderSize.cx + nOrigWidth;
-		int nRequiredHeight = borderSize.cy + nOrigHeight;
-		CRect workingArea = CMultiMonitorSupport::GetWorkingRect(hWnd);
-		if (bKeepAspectRatio && (nRequiredWidth > workingArea.Width() || nRequiredHeight > workingArea.Height())) {
-			double dZoom;
-			CSize imageRect = Helpers::GetImageRect(nOrigWidth, nOrigHeight, 
-				std::min(maxSize.cx, workingArea.Width() - borderSize.cx),
-				std::min(maxSize.cy, workingArea.Height() - borderSize.cy),
-				false, false, false, eAutoZoomMode, dZoom);
-			nRequiredWidth = imageRect.cx + borderSize.cx;
-			nRequiredHeight = imageRect.cy + borderSize.cy;
-		} else {
-			nRequiredWidth = std::min<int>(maxSize.cx, std::min(workingArea.Width(), nRequiredWidth));
-			nRequiredHeight = std::min<int>(maxSize.cy, std::min(workingArea.Height(), nRequiredHeight));
-		}
-		nRequiredWidth = std::max<int>(minSize.cx, nRequiredWidth);
-		nRequiredHeight = std::max<int>(minSize.cy, nRequiredHeight);
-		dZoom = ((double)(nRequiredWidth - borderSize.cx)) / nOrigWidthUnzoomed;
-		CRect wndRect;
-		::GetWindowRect(hWnd, reinterpret_cast<LPRECT>(&wndRect));
-		int nNewLeft = (wndRect.left + wndRect.right - nRequiredWidth) / 2;
-		int nNewTop = (wndRect.top + wndRect.bottom - nRequiredHeight) / 2;
-		nNewLeft = std::max<int>(workingArea.left, std::min<int>(workingArea.right - nRequiredWidth, nNewLeft));
-		nNewTop = std::max<int>(workingArea.top, std::min<int>(workingArea.bottom - nRequiredHeight, nNewTop));
+        int nRequiredWidth = borderSize.width() + nOrigWidth;
+        int nRequiredHeight = borderSize.height() + nOrigHeight;
 
-		if (!bForceCenterWindow) {
-			return CRect(CPoint(nNewLeft, nNewTop), CSize(nRequiredWidth, nRequiredHeight));
-		} else {
-			return CRect(CPoint(workingArea.left + (workingArea.Width() - nRequiredWidth) / 2, workingArea.top + (workingArea.Height() - nRequiredHeight) / 2), CSize(nRequiredWidth, nRequiredHeight));
-		}
-	}
+        if (bKeepAspectRatio && (nRequiredWidth > workingArea.width() || nRequiredHeight > workingArea.height())) {
+            double dummyZoom;
+            QSize imageRect = Helpers::GetImageRect(
+                nOrigWidth, nOrigHeight,
+                std::min(maxSize.width(), workingArea.width() - borderSize.width()),
+                std::min(maxSize.height(), workingArea.height() - borderSize.height()),
+                false, false, false, eAutoZoomMode, dummyZoom
+                );
+            nRequiredWidth = imageRect.width() + borderSize.width();
+            nRequiredHeight = imageRect.height() + borderSize.height();
+        } else {
+            nRequiredWidth = std::min<int>(maxSize.width(), std::min(workingArea.width(), nRequiredWidth));
+            nRequiredHeight = std::min<int>(maxSize.height(), std::min(workingArea.height(), nRequiredHeight));
+        }
+
+        nRequiredWidth = std::max<int>(minSize.width(), nRequiredWidth);
+        nRequiredHeight = std::max<int>(minSize.height(), nRequiredHeight);
+
+        dZoom = static_cast<double>(nRequiredWidth - borderSize.width()) / nOrigWidthUnzoomed;
+
+        // Aktuelle Fenstergeometrie über Qt holen statt ::GetWindowRect
+        QRect wndRect = pWidget ? pWidget->geometry() : workingArea;
+
+        int nNewLeft = (wndRect.left() + wndRect.right() - nRequiredWidth) / 2;
+        int nNewTop = (wndRect.top() + wndRect.bottom() - nRequiredHeight) / 2;
+
+        nNewLeft = std::max<int>(workingArea.left(), std::min<int>(workingArea.right() - nRequiredWidth, nNewLeft));
+        nNewTop = std::max<int>(workingArea.top(), std::min<int>(workingArea.bottom() - nRequiredHeight, nNewTop));
+
+        if (!bForceCenterWindow) {
+            return QRect(QPoint(nNewLeft, nNewTop), QSize(nRequiredWidth, nRequiredHeight));
+        } else {
+            return QRect(
+                QPoint(workingArea.left() + (workingArea.width() - nRequiredWidth) / 2,
+                       workingArea.top() + (workingArea.height() - nRequiredHeight) / 2),
+                QSize(nRequiredWidth, nRequiredHeight)
+                );
+        }
+    }
 	
     // Gets if the given image can be displayed without sampling down the image.
-	bool CanDisplayImageWithoutResize(HWND hWnd, CJPEGImage* pImage) {
-		if (pImage == NULL) {
-			return true;
-		}
-		CRect workingArea = CMultiMonitorSupport::GetWorkingRect(hWnd);
-        CSize borderSize = Helpers::GetTotalBorderSize();
-		return pImage->OrigWidth() + borderSize.cx <= workingArea.Width() && pImage->OrigHeight() + borderSize.cy <= workingArea.Height();
-	}
+    bool CanDisplayImageWithoutResize(const QWidget* pWidget, CJPEGImage* pImage) {
+        if (pImage == nullptr) {
+            return true;
+        }
+
+        // Aktuellen Bildschirm und dessen verfügbaren Arbeitsbereich (ohne Taskleiste) ermitteln
+        QScreen* currentScreen = pWidget ? pWidget->screen() : QGuiApplication::primaryScreen();
+        QRect workingArea = currentScreen ? currentScreen->availableGeometry() : QRect(0, 0, 1920, 1080);
+
+        // Fensterrahmen-Größe abrufen (angenommen, Helpers liefert hier QSize)
+        QSize borderSize = Helpers::GetTotalBorderSize();
+
+        // Prüfen, ob Bildbreite und -höhe inklusive Rahmen in den Arbeitsbereich passen
+        return (pImage->OrigWidth() + borderSize.width() <= workingArea.width()) &&
+               (pImage->OrigHeight() + borderSize.height() <= workingArea.height());
+    }
 
     // Gets the maximum client size for a framed window that fits into the working area of the screen the given window is placed on
-	CSize GetMaxClientSize(HWND hWnd) {
-		CRect workingArea = CMultiMonitorSupport::GetWorkingRect(hWnd);
-        CSize borderSize = Helpers::GetTotalBorderSize();
-		return CSize(workingArea.Width() - borderSize.cx, workingArea.Height() - borderSize.cy);
-	}
+    QSize GetMaxClientSize(const QWidget* pWidget) {
+        QRect workingArea = CMultiMonitorSupport::GetWorkingRect(pWidget);
+        QSize borderSize = Helpers::GetTotalBorderSize();
+
+        return QSize(
+            workingArea.width() - borderSize.width(),
+            workingArea.height() - borderSize.height()
+            );
+    }
 
     // Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
-    void DrawImageLoadErrorText(CDC& dc, const CRect& clientRect, const QString& failedFileName, int nFileLoadError, int nLoadErrorDetail) {
+    // Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
+    void DrawImageLoadErrorText(QPainter& painter, const QRect& clientRect, const QString& failedFileName, int nFileLoadError, int nLoadErrorDetail) {
         const bool bOutOfMemory = (nLoadErrorDetail & FileLoad_OutOfMemory) != 0;
         const bool bExceptionError = (nLoadErrorDetail & FileLoad_ExceptionError) != 0;
 
         QString message;
 
         switch (nFileLoadError) {
-            case FileLoad_LoadError:
-                message = QStringLiteral("The file '%1' could not be read!").arg(failedFileName);
-                break;
+        case FileLoad_LoadError:
+            message = QStringLiteral("The file '%1' could not be read!").arg(failedFileName);
+            break;
 
-            case FileLoad_SlideShowListInvalid:
-                message = QStringLiteral("The file '%1' does not contain a list of file names!").arg(failedFileName);
-                break;
+        case FileLoad_SlideShowListInvalid:
+            message = QStringLiteral("The file '%1' does not contain a list of file names!").arg(failedFileName);
+            break;
 
-            case FileLoad_NoFilesInDirectory:
-                message = QStringLiteral("The directory '%1' does not contain any image files!").arg(failedFileName) +
-                        QLatin1Char('\n') +
-                        QStringLiteral("Press any key to search the subdirectories for image files.");
-                break;
+        case FileLoad_NoFilesInDirectory:
+            message = QStringLiteral("The directory '%1' does not contain any image files!").arg(failedFileName) +
+                      QLatin1Char('\n') +
+                      QStringLiteral("Press any key to search the subdirectories for image files.");
+            break;
 
-            default:
-                return;
+        default:
+            return;
         }
 
         if (bOutOfMemory) {
@@ -349,10 +388,9 @@ namespace {
             }
         }
 
-        CRect rectText(0, clientRect.Height()/2 - Helpers::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
-        dc.DrawText(reinterpret_cast<LPCTSTR>(message.utf16()), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
-        //QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), clientRect.height());
-        //painter.drawText(rectText, Qt::AlignHCenter | Qt::TextWordWrap, message);
+        QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), clientRect.height());
+
+        painter.drawText(rectText, Qt::AlignHCenter | Qt::TextWordWrap, message);
     }
 
     void SelectDefaultGUIFont(HDC dc) {
@@ -412,8 +450,14 @@ namespace {
                     sNewMenuText += QLatin1Char('\t');
                     if (sTabPart.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive)) {
                         // Hexadezimale Mappings auswerten (äquivalent zu _stscanf)
-                        int nCommand = 0;
-                        swscanf(reinterpret_cast<const wchar_t*>(sTabPart.utf16()), L"%x", &nCommand);
+                        bool ok = false;
+
+                        // 16 steht hier für die Hexadezimal-Basis (entspricht %x in swscanf)
+                        int nCommand = sTabPart.toInt(&ok, 16);
+                        if (!ok) {
+                            nCommand = 0;
+                        }
+
                         if (nCommand == 0xFFFF) {
                             // Exit JPEGView is special
                             QString shortCutExit = pKeyMap ? pKeyMap->GetKeyStringForCommand(0xFF) : QString();
@@ -448,69 +492,45 @@ namespace {
         }
     }
 
-    // Draws a text with a black outline to improve readability. nFormat is according to format in GDI DrawText method.
-    void DrawTextBordered(CDC& dc, LPCTSTR sText, const CRect& rect, UINT nFormat) {
-        int oldBkMode = dc.GetBkMode();
-        if (oldBkMode != TRANSPARENT) {
-            dc.SetBkMode(TRANSPARENT);
-        }
-
-        COLORREF oldColor = dc.SetTextColor(RGB(0, 0, 0));
-
-        CRect textRect = rect;
-        textRect.InflateRect(-1, -1);
-
-        textRect.OffsetRect(-1, 0); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
-        textRect.OffsetRect(2, 0); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
-        textRect.OffsetRect(-1, -1); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
-        textRect.OffsetRect(0, 2); dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
-        textRect.OffsetRect(0, -1);
-
-        dc.SetTextColor(oldColor);
-        dc.DrawText(sText, -1, &textRect, nFormat | DT_NOPREFIX);
-
-        if (oldBkMode != TRANSPARENT) {
-            dc.SetBkMode(oldBkMode);
-        }
-    }
-
     // Draws a 32 bit DIB centered in the given target area, filling the remaining area with the given brush
     // The bmInfo struct will be initialized by this method and does not need to be preinitialized.
     // Return value is the top, left coordinate of the painted DIB in the target area
-    CPoint DrawDIB32bppWithBlackBorders(CDC& dc, BITMAPINFO& bmInfo, void* pDIBData, HBRUSH backBrush, const CRect& targetArea, CSize dibSize, CPoint offset) {
-        memset(&bmInfo, 0, sizeof(BITMAPINFO));
-        bmInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmInfo.bmiHeader.biWidth = dibSize.cx;
-        bmInfo.bmiHeader.biHeight = -dibSize.cy;
-        bmInfo.bmiHeader.biPlanes = 1;
-        bmInfo.bmiHeader.biBitCount = 32;
-        bmInfo.bmiHeader.biCompression = BI_RGB;
-        int xDest = (targetArea.Width() - dibSize.cx) / 2 + offset.x;
-        int yDest = (targetArea.Height() - dibSize.cy) / 2 + offset.y;
+    /*
+    QPoint DrawDIB32bppWithBlackBorders(QPainter& painter, void* pDIBData, const QColor& backColor, const CRect& targetArea, CSize dibSize, CPoint offset) {
+        int targetWidth = targetArea.Width();
+        int targetHeight = targetArea.Height();
 
-        // remaining client area is painted black
+        int xDest = (targetWidth - dibSize.cx) / 2 + offset.x;
+        int yDest = (targetHeight - dibSize.cy) / 2 + offset.y;
+
+        // 1. Verbleibende Randbereiche (Borders) mit der Hintergrundfarbe füllen
         if (xDest > 0) {
-            CRect r(0, 0, xDest, targetArea.Height());
-            dc.FillRect(&r, backBrush);
+            QRect r(0, 0, xDest, targetHeight);
+            painter.fillRect(r, backColor);
         }
-        if (xDest + dibSize.cx < targetArea.Width()) {
-            CRect r(xDest + dibSize.cx, 0, targetArea.Width(), targetArea.Height());
-            dc.FillRect(&r, backBrush);
+        if (xDest + dibSize.cx < targetWidth) {
+            QRect r(xDest + dibSize.cx, 0, targetWidth - (xDest + dibSize.cx), targetHeight);
+            painter.fillRect(r, backColor);
         }
         if (yDest > 0) {
-            CRect r(xDest, 0, xDest + dibSize.cx, yDest);
-            dc.FillRect(&r, backBrush);
+            QRect r(xDest, 0, dibSize.cx, yDest);
+            painter.fillRect(r, backColor);
         }
-        if (yDest + dibSize.cy < targetArea.Height()) {
-            CRect r(xDest, yDest + dibSize.cy, xDest + dibSize.cx, targetArea.Height());
-            dc.FillRect(&r, backBrush);
+        if (yDest + dibSize.cy < targetHeight) {
+            QRect r(xDest, yDest + dibSize.cy, dibSize.cx, targetHeight - (yDest + dibSize.cy));
+            painter.fillRect(r, backColor);
         }
 
-        dc.SetDIBitsToDevice(xDest, yDest, dibSize.cx, dibSize.cy, 0, 0, 0, dibSize.cy, pDIBData,
-                             &bmInfo, DIB_RGB_COLORS);
+        // 2. Rohdaten als QImage wrappen und hochperformant zeichnen
+        if (pDIBData != nullptr) {
+            // QImage übernimmt den Pinselstrich direkt auf die DIB-Daten (Format_RGB32 entspricht Windows 32bpp)
+            QImage dibImage(static_cast<uchar*>(pDIBData), dibSize.cx, dibSize.cy, QImage::Format_RGB32);
+            painter.drawImage(xDest, yDest, dibImage);
+        }
 
-        return CPoint(xDest, yDest);
+        return QPoint(xDest, yDest);
     }
+    */
 
 } // namespace
 
@@ -518,7 +538,8 @@ namespace {
 // Public
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-CMainDlg::CMainDlg(const QString& sStartupFile) {
+CMainDlg::CMainDlg(const QString& sStartupFile)
+    : QMainWindow(nullptr) {
     m_sStartupFile = sStartupFile;
 
     CSettingsProvider& sp = CSettingsProvider::This();
@@ -575,7 +596,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile) {
     m_bUserPan = false;
     m_bMovieMode = false;
     m_bProcFlagsTouched = false;
-    m_bInTrackPopupMenu = false;
     m_bResizeForNewImage = false;
     m_dZoom = -1.0;
     m_dStartZoom = -1.0;
@@ -583,8 +603,8 @@ CMainDlg::CMainDlg(const QString& sStartupFile) {
     m_dZoomMult = -1.0;
     m_bDragging = false;
     m_bDoDragging = false;
-    m_offsets = CPoint(0, 0);
-    m_DIBOffsets = CPoint(0, 0);
+    m_offsets = QPoint(0, 0);
+    m_DIBOffsets = QPoint(0, 0);
     m_nCapturedX = m_nCapturedY = 0;
     m_nMouseX = m_nMouseY = 0;
     m_bAutoFitWndToImage = sp.DefaultWndToImage();
@@ -592,16 +612,15 @@ CMainDlg::CMainDlg(const QString& sStartupFile) {
     m_bLockPaint = true;
     m_nCurrentTimeout = 0;
     m_startMouse.x = m_startMouse.y = -1;
-    m_virtualImageSize = CSize(-1, -1);
+    m_virtualImageSize = QSize(-1, -1);
     m_bInZooming = false;
     m_bTemporaryLowQ = false;
     m_bShowZoomFactor = false;
-    m_bSpanVirtualDesktop = false;
     m_bPanMouseCursorSet = false;
     m_storedWindowPlacement.length = sizeof(WINDOWPLACEMENT);
     m_nMonitor = 0;
-    m_monitorRect = CRect(0, 0, 0, 0);
-    m_windowRectOnClose = CRect(0, 0, 0, 0);
+    m_monitorRect = QRect(0, 0, 0, 0);
+    m_windowRectOnClose = QRect(0, 0, 0, 0);
     m_bMouseOn = false;
     m_bKeepParametersBeforeAnimation = false;
     m_bIsAnimationPlaying = false;
@@ -609,8 +628,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile) {
     m_nExpectedNextAnimationTickCount = 0;
     m_isUserFitToScreen = false;
     m_autoZoomFitToScreen = Helpers::ZM_FillScreen;
-    m_bWindowBorderless = sp.WindowBorderlessOnStartup();  // unlike AlwaysOnTop, this is set early on initialize as it affects calculations of the window size, position, etc
-    m_bAlwaysOnTop = false;  // default normal window.  this will be set to true when AlwaysOnTop is toggled if set to startup in INI
     m_bSelectZoom = false;  // this value is set when LButtonDown happens, to be read by LButtonUp
 
     m_pKeyMap = new CKeyMap(); // routine to load the keymap, it's not as simple as just loading one file anymore, but all logic handled by CKeyMap
@@ -622,7 +639,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile) {
     /* Custom variables of the linear scaling mod */
     /*############################################*/
 
-    m_hmodDwmapi = NULL;
     m_bDWMenabled = FALSE;
     m_DynDwmFlush = 0;
 
@@ -638,73 +654,27 @@ CMainDlg::CMainDlg(const QString& sStartupFile) {
     m_customAnimationFrameTime = 1000;
     
     m_eSortModeBeforeRandom = Helpers::FS_FileName;
-}
 
-CMainDlg::~CMainDlg() {
-    delete m_pDirectoryWatcher;
-    delete m_pFileList;
-    if (m_pJPEGProvider != NULL) delete m_pJPEGProvider;
-    delete m_pImageProcParams;
-    delete m_pImageProcParamsKept;
-    delete m_pKeyMap;
+    //setMinimumSize(0, 0);
+    QSize minimalSize = sp.MinimalWindowSize();
+    setMinimumSize(std::max(0, minimalSize.width()), std::max(0, minimalSize.height()));
 
-    for (auto it = s_iconCache.begin(); it != s_iconCache.end(); ++it) {
-        if (it->hBig != nullptr) {
-            ::DestroyIcon(it->hBig);
-        }
-        if (it->hSmall != nullptr) {
-            ::DestroyIcon(it->hSmall);
-        }
-    }
-    s_iconCache.clear();
+    this->setWindowTitle("JPEGView");
 
-// DWM api is used for vsync in smooth scrolling implementation
-    if (m_hmodDwmapi) {
-        FreeLibrary(m_hmodDwmapi);
-    }
-}
-
-LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    //     UpdateWindowTitle();
-    // There is no point doing a full UpdateWindowTitle() at this point since we don't know any file path yet, so just do SetWindowText() instead
-    this->SetWindowText(_T("JPEGView"));
-
-    // set the scaling of the screen (DPI) compared to 96 DPI (design value)
-    CPaintDC dc(this->m_hWnd);
-    Helpers::DPIScalingFactor = ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f;
-
-    ::SetClassLongPtr(m_hWnd, GCLP_HCURSOR, NULL);
-
-    HRESULT hresult = !S_OK;
-    m_hmodDwmapi = LoadLibrary(_T("Dwmapi"));
-    if (m_hmodDwmapi) {
-        MyDwmIsCompositionEnabledType DynDwmIsCompositionEnabled = (MyDwmIsCompositionEnabledType)GetProcAddress(m_hmodDwmapi, "DwmIsCompositionEnabled");
-        if (DynDwmIsCompositionEnabled) {
-            hresult = DynDwmIsCompositionEnabled(&m_bDWMenabled);
-            if (hresult != S_OK)
-                ::OutputDebugStringW(_T("[JpegView] Dwmapi library found, but DynDwmIsCompositionEnabled call failed"));
-        }
-
-        if (m_bDWMenabled == TRUE) {
-            m_DynDwmFlush = (MyDwmFlushType)GetProcAddress(m_hmodDwmapi, "DwmFlush");
-            if (!m_DynDwmFlush)
-                ::OutputDebugStringW(_T("[JpegView] Dwmapi library found, but DynDwmFlush isn't available"));
-        }
+    // DPI-Skalierung über den aktuellen Screen ermitteln
+    QScreen* currentScreen = this->screen();
+    if (currentScreen) {
+        Helpers::DPIScalingFactor = currentScreen->logicalDotsPerInch() / 96.0f;
     } else {
-        ::OutputDebugStringW(_T("[JpegView] Dwmapi library not found"));
+        Helpers::DPIScalingFactor = 1.0f;
     }
 
-    m_pDirectoryWatcher = new CDirectoryWatcher(m_hWnd);
+    m_pDirectoryWatcher = new CDirectoryWatcher(this);
 
     // determine the monitor rectangle and client rectangle
-    CSettingsProvider& sp = CSettingsProvider::This();
     m_nMonitor = sp.DisplayMonitor();
     m_monitorRect = CMultiMonitorSupport::GetMonitorRect(m_nMonitor);
-    // move to correct monitor - but no redraw as Windows does not like that this early
-    ::SetWindowPos(m_hWnd, HWND_TOP, m_monitorRect.left, m_monitorRect.top, m_monitorRect.Width(), m_monitorRect.Height(),
-        SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOREDRAW);
-
-
+    this->setGeometry(m_monitorRect);
 
     int nFrameIndex = 0;    // Will stay zero if no bookmarks are found.
 
@@ -741,19 +711,17 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
 
     m_clientRect = m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultClientRectInWindowMode(sp.AutoFullScreen());
 
-// Note: With AutoFullScreen, at this point m_clientRect will be monitorRect even when m_bFullScreenMode==0
+    // Note: With AutoFullScreen, at this point m_clientRect will be monitorRect even when m_bFullScreenMode==0
 
-    // set icons (for toolbar)
-    HICON hIcon = (HICON)::LoadImage(_Module.GetResourceInstance(), MAKEINTRESOURCE(IDR_MAINFRAME), 
-        IMAGE_ICON, ::GetSystemMetrics(SM_CXICON), ::GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR | LR_SHARED);
-    SetIcon(hIcon, TRUE);
-    HICON hIconSmall = (HICON)::LoadImage(_Module.GetResourceInstance(), MAKEINTRESOURCE(IDR_MAINFRAME), 
-        IMAGE_ICON, ::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR | LR_SHARED);
-    SetIcon(hIconSmall, FALSE);
+    this->setWindowIcon(QIcon(":/icons/mainframes.ico"));
 
     // turn on/off mouse coursor
     m_bMouseOn = !m_bFullScreenMode;
-    ::ShowCursor(m_bMouseOn);
+    if (!m_bMouseOn) {
+        this->setCursor(Qt::BlankCursor);
+    } else {
+        this->unsetCursor();
+    }
 
     // intitialize list of files to show with startup file (and folder)
     m_pFileList = new CFileList(m_sStartupFile,
@@ -769,11 +737,10 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
     // create thread pool for processing requests on multiple CPU cores
     CProcessingThreadPool::This().CreateThreadPoolThreads();
 
+    int nReadAheadBuffers = (CSettingsProvider::This().CacheRange() * 2) + 1;    // The +1 is the current image
 
-    int nReadAheadBuffers = CSettingsProvider::This().CacheRange()*2 + 1;    // The +1 is the current image
-    
     // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
-    m_pJPEGProvider = new CJPEGProvider(m_hWnd, NUM_THREADS, nReadAheadBuffers);
+    m_pJPEGProvider = new CJPEGProvider(this, NUM_THREADS, nReadAheadBuffers);
 
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
                                                     CJPEGProvider::FORWARD,
@@ -793,26 +760,19 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
 
     if (!m_bFullScreenMode) {
         // Window mode, set correct window size
-        SetCurrentWindowStyle();
         if (!IsAdjustWindowToImage()) {
-            CRect windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
-            this->SetWindowPos(HWND_TOP, windowRect.left, windowRect.top, windowRect.Width(), windowRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
+            QRect windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
+            this->setGeometry(windowRect);
         } else {
             AdjustWindowToImage(true);
         }
         if (sp.DefaultMaximized()) {
-            this->ShowWindow(SW_MAXIMIZE);
+            this->showMaximized();
         }
     } else {
         PrefetchDIB(m_monitorRect);
-        SetWindowLong(GWL_STYLE, WS_VISIBLE);
-        SetWindowPos(HWND_TOP, &m_monitorRect, SWP_NOZORDER);
-        SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_FRAMECHANGED);
-    }
-
-    if (CSettingsProvider::This().WindowAlwaysOnTopOnStartup()) {
-        // if set by default for startup ... it is false by default, toggle = true
-        ToggleAlwaysOnTop();
+        this->showFullScreen();
+        this->setGeometry(m_monitorRect);
     }
 
     m_bLockPaint = false;
@@ -822,76 +782,91 @@ LRESULT CMainDlg::OnInitDialog(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam
     }
 
     StartLowQTimer(ZOOM_TIMEOUT);    // Start out in low quality scaling to get something on the screen asap. Feels more responsive with huge images.
-    
-    this->Invalidate(FALSE);
 
-    this->DragAcceptFiles();
+    this->update();
 
-    return TRUE;
+    this->setAcceptDrops(true);
 }
 
-LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/)
+CMainDlg::~CMainDlg() {
+    delete m_pDirectoryWatcher;
+    delete m_pFileList;
+    if (m_pJPEGProvider != NULL) delete m_pJPEGProvider;
+    delete m_pImageProcParams;
+    delete m_pImageProcParamsKept;
+    delete m_pKeyMap;
+
+    for (auto it = s_iconCache.begin(); it != s_iconCache.end(); ++it) {
+        if (it->hBig != nullptr) {
+            ::DestroyIcon(it->hBig);
+        }
+        if (it->hSmall != nullptr) {
+            ::DestroyIcon(it->hSmall);
+        }
+    }
+    s_iconCache.clear();
+}
+
+void CMainDlg::paintEvent(QPaintEvent* /*event*/)
 {
-    static bool s_bFirst = true;
-
     if (m_bLockPaint) {
-        return 0;
+        return;
     }
 
-    if (m_DynDwmFlush) {
-        m_DynDwmFlush();    // Waits for vsync
-    }
-
-    CPaintDC dc(m_hWnd);
+    QPainter painter(this);
     m_dRealizedZoom = 1.0;
 
-    this->GetClientRect(&m_clientRect);
+    QRect qtClient = rect();
+    m_clientRect = QRect(qtClient.left(), qtClient.top(), qtClient.right(), qtClient.bottom());
 
-    CBrush backBrush;
-    backBrush.CreateSolidBrush(CSettingsProvider::This().ColorBackground());
+    QColor backColor = CSettingsProvider::This().ColorBackground();
+    if (backColor.rgb() == 0) {
+        backColor = QColor(0, 0, 1); // nVidia Bug-Workaround
+    }
+    painter.fillRect(qtClient, backColor);
 
-    if (m_pCurrentImage == NULL) {
-        dc.FillRect(&m_clientRect, backBrush);
-    } else {
-        // do this as very first - may changes size of image
+    if (m_pCurrentImage != NULL) {
         m_pCurrentImage->VerifyRotation(CRotationParams(m_pCurrentImage->GetRotationParams(), m_nRotation));
 
-        // Find out zoom multiplier if not yet known
         if (m_dZoomMult < 0.0) {
             m_dZoomMult = GetZoomMultiplier(m_pCurrentImage, m_clientRect);
         }
 
-        // find out the new vitual image size and the size of the bitmap to request
-        CSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
-            m_clientRect.Size(),
-            IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : (m_isUserFitToScreen ? m_autoZoomFitToScreen : GetAutoZoomMode()),
-            m_dZoom);
+        QSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
+                                            m_clientRect.size(),
+                                            IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : (m_isUserFitToScreen ? m_autoZoomFitToScreen : GetAutoZoomMode()),
+                                            m_dZoom);
 
         m_virtualImageSize = newSize;
-        m_dRealizedZoom = (double)newSize.cx / m_pCurrentImage->OrigSize().cx;
-        CPoint unlimitedOffsets = m_offsets;
-        m_offsets = LimitOffsets(m_offsets, m_clientRect.Size(), newSize);
-        m_DIBOffsets = m_bZoomMode ? static_cast<CPoint>(unlimitedOffsets - m_offsets) : CPoint(0, 0);
+        m_dRealizedZoom = (double)newSize.width() / m_pCurrentImage->OrigSize().cx;
+        QPoint unlimitedOffsets = m_offsets;
+        m_offsets = LimitOffsets(m_offsets, m_clientRect.size(), newSize);
+        m_DIBOffsets = m_bZoomMode ? (unlimitedOffsets - m_offsets) : QPoint(0, 0);
 
-        // Clip to client rectangle and request the DIB
-        CSize clippedSize(std::min<long>(m_clientRect.Width(), newSize.cx), std::min<long>(m_clientRect.Height(), newSize.cy));
+        QSize clippedSize(std::min<long>(m_clientRect.width(), newSize.width()), std::min<long>(m_clientRect.height(), newSize.height()));
         CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, m_offsets);
 
-        void* pDIBData;
-        pDIBData = m_pCurrentImage->GetDIB(newSize,
-                                           clippedSize,
-                                           offsetsInImage,
-                                           *m_pImageProcParams,
-                                           CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, false));
+        void* pDIBData = m_pCurrentImage->GetDIB(newSize,
+                                                 clippedSize,
+                                                 offsetsInImage,
+                                                 *m_pImageProcParams,
+                                                 CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, false));
 
-        // Paint the DIB
+        // Das rohe DIB über Qt QImage hochperformant zeichnen
         if (pDIBData != NULL) {
-            BITMAPINFO bmInfo{ 0 };
-            DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, m_DIBOffsets);
+            QImage dibImage(static_cast<uchar*>(pDIBData), clippedSize.width(), clippedSize.height(), QImage::Format_RGB32);
+
+            int xDest = (m_clientRect.width() - clippedSize.width()) / 2 + m_DIBOffsets.x();
+            int yDest = (m_clientRect.height() - clippedSize.height()) / 2 + m_DIBOffsets.y();
+
+            painter.drawImage(xDest, yDest, dibImage);
         }
 
         if (m_bZoomMode) m_offsets = unlimitedOffsets;
 
+        // -------------------------------------------------------------------------
+        // 1. Info-Overlay (m_bShowInfo) über QPainter zeichnen
+        // -------------------------------------------------------------------------
         if (m_bShowInfo) {
             CSettingsProvider& sp = CSettingsProvider::This();
             int iNumThreads = sp.NumberOfCoresToUse();
@@ -899,28 +874,18 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
             EFilterType filter = sp.DownsamplingFilter();
             QString sCPU;
             QString sFilter;
-    
-            if (cpu == Helpers::CPU_Unknown)
-                sCPU = "Unknown";
-            else if (cpu == Helpers::CPU_Generic)
-                sCPU = "Generic";
-            else if (cpu == Helpers::CPU_MMX)
-                sCPU = "MMX";
-            else if (cpu == Helpers::CPU_SSE)
-                sCPU = "SSE2 (128 bit)";
-            else if (cpu == Helpers::CPU_AVX2)
-                sCPU = "AVX2 (256 bit)";
-    
-            if (filter == Filter_Downsampling_None)
-                sFilter = "None";
-            else if (filter == Filter_Downsampling_Hermite)
-                sFilter = "Hermite";
-            else if (filter == Filter_Downsampling_Catrom)
-                sFilter = "Catrom";
-            else if (filter == Filter_Downsampling_Mitchell)
-                sFilter = "Mitchell";
-            else if (filter == Filter_Downsampling_Lanczos2)
-                sFilter = "Lanczos2";
+
+            if (cpu == Helpers::CPU_Unknown) sCPU = "Unknown";
+            else if (cpu == Helpers::CPU_Generic) sCPU = "Generic";
+            else if (cpu == Helpers::CPU_MMX) sCPU = "MMX";
+            else if (cpu == Helpers::CPU_SSE) sCPU = "SSE2 (128 bit)";
+            else if (cpu == Helpers::CPU_AVX2) sCPU = "AVX2 (256 bit)";
+
+            if (filter == Filter_Downsampling_None) sFilter = "None";
+            else if (filter == Filter_Downsampling_Hermite) sFilter = "Hermite";
+            else if (filter == Filter_Downsampling_Catrom) sFilter = "Catrom";
+            else if (filter == Filter_Downsampling_Mitchell) sFilter = "Mitchell";
+            else if (filter == Filter_Downsampling_Lanczos2) sFilter = "Lanczos2";
 
             unsigned int iRealWidth = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigWidth()));
             unsigned int iRealHeight = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigHeight()));
@@ -930,221 +895,209 @@ LRESULT CMainDlg::OnPaint(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, B
 
             if (!sFullPath.isEmpty()) {
                 QFileInfo fileInfo(sFullPath);
-				QString sFileSize = FormatFileSize(fileInfo.size());
-
+                QString sFileSize = FormatFileSize(fileInfo.size());
                 QString visiblePath = QDir::toNativeSeparators(sFullPath);
-                if (m_bIsRunningInWine) {
-                    QString sUnixPath = GetUnixPathFromWine(sFullPath);
-                    if (!sUnixPath.isEmpty()) {
-                        visiblePath = sUnixPath;
-                    }
-                }
 
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     if (m_bIsAnimationPlaying) {
-                        infoText = QString(
-                                       "%1\n"
-                                       "Frame %2 of %3 (%4 ms)\n"
-                                       "File Size:   %5\n"
-                                       "Image Size:  %6 x %7\n"
-                                       "Zoomed Size: %8 x %9   (Zoom Factor: %10)\n"
-                                       "Window Size: %11 x %12\n\n"
-                                       "CPU-Threads: %13\n"
-                                       "CPU-Algorithm: %14\n"
-                                       "Downsampling-Filter: %15\n\n"
-                                       "Loading Image:  %16 ms\n"
-                                       "Scaling Image:  %17 ms"
-                                       )
-                                       .arg(visiblePath)
-                                       .arg(m_pCurrentImage->FrameIndex() + 1)
-                                       .arg(m_pCurrentImage->NumberOfFrames())
-                                       .arg(m_pCurrentImage->FrameTimeMs())
-                                       .arg(sFileSize)
-                                       .arg(m_pCurrentImage->OrigWidth())
-                                       .arg(m_pCurrentImage->OrigHeight())
-                                       .arg(iRealWidth)
-                                       .arg(iRealHeight)
-                                       .arg(m_dZoom)
-                                       .arg(m_clientRect.Width())
-                                       .arg(m_clientRect.Height())
-                                       .arg(iNumThreads)
-                                       .arg(sCPU)
-                                       .arg(sFilter)
-                                       .arg(m_pCurrentImage->GetFileLoadDelayMs())
-                                       .arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                        infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms")
+                        .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
+                            .arg(m_pCurrentImage->FrameTimeMs()).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
+                            .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
+                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
                     } else {
-                        infoText = QString(
-                                       "%1\n"
-                                       "Frame %2 of %3\n"
-                                       "File Size:   %4\n"
-                                       "Image Size:  %5 x %6\n"
-                                       "Zoomed Size: %7 x %8   (Zoom Factor: %9)\n"
-                                       "Window Size: %10 x %11\n\n"
-                                       "CPU-Threads: %12\n"
-                                       "CPU-Algorithm: %13\n"
-                                       "Downsampling-Filter: %14\n\n"
-                                       "Loading Image:  %15 ms\n"
-                                       "Scaling Image:  %16 ms"
-                                       )
-                                       .arg(visiblePath)
-                                       .arg(m_pCurrentImage->FrameIndex() + 1)
-                                       .arg(m_pCurrentImage->NumberOfFrames())
-                                       .arg(sFileSize)
-                                       .arg(m_pCurrentImage->OrigWidth())
-                                       .arg(m_pCurrentImage->OrigHeight())
-                                       .arg(iRealWidth)
-                                       .arg(iRealHeight)
-                                       .arg(m_dZoom)
-                                       .arg(m_clientRect.Width())
-                                       .arg(m_clientRect.Height())
-                                       .arg(iNumThreads)
-                                       .arg(sCPU)
-                                       .arg(sFilter)
-                                       .arg(m_pCurrentImage->GetFileLoadDelayMs())
-                                       .arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                        infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms")
+                        .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
+                            .arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
+                            .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
+                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
                     }
                 } else {
-                    infoText = QString(
-                                   "%1\n"
-                                   "File Size:   %2\n"
-                                   "Image Size:  %3 x %4\n"
-                                   "Zoomed Size: %5 x %6   (Zoom Factor: %7)\n"
-                                   "Window Size: %8 x %9\n\n"
-                                   "CPU-Threads: %10\n"
-                                   "CPU-Algorithm: %11\n"
-                                   "Downsampling-Filter: %12\n\n"
-                                   "Loading Image:  %13 ms\n"
-                                   "Scaling Image:  %14 ms"
-                                   )
-                                   .arg(visiblePath)
-                                   .arg(sFileSize)
-                                   .arg(m_pCurrentImage->OrigWidth())
-                                   .arg(m_pCurrentImage->OrigHeight())
-                                   .arg(iRealWidth)
-                                   .arg(iRealHeight)
-                                   .arg(m_dZoom)
-                                   .arg(m_clientRect.Width())
-                                   .arg(m_clientRect.Height())
-                                   .arg(iNumThreads)
-                                   .arg(sCPU)
-                                   .arg(sFilter)
-                                   .arg(m_pCurrentImage->GetFileLoadDelayMs())
-                                   .arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                    infoText = QString("%1\nFile Size:   %2\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms")
+                    .arg(visiblePath).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
+                        .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
+                        .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
                 }
             } else {
-                infoText = QString(
-                               "\n\n"
-                               "Image Size:  %1 x %2\n"
-                               "Zoomed Size: %3 x %4   (Zoom Factor: %5)\n"
-                               "Window Size: %6 x %7\n\n"
-                               "CPU-Threads: %8\n"
-                               "CPU-Algorithm: %9\n"
-                               "Downsampling-Filter: %10\n\n"
-                               "Loading Image:  %11 ms\n"
-                               "Scaling Image:  %12 ms"
-                               )
-                               .arg(m_pCurrentImage->OrigWidth())
-                               .arg(m_pCurrentImage->OrigHeight())
-                               .arg(iRealWidth)
-                               .arg(iRealHeight)
-                               .arg(m_dZoom)
-                               .arg(m_clientRect.Width())
-                               .arg(m_clientRect.Height())
-                               .arg(iNumThreads)
-                               .arg(sCPU)
-                               .arg(sFilter)
-                               .arg(m_pCurrentImage->GetFileLoadDelayMs())
-                               .arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms")
+                .arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
+                    .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
+                    .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
             }
 
-            HFONT hFont = CreateFont(25, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FF_DONTCARE, TEXT("CONSOLAS"));
+            // QPainter Konfiguration für Text
+            painter.setFont(QFont("Consolas", 10));
 
-            dc.SelectFont(hFont);
-            dc.SetBkColor(RGB(0, 0, 0));
-            dc.SetTextColor(RGB(255, 255, 255));
-            dc.SetBkMode(OPAQUE); // OPAQUE / TRANSPARENT
+            // Verfügbares Rechteck definieren (mit 10px Abstand zum Rand)
+            QRect textRect = qtClient.adjusted(10, 10, -10, -10);
 
-            ::DrawTextW(dc, reinterpret_cast<LPCWSTR>(infoText.utf16()), infoText.length(), &m_clientRect, DT_LEFT | DT_EXTERNALLEADING | DT_WORDBREAK | DT_NOPREFIX);
+            // 1. Exakte Ausdehnung des Textes (inkl. Wortumbruch) im Vorfeld berechnen
+            QRect boundingRect = painter.boundingRect(
+                textRect,
+                Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap,
+                infoText
+                );
 
-            // Variant with outlined text
-            //dc.SetBkMode(TRANSPARENT);    // OPAQUE / TRANSPARENT
-            //DrawTextBordered(dc, infoText, &m_clientRect, DT_LEFT | DT_EXTERNALLEADING | DT_WORDBREAK | DT_NOPREFIX);
-            
-            DeleteObject(hFont);
+            // 2. Hintergrund-Rechteck (z.B. halbtransparent schwarz oder deckend schwarz) zeichnen
+            // Für echtes OPAQUE (vollständig deckendes Schwarz): QColor(0, 0, 0)
+            // Für ein schöneres, leicht transparentes Overlay (z.B. RGBA 150): QColor(0, 0, 0, 150)
+            painter.fillRect(boundingRect.adjusted(-4, -4, 4, 4), QColor(0, 0, 0, 180));
+
+            // 3. Text in Weiß darüberzeichnen
+            painter.setPen(Qt::white);
+            painter.drawText(textRect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, infoText);
         }
     }
 
-    // Display errors and warnings
-    DisplayErrors(m_pCurrentImage, m_clientRect, dc);
-
-    // Show current zoom factor
+    // -------------------------------------------------------------------------
+    // 2. Zoom-Faktor-Anzeige
+    // -------------------------------------------------------------------------
     if (m_bInZooming || m_bShowZoomFactor) {
-        dc.SetTextColor(CSettingsProvider::This().ColorGUI());
-        SelectDefaultZoomFactorFont(dc);
-        DrawTextBordered(dc, formatOutputZoomFactor(m_dZoom).toStdWString().c_str(), GetZoomTextRect(), DT_RIGHT);
+        /*
+        painter.setFont(QFont("Arial", 12, QFont::Bold));
+        painter.setPen(CSettingsProvider::This().ColorGUI());
+        painter.drawText(GetZoomTextRect(), Qt::AlignRight | Qt::AlignVCenter, formatOutputZoomFactor(m_dZoom));
+        */
+        QString zoomText = formatOutputZoomFactor(m_dZoom);
+
+        QRect zoomRect = GetZoomTextRect();
+
+        QFont font("Arial", 12, QFont::Bold);
+        painter.setFont(font);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+
+        QPainterPath textPath;
+        QFontMetrics fm(font);
+        int textWidth = fm.horizontalAdvance(zoomText);
+
+        int x = zoomRect.right() - textWidth;
+        int y = zoomRect.center().y() + (fm.ascent() - fm.descent()) / 2;
+
+        textPath.addText(x, y, font, zoomText);
+
+        // 1. Outline-Pfad (Stroker) erzeugen – dieser wächst sauber nach außen
+        QPainterPathStroker stroker;
+        stroker.setWidth(3); // Dicke der Umrandung (z.B. 2 oder 3 Pixel)
+        QPainterPath outlinePath = stroker.createStroke(textPath);
+
+        // 2. Zuerst die schwarze Umrandung zeichnen
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Qt::black);
+        painter.drawPath(outlinePath);
+
+        // 3. Danach den weißen Text exakt darüberlegen
+        painter.setBrush(Qt::white);
+        painter.drawPath(textPath);
     }
 
-    if (!m_strToast.isEmpty())
-    {
-        dc.SetTextColor(CSettingsProvider::This().ColorGUI());
-        SelectDefaultToastFont(dc);
-        DrawTextBordered(dc, reinterpret_cast<LPCTSTR>(m_strToast.utf16()), GetToastTextRect(), DT_RIGHT);
+    // -------------------------------------------------------------------------
+    // 3. Toast-Nachrichten
+    // -------------------------------------------------------------------------
+    if (!m_strToast.isEmpty()) {
+        /*
+        painter.setFont(QFont("Arial", 12, QFont::Bold));
+        painter.setPen(CSettingsProvider::This().ColorGUI());
+        painter.drawText(GetToastTextRect(), Qt::AlignRight | Qt::AlignVCenter, m_strToast);
+        */
+        QRect toastRect = GetToastTextRect();
+
+        QFont font("Arial", 14, QFont::Bold);
+        painter.setFont(font);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+
+        QPainterPath textPath;
+        QFontMetrics fm(font);
+        int textWidth = fm.horizontalAdvance(m_strToast);
+
+        int x = toastRect.right() - textWidth;
+        int y = toastRect.center().y() + (fm.ascent() - fm.descent()) / 2;
+
+        textPath.addText(x, y, font, m_strToast);
+
+        // 1. Outline-Pfad (Stroker) erzeugen – dieser wächst sauber nach außen
+        QPainterPathStroker stroker;
+        stroker.setWidth(3); // Dicke der Umrandung (z.B. 2 oder 3 Pixel)
+        QPainterPath outlinePath = stroker.createStroke(textPath);
+
+        // 2. Zuerst die schwarze Umrandung zeichnen
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Qt::black);
+        painter.drawPath(outlinePath);
+
+        // 3. Danach den weißen Text exakt darüberlegen
+        painter.setBrush(Qt::white);
+        painter.drawPath(textPath);
     }
 
     SetCursorForMoveSection();
-
-    return 0;
 }
 
-void CMainDlg::PaintToDC(CDC& dc) {
-    COLORREF backColor = CSettingsProvider::This().ColorBackground();
-    if (backColor == 0)
-        backColor = RGB(0, 0, 1); // these f**ing nVidia drivers have a bug when blending pure black
-    CBrush backBrush;
-    backBrush.CreateSolidBrush(backColor);
+/*
+void CMainDlg::PaintToDC(QPainter& painter) {
+    QColor backColor = CSettingsProvider::This().ColorBackground();
+    if (backColor.rgb() == 0) {
+        backColor = QColor(0, 0, 1); // nVidia Bug-Workaround für reines Schwarz
+    }
+
     m_dRealizedZoom = 1.0;
+
+    QRect qClient(m_clientRect.left, m_clientRect.top, m_clientRect.Width(), m_clientRect.Height());
 
     CJPEGImage* pCurrentImage = GetCurrentImage();
     if (pCurrentImage == NULL) {
-        dc.FillRect(&m_clientRect, backBrush);
+        painter.fillRect(qClient, backColor);
     } else {
-        // do this as very first - may changes size of image
+        // Rotation verifizieren
         pCurrentImage->VerifyRotation(CRotationParams(pCurrentImage->GetRotationParams(), GetRotation()));
 
-        // find out the new virtual image size and the size of the bitmap to request
+        // Virtuelle Bildgröße und Zoom berechnen
         double dZoom = m_dZoom;
-        CSize newSize = GetVirtualImageSize(pCurrentImage->OrigSize(), m_clientRect.Size(), GetAutoZoomMode(), dZoom);
-        CPoint offsets = LimitOffsets(GetOffsets(), m_clientRect.Size(), newSize);
+        CSize newSize = GetVirtualImageSize(pCurrentImage->OrigSize(), qClient.size(), GetAutoZoomMode(), dZoom);
+        CPoint offsets = LimitOffsets(GetOffsets(), qClient.size(), newSize);
         m_dRealizedZoom = (double)newSize.cx / m_pCurrentImage->OrigSize().cx;
 
-        // Clip to client rectangle and request the DIB
-        CSize clippedSize(std::min<long>(m_clientRect.Width(), newSize.cx), std::min<long>(m_clientRect.Height(), newSize.cy));
+        // Auf Client-Rechteck clippen und DIB anfordern
+        CSize clippedSize(std::min<long>(qClient.width(), newSize.cx), std::min<long>(qClient.height(), newSize.cy));
         CPoint offsetsInImage = pCurrentImage->ConvertOffset(newSize, clippedSize, offsets);
 
-        void* pDIBData = pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, 
+        void* pDIBData = pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage,
                 *GetImageProcessingParams(),
                 CreateDefaultProcessingFlags());
+
+        // Hintergrund füllen und Bild hochperformant via QImage / QPainter zeichnen
+        painter.fillRect(qClient, backColor);
+
         if (pDIBData != NULL) {
-            BITMAPINFO bmInfo{ 0 };
-            DrawDIB32bppWithBlackBorders(dc, bmInfo, pDIBData, backBrush, m_clientRect, clippedSize, CPoint(0, 0));
+            QImage dibImage(static_cast<uchar*>(pDIBData), clippedSize.width(), clippedSize.height(), QImage::Format_RGB32);
+
+            int xDest = (qClient.width() - clippedSize.width()) / 2;
+            int yDest = (qClient.height() - clippedSize.height()) / 2;
+
+            painter.drawImage(xDest, yDest, dibImage);
         }
 
-        DisplayErrors(pCurrentImage, m_clientRect, dc);
+        // Fehler- und Warnungsanzeige mit dem neuen QPainter übergeben
+        DisplayErrors(pCurrentImage, qClient, painter);
     }
 }
+*/
 
-void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const CRect& clientRect, CDC& dc) {
-    int oldBkMode = dc.GetBkMode();
-    if (oldBkMode != TRANSPARENT) {
-        dc.SetBkMode(TRANSPARENT);
-    }
-        
-    dc.SetTextColor(CSettingsProvider::This().ColorGUI());
+void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const QRect& clientRect, QPainter& painter)
+{
+    // Textfarbe aus den Einstellungen setzen
+    painter.setPen(CSettingsProvider::This().ColorGUI());
+
+    // Einheitliche Schriftart für Fehlermeldungen setzen (z. B. Arial oder Standard-GUI-Font)
+    painter.setFont(QFont("Arial", 12, QFont::Bold));
+
     if (m_sStartupFile.isEmpty() && m_pCurrentImage == NULL) {
-        CRect rectText(0, clientRect.Height()/2 - Helpers::ScaleWithDPI(40), clientRect.Width(), clientRect.Height());
+        QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), Helpers::ScaleWithDPI(80));
         QString message = QStringLiteral("No image loaded!\n\nPress ESC to exit...");
-        dc.DrawText(reinterpret_cast<LPCWSTR>(message.utf16()), -1, &rectText, DT_CENTER | DT_WORDBREAK | DT_NOPREFIX);
-    } else if (pCurrentImage == NULL) {
+
+        // Mit QPainter zentriert und mit Wortumbruch zeichnen
+        painter.drawText(rectText, Qt::AlignCenter | Qt::TextWordWrap, message);
+    }
+    else if (pCurrentImage == NULL) {
         QString sFileName;
         if (m_nLastLoadError == FileLoad_SlideShowListInvalid) {
             sFileName = m_sStartupFile;
@@ -1154,51 +1107,41 @@ void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const CRect& clientRect,
             sFileName = CurrentFileName(false);
         }
 
-        DrawImageLoadErrorText(dc, clientRect, sFileName, m_nLastLoadError,
-            (m_bOutOfMemoryLastImage ? FileLoad_OutOfMemory : 0) | (m_bExceptionErrorLastImage ? FileLoad_ExceptionError : 0));
-    }
-
-    if (oldBkMode != TRANSPARENT) {
-        dc.SetBkMode(oldBkMode);
+        // Falls DrawImageLoadErrorText ebenfalls CDC verwendet, muss diese Funktion
+        // im nächsten Schritt ebenfalls auf QPainter& umgestellt werden!
+        DrawImageLoadErrorText(painter, clientRect, sFileName, m_nLastLoadError,
+                               (m_bOutOfMemoryLastImage ? FileLoad_OutOfMemory : 0) | (m_bExceptionErrorLastImage ? FileLoad_ExceptionError : 0));
     }
 }
-
-LRESULT CMainDlg::OnSize(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    if (wParam == 1) {    // minimize -> should be ignored
-        return 0;
+void CMainDlg::resizeEvent(QResizeEvent* event) {
+    if (isMinimized()) {
+        QMainWindow::resizeEvent(event);
+        return;
     }
 
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
     bool bFillCrop = (eAutoZoomMode == Helpers::ZM_FillScreenNoZoom || eAutoZoomMode == Helpers::ZM_FillScreen);
     bool bAllowZoomIn = (eAutoZoomMode == Helpers::ZM_FitToScreen || eAutoZoomMode == Helpers::ZM_FillScreen);
     bool bAdjustWindowSize = false;
-    
+
     float dZoomForFit = GetZoomFactorForFitToScreen(bFillCrop, bAllowZoomIn);
     bool bKeepFitToScreen = !m_bResizeForNewImage && (MaxRatio(m_dZoom, dZoomForFit) < 1.01);
-    this->GetClientRect(&m_clientRect);
-    this->Invalidate(FALSE);
+
+    m_clientRect = QRect(0, 0, width(), height());
+
+    this->update();
 
     m_nMouseX = m_nMouseY = -1;
 
     // keep fit to screen
     if (bKeepFitToScreen) {
-        dZoomForFit = GetZoomFactorForFitToScreen(bFillCrop, bAllowZoomIn);    // Calling again, since now m_clientRect is up to date.
+        dZoomForFit = GetZoomFactorForFitToScreen(bFillCrop, bAllowZoomIn);    // Erneut aufrufen, da m_clientRect nun aktuell ist.
         if (MaxRatio(m_dZoom, dZoomForFit) >= 1.00001) {
             ResetZoomToFitScreen(bFillCrop, bAllowZoomIn, bAdjustWindowSize);
         }
     }
-    return 0;
-}
 
-LRESULT CMainDlg::OnGetMinMaxInfo(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
-    if (m_pJPEGProvider != NULL) {
-        MINMAXINFO* pMinMaxInfo = (MINMAXINFO*) lParam;
-        CSize minimalSize = CSettingsProvider::This().MinimalWindowSize();
-        pMinMaxInfo->ptMinTrackSize = CPoint(std::max<long>(0, minimalSize.cx), std::max<long>(0, minimalSize.cy));
-        return 1;
-    } else {
-        return 0;
-    }
+    QMainWindow::resizeEvent(event);
 }
 
 // Note: Reacts to WM_COPYDATA message.
@@ -1206,202 +1149,200 @@ LRESULT CMainDlg::OnGetMinMaxInfo(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lPara
 // The hidden assumption being that if the WM_COPYDATA came from newly launched instance, that instance will,
 // upon receiving KEY_MAGIC, dutifully close itself, since we answered it "I got this" by returning KEY_MAGIC.
 // If we return NULL, the new instance is free to do as it pleases and show the image itself or whatever.
-LRESULT CMainDlg::OnAnotherInstanceStarted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& bHandled) {
-    bHandled = FALSE;
-    auto* pData = reinterpret_cast<COPYDATASTRUCT*>(lParam);
+bool CMainDlg::nativeEvent(const QByteArray &eventType, void *message, qintptr *result) {
+#if defined(Q_OS_WIN)
+    if (eventType == "windows_generic_MSG" || eventType == "windows_dispatcher_MSG") {
+        MSG* msg = static_cast<MSG*>(message);
+        if (msg->message == WM_COPYDATA) {
+            // Todo: Handle via QLocalServer/QLocalSocket or QSharedMemory
+            auto* pData = reinterpret_cast<COPYDATASTRUCT*>(msg->lParam);
+            if (pData != nullptr) {
+                if (pData->dwData == KEY_MAGIC && pData->cbData > 0) {
+                    bool bSameImageFolder = false;
 
-    if (pData != nullptr) {
-        if (pData->dwData == KEY_MAGIC && pData->cbData > 0) {
-            bool bSameImageFolder = false;
+                    const auto* pWCharData = static_cast<const wchar_t*>(pData->lpData);
+                    const int charCount = static_cast<int>((pData->cbData / sizeof(wchar_t)) - 1);
+                    const QString sCopyDataFile = QString::fromWCharArray(pWCharData, charCount);
 
-            // Puffer aus COPYDATASTRUCT in QString umwandeln (Länge in Anzahl wchar_t/TCHAR)
-            const auto* pWCharData = static_cast<const wchar_t*>(pData->lpData);
-            const int charCount = static_cast<int>((pData->cbData / sizeof(wchar_t)) - 1);
-            const QString sCopyDataFile = QString::fromWCharArray(pWCharData, charCount);
+                    const QString sCurrentFile = CurrentFileName(false);
 
-            const QString sCurrentFile = CurrentFileName(false);
-
-            if (!sCurrentFile.isEmpty()) {
-                if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-                    if (sCopyDataFile.compare(sCurrentFile, Qt::CaseInsensitive) == 0) {
-                        // Gleiches Comic-Archiv. Nichts tun, aber der neuen Instanz mitteilen,
-                        // dass wir es verarbeiten (verhindert doppeltes Öffnen desselben Buchs).
-                        bHandled = TRUE;
-                        this->ShowWindow(SW_RESTORE);
-                        SetForegroundWindow(m_hWnd);
-                        return KEY_MAGIC;
-                    } else {
-                        // Anderes Comic-Archiv: Nicht verarbeiten, damit die andere Instanz es öffnet.
-                        return 0;
+                    if (!sCurrentFile.isEmpty()) {
+                        if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
+                            if (sCopyDataFile.compare(sCurrentFile, Qt::CaseInsensitive) == 0) {
+                                *result = KEY_MAGIC;
+                                showNormal();
+                                raise();
+                                activateWindow();
+                                return true; // Handled
+                            } else {
+                                *result = 0;
+                                return true;
+                            }
+                        } else {
+                            const QString copyDataPath = QFileInfo(sCopyDataFile).path();
+                            const QString currentPath  = QFileInfo(sCurrentFile).path();
+                            bSameImageFolder = (copyDataPath.compare(currentPath, Qt::CaseInsensitive) == 0);
+                        }
                     }
-                } else {
-                    // Verzeichnisse mit QFileInfo vergleichen (vollständig ohne PathRemoveFileSpec / TCHAR)
-                    const QString copyDataPath = QFileInfo(sCopyDataFile).path();
-                    const QString currentPath  = QFileInfo(sCurrentFile).path();
 
-                    bSameImageFolder = (copyDataPath.compare(currentPath, Qt::CaseInsensitive) == 0);
+                    const bool bNoCurrentFile = sCurrentFile.isEmpty();
+                    const bool bSingleFullScreen = m_bFullScreenMode && CSettingsProvider::This().SingleFullScreenInstance();
+                    const bool bSingleInstanceAlways = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_Always);
+                    const bool bSingleInstancePerFolder = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_PerFolder) && bSameImageFolder;
+
+                    if (bNoCurrentFile || bSingleFullScreen || bSingleInstanceAlways || bSingleInstancePerFolder) {
+                        m_sStartupFile = sCopyDataFile;
+
+                        // Asynchron laden über Qt-invokeMethod statt PostMessage
+                        QMetaObject::invokeMethod(this, [this]() {
+                            // Hier dein Laden triggern, analog zu WM_LOAD_FILE_ASYNCH
+                        }, Qt::QueuedConnection);
+
+                        showNormal();
+                        raise();
+                        activateWindow();
+                        *result = KEY_MAGIC;
+                        return true;
+                    }
                 }
             }
-
-            const bool bNoCurrentFile = sCurrentFile.isEmpty();
-            const bool bSingleFullScreen = m_bFullScreenMode && CSettingsProvider::This().SingleFullScreenInstance();
-            const bool bSingleInstanceAlways = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_Always);
-            const bool bSingleInstancePerFolder = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_PerFolder) && bSameImageFolder;
-
-            if (bNoCurrentFile || bSingleFullScreen || bSingleInstanceAlways || bSingleInstancePerFolder) {
-                m_sStartupFile = sCopyDataFile;
-
-                ::PostMessage(m_hWnd, WM_LOAD_FILE_ASYNCH, 0, KEY_MAGIC);
-                bHandled = TRUE;
-                this->ShowWindow(SW_RESTORE);
-                SetForegroundWindow(m_hWnd);
-                return KEY_MAGIC;
-            }
+            *result = 0;
+            return true;
         }
     }
-    return 0;
+#endif
+    return QMainWindow::nativeEvent(eventType, message, result);
 }
 
-LRESULT CMainDlg::OnLoadFileAsynch(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& bHandled) {
-    bHandled = lParam == KEY_MAGIC;
-    if (lParam == KEY_MAGIC && ::IsWindowEnabled(m_hWnd)) {
+void CMainDlg::loadFileAsynch() {
+    if (isEnabled()) {
         StopMovieMode();
         StopAnimation();
         MouseOn();
         OpenFile(m_sStartupFile, false);
     }
-    return 0;
 }
 
-LRESULT CMainDlg::OnClose(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& bHandled) {
-    GetWindowRect(m_windowRectOnClose);
-    bHandled = FALSE;
-    return 0;
+void CMainDlg::closeEvent(QCloseEvent* event) {
+    m_windowRectOnClose = frameGeometry();
+    event->accept(); // Erlaubt das Schließen des Fensters (entspricht bHandled = FALSE)
 }
 
-LRESULT CMainDlg::OnLButtonDown(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
-    this->SetCapture();
-    CPoint pointClicked(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+//LRESULT CMainDlg::OnLButtonDown(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
+void CMainDlg::mousePressEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        QPoint pos = event->pos(); // statt GET_X_LPARAM(lParam)
 
-    bool bCtrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
-    bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+        this->grabMouse();
+        CPoint pointClicked(pos.x(), pos.y()); // Direkt über das Qt-Event aufgelöst
 
-    bool bDraggingRequired = m_virtualImageSize.cx > m_clientRect.Width() || m_virtualImageSize.cy > m_clientRect.Height();
+        bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
+        bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
 
-    if (!m_bZoomModeOnLeftMouse && HandleMouseButtonByKeymap(VK_LBUTTON)) {
-        return 0;
-    }
-    bool bZoomMode = (bShift || m_bZoomModeOnLeftMouse) && !bCtrl;
-    if (bZoomMode) {
-        m_bZoomMode = true;
-        m_dStartZoom = m_dZoom;
-        m_nCapturedX = m_nMouseX; m_nCapturedY = m_nMouseY;
-    } else if (bDraggingRequired) {
-        StartDragging(pointClicked.x, pointClicked.y, false);
-    } 
+        bool bDraggingRequired = m_virtualImageSize.width() > m_clientRect.width() || m_virtualImageSize.height() > m_clientRect.height();
 
-    SetCursorForMoveSection();
-
-    return 0;
-}
-
-LRESULT CMainDlg::OnLButtonUp(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
-    if (m_bZoomMode) {
-        m_bZoomMode = false;
-        AdjustWindowToImage(false);
-        Invalidate(FALSE);
-    } else if (m_bDragging) {
-        EndDragging();
-    }
-    ::ReleaseCapture();
-    return 0;
-}
-
-
-// based on https://www.codeproject.com/Articles/18400/How-to-move-a-dialog-which-does-not-have-a-caption
-// https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-nchittest
-LRESULT CMainDlg::OnNCHitTest(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL& bHandled) {
-    bool bAlt = (::GetKeyState(VK_MENU) & 0x8000) != 0;
-    bool bLButton = ::GetAsyncKeyState(MK_LBUTTON) < 0;
-
-    // only move when alt is held down, double click causes this to expand as well
-    if (!m_bFullScreenMode && bAlt && ::DefWindowProc(m_hWnd, uMsg, wParam, lParam) == HTCLIENT && bLButton) {
-        // don't allow intercepting if we're in full screen mode
-        // (which is really just the window repositioned so the titlebar falls off the screen)
-        return HTCAPTION;
-    }
-
-    bHandled = FALSE;  // if not moving window, considered unhandled, or else all the mouse button code stops working
-    return 0;
-}
-
-LRESULT CMainDlg::OnNCLButtonDown(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled) {
-    m_dZoomAtResizeStart = m_dZoom;
-    bHandled = FALSE; // do not handle message, this would block correct processing by OS
-    return 0;
-}
-
-LRESULT CMainDlg::OnRButtonDown(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& bHandled) {
-    bHandled = HandleMouseButtonByKeymap(VK_RBUTTON);
-    return 0;
-}
-
-LRESULT CMainDlg::OnRButtonUp(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& bHandled) {
-    bHandled = HandleMouseButtonByKeymap(VK_RBUTTON, false);
-    return 0;
-}
-
-LRESULT CMainDlg::OnMButtonDown(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
-    this->SetCapture();
-    if (HandleMouseButtonByKeymap(VK_MBUTTON)) {
-        return 0;
-    }
-    StartDragging(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), false);
-    return 0;
-}
-
-LRESULT CMainDlg::OnMButtonUp(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    EndDragging();
-    ::ReleaseCapture();
-    return 0;
-}
-
-LRESULT CMainDlg::OnLButtonDblClk(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
-    if (m_pCurrentImage != NULL) {
-        if (HandleMouseButtonByKeymap(VK_LBUTTONDBLCLK)) {
-            return 0;
+        if (!m_bZoomModeOnLeftMouse && HandleMouseButtonByKeymap(VK_LBUTTON)) {
+            return;
         }
-        double dZoom = -1.0;
-        CSize sizeAutoZoom = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
-            m_clientRect.Size(), IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : GetAutoZoomMode(), dZoom);
-        if (sizeAutoZoom != m_virtualImageSize) {
-            ExecuteCommand(GetAutoZoomMode() * 10 + IDM_AUTO_ZOOM_NONE);
+        bool bZoomMode = (bShift || m_bZoomModeOnLeftMouse) && !bCtrl;
+        if (bZoomMode) {
+            m_bZoomMode = true;
+            m_dStartZoom = m_dZoom;
+            m_nCapturedX = m_nMouseX; m_nCapturedY = m_nMouseY;
+        } else if (bDraggingRequired) {
+            StartDragging(pointClicked.x, pointClicked.y, false);
+        }
+
+        SetCursorForMoveSection();
+        return;
+    }
+    else if (event->button() == Qt::RightButton) {
+        // Entspricht OnRButtonDown
+        if (HandleMouseButtonByKeymap(VK_RBUTTON)) {
+            event->accept();
+            return;
+        }
+    }
+    else if (event->button() == Qt::MiddleButton) {
+        this->grabMouse();
+
+        if (HandleMouseButtonByKeymap(VK_MBUTTON)) {
+            return;
+        }
+
+        QPoint pos = event->pos();
+        StartDragging(pos.x(), pos.y(), false);
+    }
+    else if (event->button() == Qt::BackButton || event->button() == Qt::ForwardButton) {
+        bool isXButton1 = (event->button() == Qt::BackButton);
+        int vkCode = isXButton1 ? VK_XBUTTON1 : VK_XBUTTON2;
+
+        if (HandleMouseButtonByKeymap(vkCode)) {
+            return;
+        }
+
+        bool bExchangeXButtons = CSettingsProvider::This().ExchangeXButtons();
+        if (isXButton1) {
+            GotoImage(bExchangeXButtons ? POS_Next : POS_Previous);
         } else {
-            ResetZoomTo100Percents(true);
+            GotoImage(bExchangeXButtons ? POS_Previous : POS_Next);
         }
     }
-    return 0;
+
+    QMainWindow::mousePressEvent(event);
 }
 
-LRESULT CMainDlg::OnXButtonDown(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-
-    if (HandleMouseButtonByKeymap((GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? VK_XBUTTON1 : VK_XBUTTON2)) {
-        return 0;
+void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        if (m_bZoomMode) {
+            m_bZoomMode = false;
+            AdjustWindowToImage(false);
+            update();
+        } else if (m_bDragging) {
+            EndDragging();
+        }
+        this->releaseMouse();
     }
-    bool bExchangeXButtons = CSettingsProvider::This().ExchangeXButtons();
-    if (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) {
-        GotoImage(bExchangeXButtons ? POS_Next : POS_Previous);
-    } else {
-        GotoImage(bExchangeXButtons ? POS_Previous : POS_Next);
+    else if (event->button() == Qt::RightButton) {
+        // Entspricht OnRButtonUp (bExecuteCommand = false)
+        if (HandleMouseButtonByKeymap(VK_RBUTTON, false)) {
+            event->accept();
+            return;
+        }
+    }
+    else if (event->button() == Qt::MiddleButton) {
+        EndDragging();
+        this->releaseMouse();
     }
 
-    return 0;
+    QMainWindow::mouseReleaseEvent(event);
 }
 
-LRESULT CMainDlg::OnMouseMove(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
+void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        if (m_pCurrentImage != NULL) {
+            if (HandleMouseButtonByKeymap(VK_LBUTTONDBLCLK)) {
+                return;
+            }
+            double dZoom = -1.0;
+            QSize sizeAutoZoom = GetVirtualImageSize(m_pCurrentImage->OrigSize(),
+                                                     m_clientRect.size(), IsAdjustWindowToImage() ? Helpers::ZM_FitToScreenNoZoom : GetAutoZoomMode(), dZoom);
+            if (sizeAutoZoom != m_virtualImageSize) {
+                ExecuteCommand(GetAutoZoomMode() * 10 + IDM_AUTO_ZOOM_NONE);
+            } else {
+                ResetZoomTo100Percents(true);
+            }
+        }
+    }
+    // Falls du andere Doppelklicks hast, kannst du hier erweitern
+    QMainWindow::mouseDoubleClickEvent(event);
+}
+
+void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
     // Turn mouse pointer on when mouse has moved some distance
-    m_nMouseX = GET_X_LPARAM(lParam);
-    m_nMouseY = GET_Y_LPARAM(lParam);
+    m_nMouseX = event->pos().x();
+    m_nMouseY = event->pos().y();
+
     if (!m_bDragging) {
         if (m_startMouse.x == -1 && m_startMouse.y == -1) {
             m_startMouse.x = m_nMouseX;
@@ -1426,15 +1367,17 @@ LRESULT CMainDlg::OnMouseMove(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, B
     if (!m_bPanMouseCursorSet && !bMouseCursorSet) {
         ::SetCursor(::LoadCursor(NULL, IDC_ARROW));
     }
-
-    return 0;
 }
 
-LRESULT CMainDlg::OnMouseWheel(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/)
-{
-    bool bCtrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
-    bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
-    int nDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+void CMainDlg::wheelEvent(QWheelEvent* event) {
+    bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
+    bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
+
+    // Qt angleDelta().y() liefert 120 für einen Standard-Rastschritt, analog zu WHEEL_DELTA
+    int nDelta = event->angleDelta().y();
+    if (nDelta == 0) {
+        nDelta = event->angleDelta().x();
+    }
 
     if (CSettingsProvider::This().NavigateWithMouseWheel()) {
         if (!bCtrl && !bShift) {
@@ -1445,15 +1388,14 @@ LRESULT CMainDlg::OnMouseWheel(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, 
                 if (nDelta < 0) {
                     if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
                         if (PerformPan(0, -PAN_STEP, false) == true) {
-                            this->Invalidate(FALSE);
+                            this->update();
                         }
                     } else {
-                        unsigned int iRealHeight =
-                            static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigHeight()));
+                        unsigned int iRealHeight = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigHeight()));
 
-                        if (iRealHeight > m_clientRect.Height()) {
+                        if (iRealHeight > m_clientRect.height()) {
                             if (PerformPan(0, -PAN_STEP, false) == true) {
-                                this->Invalidate(FALSE);
+                                this->update();
                             }
                         } else {
                             GotoImage(POS_Next);
@@ -1463,15 +1405,14 @@ LRESULT CMainDlg::OnMouseWheel(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, 
                 else if (nDelta > 0) {
                     if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
                         if (PerformPan(0, PAN_STEP, false) == true) {
-                            this->Invalidate(FALSE);
+                            this->update();
                         }
                     } else {
-                        uint iRealHeight =
-                            static_cast<uint>(m_dZoom * (m_pCurrentImage->OrigHeight()));
+                        uint iRealHeight = static_cast<uint>(m_dZoom * (m_pCurrentImage->OrigHeight()));
 
-                        if (iRealHeight > m_clientRect.Height()) {
+                        if (iRealHeight > m_clientRect.height()) {
                             if (PerformPan(0, PAN_STEP, false) == true) {
-                                this->Invalidate(FALSE);
+                                this->update();
                             }
                         } else {
                             GotoImage(POS_Previous);
@@ -1490,22 +1431,21 @@ LRESULT CMainDlg::OnMouseWheel(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, 
         } else if (bCtrl && bShift) { // Zoom
             if (m_dZoom > 0) {
                 PerformZoom(
-                    CSettingsProvider::This().MouseWheelZoomSpeed() *
-                        double(nDelta) / WHEEL_DELTA,
+                    CSettingsProvider::This().MouseWheelZoomSpeed() * double(nDelta) / WHEEL_DELTA,
                     true,
                     m_bMouseOn,
                     true
-                );
+                    );
             }
         } else if (bShift) { // Pan horizontally
             if (m_pCurrentImage != NULL) {
                 if (nDelta < 0) {
                     if (PerformPan(-PAN_STEP, 0, false) == true) {
-                        this->Invalidate(FALSE);
+                        this->update();
                     }
                 } else if (nDelta > 0) {
                     if (PerformPan(PAN_STEP, 0, false) == true) {
-                        this->Invalidate(FALSE);
+                        this->update();
                     }
                 }
             }
@@ -1513,11 +1453,11 @@ LRESULT CMainDlg::OnMouseWheel(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, 
             if (m_pCurrentImage != NULL) {
                 if (nDelta < 0) {
                     if (PerformPan(0, -PAN_STEP, false) == true) {
-                        this->Invalidate(FALSE);
+                        this->update();
                     }
                 } else if (nDelta > 0) {
                     if (PerformPan(0, PAN_STEP, false) == true) {
-                        this->Invalidate(FALSE);
+                        this->update();
                     }
                 }
             }
@@ -1528,353 +1468,234 @@ LRESULT CMainDlg::OnMouseWheel(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, 
             true,
             m_bMouseOn,
             true
-        );
+            );
     }
 
-    return 0;
+    event->accept();
 }
 
-LRESULT CMainDlg::OnKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/) {
-    bool bCtrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
-    bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
-    bool bAlt = (::GetKeyState(VK_MENU) & 0x8000) != 0;
+void CMainDlg::keyPressEvent(QKeyEvent* event) {
+    bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
+    bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
+    bool bAlt = event->modifiers().testFlag(Qt::AltModifier);
 
-    //bool bHandled = false;
-    if (!bCtrl && wParam != VK_ESCAPE && m_nLastLoadError == FileLoad_NoFilesInDirectory && !m_sStartupFile.isEmpty()) {
+    // Qt-Key in den alten Win32 Virtual-Key übersetzen (falls m_pKeyMap noch VK_* erwartet)
+    // Alternativ: Nutze event->key(), falls dein KeyMap bereits Qt-Keys versteht.
+    int vkCode = event->nativeVirtualKey();
+    if (vkCode == 0) {
+        vkCode = event->key(); // Fallback
+    }
+
+    if (!bCtrl && vkCode != Qt::Key_Escape && m_nLastLoadError == FileLoad_NoFilesInDirectory && !m_sStartupFile.isEmpty()) {
         // search in subfolders if initial directory has no images
-        //bHandled = true;
         m_pFileList->SetNavigationMode(Helpers::NM_LoopSubDirectories);
         GotoImage(POS_Next);
-    } else if (wParam == VK_F1) {
-        //bHandled = true;
+        event->accept();
+        return;
+    }
+
+    if (vkCode == Qt::Key_F1) {
         ExecuteCommand(IDM_HELP);
-    } else {
-        int nCommand = m_pKeyMap->GetCommandIdForKey((int)wParam, bAlt, bCtrl, bShift);
-        if (nCommand > 0) {
-            if (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN || nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT) {
-                if ((nCommand == IDM_PAN_UP && wParam != VK_UP) || (nCommand == IDM_PAN_DOWN &&  wParam != VK_DOWN) || (nCommand == IDM_PAN_LEFT &&  wParam != VK_LEFT) || (nCommand == IDM_PAN_RIGHT &&  wParam != VK_RIGHT)) {
-                    // Allow smooth panning only for these particular keys. The scrolling timer will wait for their release to know when to stop scrolling.
-                    m_bAllowSmoothPanning = false;
-                }
-                if (m_bAllowSmoothPanning && (lParam & 0xc0000000)) {
-                    // Ignore key repeat events (lParam & 0xc0000000) for the panning keys.
-                    return 1;
-                }
+        event->accept();
+        return;
+    }
+
+    int nCommand = m_pKeyMap->GetCommandIdForKey(vkCode, bAlt, bCtrl, bShift);
+    if (nCommand > 0) {
+        if (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN || IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT) {
+            // Prüfung analog zum Original: Wenn eine andere Taste als die Pfeiltaste selbst das Panning triggert
+            if ((nCommand == IDM_PAN_UP && vkCode != Qt::Key_Up) ||
+                (nCommand == IDM_PAN_DOWN && vkCode != Qt::Key_Down) ||
+                (nCommand == IDM_PAN_LEFT && vkCode != Qt::Key_Left) ||
+                (nCommand == IDM_PAN_RIGHT && vkCode != Qt::Key_Right)) {
+                m_bAllowSmoothPanning = false;
             }
 
-            //bHandled = true;
-            ExecuteCommand(nCommand);
+            // Qt-Äquivalent für Key-Repeat (ersetzt lParam & 0xc0000000)
+            if (m_bAllowSmoothPanning && event->isAutoRepeat()) {
+                event->accept();
+                return;
+            }
         }
+
+        ExecuteCommand(nCommand);
+        event->accept();
+        return;
     }
 
-    return 1;
+    QMainWindow::keyPressEvent(event);
 }
 
-LRESULT CMainDlg::OnSysKeyDown(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
-    if (wParam == VK_F4) {
-        CleanupAndTerminate();
-    } else {
-        int nCommand = m_pKeyMap->GetCommandIdForKey((int)wParam, true, false, bShift);
-        if (nCommand > 0) {
-            ExecuteCommand(nCommand);
-        }
-    }
-    return 1;
-}
-
-
-LRESULT CMainDlg::OnGetDlgCode(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    // need to request key messages, else the dialog proc eats them all up
-    return DLGC_WANTALLKEYS;
-}
-
-LRESULT CMainDlg::OnImageLoadCompleted(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
-    // route to JPEG provider
-    m_pJPEGProvider->OnImageLoadCompleted((int)lParam);
-    return 0;
-}
-
-LRESULT CMainDlg::OnDisplayedFileChangedOnDisk(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    if (CSettingsProvider::This().ReloadWhenDisplayedImageChanged() && m_pCurrentImage != NULL &&
-        m_pFileList != NULL && m_pFileList->CanOpenCurrentFileForReading()) {
+void CMainDlg::onDisplayedFileChangedOnDisk() {
+    if (CSettingsProvider::This().ReloadWhenDisplayedImageChanged() &&
+            m_pCurrentImage != NULL &&
+            m_pFileList != NULL &&
+            m_pFileList->CanOpenCurrentFileForReading()) {
         ExecuteCommand(IDM_RELOAD);
     }
-    return 0;
 }
 
-LRESULT CMainDlg::OnActiveDirectoryFilelistChanged(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
+void CMainDlg::onActiveDirectoryFilelistChanged() {
     if (CSettingsProvider::This().ReloadWhenDisplayedImageChanged()) {
         if (m_pFileList != NULL && m_pFileList->CurrentFileExists()) {
             m_pFileList->Reload(NULL, false);
-            Invalidate(FALSE);
+            update(); // Qt-Methode zum Neuzeichnen
         }
 
-    if (m_pCurrentImage != NULL)
-        GotoImage(POS_Current);
+        if (m_pCurrentImage != NULL) {
+            GotoImage(POS_Current);
+        }
     }
-    return 0;
 }
 
-LRESULT CMainDlg::OnDropFiles(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    HDROP hDrop = (HDROP) wParam;
-    if (hDrop != NULL) {
-        const int BUFF_SIZE = 512;
-        TCHAR buff[BUFF_SIZE];
-        if (::DragQueryFile(hDrop, 0, (LPTSTR) &buff, BUFF_SIZE - 1) > 0) {
-            if (::GetFileAttributes(buff) & FILE_ATTRIBUTE_DIRECTORY) {
-                _tcsncat_s(buff, BUFF_SIZE, _T("\\"), BUFF_SIZE);
-            }
-            OpenFile(QString::fromWCharArray(buff), false);
-        }
-        ::DragFinish(hDrop);
+void CMainDlg::dragEnterEvent(QDragEnterEvent* event) {
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
     }
-    return 0;
 }
 
-LRESULT CMainDlg::OnTimer(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    if (wParam == ANIMATION_TIMER_EVENT_ID || (wParam == SLIDESHOW_TIMER_EVENT_ID && m_nCurrentTimeout > 0)) {
-        // Remove all timer messages for slideshow and animation events that accumulated in the queue
-        MSG msg;
-        while (::PeekMessage(&msg, this->m_hWnd, WM_TIMER, WM_TIMER, PM_REMOVE)) {
-            if (msg.wParam != SLIDESHOW_TIMER_EVENT_ID && msg.wParam != ANIMATION_TIMER_EVENT_ID) {
-                BOOL bNotUsed;
-                OnTimer(WM_TIMER, msg.wParam, msg.lParam, bNotUsed);
-            }
-            if (msg.wParam == SLIDESHOW_TIMER_EVENT_ID && wParam == ANIMATION_TIMER_EVENT_ID) {
-                // if there are queued slideshow timer events and we process an animation event, the slideshow event has preceedence
-                wParam = SLIDESHOW_TIMER_EVENT_ID;
+void CMainDlg::dropEvent(QDropEvent* event) {
+    const QMimeData* mimeData = event->mimeData();
+    if (mimeData->hasUrls()) {
+        QList<QUrl> urlList = mimeData->urls();
+        if (!urlList.isEmpty()) {
+            // Wir nehmen die erste gedroppte Datei
+            QString filePath = urlList.first().toLocalFile();
+
+            if (!filePath.isEmpty()) {
+                QFileInfo fileInfo(filePath);
+                // Falls es ein Ordner ist, hängen wir wie im Originalcode einen Slash an
+                if (fileInfo.isDir()) {
+                    if (!filePath.endsWith('/') && !filePath.endsWith('\\')) {
+                        filePath += QDir::separator();
+                    }
+                }
+
+                OpenFile(filePath, false);
+                event->acceptProposedAction();
             }
         }
+    }
+}
 
-        int nRealDisplayTimeMs = ::GetTickCount() - m_nLastSlideShowImageTickCount;
-        if (m_nCurrentTimeout > 250 && wParam == SLIDESHOW_TIMER_EVENT_ID) {
+void CMainDlg::timerEvent(QTimerEvent* event) {
+    int timerId = event->timerId();
+
+    if (timerId == m_animationTimerId || (timerId == m_slideshowTimerId && m_nCurrentTimeout > 0)) {
+        // In Qt läuft die Event-Queue sequenziell ab, das manuelle Herausfischen
+        // von WM_TIMER-Messages via PeekMessage entfällt hier in der Regel.
+
+        // Ersetze ::GetTickCount() durch Qt / C++ Standard (Millisekunden)
+        qint64 currentTick = QDateTime::currentMSecsSinceEpoch();
+        qint64 nRealDisplayTimeMs = currentTick - m_nLastSlideShowImageTickCount;
+
+        if (m_nCurrentTimeout > 250 && timerId == m_slideshowTimerId) {
             if (m_nCurrentTimeout - nRealDisplayTimeMs > 100) {
-                // restart timer
-                ::Sleep(m_nCurrentTimeout - nRealDisplayTimeMs);
-                ::KillTimer(this->m_hWnd, SLIDESHOW_TIMER_EVENT_ID);
-                ::SetTimer(this->m_hWnd, SLIDESHOW_TIMER_EVENT_ID, m_nCurrentTimeout, NULL);
+                killTimer(m_slideshowTimerId);
+                QThread::msleep(m_nCurrentTimeout - nRealDisplayTimeMs);
+                m_slideshowTimerId = startTimer(m_nCurrentTimeout);
             }
         }
-        GotoImage((wParam == ANIMATION_TIMER_EVENT_ID) ? POS_NextFrame : POS_NextSlideShow, NO_REMOVE_KEY_MSG);
-        if (wParam == SLIDESHOW_TIMER_EVENT_ID && UseSlideShowTransitionEffect()) {
-            AnimateTransition();
+
+        GotoImage((timerId == m_animationTimerId) ? POS_NextFrame : POS_NextSlideShow, NO_REMOVE_KEY_MSG);
+
+        if (timerId == m_slideshowTimerId && UseSlideShowTransitionEffect()) {
+            //AnimateTransition();
         }
-        if (wParam != ANIMATION_TIMER_EVENT_ID) {
-            m_nLastSlideShowImageTickCount = ::GetTickCount();
+
+        if (timerId != m_animationTimerId) {
+            m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
         }
-    } else if (wParam == ZOOM_TIMER_EVENT_ID) {
-        ::KillTimer(this->m_hWnd, ZOOM_TIMER_EVENT_ID);
+    }
+    else if (timerId == m_zoomTimerId) {
+        killTimer(m_zoomTimerId);
+        m_zoomTimerId = 0;
+
         if (m_bTemporaryLowQ || m_bInZooming) {
-            ::SetTimer(this->m_hWnd, ZOOM_TEXT_TIMER_EVENT_ID, ZOOM_TEXT_TIMEOUT, NULL);
-            if (m_bInZooming) m_bShowZoomFactor = true;
+            m_zoomTextTimerId = startTimer(ZOOM_TEXT_TIMEOUT);
+            if (m_bInZooming) {
+                m_bShowZoomFactor = true;
+            }
             m_bTemporaryLowQ = false;
             m_bInZooming = false;
-            if (m_bHQResampling && m_pCurrentImage != NULL) {
-                this->Invalidate(FALSE);
+            if (m_bHQResampling && m_pCurrentImage != nullptr) {
+                this->update();
             }
         }
-    } else if (wParam == ZOOM_TEXT_TIMER_EVENT_ID) {
+    }
+    else if (timerId == m_zoomTextTimerId) {
         m_bShowZoomFactor = false;
-        ::KillTimer(this->m_hWnd, ZOOM_TEXT_TIMER_EVENT_ID);
-        this->InvalidateRect(GetZoomTextRect(), FALSE);
-    } else if (wParam == TOAST_EXPIRY_TIMER_EVENT_ID) {
+        killTimer(m_zoomTextTimerId);
+        m_zoomTextTimerId = 0;
+
+        // InvalidateRect wird in Qt durch update(QRect) ersetzt
+        this->update(GetZoomTextRect());
+    }
+    else if (timerId == m_toastTimerId) {
+        killTimer(m_toastTimerId);
+        m_toastTimerId = 0;
         m_strToast = "";
-        this->InvalidateRect(GetToastTextRect(), FALSE);
-    } else if (wParam == PAN_TIMER_EVENT_ID) {
-        if (m_pCurrentImage != NULL) {
-            ::KillTimer(this->m_hWnd, PAN_TIMER_EVENT_ID);
-            //::timeBeginPeriod(1);
 
-            bool bUp = 0;
-            bool bDown = 0;
-            bool bLeft = 0;
-            bool bRight = 0;
+        this->update(GetToastTextRect());
+    }
+    else if (timerId == m_panTimerId) {
+        if (m_pCurrentImage != nullptr) {
+            // In Qt prüfen wir Tastendrücke idealerweise über Qt-Events oder plattformunabhängig.
+            // Für den Beibehalt von GetAsyncKeyState unter Windows:
+            bool bUp = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
+            bool bDown = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
+            bool bLeft = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+            bool bRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
 
-            static int PanXbase = 0;
-            static int PanYbase = 0;
+            // Wenn keine Taste mehr gedrückt wird, stoppen wir den Pan-Timer
+            if (!bUp && !bDown && !bLeft && !bRight) {
+                killTimer(m_panTimerId);
+                m_panTimerId = 0;
+                m_bPanTimerActive = false;
+                return;
+            }
 
+            int PanXbase = 0;
+            int PanYbase = 0;
             INT BorderDistanceY = 0;
             int PanX = 0;
             int PanY = 0;
-            INT iRealHeight = 0;
-            INT iRealWidth = 0;
-            bool DoStopPan = 1;
+            INT iRealHeight = INT(m_dZoom * (m_pCurrentImage->OrigHeight()));
+            INT iRealWidth = INT(m_dZoom * (m_pCurrentImage->OrigWidth()));
 
-            if (m_DynDwmFlush) {
-                while (m_bPanTimerActive == true) {
-                    bUp = (::GetAsyncKeyState(VK_UP) & 0x8000) != 0;
-                    bDown = (::GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
-                    bLeft = (::GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-                    bRight = (::GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
-
-                    if ((bUp == false) && (bDown == false) && (bLeft == false) && (bRight == false)) {
-                        //::timeEndPeriod(1);
-                        m_bPanTimerActive = false;
-                        break;
-                    } else {
-                        iRealHeight = INT (m_dZoom * (m_pCurrentImage->OrigHeight()));
-                        iRealWidth = INT (m_dZoom * (m_pCurrentImage->OrigWidth()));
-
-                        if ((iRealHeight > m_clientRect.Height()) && (iRealWidth <= m_clientRect.Width()) && (GetAutoZoomMode() == Helpers::ZM_BookMode)) {
-                            if (((bLeft == true) && (bRight == false)) || ((bUp == true) && (bDown == false)))
-                                PanYbase = 10;
-                            else if (((bLeft == false) && (bRight == true)) || ((bUp == false) && (bDown == true)))
-                                PanYbase = -10;
-                            else
-                                PanYbase = 0;
-                        } else {
-                            if ((bUp == true) && (bDown == false))
-                                PanYbase = 10;
-                            else if ((bUp == false) && (bDown == true))
-                                PanYbase = -10;
-                            else
-                                PanYbase = 0;
-
-                            if ((bLeft == true) && (bRight == false))
-                                PanXbase = 10;
-                            else if (( bLeft == false) && (bRight == true))
-                                PanXbase = -10;
-                            else
-                                PanXbase = 0;
-                        }
-
-                        if ((PanXbase != 0) && (PanYbase != 0)) {    // diagonal movement
-                            PanX = (int)(PanXbase * 0.7);
-                            PanY = (int)(PanYbase * 0.7);
-                        } else {
-                            PanX = PanXbase;
-                            PanY = PanYbase;
-                        }
-                            
-                        if (PerformPan(PanX,PanY,false) == true) {
-                            //this->Invalidate(FALSE);
-                            this->UpdateWindow();    // force wait until actually redrawn
-
-                            MSG msg;
-                            while (::PeekMessage(&msg, this->m_hWnd, 0, 0, PM_REMOVE));
-
-                            Sleep(1);
-                        } else {
-                            MSG msg;
-                            while (::PeekMessage(&msg, this->m_hWnd, 0, 0, PM_REMOVE));
-
-                            Sleep(10);
-                        }
-                    }
-                }
+            if (GetAutoZoomMode() == Helpers::ZM_BookMode && iRealHeight > m_clientRect.height() && iRealWidth <= m_clientRect.width()) {
+                if ((bLeft && !bRight) || (bUp && !bDown)) PanYbase = 10;
+                else if ((!bLeft && bRight) || (!bUp && bDown)) PanYbase = -10;
+                else PanYbase = 0;
             } else {
-                UINT timestart = Helpers::GetTimeMs();
-                UINT timenow = 0;
-                
-                UINT modu_old = 4294967295;
-                UINT modu = 0;
-                
-                while (m_bPanTimerActive == true) {
-                    bUp = (::GetAsyncKeyState(VK_UP) & 0x8000) != 0;
-                    bDown = (::GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
-                    bLeft = (::GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-                    bRight = (::GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+                if (bUp && !bDown) PanYbase = 10;
+                else if (!bUp && bDown) PanYbase = -10;
+                else PanYbase = 0;
 
-                    if ((bUp == false) && (bDown == false)  && (bLeft == false)  && (bRight == false)) {
-                        //::timeEndPeriod(1);
-                        m_bPanTimerActive = false;
-                        break;
-                    } else {
-                        timenow = Helpers::GetTimeMs();
-                        modu = ((timenow-timestart)*100) % 1668;     // 1663 on intel
-                        INT BorderDistanceY = 0;
+                if (bLeft && !bRight) PanXbase = 10;
+                else if (!bLeft && bRight) PanXbase = -10;
+                else PanXbase = 0;
+            }
 
-                        if (modu < modu_old) {
-                            if (GetAutoZoomMode() != Helpers::ZM_BookMode) {
-                                if ((bUp == true) && (bDown == false))
-                                    PanY = 10;
-                                else if ((bUp == false) && (bDown == true))
-                                    PanY = -10;
+            if (PanXbase != 0 && PanYbase != 0) { // Diagonale Bewegung
+                PanX = static_cast<int>(PanXbase * 0.7);
+                PanY = static_cast<int>(PanYbase * 0.7);
+            } else {
+                PanX = PanXbase;
+                PanY = PanYbase;
+            }
 
-                                if (( bLeft == true) && (bRight == false))
-                                    PanX = 10;
-                                else if (( bLeft == false) && (bRight == true))
-                                    PanX = -10;
-                            } else {
-                                iRealHeight = INT (m_dZoom * (m_pCurrentImage->OrigHeight()));
-                                iRealWidth = INT (m_dZoom * (m_pCurrentImage->OrigWidth()));
-
-                                if ((iRealHeight > m_clientRect.Height()) && (iRealWidth <= m_clientRect.Width())) {
-                                    if ((bLeft == true) && (bRight == false))
-                                        PanY = 10;
-                                    else if ((bUp == true) && (bDown == false))
-                                        PanY = 10;
-
-                                    if ((bLeft == false) && (bRight == true))
-                                        PanY = -10;
-                                    else if ((bUp == false) && (bDown == true))
-                                        PanY = -10;
-
-                                    if (m_offsets.y>0)
-                                        BorderDistanceY = ((iRealHeight-m_clientRect.Height())/2)-m_offsets.y;    // Top
-                                    else
-                                        BorderDistanceY = ((iRealHeight-m_clientRect.Height())/2)+m_offsets.y;    // Bottom
-                                    
-                                    if (BorderDistanceY<=100) {
-                                        if (BorderDistanceY<6)
-                                            PanY = (int)(PanY*0.1);
-                                        else if (BorderDistanceY<8)
-                                            PanY = (int)(PanY*0.2);
-                                        else if (BorderDistanceY<12)
-                                            PanY = (int)(PanY*0.3);
-                                        else if (BorderDistanceY<17)
-                                            PanY = (int)(PanY*0.4);
-                                        else if (BorderDistanceY<24)
-                                            PanY = (int)(PanY*0.5);
-                                        else if (BorderDistanceY<34)
-                                            PanY = (int)(PanY*0.6);
-                                        else if (BorderDistanceY<50)
-                                            PanY = (int)(PanY*0.7);
-                                        else if (BorderDistanceY<70)
-                                            PanY = (int)(PanY*0.8);
-                                        else
-                                            PanY = (int)(PanY*0.9);
-                                    }
-                                } else {
-                                    if ((bUp == true) && (bDown == false))
-                                        PanY = 10;
-                                    else if ((bUp == false) && (bDown == true))
-                                        PanY = -10;
-
-                                    if (( bLeft == true) && (bRight == false))
-                                        PanX = 10;
-                                    else if (( bLeft == false) && (bRight == true))
-                                        PanX = -10;
-                                }
-                            }
-                                
-                            if ((PanX != 0) && (PanY != 0)) {    // diagonal movement
-                                PanX = (int)(PanX * 0.7);
-                                PanY = (int)(PanY * 0.7);
-                            }
-
-                            if (PerformPan(PanX,PanY,false) == true) {
-                                //this->Invalidate(FALSE);
-                                this->UpdateWindow();    // force wait until actually redrawn
-                            }
-
-                            MSG msg;
-                            while (::PeekMessage(&msg, this->m_hWnd, 0, 0, PM_REMOVE));    // Empty message queue at 60 Hz
-                        }
-
-                        modu_old = modu;
-                        Sleep(1);
-                    }
-                }
+            // Ausführen des Pans
+            if (PerformPan(PanX, PanY, false)) {
+                // Erzwingt ein sofortiges Neuzeichnen ohne den Event-Loop zu blockieren
+                this->repaint();
             }
         }
     }
-
-    return 0;
 }
 
-LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/) {
+//LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOOL& /*bHandled*/) {
+/*
     // [GF] If there is already a menu being shown, cancel it and open a new one
     if (m_bInTrackPopupMenu == true) {
         ::SendMessage(this->m_hWnd, WM_CANCELMODE, 0, 0);
@@ -1927,14 +1748,10 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
     ::EnableMenuItem(hMenuMovie, IDM_MOVIE_START_FPS, MF_BYCOMMAND | MF_GRAYED);
     
     HMENU hMenuZoom = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_WINDOW);
-    if (m_bSpanVirtualDesktop) ::CheckMenuItem(hMenuZoom,  IDM_SPAN_SCREENS, MF_CHECKED);
     if (m_bFullScreenMode) ::CheckMenuItem(hMenuZoom,  IDM_FULL_SCREEN_MODE, MF_CHECKED);
-    if (m_bWindowBorderless) ::CheckMenuItem(hMenuZoom, IDM_HIDE_TITLE_BAR, MF_CHECKED);
-    if (m_bAlwaysOnTop) ::CheckMenuItem(hMenuZoom, IDM_ALWAYS_ON_TOP, MF_CHECKED);
     if (IsAdjustWindowToImage() && IsImageExactlyFittingWindow()) ::CheckMenuItem(hMenuZoom, IDM_FIT_WINDOW_TO_IMAGE, MF_CHECKED);
     if (m_bFullScreenMode) ::EnableMenuItem(hMenuZoom, IDM_FIT_WINDOW_TO_IMAGE, MF_BYCOMMAND | MF_GRAYED);
     if (!m_bFullScreenMode) ::EnableMenuItem(hMenuZoom, IDM_SPAN_SCREENS, MF_BYCOMMAND | MF_GRAYED);
-    if (m_bFullScreenMode) ::EnableMenuItem(hMenuZoom, IDM_HIDE_TITLE_BAR, MF_BYCOMMAND | MF_GRAYED);
     
     HMENU hMenuAutoZoomMode = ::GetSubMenu(hMenuTrackPopup, SUBMENU_POS_AUTOZOOMMODE);
     ::CheckMenuItem(hMenuAutoZoomMode, GetAutoZoomMode() * 10 + IDM_AUTO_ZOOM_NONE, MF_CHECKED);
@@ -1955,29 +1772,31 @@ LRESULT CMainDlg::OnContextMenu(UINT /*uMsg*/, WPARAM wParam, LPARAM lParam, BOO
     ::DestroyMenu(hMenu);
     return 1;
 }
+*/
 
-// Make the text edit control for renaming image colored black/white
-LRESULT CMainDlg::OnCtlColorEdit(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& /*bHandled*/) {
-    HDC hDC = (HDC) wParam;
-    ::SetTextColor(hDC, RGB(255, 255, 255));
-    ::SetBkColor(hDC, RGB(0, 0, 0));
-    return (LRESULT)::GetStockObject(BLACK_BRUSH);
-}
+void CMainDlg::onShowContextMenu(const QPoint &pos) {
+    MouseOn();
 
-LRESULT CMainDlg::OnEraseBackground(UINT /*uMsg*/, WPARAM wParam, LPARAM /*lParam*/, BOOL& bHandled) {
-    // prevent erasing background
-    bHandled = TRUE;
-    return TRUE;
-}
+    QMenu menu(this);
 
-LRESULT CMainDlg::OnOK(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
-    // NOP
-    return 0;
-}
+    // 1. Aktionen hinzufügen und konfigurieren (Zustände, Haken, Aktivierung)
+    QAction* actReload = menu.addAction("Neu laden");
+    actReload->setData(IDM_RELOAD_FULL);
+    actReload->setEnabled(m_pCurrentImage != nullptr);
 
-LRESULT CMainDlg::OnCancel(WORD /*wNotifyCode*/, WORD wID, HWND /*hWndCtl*/, BOOL& /*bHandled*/) {
-    CleanupAndTerminate();
-    return 0;
+    // ... weitere Menüeinträge hinzufügen ...
+
+    // 2. Direkt ausführen und auf globale Mausposition setzen
+    QAction* pSelectedAction = menu.exec(pos);
+	/*
+    // 3. Befehl ausführen, falls etwas gewählt wurde
+    if (pSelectedAction != nullptr) {
+        int nCommand = pSelectedAction->data().toInt();
+        if (nCommand > 0) {
+            ExecuteCommand(nCommand);
+        }
+    }
+	*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -1988,7 +1807,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
     CSettingsProvider& sp = CSettingsProvider::This();
     switch (nCommand) {
         case IDM_MINIMIZE:
-            this->ShowWindow(SW_MINIMIZE);
+            this->showMinimized();
             break;
         case IDM_EXPLORE:
             qDebug() << "IDM_EXPLORE";
@@ -2005,7 +1824,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             if (m_pFileList != NULL && m_pFileList->CurrentFileExists())
                 {
                 m_pFileList->Reload(NULL);
-                this->Invalidate(FALSE);
+                this->update();
                 }
 
             ReloadImage(false);
@@ -2018,7 +1837,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
         case IDM_COPY_FULL:
             if (m_pCurrentImage != NULL) {
                 CClipboard::CopyFullImageToClipboard(m_pCurrentImage, *m_pImageProcParams, CreateDefaultProcessingFlags(), m_pFileList->Current());
-                this->Invalidate(FALSE);
+                this->update();
             }
             break;
         case IDM_COPY_PATH:
@@ -2057,10 +1876,10 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                     if (QFile::remove(currentFileName)) {
                         fileListOfDeletedImage->Reload(NULL, false);
                         m_pFileList->DeleteHistory(true);
-                        Invalidate();
+                        update();
                         GotoImage(POS_Current);
                     } else {
-                        Invalidate();
+                        update();
                         if (m_pFileList->Current().isEmpty()) {
                             GotoImage(POS_First);
                         } else {
@@ -2239,20 +2058,20 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_bUserZoom = false;
                 m_bUserPan = false;
                 AdjustWindowToImage(false);
-                this->Invalidate(FALSE);
+                this->update();
             }
             break;
         case IDM_MIRROR_H:
         case IDM_MIRROR_V:
             if (m_pCurrentImage != NULL) {
                 m_pCurrentImage->Mirror(nCommand == IDM_MIRROR_H);
-                this->Invalidate(FALSE);
+                this->update();
             }
             break;
         case IDM_AUTO_CORRECTION:
             m_bAutoContrast = !m_bAutoContrast;
             SetToast(m_bAutoContrast ? QStringLiteral("Auto Contrast: ON") : QStringLiteral("Auto Contrast: OFF"));
-            this->Invalidate(FALSE);
+            this->update();
             break;
         case IDM_KEEP_PARAMETERS:
             m_bKeepParams = !m_bKeepParams;
@@ -2260,7 +2079,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 *m_pImageProcParamsKept = *m_pImageProcParams;
                 m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
                 m_dZoomKept = (m_bUserZoom || IsAdjustWindowToImage()) ? m_dZoom : -1;
-                m_offsetKept = m_bUserPan ? m_offsets : CPoint(0, 0);
+                m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
             }
             break;
         case IDM_SAVE_PARAMETERS:
@@ -2318,7 +2137,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
 
                 m_bInZooming = true;
                 StartLowQTimer(ZOOM_TIMEOUT);
-                this->Invalidate(FALSE);
+                this->update();
                 AdjustWindowToImage(false);
             }
             break;
@@ -2331,119 +2150,47 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 ResetZoomTo100Percents(m_bMouseOn);
             }
             break;
-        case IDM_SPAN_SCREENS:
-            if (m_bFullScreenMode && CMultiMonitorSupport::IsMultiMonitorSystem()) {
-                m_dZoom = -1.0;
-                this->Invalidate(FALSE);
-                if (m_bSpanVirtualDesktop) {
-                    this->SetWindowPlacement(&m_storedWindowPlacement);
-                } else {
-                    this->GetWindowPlacement(&m_storedWindowPlacement);
-                    CRect rectAllScreens = CMultiMonitorSupport::GetVirtualDesktop();
-                    this->SetWindowPos(HWND_TOP, &rectAllScreens, SWP_NOZORDER);
-                }
-                m_bSpanVirtualDesktop = !m_bSpanVirtualDesktop;
-                this->GetClientRect(&m_clientRect);
-            }
-            break;
-        case IDM_FULL_SCREEN_MODE:
+        case IDM_FULL_SCREEN_MODE: {
             m_bFullScreenMode = !m_bFullScreenMode;
             m_dZoomAtResizeStart = 1.0;
-            if (!m_bFullScreenMode) {
-                CRect windowRect;
 
-                // restore hidden title bar if enabled
-                SetCurrentWindowStyle();
-
-                HICON hIconSmall = (HICON)::LoadImage(_Module.GetResourceInstance(), MAKEINTRESOURCE(IDR_MAINFRAME), 
-                    IMAGE_ICON, ::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
-                SetIcon(hIconSmall, FALSE);
-                CRect defaultWindowRect = CMultiMonitorSupport::GetDefaultWindowRect();
-                double dZoom = -1;
-                windowRect = sp.ExplicitWindowRect() ?
-                    defaultWindowRect :
-                    GetWindowRectMatchingImageSize(
-                        m_hWnd,
-                        CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT),
-                        defaultWindowRect.Size(),
-                        dZoom, m_pCurrentImage, false, true, m_bWindowBorderless, GetAutoZoomMode());
-                this->SetWindowPos(HWND_TOP, windowRect.left, windowRect.top, windowRect.Width(), windowRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
-                UpdateWindowTitle(true);    // force update of title bar icon
-                this->MouseOn();
-                m_bSpanVirtualDesktop = false;
-            } else {
-                if (!IsZoomed() && sp.ExplicitWindowRect()) {
-                    // Save the old window rect to be able to restore it
-                    CRect rect;
-                    GetWindowRect(&rect);
+            if (m_bFullScreenMode) {
+                // Vor dem Umschalten ins Vollbild die aktuelle Position speichern (falls gewünscht)
+                if (!isMaximized() && sp.ExplicitWindowRect()) {
+                    QRect rect = this->geometry();
                     CMultiMonitorSupport::SetDefaultWindowRect(rect);
                 }
-                HMONITOR hMonitor = ::MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
-                MONITORINFO monitorInfo;
-                monitorInfo.cbSize = sizeof(MONITORINFO);
-                if (::GetMonitorInfo(hMonitor, &monitorInfo)) {
-                    CRect monitorRect(&(monitorInfo.rcMonitor));
-                    this->SetWindowLongW(GWL_STYLE, WS_VISIBLE);
-                    this->SetWindowPos(HWND_TOP, monitorRect.left, monitorRect.top, monitorRect.Width(), monitorRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
-                }
+
+                // Qt-Natives Vollbild (erkennt automatisch den aktuellen Monitor)
+                this->showFullScreen();
                 this->MouseOn();
             }
-            m_dZoom = -1;
-            StartLowQTimer(ZOOM_TIMEOUT);
-            this->SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_FRAMECHANGED);
-            break;
-        case IDM_HIDE_TITLE_BAR:
-            if (!m_bFullScreenMode) {
-                // only available when full screen mode is not active
-
-                m_bWindowBorderless = !m_bWindowBorderless;
-                SetCurrentWindowStyle();
-
-                // get the size of the border to shift the window pos downwards
-                int windowCaptionHeight = ::GetSystemMetrics(SM_CYCAPTION);
-                double dZoom = -1;
-                CRect windowRect = GetWindowRectMatchingImageSize(
-                    m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, dZoom, m_pCurrentImage, false, true, m_bWindowBorderless, GetAutoZoomMode());
-
-                // don't try to adjust for an image that isn't loaded!
-                if (m_pCurrentImage != NULL)
-                {
-                    // this is the new top to move it to so that the experience seems seamless
-                    int newTop;
-                    int t = m_pCurrentImage->OrigHeight();
-
-                    // these are experimental values figured out through trial and error
-                    // it appears if the caption size is odd, and just using /2,
-                    // it causes the window to shift up one pixel at a time when going between borderless and not borderless repeatedly
-                    // in other cases, it shifts downwards depending on rounding errors resizing the window and image... hard to hunt down but it's as good as it can get right now
-                    if (windowCaptionHeight % 2 == 0) {
-                        newTop = m_bWindowBorderless ?
-                            windowRect.top + (windowCaptionHeight / 2) :
-                            windowRect.top - (windowCaptionHeight / 2);
-                    } else {
-                        newTop = m_bWindowBorderless ?
-                            windowRect.top + (windowCaptionHeight / 2) :
-                            windowRect.top - (windowCaptionHeight / 2) + 1;
-                    }
-
-                    // tell the window the Frame has changed, not sure if it makes a difference
-                    this->SetWindowPos(HWND_TOP, windowRect.left, newTop, windowRect.Width(), windowRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS | SWP_FRAMECHANGED);
-
-                    // don't auto adjust unless auto is selected in options
-                    if (IsAdjustWindowToImage() && !(m_bAutoFitWndToImage && !IsImageExactlyFittingWindow())) {
-                        AdjustWindowToImage(false);
-                        this->Invalidate(FALSE);
-                    }
-
-                    StartLowQTimer(ZOOM_TIMEOUT);  // trigger a redraw as if zoom changed (might not be necessary)
+            else {
+                // Vollbild verlassen und normales Fenster wiederherstellen
+                if (sp.ExplicitWindowRect()) {
+                    QRect defaultWindowRect = CMultiMonitorSupport::GetDefaultWindowRect();
+                    double dZoom = -1;
+                    // Deine Logik zur Größenberechnung beibehalten
+                    QRect windowRect = GetWindowRectMatchingImageSize(
+                        this,
+                        CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT),
+                        defaultWindowRect.size(),
+                        dZoom, m_pCurrentImage, false, true, false, GetAutoZoomMode()
+                        );
+                    this->setGeometry(windowRect.left(), windowRect.top(), windowRect.width(), windowRect.height());
+                    this->showNormal();
+                } else {
+                    this->showNormal();
                 }
+
+                UpdateWindowTitle(true); // Aktualisiert den Titel / das Icon der Titelleiste
+                this->MouseOn();
             }
 
+            m_dZoom = -1;
+            StartLowQTimer(ZOOM_TIMEOUT);
             break;
-        case IDM_ALWAYS_ON_TOP:
-            ToggleAlwaysOnTop();
-            SetToast(m_bAlwaysOnTop? QStringLiteral("Always on Top: enabled") : QStringLiteral("Always on Top: disabled"));
-            break;
+        }
         case IDM_FIT_WINDOW_TO_IMAGE:
             // Note: If auto fit is on but the window size does not match the image size (due to manual window resizing), restore window to image
             if (!(m_bAutoFitWndToImage && !IsImageExactlyFittingWindow()))
@@ -2488,7 +2235,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                     m_eAutoZoomModeWindowed = eAutoZoomMode;
                 m_dZoom = -1.0;
                 m_offsets = CPoint(0, 0);
-                this->Invalidate(FALSE);
+                this->update();
                 AdjustWindowToImage(false);
                 break;
             }
@@ -2516,7 +2263,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 }
             } else if (m_bShowInfo == true) {
                 m_bShowInfo = false;
-                this->Invalidate(FALSE);
+                this->update();
             } else if (m_bFullScreenMode) {
                 ExecuteCommand(IDM_FULL_SCREEN_MODE);
             } else {
@@ -2528,7 +2275,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             if (m_bAutoContrast) {
                 double dInc = (nCommand == IDM_CONTRAST_CORRECTION_INC) ? 0.05 : -0.05;
                 m_pImageProcParams->ContrastCorrectionFactor = std::max(0.0, std::min(1.0, m_pImageProcParams->ContrastCorrectionFactor + dInc));
-                this->Invalidate(FALSE);
+                this->update();
             }
             break;
         case IDM_COLOR_CORRECTION_INC:
@@ -2536,7 +2283,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             if (m_bAutoContrast) {
                 double dInc = (nCommand == IDM_COLOR_CORRECTION_INC) ? 0.05 : -0.05;
                 m_pImageProcParams->ColorCorrectionFactor = std::max(-0.5, std::min(0.5, m_pImageProcParams->ColorCorrectionFactor + dInc));
-                this->Invalidate(FALSE);
+                this->update();
             }
             break;
         case IDM_TOGGLE_TRANSPARENCY:
@@ -2576,10 +2323,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
         case IDM_TOGGLE_RESAMPLING_QUALITY:
             m_bHQResampling = !m_bHQResampling;
             SetToast(m_bHQResampling? QStringLiteral("Resampling: enabled"): QStringLiteral("Resampling: disabled"));
-            this->Invalidate(FALSE);
-            break;
-        case IDM_TOGGLE_MONITOR:
-            ToggleMonitor();
+            this->update();
             break;
         case IDM_EXCHANGE_PROC_PARAMS:
             ExchangeProcessingParams();
@@ -2593,12 +2337,12 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                     int iRealHeight = (int) (m_dZoom * (m_pCurrentImage->OrigHeight()));
                     int iRealWidth = (int) (m_dZoom * (m_pCurrentImage->OrigWidth()));
 
-                    if (((iRealHeight > m_clientRect.Height()) && (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN))
-                     || (( iRealWidth >  m_clientRect.Width()) && (nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT))) {
+                    if (((iRealHeight > m_clientRect.height()) && (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN))
+                     || (( iRealWidth >  m_clientRect.width()) && (nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT))) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
-                                ::SetTimer(this->m_hWnd, PAN_TIMER_EVENT_ID, 10, NULL);
+                                m_panTimerId = startTimer(10);
                             }
                         } else {
                             PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
@@ -2617,12 +2361,12 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                     int iRealHeight = (int) (m_dZoom * (m_pCurrentImage->OrigHeight()));
                     int iRealWidth = (int) (m_dZoom * (m_pCurrentImage->OrigWidth()));
 
-                    if (((iRealHeight > m_clientRect.Height()) && (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN))
-                     || (( iRealWidth >  m_clientRect.Width()) && (nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT))) {
+                    if (((iRealHeight > m_clientRect.height()) && (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN))
+                     || (( iRealWidth >  m_clientRect.width()) && (nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT))) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
-                                ::SetTimer(this->m_hWnd, PAN_TIMER_EVENT_ID, 10, NULL);
+                                m_panTimerId = startTimer(10);
                             }
                         } else {
                             PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
@@ -2635,16 +2379,16 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                             else if (nCommand == IDM_PAN_LEFT)
                                 GotoImage(POS_Previous);
                         } else {
-                            if (iRealHeight > m_clientRect.Height()) {
+                            if (iRealHeight > m_clientRect.height()) {
                                 if (m_bPanTimerActive == false) {
-                                    if ((m_offsets.y >= ((iRealHeight-m_clientRect.Height())/2)) && (nCommand == IDM_PAN_LEFT)) {    // Upper Border!
+                                    if ((m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (nCommand == IDM_PAN_LEFT)) {    // Upper Border!
                                         GotoImage(POS_Previous);
-                                    } else if ((-m_offsets.y >= ((iRealHeight-m_clientRect.Height())/2)) && (nCommand == IDM_PAN_RIGHT)) {    //Lower Border!
+                                    } else if ((-m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (nCommand == IDM_PAN_RIGHT)) {    //Lower Border!
                                         GotoImage(POS_Next);
                                     } else {
                                         if (m_bAllowSmoothPanning) {
                                             m_bPanTimerActive = true;
-                                            ::SetTimer(this->m_hWnd, PAN_TIMER_EVENT_ID, 10, NULL);
+                                            m_panTimerId = startTimer(10);
                                         } else {
                                             PerformPan(0, ((nCommand == IDM_PAN_UP) || (nCommand == IDM_PAN_LEFT)) ? PAN_STEP : ((nCommand == IDM_PAN_DOWN) || (nCommand == IDM_PAN_RIGHT)) ? -PAN_STEP : 0, false);
                                         }
@@ -2671,15 +2415,9 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_CONTEXT_MENU:
             {
-            BOOL bNotUsed;
-            /*
-            OnContextMenu() expects screen coordinates, but m_nMouseX/m_nMouseY contain client area coordinates!
-            When OnContextMenu() gets called after WM_CONTEXTMENU from the Message Handler, it will receive screen
-            coordinates in LPARAM from the beginning, but when using m_nMouseX/m_nMouseY, we need to convert first.
-            */
-            int MouseCoordScreen = (m_nMouseX & 0xFFFF) | ((m_nMouseY & 0xFFFF) << 16);
-            ::ClientToScreen(this->m_hWnd, (LPPOINT)&MouseCoordScreen);
-            OnContextMenu(0, 0, MouseCoordScreen, bNotUsed);
+            QPoint clientPoint(m_nMouseX, m_nMouseY);
+            QPoint screenPoint = this->mapToGlobal(clientPoint);
+            onShowContextMenu(screenPoint);
             }
             break;
         case IDM_TOGGLE_SORT_RANDOM:
@@ -2700,7 +2438,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_TOGGLE_INFO_OVERLAY:
             m_bShowInfo = !m_bShowInfo;
-            this->Invalidate(FALSE);
+            this->update();
             break;
         case IDM_CHANGE_FOLDER_LANGUAGE:
             ChangeFolderLanguage();
@@ -2802,46 +2540,36 @@ void CMainDlg::OpenDefaultEditor() {
         return;
     }
 
+    // 1. Vollbildmodus verlassen (falls aktiv)
     if (m_bFullScreenMode) {
-        m_bFullScreenMode = !m_bFullScreenMode;
-        CRect windowRect;
-        this->SetWindowLongW(GWL_STYLE, this->GetWindowLongW(GWL_STYLE) | WS_OVERLAPPEDWINDOW | WS_VISIBLE);
-        if (::IsRectEmpty(&(m_storedWindowPlacement2.rcNormalPosition))) {
-            // never set to window mode before, use default position
-            windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
-            this->SetWindowPos(HWND_TOP, windowRect.left, windowRect.top, windowRect.Width(), windowRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
-        } else {
-            m_storedWindowPlacement2.flags = this->SetWindowPlacement(&m_storedWindowPlacement2);
-        }
-        this->MouseOn();
+        m_bFullScreenMode = false;
+
+        // Qt-Äquivalent für das Wiederherstellen des normalen Fensters
+        showNormal();
+
+        // Falls du die vorherige Geometrie gespeichert hattest, kannst du sie hier via restoreGeometry() setzen.
+
+        MouseOn();
 
         m_dZoom = -1;
         m_bInZooming = true;
         StartLowQTimer(ZOOM_TIMEOUT);
-        this->SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_FRAMECHANGED);
     }
 
+    // 2. Datei im Editor öffnen
     if (m_bIsRunningInWine) {
         QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
-
         if (!sUnixPath.isEmpty()) {
-            const QString sParams = QStringLiteral("/unix /usr/bin/gimp \"%1\"").arg(sUnixPath);
-            ::ShellExecuteW(m_hWnd, nullptr, L"start.exe", reinterpret_cast<LPCWSTR>(sParams.utf16()), nullptr, SW_SHOW );
+            // Unter Wine via QProcess starten statt rohem ShellExecuteW
+            QStringList arguments;
+            arguments << "/unix" << "/usr/bin/gimp" << sUnixPath;
+            QProcess::startDetached("start.exe", arguments);
         }
     }
     else {
-        ::ShellExecuteW(m_hWnd, _T("edit"), reinterpret_cast<LPCWSTR>(sCurrentFileName.utf16()), NULL, NULL, SW_SHOW);
-    }
-}
-
-// Setting window styles have gotten out of hand with the addition of no title bar
-// instead of each call trying to figure out the logic, consolidate it to one function
-LONG CMainDlg::SetCurrentWindowStyle() {
-    if (!m_bWindowBorderless) {
-        return this->SetWindowLongW(GWL_STYLE, this->GetWindowLongW(GWL_STYLE) | WS_OVERLAPPEDWINDOW | WS_VISIBLE);
-    } else {
-        return this->SetWindowLongW(GWL_STYLE, this->GetWindowLongW(GWL_STYLE) & ~WS_OVERLAPPEDWINDOW | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_VISIBLE);  // lose resizing
-        // just doing (& ~WS_CAPTION) leads to having a sliver of white bar on top but allows for resizing
+        // Der moderne, plattformunabhängige Qt-Weg, um Dateien mit der Standard-App zu öffnen
+        // (Ersetzt das Windows-spezifische "ShellExecuteW" mit dem "edit"-Verb)
+        QDesktopServices::openUrl(QUrl::fromLocalFile(sCurrentFileName));
     }
 }
 
@@ -2850,46 +2578,42 @@ void CMainDlg::ExploreFile() {
     if (sCurrentFileName.isEmpty()) {
         return;
     }
+
 #if defined(Q_OS_WIN)
     if (m_bIsRunningInWine) {
         const QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
 
         if (!sUnixPath.isEmpty()) {
-            QString sParams;
-
             if (IsLinuxBinaryAvailable(QStringLiteral("~/.local/bin/mkFolderWidget"))) {
-                sParams = QStringLiteral("/unix /bin/sh -c \"mkFolderWidget -f \\\"%1\\\"\"").arg(sUnixPath);
-                ::ShellExecute(m_hWnd, nullptr, TEXT("start.exe"), reinterpret_cast<LPCWSTR>(sParams.utf16()), nullptr, SW_SHOW);
+                QStringList args;
+                args << QStringLiteral("/unix") << QStringLiteral("/bin/sh") << QStringLiteral("-c")
+                     << QStringLiteral("mkFolderWidget -f \"%1\"").arg(sUnixPath);
+                QProcess::startDetached(QStringLiteral("start.exe"), args);
             }
             else if (IsLinuxBinaryAvailable(QStringLiteral("/usr/bin/dolphin"))) {
-                sParams = QStringLiteral("/unix /usr/bin/dolphin --new-window --select \"%1\"").arg(sUnixPath);
-                ::ShellExecute(m_hWnd, nullptr, TEXT("start.exe"), reinterpret_cast<LPCWSTR>(sParams.utf16()), nullptr, SW_SHOW);
+                QStringList args;
+                args << QStringLiteral("/unix") << QStringLiteral("/usr/bin/dolphin")
+                     << QStringLiteral("--new-window") << QStringLiteral("--select") << sUnixPath;
+                QProcess::startDetached(QStringLiteral("start.exe"), args);
             }
             else {
-                // Ordnerpfad mit QFileInfo::path() ermitteln (erzielt denselben Effekt wie ReverseFind('\\') + Left)
                 const QString sFolderPath = QFileInfo(sCurrentFileName).path();
-
-                ::ShellExecute(m_hWnd, nullptr, TEXT("winebrowser.exe"), reinterpret_cast<LPCWSTR>(sFolderPath.utf16()), nullptr, SW_SHOW);
+                QStringList args;
+                args << sFolderPath;
+                QProcess::startDetached(QStringLiteral("winebrowser.exe"), args);
             }
         }
     } else {
+        // Nativer Windows-Build: explorer.exe mit /select über QProcess aufrufen
         QString nativePath = QDir::toNativeSeparators(sCurrentFileName);
-        QString params = QStringLiteral("/select,\"%1\"").arg(nativePath);
+        QStringList args;
+        args << QStringLiteral("/select,%1").arg(nativePath);
 
-        ::ShellExecuteW(
-            m_hWnd,
-            L"open",
-            L"explorer.exe",
-            reinterpret_cast<LPCWSTR>(params.utf16()),
-            nullptr,
-            SW_SHOW
-            );
+        QProcess::startDetached(QStringLiteral("explorer.exe"), args);
     }
 #elif defined(Q_OS_LINUX)
     // --- Nativer Linux-Build (ohne Wine / reines Qt6) ---
-    // Hier wird direkt auf Linux-Befehle oder QDesktopServices zurückgegriffen
     if (QFileInfo(sCurrentFileName).exists()) {
-        // Beispiel für nativen Linux-Dateimanager (z. B. Dolphin mit --select)
         QStringList args;
         args << QStringLiteral("--select") << sCurrentFileName;
         QProcess::startDetached(QStringLiteral("dolphin"), args);
@@ -2971,7 +2695,7 @@ void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
     }
     m_startMouse.x = m_startMouse.y = -1;
     MouseOff();
-    this->Invalidate(FALSE);
+    this->update();
 }
 
 void CMainDlg::StartDragging(int nX, int nY, bool bDragWithZoomNavigator) {
@@ -3003,8 +2727,8 @@ void CMainDlg::EndDragging() {
     if (m_pCurrentImage != NULL) {
         m_pCurrentImage->VerifyDIBPixelsCreated();
     }
-    if (m_DIBOffsets != CPoint(0, 0)) {
-        Invalidate(FALSE);
+    if (m_DIBOffsets != QPoint(0, 0)) {
+        update();
     }
     SetCursorForMoveSection();
 }
@@ -3146,7 +2870,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
             break;
     }
 
-/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos4 m_offsets.x:" <<  m_offsets.x << "m_offsets.y:" << m_offsets.y << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex;
+        /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos4 m_offsets.x:" <<  m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex;
 
     if (bCheckIfSameImage && (m_pFileList == pOldFileList && (nOldFrameIndex == nFrameIndex || bNoWrapAroundEdgeFrame) && !m_pFileList->ChangedSinceCheckpoint())) {
         if (m_bMovieMode && m_bAutoExit) {
@@ -3199,13 +2923,13 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
     m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current().isEmpty()) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
 
-/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos6  m_offsets.x:" << m_offsets.x << "m_offsets.y:" << m_offsets.y << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
+    /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos6  m_offsets.x:" << m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
     bool bSynchronize = (nFlags & KEEP_PARAMETERS) == 0;
 
     AfterNewImageLoaded(bSynchronize, false, ePos == POS_Previous);
 
-/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos7  m_offsets.x:" << m_offsets.x << "m_offsets.y:" << m_offsets.y << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
+    /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos7  m_offsets.x:" << m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
     // If current image is animated, start playback
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
@@ -3216,21 +2940,15 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         }
     }
 
-/* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos8  m_offsets.x:" << m_offsets.x << "m_offsets.y:" << m_offsets.y;
+    /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos8  m_offsets.x:" << m_offsets.x() << "m_offsets.y:" << m_offsets.y();
 
     if (((nFlags & NO_UPDATE_WINDOW) == 0) && !(ePos == POS_NextSlideShow && UseSlideShowTransitionEffect())) {
-        this->Invalidate(FALSE);
+        this->update();
         // this will force to wait until really redrawn, preventing to process images but do not show them
-        this->UpdateWindow();
+        this->repaint();
     }
 
-/* Debugging */ qDebug() << "GotoImage() Pos9 after UpdateWindow() nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
-
-    // remove key messages accumulated so far
-    if (!(nFlags & NO_REMOVE_KEY_MSG)) {
-        MSG msg;
-        while (::PeekMessage(&msg, this->m_hWnd, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE));
-    }
+/* Debugging */ qDebug() << "GotoImage() Pos9 after repaint() nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 }
 
 void CMainDlg::ReloadImage(bool keepParameters, bool updateWindow) {
@@ -3319,21 +3037,21 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, boo
         // zoom to mouse
         int nCenterX = m_bZoomMode ? m_nCapturedX : m_nMouseX;
         int nCenterY = m_bZoomMode ? m_nCapturedY : m_nMouseY;
-        int nOldX = nOldXSize/2 - m_clientRect.Width()/2 + nCenterX - m_offsets.x;
-        int nOldY = nOldYSize/2 - m_clientRect.Height()/2 + nCenterY - m_offsets.y;
+        int nOldX = nOldXSize/2 - m_clientRect.width()/2 + nCenterX - m_offsets.x();
+        int nOldY = nOldYSize/2 - m_clientRect.height()/2 + nCenterY - m_offsets.y();
         double dFac = m_dZoom/dOldZoom;
-        m_offsets.x = Helpers::RoundToInt(nNewXSize/2 - m_clientRect.Width()/2 + nCenterX - nOldX*dFac);
-        m_offsets.y = Helpers::RoundToInt(nNewYSize/2 - m_clientRect.Height()/2 + nCenterY - nOldY*dFac);
+        m_offsets.setX(Helpers::RoundToInt(nNewXSize/2 - m_clientRect.width()/2 + nCenterX - nOldX*dFac));
+        m_offsets.setY(Helpers::RoundToInt(nNewYSize/2 - m_clientRect.height()/2 + nCenterY - nOldY*dFac));
     } else {
         // zoom to center
-        m_offsets.x = Helpers::RoundToInt(m_offsets.x*m_dZoom/dOldZoom);
-        m_offsets.y = Helpers::RoundToInt(m_offsets.y*m_dZoom/dOldZoom);
+        m_offsets.setX(Helpers::RoundToInt(m_offsets.x() * m_dZoom / dOldZoom));
+        m_offsets.setY(Helpers::RoundToInt(m_offsets.y() * m_dZoom / dOldZoom));
     }
 
     m_bInZooming = true;
     StartLowQTimer(ZOOM_TIMEOUT);
     if (fabs(dOldZoom - m_dZoom) > 0.0001 || m_bZoomMode) {
-        this->Invalidate(FALSE);
+        this->update();
         if (bAdjustWindowToImage) {
             AdjustWindowToImage(false);
         }
@@ -3343,8 +3061,8 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, boo
         if ((GetAutoZoomMode() == Helpers::ZM_BookMode) && (m_bZoomMode == false)) {
             int nImageW = m_pCurrentImage->OrigWidth();
             int nImageH = m_pCurrentImage->OrigHeight();
-            int nWinW = m_clientRect.Width();
-            int nWinH = m_clientRect.Height();
+            int nWinW = m_clientRect.width();
+            int nWinH = m_clientRect.height();
 
             double dImageAR = (double)nImageW/nImageH;
 
@@ -3366,16 +3084,16 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse, boo
 }
 
 bool CMainDlg::PerformPan(int dx, int dy, bool bAbsolute) {
-    if ((m_virtualImageSize.cx > 0 && m_virtualImageSize.cx > m_clientRect.Width()) ||
-        (m_virtualImageSize.cy > 0 && m_virtualImageSize.cy > m_clientRect.Height())) {
+    if ((m_virtualImageSize.width() > 0 && m_virtualImageSize.width() > m_clientRect.width()) ||
+        (m_virtualImageSize.height() > 0 && m_virtualImageSize.height() > m_clientRect.height())) {
         if (bAbsolute) {
-            m_offsets = CPoint(dx, dy);
+            m_offsets = QPoint(dx, dy);
         } else {
-            m_offsets = CPoint(m_offsets.x + dx, m_offsets.y + dy);
+            m_offsets = QPoint(m_offsets.x() + dx, m_offsets.y() + dy);
         }
         m_bUserPan = true;
 
-        this->Invalidate(FALSE);
+        this->update();
         return true;
     }
     return false;
@@ -3385,7 +3103,7 @@ double CMainDlg::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnla
     if (m_pCurrentImage != NULL) {
         double dZoom;
         Helpers::GetImageRect(m_pCurrentImage->OrigWidth(), m_pCurrentImage->OrigHeight(), 
-            m_clientRect.Width(), m_clientRect.Height(), bAllowEnlarge, bFillWithCrop, false, GetAutoZoomMode(), dZoom);
+            m_clientRect.width(), m_clientRect.height(), bAllowEnlarge, bFillWithCrop, false, GetAutoZoomMode(), dZoom);
         double dZoomMax = bAllowEnlarge ? Helpers::ZoomMax : std::max(1.0, m_dZoomAtResizeStart);
         return std::max(0.0001, std::min(dZoomMax, dZoom));
     } else {
@@ -3396,17 +3114,24 @@ double CMainDlg::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnla
 void CMainDlg::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool bAdjustWindowSize) {
     m_isUserFitToScreen = false;
     if (m_pCurrentImage != NULL) {
-        if (bAdjustWindowSize && !m_bFullScreenMode && !IsZoomed() && m_bAutoFitWndToImage) {
+        if (bAdjustWindowSize && !m_bFullScreenMode && !isMaximized() && m_bAutoFitWndToImage) {
             m_dZoom = bAllowEnlarge ? Helpers::ZoomMax : 1;
-            CRect wndRect = GetWindowRectMatchingImageSize(m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, m_dZoom, m_pCurrentImage, false, true, m_bWindowBorderless, GetAutoZoomMode());
+
+            QRect wndRect = GetWindowRectMatchingImageSize(this, QSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, m_dZoom, m_pCurrentImage, false, true, false, GetAutoZoomMode());
+
             if (m_dZoom <= 1) {
                 m_dZoom = -1;
             }
             m_bResizeForNewImage = true;
-            this->SetWindowPos(HWND_TOP, wndRect.left, wndRect.top, wndRect.Width(), wndRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
-            this->GetClientRect(&m_clientRect);
+
+            // Ersetzung von SetWindowPos durch Qt-Bordmittel (setGeometry)
+            this->setGeometry(wndRect);
+
+            // Client-Rechteck in Qt-Stil aktualisieren
+            m_clientRect = this->rect();
+
             m_bResizeForNewImage = false;
-            this->Invalidate(FALSE);
+            this->update();
         } else {
             double dOldZoom = m_dZoom;
             m_dZoom = GetZoomFactorForFitToScreen(bFillWithCrop, bAllowEnlarge);
@@ -3420,7 +3145,7 @@ void CMainDlg::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool
             if (fabs(dOldZoom - m_dZoom) > 0.01) {
                 //m_bInZooming = true;    // Disabled, since this would trigger a display of the Zoom Factor text at ANY change in zoom (fullscreen, onsize() etc.)
                 StartLowQTimer(ZOOM_TIMEOUT);
-                this->Invalidate(FALSE);
+                this->update();
             }
         }
     }
@@ -3434,16 +3159,16 @@ void CMainDlg::ResetZoomTo100Percents(bool bZoomToMouse) {
 }
 
 CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
-    int nClientWidth = m_clientRect.Width();
-    int nClientHeight = m_clientRect.Height();
+    int nClientWidth = m_clientRect.width();
+    int nClientHeight = m_clientRect.height();
     if (nClientWidth == 0 && nClientHeight == 0) {
-        CRect rect = CMultiMonitorSupport::GetMonitorRect(m_hWnd);
-        nClientWidth = rect.Width();
-        nClientHeight = rect.Height();
+        QRect rect = CMultiMonitorSupport::GetMonitorRect(this);
+        nClientWidth = rect.width();
+        nClientHeight = rect.height();
     }
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
     if (IsAdjustWindowToImage() && !bNoProcessingAfterLoad) {
-        CSize maxClientSize = GetMaxClientSize(m_hWnd);
+        CSize maxClientSize = GetMaxClientSize(this);
         nClientWidth = maxClientSize.cx;
         nClientHeight = maxClientSize.cy;
         eAutoZoomMode = Helpers::ZM_FitToScreenNoZoom;
@@ -3452,11 +3177,11 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
         *m_pImageProcParamsKept = *m_pImageProcParams;
         m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
         m_dZoomKept = (m_bUserZoom || IsAdjustWindowToImage()) ? m_dZoom : -1;
-        m_offsetKept = m_bUserPan ? m_offsets : CPoint(0, 0);
+        m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
         if (m_isUserFitToScreen && !IsAdjustWindowToImage()) { eAutoZoomMode = m_autoZoomFitToScreen; }
 
         return CProcessParams(nClientWidth, nClientHeight,
-            CMultiMonitorSupport::GetMonitorRect(m_hWnd).Size(),
+            CMultiMonitorSupport::GetMonitorRect(this).size(),
             CRotationParams(0),
             m_nUserRotation,
             m_dZoomKept,
@@ -3469,7 +3194,7 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
         m_isUserFitToScreen = false;
         CSettingsProvider& sp = CSettingsProvider::This();
         return CProcessParams(nClientWidth, nClientHeight, 
-            CMultiMonitorSupport::GetMonitorRect(m_hWnd).Size(),
+            CMultiMonitorSupport::GetMonitorRect(this).size(),
             CRotationParams(0), 0, -1, eAutoZoomMode, CPoint(0, 0), m_eTransparencyMode,
             GetDefaultProcessingParams(),
             SetProcessingFlag(GetDefaultProcessingFlags(), PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
@@ -3491,14 +3216,18 @@ void CMainDlg::ResetParamsToDefault() {
 
 void CMainDlg::StartSlideShowTimer(int nMilliSeconds) {
     m_nCurrentTimeout = nMilliSeconds;
-    ::SetTimer(this->m_hWnd, SLIDESHOW_TIMER_EVENT_ID, nMilliSeconds, NULL);
-    m_nLastSlideShowImageTickCount = ::GetTickCount();
+    m_slideshowTimerId = startTimer(nMilliSeconds);
+    m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
 }
 
 void CMainDlg::StopSlideShowTimer(void) {
     if (m_nCurrentTimeout > 0) {
         m_nCurrentTimeout = 0;
-        ::KillTimer(this->m_hWnd, SLIDESHOW_TIMER_EVENT_ID);
+
+        if (m_slideshowTimerId != 0) {
+            killTimer(m_slideshowTimerId);
+            m_slideshowTimerId = 0;
+        }
     }
 }
 
@@ -3525,7 +3254,7 @@ void CMainDlg::StartMovieMode(double dFPS) {
     m_bMovieMode = true;
     StartSlideShowTimer(Helpers::RoundToInt(1000.0/dFPS));
     AfterNewImageLoaded(false, false);
-    Invalidate(FALSE);
+    update();
 }
 
 void CMainDlg::StopMovieMode() {
@@ -3548,29 +3277,44 @@ void CMainDlg::StopMovieMode() {
         m_bProcFlagsTouched = false;
         StopSlideShowTimer();
         AfterNewImageLoaded(false, false);
-        this->Invalidate(FALSE);
+        this->update();
     }
 }
 
 void CMainDlg::StartLowQTimer(int nTimeout) {
     m_bTemporaryLowQ = true;
-    ::KillTimer(this->m_hWnd, ZOOM_TIMER_EVENT_ID);
-    ::SetTimer(this->m_hWnd, ZOOM_TIMER_EVENT_ID, nTimeout, NULL);
+
+    // Alten Zoom-Timer stoppen, falls er bereits läuft
+    if (m_zoomTimerId != 0) {
+        killTimer(m_zoomTimerId);
+        m_zoomTimerId = 0;
+    }
+
+    // Neuen Timer starten und die ID in unserer Member-Variable speichern
+    m_zoomTimerId = startTimer(nTimeout);
 }
 
 void CMainDlg::MouseOff() {
     if (m_bMouseOn) {
-        if (m_nMouseY < m_clientRect.bottom && !m_bInTrackPopupMenu) {
+        // Prüfen, ob aktuell ein Menü/Popup offen ist (ersetzt m_bInTrackPopupMenu)
+        if (QApplication::activePopupWidget() != nullptr) {
+            return;
+        }
+
+        if (m_nMouseY < this->rect().bottom()) {
             if (m_bFullScreenMode) {
-                // cursor only hides when in full screen mode
-                while (::ShowCursor(FALSE) >= 0);
+                // Cursor nur im Vollbildmodus verstecken (Qt plattformübergreifend)
+                this->setCursor(Qt::BlankCursor);
             }
+
             m_startMouse.x = m_startMouse.y = -1;
+            // Verwendung von QPoint statt Win32-Structs
+            //m_startMouse.setX(-1);
+            //m_startMouse.setY(-1);
             m_bMouseOn = false;
         }
     }
 }
-
 void CMainDlg::MouseOn() {
     if (!m_bMouseOn) {
         ::ShowCursor(TRUE);
@@ -3600,7 +3344,7 @@ void CMainDlg::ExchangeProcessingParams() {
     InitFromProcessingFlags(m_eProcessingFlags2, m_bHQResampling, m_bAutoContrast);
     *m_pImageProcParams2 = tempParams;
     m_eProcessingFlags2 = tempFlags;
-    this->Invalidate(FALSE);
+    this->update();
 }
 
 void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack) {
@@ -3653,33 +3397,52 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
 }
 
 bool CMainDlg::IsAdjustWindowToImage() {
-    return !m_bFullScreenMode && !::IsZoomed(m_hWnd) && m_bAutoFitWndToImage;
+    return !m_bFullScreenMode && !isMaximized() && m_bAutoFitWndToImage;
 }
 
 bool CMainDlg::IsImageExactlyFittingWindow() {
-    return (m_pCurrentImage != NULL) && m_pCurrentImage->DIBWidth() == m_clientRect.Width() && m_pCurrentImage->DIBHeight() == m_clientRect.Height();
+    return (m_pCurrentImage != NULL) && m_pCurrentImage->DIBWidth() == m_clientRect.width() && m_pCurrentImage->DIBHeight() == m_clientRect.height();
 }
 
 void CMainDlg::AdjustWindowToImage(bool bAfterStartup) {
-    if (IsAdjustWindowToImage() && (m_pCurrentImage != NULL || bAfterStartup)) {
-        // window size shall be adjusted to image size (at least keep aspect ratio)
+    if (IsAdjustWindowToImage() && (m_pCurrentImage != nullptr || bAfterStartup)) {
+        // Fenstergröße an die Bildgröße anpassen (unter Beibehaltung des Seitenverhältnisses)
         double dZoom = m_dZoom;
-        CRect windowRect = GetWindowRectMatchingImageSize(m_hWnd, CSize(MIN_WND_WIDTH, MIN_WND_HEIGHT), HUGE_SIZE, dZoom, m_pCurrentImage, bAfterStartup, dZoom < 0, m_bWindowBorderless , GetAutoZoomMode());
-        CRect defaultRect = CMultiMonitorSupport::GetDefaultWindowRect();
+
+        // Übergabe von 'this' (als QWidget*) an die neue Qt-Signatur
+        QRect windowRect = GetWindowRectMatchingImageSize(
+            this,
+            QSize(MIN_WND_WIDTH, MIN_WND_HEIGHT),
+            HUGE_SIZE,
+            dZoom,
+            m_pCurrentImage,
+            bAfterStartup,
+            dZoom < 0,
+            false,
+            GetAutoZoomMode()
+            );
+
+        QRect defaultRect = CMultiMonitorSupport::GetDefaultWindowRect();
         if (bAfterStartup && CSettingsProvider::This().ExplicitWindowRect()) {
-            windowRect = CRect(defaultRect.TopLeft(), windowRect.Size());
+            windowRect = QRect(defaultRect.topLeft(), windowRect.size());
         }
+
         m_bResizeForNewImage = true;
-        this->Invalidate(FALSE);
-        this->SetWindowPos(HWND_TOP, windowRect.left, windowRect.top, windowRect.Width(), windowRect.Height(), SWP_NOZORDER | SWP_NOCOPYBITS);
-        this->GetClientRect(&m_clientRect);
+        this->update();
+
+        // Ersetzt das alte SetWindowPos durch Qt-Geometrie-Zuweisung
+        this->setGeometry(windowRect);
+
+        // Aktualisiert das Client-Rechteck über Qt-Bordmittel (ersetzt GetClientRect)
+        m_clientRect = this->rect();
+
         m_bResizeForNewImage = false;
     }
 }
 
 void CMainDlg::CheckIfApplyAutoFitWndToImage(bool bInInitDialog) {
     if (CSettingsProvider::This().AutoFullScreen()) {
-        if (!CanDisplayImageWithoutResize(m_hWnd, m_pCurrentImage)) {
+        if (!CanDisplayImageWithoutResize(this, m_pCurrentImage)) {
             if (!bInInitDialog) {
                 ExecuteCommand(IDM_FULL_SCREEN_MODE);
             }
@@ -3727,45 +3490,24 @@ void CMainDlg::SetCursorForMoveSection() {
     }
 }
 
-void CMainDlg::ToggleMonitor() {
-    if (CMultiMonitorSupport::IsMultiMonitorSystem() && !m_bSpanVirtualDesktop) {
-        int nMaxMonitorIdx = ::GetSystemMetrics(SM_CMONITORS);
-        if (m_nMonitor == -1) {
-            // index unknown, search
-            for (int i = 0; i < nMaxMonitorIdx; i++) {
-                if (m_monitorRect == CMultiMonitorSupport::GetMonitorRect(i)) {
-                    m_nMonitor = i;
-                    break;
-                }
-            }
-        }
-        m_dZoom = -1.0;
-        this->Invalidate(FALSE);
-        m_nMonitor = (m_nMonitor + 1) % nMaxMonitorIdx;
-        m_monitorRect = CMultiMonitorSupport::GetMonitorRect(m_nMonitor);
-        SetWindowPos(HWND_TOP, &m_monitorRect, SWP_NOZORDER);
-        this->GetClientRect(&m_clientRect);
-    }
-}
-
-CRect CMainDlg::GetZoomTextRect() {
-    int nEndX = m_clientRect.right - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
+QRect CMainDlg::GetZoomTextRect() {
+    int nEndX = m_clientRect.right() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
     int nStartX = nEndX - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_WIDTH);
-    
-    int nEndY = m_clientRect.bottom - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_Y);
+
+    int nEndY = m_clientRect.bottom() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_Y);
     int nStartY = nEndY - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_HEIGHT);
-    
-    return CRect(nStartX, nStartY, nEndX, nEndY);
+
+    return QRect(nStartX, nStartY, nEndX - nStartX, nEndY - nStartY);
 }
 
-CRect CMainDlg::GetToastTextRect() {
-    int nEndX = m_clientRect.right - Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
-    int nStartX = m_clientRect.right/2;
+QRect CMainDlg::GetToastTextRect() {
+    int nEndX = m_clientRect.right() - Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
+    int nStartX = m_clientRect.right() / 2;
     
     int nStartY = Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_Y);
     int nEndY = nStartY + Helpers::ScaleWithDPI(TOAST_TEXT_RECT_HEIGHT);
     
-    return CRect(nStartX, nStartY, nEndX, nEndY);
+    return QRect(nStartX, nStartY,  nEndX - nStartX, nEndY - nStartY);
 }
 
 void CMainDlg::EditINIFile(bool bGlobalINI) {
@@ -3816,13 +3558,10 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     const bool bShowFullPathInTitle = CSettingsProvider::This().ShowFullPathInTitle();
     const QString sCurrentFileName = CurrentFileName(!bShowFullPathInTitle);
 
+    // 1. Fenstertitel aktualisieren
+    QString sWindowText;
     if (sCurrentFileName.isEmpty() || m_pCurrentImage == nullptr) {
-        const QString defaultTitle = QStringLiteral(JPEGVIEW_TITLE);
-
-        if ((s_PrevTitleText != defaultTitle) || bForce) {
-            s_PrevTitleText = defaultTitle;
-            this->SetWindowText(reinterpret_cast<LPCWSTR>(defaultTitle.utf16()));
-        }
+        sWindowText = QStringLiteral(JPEGVIEW_TITLE);
     } else {
         QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
         if (m_bIsRunningInWine && bShowFullPathInTitle) {
@@ -3831,18 +3570,19 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
                 visibleName = sUnixPath;
             }
         }
-        QString sWindowText = visibleName
-        + QString(GetMultiframeIndex(m_pCurrentImage))
-        + QStringLiteral(" - ")
-        + QStringLiteral(JPEGVIEW_TITLE);
-
-        if ((s_PrevTitleText != sWindowText) || bForce) {
-            s_PrevTitleText = sWindowText;
-            this->SetWindowText(reinterpret_cast<LPCWSTR>(sWindowText.utf16()));
-        }
+        sWindowText = visibleName
+                      + QString(GetMultiframeIndex(m_pCurrentImage))
+                      + QStringLiteral(" - ")
+                      + QStringLiteral(JPEGVIEW_TITLE);
     }
 
-    // Update title bar icon
+    if ((s_PrevTitleText != sWindowText) || bForce) {
+        s_PrevTitleText = sWindowText;
+        // Qt-native Methode zum Setzen des Fenstertitels
+        this->setWindowTitle(sWindowText);
+    }
+
+    // 2. Titelbild-Icon aktualisieren
     if (CSettingsProvider::This().TitleBarUseFileIcon()) {
         const QString sCurrentFilePath = CurrentFileName(false);
         QString cacheKey = QStringLiteral("__default__");
@@ -3850,82 +3590,44 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
 
         if (!sCurrentFilePath.isEmpty() && m_pCurrentImage != nullptr) {
             const QFileInfo fileInfo(sCurrentFilePath);
-            const QString ext = fileInfo.suffix(); // Endung ohne Punkt (z.B. "jpg")
+            const QString ext = fileInfo.suffix(); // z.B. "jpg"
 
             if (!ext.isEmpty()) {
-                currentCheckExt = QStringLiteral(".") + ext; // ".jpg" für SHGetFileInfo
-                cacheKey = currentCheckExt.toLower();
-            } else {
-                currentCheckExt = QString();
-                cacheKey = QStringLiteral("__default__");
+                currentCheckExt = ext.toLower();
+                cacheKey = currentCheckExt;
             }
         }
 
         if ((s_PrevFileExt != currentCheckExt) || bForce) {
             s_PrevFileExt = currentCheckExt;
 
-            HICON hBig = nullptr;
-            HICON hSmall = nullptr;
+            // Statischer Icon-Cache für QIcon-Objekte (ersetzt den alten HICON-Cache)
+            static QMap<QString, QIcon> s_qtIconCache;
 
-            if (s_iconCache.contains(cacheKey)) {
-                hBig = s_iconCache[cacheKey].hBig;
-                hSmall = s_iconCache[cacheKey].hSmall;
-            } else {
-                /* Debugging */ const UINT timeStart = Helpers::GetTimeMs();
-
-                IconResult result;
-
+            if (!s_qtIconCache.contains(cacheKey)) {
+                QIcon fileIcon;
                 if (cacheKey == QStringLiteral("__default__")) {
-                    HINSTANCE hInst = ::GetModuleHandle(nullptr);
-                    const int cxIcon = ::GetSystemMetrics(SM_CXICON);
-                    const int cyIcon = ::GetSystemMetrics(SM_CYICON);
-                    const int cxSmIcon = ::GetSystemMetrics(SM_CXSMICON);
-                    const int cySmIcon = ::GetSystemMetrics(SM_CYSMICON);
-
-                    result.hBig = (HICON)::LoadImage(hInst, MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, cxIcon, cyIcon, LR_VGACOLOR);
-                    result.hSmall = (HICON)::LoadImage(hInst, MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, cxSmIcon, cySmIcon, LR_VGACOLOR);
+                    // Standard-App-Icon laden (z.B. aus Qt-Ressourcen)
+                    fileIcon = QIcon(QStringLiteral(":/icons/app_icon.ico"));
                 } else {
-                    SHFILEINFO shfi{};
-                    // punktuelle Umwandlung von QString zu LPCTSTR/LPCWSTR für Win32 SHGetFileInfo
-                    const auto* pExtWStr = reinterpret_cast<LPCWSTR>(cacheKey.utf16());
-
-                    if (::SHGetFileInfo(pExtWStr, FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_USEFILEATTRIBUTES)) {
-                        result.hBig = shfi.hIcon;
-                    }
-                    if (::SHGetFileInfo(pExtWStr, FILE_ATTRIBUTE_NORMAL, &shfi, sizeof(SHFILEINFO), SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES)) {
-                        result.hSmall = shfi.hIcon;
+                    // QFileIconProvider holt das System-Dateityp-Icon komplett plattformunabhängig!
+                    QFileIconProvider iconProvider;
+                    QFileInfo fileInfo(sCurrentFilePath);
+                    if (fileInfo.exists()) {
+                        fileIcon = iconProvider.icon(fileInfo);
+                    } else {
+                        // Fallback über eine temporäre Dummy-Datei mit der Endung
+                        QFileInfo dummyInfo(QStringLiteral("dummy.") + cacheKey);
+                        fileIcon = iconProvider.icon(dummyInfo);
                     }
                 }
-
-                if (result.hBig != nullptr || result.hSmall != nullptr) {
-                    s_iconCache[cacheKey] = result;
-                    hBig = result.hBig;
-                    hSmall = result.hSmall;
-                }
-
-                /* Debugging */ const QString debugText = QStringLiteral("async icon loading for '%1' took %2 ms")
-                .arg(cacheKey)
-                .arg(Helpers::GetTimeMs() - timeStart);
-                /* Debugging */ ::OutputDebugStringW(reinterpret_cast<LPCWSTR>(debugText.utf16()));
+                s_qtIconCache[cacheKey] = fileIcon;
             }
 
-            if (hBig != nullptr) {
-                ::SendMessage(m_hWnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hBig));
-            }
-
-            if (hSmall != nullptr) {
-                ::SendMessage(m_hWnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hSmall));
-            }
+            // Setzt das Fenster-Icon direkt über Qt
+            this->setWindowIcon(s_qtIconCache[cacheKey]);
         }
     }
-}
-
-int CMainDlg::TrackPopupMenu(CPoint pos, HMENU hMenu) {
-    m_bInTrackPopupMenu = true;
-    int nMenuCmd = ::TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_NONOTIFY | TPM_RETURNCMD, 
-        pos.x, pos.y, 0, this->m_hWnd, NULL);
-    m_bInTrackPopupMenu = false;
-    return nMenuCmd;
 }
 
 int CMainDlg::GetLoadErrorAfterOpenFile() {
@@ -3941,22 +3643,22 @@ int CMainDlg::GetLoadErrorAfterOpenFile() {
     return FileLoad_Ok;
 }
 
-void CMainDlg::PrefetchDIB(const CRect& clientRect) {
+void CMainDlg::PrefetchDIB(const QRect& clientRect) {
     if (m_pCurrentImage == NULL) return;
 
-    CSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.Size(), GetAutoZoomMode(), m_dZoom);
-    CSize clippedSize(std::min<long>(clientRect.Width(), newSize.cx), std::min<long>(clientRect.Height(), newSize.cy));
-    CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, LimitOffsets(m_offsets, clientRect.Size(), newSize));
+    CSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.size(), GetAutoZoomMode(), m_dZoom);
+    CSize clippedSize(std::min<long>(clientRect.width(), newSize.cx), std::min<long>(clientRect.height(), newSize.cy));
+    CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, LimitOffsets(m_offsets, clientRect.size(), newSize));
     m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, *m_pImageProcParams, CreateDefaultProcessingFlags());
 }
 
-double CMainDlg::GetZoomMultiplier(CJPEGImage* pImage, const CRect& clientRect) {
+double CMainDlg::GetZoomMultiplier(CJPEGImage* pImage, const QRect& clientRect) {
     double dZoomToFit;
 
     Helpers::GetImageRect(pImage->OrigWidth(),
                           pImage->OrigHeight(),
-                          clientRect.Width(),
-                          clientRect.Height(),
+                          clientRect.width(),
+                          clientRect.height(),
                           true,
                           false,
                           false,
@@ -3989,50 +3691,52 @@ bool CMainDlg::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteComm
 }
 
 bool CMainDlg::UseSlideShowTransitionEffect() {
-    return /*m_bFullScreenMode &&*/ m_nCurrentTimeout >= 1000 && m_eTransitionEffect != Helpers::TE_None;
+    return m_nCurrentTimeout >= 1000 && m_eTransitionEffect != Helpers::TE_None;
 }
-
+/*
 void CMainDlg::AnimateTransition() {
+    if (m_eTransitionEffect == Helpers::TE_None) {
+        update();
+        return;
+    }
+
+    int nW = width();
+    int nH = height();
+    if (nW <= 0 || nH <= 0) return;
 
     int nFrameTimeMs = (m_eTransitionEffect >= Helpers::TE_RollLR || m_eTransitionEffect <= Helpers::TE_ScrollBT) ? 10 : 20;
 
-    // paint to memory DC
-    int nW = m_clientRect.Width(), nH = m_clientRect.Height();
+    // 1. Aktuelles Bild (Vorher-Zustand) als Screenshot sichern
+    QImage oldImage = this->grab().toImage();
 
-    HDC hWndDC = ::GetDC(m_hWnd);
-    if (hWndDC == NULL) {
-        return;
+    // 2. Neues Bild (Nachher-Zustand) in ein Offscreen-Image rendern
+    QImage memImage(nW, nH, QImage::Format_ARGB32_Premultiplied);
+    memImage.fill(Qt::black);
+    {
+        QPainter memPainter(&memImage);
+        memPainter.setRenderHint(QPainter::Antialiasing, true);
+        PaintToPainter(memPainter);
     }
-    CDCHandle paintDC(hWndDC);
-    
-    CDC memDC;
-    memDC.CreateCompatibleDC(paintDC);
-    CBitmap memDCBitmap;
-    memDCBitmap.CreateCompatibleBitmap(paintDC, nW, nH);
-    memDC.SelectBitmap(memDCBitmap);
-    PaintToDC(memDC);
 
     int nSteps = std::max(1, (m_nTransitionTime + 20) / nFrameTimeMs);
+    qint64 lastTime = QDateTime::currentMSecsSinceEpoch();
 
-    BLENDFUNCTION blendFunc{ 0 };
-    blendFunc.BlendOp = AC_SRC_OVER;
-    blendFunc.AlphaFormat = 0;
-    float fAlphaStep = 255.0f / nSteps;
-
-    DWORD lastTime = ::GetTickCount();
     for (int i = 0; i <= nSteps; i++) {
-        switch (m_eTransitionEffect)
-        {
-        case Helpers::TE_None:
-            break;
+        QImage frameImage(nW, nH, QImage::Format_ARGB32_Premultiplied);
+        QPainter painter(&frameImage);
+
+        switch (m_eTransitionEffect) {
         case Helpers::TE_Blend:
             {
+                painter.drawImage(0, 0, oldImage);
                 if (i == nSteps) {
-                    paintDC.BitBlt(0, 0, nW, nH, memDC, 0, 0, SRCCOPY);
+                    painter.drawImage(0, 0, memImage);
                 } else {
-                    float fFactor = (float)i / nSteps ;
-                    blendFunc.SourceConstantAlpha = std::min(255, (int)((fFactor * fFactor * i + 1) * fAlphaStep + 0.5f));
-                    paintDC.AlphaBlend(0, 0, nW, nH, memDC, 0, 0, nW, nH, blendFunc);
+                    float fFactor = (float)i / nSteps;
+                    float fCurve = fFactor * fFactor * i; // Behält die originale Beschleunigungskurve bei
+                    int alpha = std::min(255, (int)((fCurve + 1) * (255.0f / nSteps) + 0.5f));
+                    painter.setOpacity(alpha / 255.0;
+                    painter.drawImage(0, 0, memImage);
                 }
                 break;
             }
@@ -4041,12 +3745,14 @@ void CMainDlg::AnimateTransition() {
         case Helpers::TE_SlideBT:
         case Helpers::TE_SlideTB:
             {
+                painter.drawImage(0, 0, oldImage);
                 float fFactor = (float)(i + 1) / (nSteps + 1);
                 int nFracHeight = (int)(nH * fFactor + 0.5f);
                 int nFracWidth = (int)(nW * fFactor + 0.5f);
                 int nStartX = (m_eTransitionEffect == Helpers::TE_SlideLR) ? nFracWidth - nW : (m_eTransitionEffect == Helpers::TE_SlideRL) ? nW - nFracWidth : 0;
                 int nStartY = (m_eTransitionEffect == Helpers::TE_SlideTB) ? nFracHeight - nH : (m_eTransitionEffect == Helpers::TE_SlideBT) ? nH - nFracHeight : 0;
-                paintDC.BitBlt(nStartX, nStartY, nW, nH, memDC, 0, 0, SRCCOPY);
+
+                painter.drawImage(nStartX, nStartY, memImage);
                 break;
             }
         case Helpers::TE_RollLR:
@@ -4054,6 +3760,7 @@ void CMainDlg::AnimateTransition() {
         case Helpers::TE_RollBT:
         case Helpers::TE_RollTB:
             {
+                painter.drawImage(0, 0, oldImage);
                 float fFactor = (float)(i + 1) / (nSteps + 1);
                 int nFracHeight = (int)(nH * fFactor + 0.5f);
                 int nClipH = (m_eTransitionEffect == Helpers::TE_RollLR || m_eTransitionEffect == Helpers::TE_RollRL) ? nH : 1 + nH / (nSteps + 1);
@@ -4061,10 +3768,9 @@ void CMainDlg::AnimateTransition() {
                 int nClipW = (m_eTransitionEffect == Helpers::TE_RollTB || m_eTransitionEffect == Helpers::TE_RollBT) ? nW : 1 + nW / (nSteps + 1);
                 int nClipX = (m_eTransitionEffect == Helpers::TE_RollLR) ? nFracWidth - nClipW : (m_eTransitionEffect == Helpers::TE_RollRL) ? nW - nFracWidth : 0;
                 int nClipY = (m_eTransitionEffect == Helpers::TE_RollTB) ? nFracHeight - nClipH : (m_eTransitionEffect == Helpers::TE_RollBT) ? nH - nFracHeight : 0;
-                CRgn region;
-                region.CreateRectRgn(nClipX, nClipY, nClipX + nClipW, nClipY + nClipH);
-                paintDC.SelectClipRgn(region);
-                paintDC.BitBlt(0, 0, nW, nH, memDC, 0, 0, SRCCOPY);
+
+                painter.setClipRect(nClipX, nClipY, nClipW, nClipH);
+                painter.drawImage(0, 0, memImage);
                 break;
             }
         case Helpers::TE_ScrollLR:
@@ -4074,65 +3780,60 @@ void CMainDlg::AnimateTransition() {
             {
                 float fFactorLast = (float)i / (nSteps + 1);
                 float fFactor = (float)(i + 1) / (nSteps + 1);
-                int nScrollW, nScrollH;
-                int nStartX, nStartY;
-                int nStartClipX, nStartClipY, nEndClipX, nEndClipY;
+                int nScrollW = 0, nScrollH = 0;
+                int nStartX = 0, nStartY = 0;
+                QRect clipRect;
+
                 if (m_eTransitionEffect == Helpers::TE_ScrollLR) {
                     nScrollW = (int)(nW * fFactor + 0.5f) - (int)(nW * fFactorLast + 0.5f);
-                    nScrollH = 0;
                     nStartX = (int)(nW * fFactor + 0.5f) - nW;
-                    nStartY = 0;
-                    nStartClipX = nStartClipY = 0;
-                    nEndClipX = nScrollW; nEndClipY = nH;
+                    clipRect = QRect(0, 0, nScrollW, nH);
                 } else if (m_eTransitionEffect == Helpers::TE_ScrollRL) {
-                    nScrollW = - ((int)(nW * fFactor + 0.5f) - (int)(nW * fFactorLast + 0.5f));
-                    nScrollH = 0;
+                    nScrollW = -((int)(nW * fFactor + 0.5f) - (int)(nW * fFactorLast + 0.5f));
                     nStartX = nW - (int)(nW * fFactor + 0.5f);
-                    nStartY = 0;
-                    nStartClipX = nW + nScrollW;
-                    nStartClipY = 0;
-                    nEndClipX = nW; nEndClipY = nH;
+                    clipRect = QRect(nW + nScrollW, 0, -nScrollW, nH);
                 } else if (m_eTransitionEffect == Helpers::TE_ScrollTB) {
-                    nScrollW = 0;
                     nScrollH = (int)(nH * fFactor + 0.5f) - (int)(nH * fFactorLast + 0.5f);
-                    nStartX = 0;
                     nStartY = (int)(nH * fFactor + 0.5f) - nH;
-                    nStartClipX = 0; nStartClipY = 0;
-                    nEndClipX = nW; nEndClipY = nScrollH;
+                    clipRect = QRect(0, 0, nW, nScrollH);
                 } else {
-                    nScrollW = 0;
                     nScrollH = -((int)(nH * fFactor + 0.5f) - (int)(nH * fFactorLast + 0.5f));
-                    nStartX = 0;
                     nStartY = nH - (int)(nH * fFactor + 0.5f);
-                    nStartClipX = 0; nStartClipY = nH + nScrollH;
-                    nEndClipX = nW; nEndClipY = nH;
+                    clipRect = QRect(0, nH + nScrollH, nW, -nScrollH);
                 }
 
-                paintDC.SelectClipRgn(NULL);
-                paintDC.BitBlt(nScrollW, nScrollH, nW, nH, paintDC, 0, 0, SRCCOPY);
-                
-                CRgn region;
-                region.CreateRectRgn(nStartClipX, nStartClipY, nEndClipX, nEndClipY);
-                paintDC.SelectClipRgn(region);
-
-                paintDC.BitBlt(nStartX, nStartY, nW, nH, memDC, 0, 0, SRCCOPY);
+                // Alten Inhalt verschoben zeichnen + neuen Teil einblenden
+                painter.drawImage(nScrollW, nScrollH, oldImage);
+                painter.setClipRect(clipRect);
+                painter.drawImage(nStartX, nStartY, memImage);
                 break;
             }
+        default:
+            painter.drawImage(0, 0, memImage);
+            break;
         }
-        DWORD time = ::GetTickCount();
-        if (time - lastTime < nFrameTimeMs) {
-            ::Sleep(nFrameTimeMs - (time - lastTime));
-        }
-        lastTime = time;
-        
-        // terminate if a key is pressed or context menu shall be shown
-        MSG msg;
-        if (::PeekMessage(&msg, m_hWnd, WM_KEYFIRST, WM_KEYLAST, PM_NOREMOVE)) break;
-        if (::PeekMessage(&msg, m_hWnd, WM_CONTEXTMENU, WM_CONTEXTMENU, PM_NOREMOVE)) break;
-    }
-    ::ReleaseDC(m_hWnd, hWndDC);
-}
 
+        // Frame direkt auf das Widget zeichnen
+        {
+            QPainter widgetPainter(this);
+            widgetPainter.drawImage(0, 0, frameImage);
+        }
+
+        // Timing & Event-Loop Verarbeiten (damit das UI während der Animation nicht einfriert)
+        qint64 time = QDateTime::currentMSecsSinceEpoch();
+        qint64 elapsed = time - lastTime;
+        if (elapsed < nFrameTimeMs) {
+            QThread::msleep(nFrameTimeMs - elapsed);
+        }
+        lastTime = QDateTime::currentMSecsSinceEpoch();
+
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+
+    // Am Ende einmal regulär aktualisieren
+    update();
+}
+*/
 void CMainDlg::CleanupAndTerminate() {
     SaveBookmark();
     CSettingsProvider::This().SaveCustomSettings();
@@ -4140,7 +3841,7 @@ void CMainDlg::CleanupAndTerminate() {
     StopAnimation();
     delete m_pJPEGProvider; // delete this early to properly shut down the loading threads
     m_pJPEGProvider = NULL;
-    EndDialog(0);
+    close();
 }
     
 void CMainDlg::StartAnimation() {
@@ -4155,7 +3856,7 @@ void CMainDlg::StartAnimation() {
 
     m_bAutoContrast = false;
     m_bIsAnimationPlaying = true;
-    m_nLastSlideShowImageTickCount = ::GetTickCount();
+    m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
 
     m_nLastAnimationOffset = 0;
     
@@ -4167,13 +3868,16 @@ void CMainDlg::StartAnimation() {
     }
     
     int nTimerDelay = std::max(10, m_pCurrentImage->FrameTimeMs());
-    m_nExpectedNextAnimationTickCount = ::GetTickCount() + nTimerDelay;
-    ::SetTimer(this->m_hWnd, ANIMATION_TIMER_EVENT_ID, nTimerDelay, NULL);
+    m_nExpectedNextAnimationTickCount = QDateTime::currentMSecsSinceEpoch() + nTimerDelay;
+    m_animationTimerId = startTimer(nTimerDelay);
 }
 
 void CMainDlg::AdjustAnimationFrameTime() {
     // restart timer with new frame time
-    ::KillTimer(this->m_hWnd, ANIMATION_TIMER_EVENT_ID);
+    if (m_animationTimerId != 0) {
+        killTimer(m_animationTimerId);
+        m_animationTimerId = 0;
+    }
     
     int usedFrameTime;
     if (m_customAnimationFrameTime < 250) {
@@ -4183,7 +3887,7 @@ void CMainDlg::AdjustAnimationFrameTime() {
     }
     
 
-    m_nLastAnimationOffset = ::GetTickCount() - m_nExpectedNextAnimationTickCount;
+    m_nLastAnimationOffset = static_cast<int>(QDateTime::currentMSecsSinceEpoch() - m_nExpectedNextAnimationTickCount);
     int nTimerDelay = std::max(10, usedFrameTime - m_nLastAnimationOffset);
     m_nExpectedNextAnimationTickCount += std::max(10, usedFrameTime);
 
@@ -4199,7 +3903,7 @@ void CMainDlg::AdjustAnimationFrameTime() {
 //    if (m_nLastAnimationOffset > 2 * usedFrameTime) {
 //        GotoImage(POS_NextFrame, NO_REMOVE_KEY_MSG | NO_UPDATE_WINDOW);
 //    } else {
-        ::SetTimer(this->m_hWnd, ANIMATION_TIMER_EVENT_ID, nTimerDelay, NULL);
+        m_animationTimerId = startTimer(nTimerDelay);
 //    }
 }
 
@@ -4213,32 +3917,18 @@ void CMainDlg::StopAnimation() {
     if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_AutoContrast)) {
         m_bAutoContrast = true;
     }
-    ::KillTimer(this->m_hWnd, ANIMATION_TIMER_EVENT_ID);
+
+    // Animations-Timer über die Qt-interne ID stoppen
+    if (m_animationTimerId != 0) {
+        killTimer(m_animationTimerId);
+        m_animationTimerId = 0;
+    }
+
     m_bIsAnimationPlaying = false;
 }
 
-void CMainDlg::ToggleAlwaysOnTop() {
-    // toggle the member variable and call the SetWindowPos to set
-    m_bAlwaysOnTop = !m_bAlwaysOnTop;
-
-    // SetWindowPos - https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
-    this->SetWindowPos(
-        m_bAlwaysOnTop ? HWND_TOPMOST : HWND_NOTOPMOST,
-        0, 0, 0, 0,
-        SWP_NOMOVE | SWP_NOSIZE  // causes SetWindowPos to ignore the parameters for top/left/width/height
-    );
-
-}
-
-/*################################################################*/
-/* Custom Functions of linear scaling mod                         */
-/*################################################################*/
-
-// Handler used when receiving the custom WM_REFRESHVIEW message
-// Compared to ReloadImage() this also reloads the file list!
-LRESULT CMainDlg::OnRefreshView(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& bHandled) {
+void CMainDlg::onRefreshView() {
     ExecuteCommand(IDM_RELOAD_FULL);
-    return 0;
 }
 
 QString CMainDlg::LoadBookmark(const QString& filePath) {
@@ -4404,12 +4094,19 @@ float CMainDlg::MaxRatio(float valA, float valB) {
     return dRatio;
 }
 
-void CMainDlg::SetToast(const QString& strToast, DWORD nDurationMs)
+void CMainDlg::SetToast(const QString& strToast, int nDurationMs)
 {
-    ::KillTimer(this->m_hWnd, TOAST_EXPIRY_TIMER_EVENT_ID);
-    ::SetTimer(this->m_hWnd, TOAST_EXPIRY_TIMER_EVENT_ID, nDurationMs, NULL);
+    // Alten Toast-Timer stoppen, falls er noch läuft
+    if (m_toastTimerId != 0) {
+        killTimer(m_toastTimerId);
+        m_toastTimerId = 0;
+    }
+
+    // Neuen Timer starten und ID speichern
+    m_toastTimerId = startTimer(nDurationMs);
+
     m_strToast = strToast;
-    this->Invalidate(FALSE);
+    this->update();
 }
 
 /*

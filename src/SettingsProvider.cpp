@@ -288,12 +288,6 @@ QWidget* SettingsDialog::createWindowTab() {
     minSizeLayout->addWidget(m_spinMinHeight);
     layout->addRow(tr("Minimale Fenstergröße:"), minSizeLayout);
 
-    m_checkWindowBorderless = new QCheckBox(tr("Start in rahmenlosem Fenster (Borderless)"));
-    layout->addRow(m_checkWindowBorderless);
-
-    m_checkWindowAlwaysOnTop = new QCheckBox(tr("Start als Immer-im-Vordergrund (Always-On-Top)"));
-    layout->addRow(m_checkWindowAlwaysOnTop);
-
     m_checkShowFilePathInTitle = new QCheckBox(tr("Vollständigen Dateipfad in Titelleiste anzeigen"));
     layout->addRow(m_checkShowFilePathInTitle);
 
@@ -528,8 +522,6 @@ void SettingsDialog::loadFromSettings() {
     m_checkSingleFullScreenInstance->setChecked(settings.m_bSingleFullScreenInstance);
     m_spinMinWidth->setValue(settings.m_minimalWindowSize.width());
     m_spinMinHeight->setValue(settings.m_minimalWindowSize.height());
-    m_checkWindowBorderless->setChecked(settings.m_bWindowBorderlessOnStartup);
-    m_checkWindowAlwaysOnTop->setChecked(settings.m_bWindowAlwaysOnTopOnStartup);
     m_checkShowFilePathInTitle->setChecked(settings.m_bShowFullPathInTitle);
     m_checkTitleBarUseFileIcon->setChecked(settings.m_bTitleBarUseFileIcon);
     m_spinDisplayMonitor->setValue(settings.m_nDisplayMonitor);
@@ -615,8 +607,6 @@ void SettingsDialog::saveToSettings() {
     settings.WriteBool("SingleFullScreenInstance", m_checkSingleFullScreenInstance->isChecked());
     settings.WriteString("DefaultWindowRect", m_comboDefaultWindowRect->currentText());
     settings.WriteString("MinimalWindowSize", QString("%1 %2").arg(m_spinMinWidth->value()).arg(m_spinMinHeight->value()));
-    settings.WriteBool("WindowBorderlessOnStartup", m_checkWindowBorderless->isChecked());
-    settings.WriteBool("WindowAlwaysOnTopOnStartup", m_checkWindowAlwaysOnTop->isChecked());
     settings.WriteBool("ShowFilePathInTitle", m_checkShowFilePathInTitle->isChecked());
     settings.WriteBool("TitleBarUseFileIcon", m_checkTitleBarUseFileIcon->isChecked());
     settings.WriteInt("DisplayMonitor", m_spinDisplayMonitor->value());
@@ -809,8 +799,6 @@ CSettingsProvider::CSettingsProvider() {
     m_nSlideShowEffectTimeMs = GetInt("SlideShowEffectTime", 200, 100, 5000);
     m_bSingleFullScreenInstance = GetBool("SingleFullScreenInstance", true);
     m_bWrapAroundFolder = GetBool("WrapAroundFolder", true);
-    m_bWindowBorderlessOnStartup = GetBool("WindowBorderlessOnStartup", false);
-    m_bWindowAlwaysOnTopOnStartup = GetBool("WindowAlwaysOnTopOnStartup", false);
     m_zoomPauseFactor = GetInt("ZoomPausePercent", 100, 0, 6553500) / 100.0;  // can't have a % larger than the MAX_IMAGE_DIMENSION %, and convert to a scale factor (double/double division) only once
     m_bExchangeXButtons = GetBool("ExchangeXButtons", true);
     m_bAutoRotateEXIF = GetBool("AutoRotateEXIF", true);
@@ -992,13 +980,13 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
     ReadWriteableINISettings();
 }
 
-void CSettingsProvider::SaveStickyWindowRect(CRect rect) {
-    if (ToCRect(m_stickyWindowRect) != rect && !rect.IsRectEmpty()) {
+void CSettingsProvider::SaveStickyWindowRect(QRect rect) {
+    if (m_stickyWindowRect != rect && !rect.isEmpty()) {
         QString sRect = QString("%1 %2 %3 %4")
-        .arg(rect.left)
-            .arg(rect.top)
-            .arg(rect.right)
-            .arg(rect.bottom);
+                            .arg(rect.left())
+                            .arg(rect.top())
+                            .arg(rect.right())
+                            .arg(rect.bottom());
 
         MakeSureUserINIExists();
         WriteString("StickyWindowRect", sRect);

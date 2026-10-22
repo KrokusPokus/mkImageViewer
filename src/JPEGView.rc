@@ -116,9 +116,6 @@ BEGIN
         BEGIN
             MENUITEM "Full screen mode",            IDM_FULL_SCREEN_MODE
             MENUITEM "Fit window to image",         IDM_FIT_WINDOW_TO_IMAGE
-            MENUITEM "Hide window title bar",       IDM_HIDE_TITLE_BAR
-            MENUITEM "Set window always on top",    IDM_ALWAYS_ON_TOP
-
         END
         MENUITEM SEPARATOR
         POPUP "Play folder as slideshow/movie"

@@ -2,11 +2,8 @@
 #define WTLCOMPAT_H
 
 #include <algorithm>
-#include <chrono>
-#include <cstdint>
 #include <cwchar>
 #include <cwctype>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -17,6 +14,30 @@
 #include <QString>
 #endif
 
+//-----------------------------------------------------------------
+/*
+struct POINT {
+    long x;
+    long y;
+};
+
+struct SIZE {
+    long cx;
+    long cy;
+};
+
+struct RECT {
+    long left;
+    long top;
+    long right;
+    long bottom;
+};
+
+using LPCRECT = const RECT*;
+using LPRECT = RECT*;
+using LPPOINT = POINT*;
+using LPSIZE = SIZE*;
+*/
 //-----------------------------------------------------------------
 
 struct DSize {
@@ -50,10 +71,6 @@ struct DPoint {
     constexpr DPoint() noexcept = default;
     constexpr DPoint(int xPos, int yPos) noexcept : x(xPos), y(yPos) {}
 
-#if defined(_WIN32) || defined(POINT)
-    constexpr DPoint(const POINT& pt) noexcept : x(pt.x), y(pt.y) {}
-    constexpr operator POINT() const noexcept { return POINT{x, y}; }
-#endif
 
     // --- C++20 Vergleichsoperatoren ---
     constexpr bool operator==(const DPoint&) const noexcept = default;
@@ -431,10 +448,14 @@ inline DString operator+(const DString& lhs, LPCTSTR rhs) {
 
 //-----------------------------------------------------------------
 
+#ifndef COLORREF
+using COLORREF = unsigned long;
+#endif
+
+//-----------------------------------------------------------------
+
 using CSize = DSize;
 using CPoint = DPoint;
 using CRect = DRect;
-using CString = DString;
-using CStringW = DString;
 
 #endif // WTLCOMPAT_H

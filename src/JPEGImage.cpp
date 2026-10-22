@@ -11,6 +11,8 @@
 #include <cmath>
 #include <cassert>
 
+#include <QColor>
+
 ///////////////////////////////////////////////////////////////////////////////////
 // Static helpers
 ///////////////////////////////////////////////////////////////////////////////////
@@ -172,29 +174,6 @@ CJPEGImage::~CJPEGImage(void) {
     m_pEXIFReader = NULL;
     delete m_pCachedProcessedHistogram;
     m_pCachedProcessedHistogram = NULL;
-}
-
-bool CJPEGImage::RotateOriginalPixels(double dRotation, bool bAutoCrop, bool bKeepAspectRatio) {
-    InvalidateAllCachedPixelData();
-
-    CPoint offset;
-    CSize newSize = GetSizeAfterFreeRotation(CSize(m_nOrigWidth, m_nOrigHeight), dRotation, bAutoCrop, bKeepAspectRatio, offset);
-    void* pRotatedPixels = CBasicProcessing::RotateHQ(offset, newSize, dRotation,
-        CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, CSettingsProvider::This().ColorBackground());
-    if (pRotatedPixels == NULL) return false;
-    delete[] m_pOrigPixels;
-
-    m_nOrigWidth = newSize.cx;
-    m_nOrigHeight = newSize.cy;
-    m_nOriginalChannels = 4;
-    m_pOrigPixels = pRotatedPixels;
-    MarkAsDestructivelyProcessed();
-
-    m_rotationParams.FreeRotation = fmod(360 * dRotation / (2 * 3.141592653), 360);
-    m_rotationParams.Flags = SetRotationFlag(m_rotationParams.Flags, RFLAG_AutoCrop, bAutoCrop);
-    m_rotationParams.Flags = SetRotationFlag(m_rotationParams.Flags, RFLAG_KeepAspectRatio, bKeepAspectRatio);
-
-    return true;
 }
 
 void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, CSize fullTargetSize, 
@@ -362,15 +341,9 @@ CPoint CJPEGImage::ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoin
 }
 
 bool CJPEGImage::VerifyRotation(const CRotationParams& rotationParams) {
-    // First integer rotation (fast)
     int nDiff = ((rotationParams.Rotation - m_rotationParams.Rotation) + 360) % 360;
     if (nDiff != 0) {
         if (!Rotate(nDiff)) return false;
-    }
-    if (fabs(rotationParams.FreeRotation - m_rotationParams.FreeRotation) >= 0.009)
-    {
-        return RotateOriginalPixels(2 * 3.141592653  * rotationParams.FreeRotation / 360, 
-            GetRotationFlag(rotationParams.Flags, RFLAG_AutoCrop), GetRotationFlag(rotationParams.Flags, RFLAG_KeepAspectRatio));
     }
     return true;
 }
@@ -656,77 +629,6 @@ bool CJPEGImage::ConvertSrcTo4Channels() {
     return true;
 }
 
-CSize CJPEGImage::GetSizeAfterFreeRotation(const CSize& sourceSize, double dRotation, bool bAutoCrop, bool bKeepAspectRatio, CPoint & offset) {
-    double dCoords[] = {
-        0.0, 0.0,
-        static_cast<double>(sourceSize.cx - 1), 0.0,
-        static_cast<double>(sourceSize.cx - 1), static_cast<double>(sourceSize.cy - 1),
-        0.0, static_cast<double>(sourceSize.cy - 1)
-    };
-
-    double dXMin = HUGE_VAL, dXMax = -HUGE_VAL;
-    double dYMin = HUGE_VAL, dYMax = -HUGE_VAL;
-    for (int i = 0; i < 4; i++) {
-        RotateInplace(sourceSize, dCoords[i * 2], dCoords[i * 2 + 1], dRotation);
-        dXMin = std::min(dXMin, dCoords[i * 2]);
-        dXMax = std::max(dXMax, dCoords[i * 2]);
-        dYMin = std::min(dYMin, dCoords[i * 2 + 1]);
-        dYMax = std::max(dYMax, dCoords[i * 2 + 1]);
-    }
-
-    double dCenterX = (sourceSize.cx - 1) * 0.5;
-    double dCenterY = (sourceSize.cy - 1) * 0.5;
-
-    int nXStart, nXEnd;
-    int nYStart, nYEnd;
-
-    if (bAutoCrop) {
-        // Calculate the maximum enclosed rectangle by intersecting the diagonal lines of the bounding box with the rotated rectangle sides
-        if (bKeepAspectRatio) {
-            double dNeededX = ((double)sourceSize.cx / sourceSize.cy) * (dYMax - dYMin);
-            double dCenterX = (dXMax + dXMin) * 0.5;
-            dXMin = dCenterX - 0.5 * dNeededX;
-            dXMax = dCenterX + 0.5 * dNeededX;
-        }
-        double dBestX = (dXMax - dXMin) * 0.5;
-        double dBestY = (dYMax - dYMin) * 0.5;
-        double dBestDistance = dBestX*dBestX + dBestY*dBestY;
-        for (int nSign = -1; nSign < 2; nSign += 2) {
-            for (int i = 0; i < 4; i++) {
-                int j = (i + 1) % 4;
-                double dV1x = dCoords[j * 2] - dCoords[i * 2];
-                double dV1y = dCoords[j * 2 + 1] - dCoords[i * 2 + 1];
-                double dNumerator = dCoords[i * 2] * dYMin - dCoords[i * 2 + 1] * nSign * dXMax;
-                double dDenumerator = dV1y * nSign * dXMax - dV1x * dYMin;
-                double dT = dNumerator / dDenumerator;
-                if (dT > -1e-8 && dT - 1 < 1e-8) {
-                    double dX = dCoords[i * 2] + dT * dV1x;
-                    double dY = dCoords[i * 2 + 1] + dT * dV1y;
-                    double dDist = dX*dX + dY*dY;
-                    if (dDist < dBestDistance) {
-                        dBestDistance = dDist;
-                        dBestX = dX;
-                        dBestY = dY;
-                    }
-                }
-            }
-        }
-        nXStart = Helpers::RoundToInt(-fabs(dBestX) + dCenterX);
-        nXEnd = Helpers::RoundToInt(fabs(dBestX) + dCenterX);
-        nYStart = Helpers::RoundToInt(-fabs(dBestY) + dCenterY);
-        nYEnd = Helpers::RoundToInt(fabs(dBestY) + dCenterY);
-    } else {
-        nXStart = (int)(dXMin + dCenterX - 0.999);
-        nXEnd = (int)(dXMax + dCenterX + 0.999);
-        nYStart = (int)(dYMin + dCenterY - 0.999);
-        nYEnd = (int)(dYMax + dCenterY + 0.999);
-    }
-
-    offset = CPoint(nXStart, nYStart);
-
-    return CSize(nXEnd - nXStart + 1, nYEnd - nYStart + 1);
-}
-
 CJPEGImage::EResizeType CJPEGImage::GetResizeType(CSize targetSize, CSize sourceSize) {
     if (targetSize.cx == sourceSize.cx && targetSize.cy == sourceSize.cy) {
         return NoResize;
@@ -775,7 +677,6 @@ int CJPEGImage::GetRotationFromEXIF(int nOrigRotation) {
 
 void CJPEGImage::MarkAsDestructivelyProcessed() {
     m_bIsDestructivelyProcessed = true;
-    m_rotationParams.FreeRotation = 0.0;
     m_rotationParams.Flags = RFLAG_None;
 }
 

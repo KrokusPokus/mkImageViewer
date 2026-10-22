@@ -21,9 +21,6 @@
 
     // Nur falls WTL/ATL in einzelnen Dateien noch schrittweise abgebaut wird:
     #include <atlbase.h>
-    #include <atlapp.h>        // WTL-sf\Include: CDialog, CDC
-
-    extern CAppModule _Module;
 
     #define VK_PAGE_UP 0x021
     #define VK_PAGE_DOWN 0x22

@@ -142,24 +142,6 @@ public:
     static void* SampleUp_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
         CSize sourceSize, const void* pPixels, int nChannels, SIMDArchitecture simd);
 
-    // Rotate 32 or 24 bpp BGR(A) image around image center using bicubic interpolation.
-    // Notice that the A channel is processed for 32 bpp images.
-    // Notice that the returned image is always 32 bpp!
-    // targetOffset: Offset for start of clipping window (in the region given by sourceSize)
-    // targetSize: Size of target image - returned DIB has this size
-    // dRotation: rotation angle in radians
-    // sourceSize: Size of source image (pSourcePixels)
-    // pSourcePixels: Source image
-    // nChannels: number of channels (bytes) in source image, must be 3 or 4
-    // backColor: color to fill background of rotated image
-    // Returns a 32 bpp DIB of size targetSize
-    static void* RotateHQ(CPoint targetOffset, CSize targetSize, double dRotation, CSize sourceSize, 
-        const void* pSourcePixels, int nChannels, COLORREF backColor);
-
-    // Gauss filtering of a 16 bpp 1 channel image. In the image with size fullSize, the rectangle rect at position offset is filtered.
-    // The returned image has size 'rect'.
-    static int16* GaussFilter16bpp1Channel(CSize fullSize, CPoint offset, CSize rect, double dRadius, const int16* pPixels);
-
 private:
     CBasicProcessing(void);
 };

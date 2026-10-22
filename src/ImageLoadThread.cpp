@@ -4,6 +4,7 @@
 #include "JPEGImage.h"
 #include "MaxImageDef.h"
 #include "MessageDef.h"
+#include "MainDlg.h"
 #include "ReaderBMP.h"
 #include "ReaderTGA.h"
 #include "SettingsProvider.h"
@@ -18,15 +19,11 @@
 #include "zip/zip.h"
 
 #include <algorithm>
-#include <cwctype> // für std::towlower
-#include <filesystem>
 #include <string>
 
 #include <QString>
 #include <QFile>
 #include <QFileInfo>
-
-#include <gdiplus.h>
 
 using namespace Gdiplus;
 
@@ -34,7 +31,7 @@ using namespace bit7z;
 #include "bit7z/include/bitarchivereader.hpp"
 
 // static initializers
-volatile int CImageLoadThread::m_curHandle = 0;
+QAtomicInt CImageLoadThread::m_curHandle(0);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // static helpers
@@ -236,9 +233,10 @@ namespace {
 		if (lastStatus == Gdiplus::Ok) {
 			assert(bmData.PixelFormat == PixelFormat32bppRGB);
 			void* pDIB = CBasicProcessing::ConvertGdiplus32bppRGB(bmRect.Width, bmRect.Height, bmData.Stride, bmData.Scan0, !bHasAlphaChannel);
-			if (bHasAlphaChannel == true)
-				Helpers::BlendAlpha((uint32*)pDIB, bmRect.Width, bmRect.Height, nTransparencyMode);
 			if (pDIB != NULL) {
+                if (bHasAlphaChannel == true) {
+                    Helpers::BlendAlpha((uint32*)pDIB, bmRect.Width, bmRect.Height, nTransparencyMode);
+                }
 				pJPEGImage = new CJPEGImage(bmRect.Width, bmRect.Height, pDIB, pEXIFData, 4, nJPEGHash, eImageFormat,
 					eImageFormat == IF_GIF && nFrameCount > 1, nFrameIndex, nFrameCount, nFrameTimeMs);
 			}
@@ -277,11 +275,9 @@ CImageLoadThread::~CImageLoadThread(void) {
     DeleteCachedZip();
 }
 
-int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, HWND targetWnd, HANDLE eventFinished) {
-    CRequest* pRequest = new CRequest(strFileName, nFrameIndex, targetWnd, processParams, eventFinished);
-
+int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, std::function<void(int)> onCompleted) {
+    CRequest* pRequest = new CRequest(strFileName, nFrameIndex, processParams, onCompleted);
     ProcessAsync(pRequest);
-
     return pRequest->RequestHandle;
 }
 
@@ -291,13 +287,12 @@ CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
     bool bFailedMemory = false;
     bool bFailedException = false;
     std::list<CRequestBase*>::iterator iter;
-    for (iter = m_requestList.begin( ); iter != m_requestList.end( ); iter++ ) {
+    for (iter = m_requestList.begin(); iter != m_requestList.end(); iter++) {
         CRequest* pRequest = (CRequest*)(*iter);
         if (pRequest->Processed && pRequest->Deleted == false && pRequest->RequestHandle == nHandle) {
             imageFound = pRequest->Image;
             bFailedMemory = pRequest->OutOfMemory;
             bFailedException = pRequest->ExceptionError;
-            // only mark as deleted
             pRequest->Deleted = true;
             break;
         }
@@ -306,7 +301,6 @@ CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
 }
 
 void CImageLoadThread::ReleaseFile(const QString& strFileName) {
-	
     CReleaseFileRequest* pRequest = new CReleaseFileRequest(strFileName);
     ProcessAndWait(pRequest);
 }
@@ -459,9 +453,9 @@ void CImageLoadThread::AfterFinishProcess(CRequestBase& request) {
     }
 
     CRequest& rq = (CRequest&)request;
-    if (rq.TargetWnd != NULL) {
-        // post message to window that request has been processed
-        ::PostMessage(rq.TargetWnd, WM_IMAGE_LOAD_COMPLETED, 0, rq.RequestHandle);
+    // Ruft den im CJPEGProvider übergebenen Lambda-Callback thread-sicher auf
+    if (rq.CompletedCallback) {
+        rq.CompletedCallback(rq.RequestHandle);
     }
 }
 
@@ -1159,6 +1153,8 @@ Note on "request->FrameIndex":
         }
         else {
             zip = zip_open(bufFilename.c_str(), 0, 'r');
+            if (!zip) return;
+
             int n = zip_entries_total(zip);
             for (int i = 0; i < n; ++i) {
                 zip_entry_openbyindex(zip, i);
@@ -1171,7 +1167,7 @@ Note on "request->FrameIndex":
         }
         
         
-        if (m_nZipCount < 0) {
+        if (m_nZipCount <= 0) {
             if (zip) {
                 zip_close(zip);
                 zip = NULL;

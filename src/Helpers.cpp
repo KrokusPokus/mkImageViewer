@@ -323,7 +323,8 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
 
 // Based on: https://github.com/sdneon/jpegview.git
     void BlendAlpha(uint32* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode nTransparencyMode) {
-        COLORREF nTransparency = CSettingsProvider::This().ColorTransparency();
+		QColor cT = CSettingsProvider::This().ColorTransparency();
+        COLORREF nTransparency = RGB(cT.red(), cT.green(), cT.blue());
         if (nTransparencyMode != Helpers::TP_CHECKERBOARD) {
             if (nTransparencyMode == Helpers::TP_BLEND_INVERSE) {
                 nTransparency = ~(nTransparency & 0xffffff);

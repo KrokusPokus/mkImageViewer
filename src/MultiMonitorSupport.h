@@ -1,7 +1,12 @@
 #ifndef MULTIMONITORSUPPORT_H
 #define MULTIMONITORSUPPORT_H
 
-// Support for multiple-monitor systems
+#include <QRect>
+
+
+class QWidget; // Forward-Deklaration
+
+// Support for multiple-monitor systems (Qt-based)
 class CMultiMonitorSupport
 {
 public:
@@ -9,30 +14,29 @@ public:
     static bool IsMultiMonitorSystem();
 
     // virtual desktop (spanning all monitors)
-    static CRect GetVirtualDesktop();
+    static QRect GetVirtualDesktop();
 
     // Display rectangle of the monitor, use -1 for largest monitor, 0 for primary monitor or 
     // 1 to n for the secondary or other monitors
-    static CRect GetMonitorRect(int nIndex);
+    static QRect GetMonitorRect(int nIndex);
 
     // Display rectangle of monitor the main part of the given window is shown on
-    static CRect GetMonitorRect(HWND hWnd);
+    static QRect GetMonitorRect(const QWidget* pWidget);
 
     // Gets the working rectangle (monitor rectangle excluding taskbar) of the monitor the given window is displayed on
-    static CRect GetWorkingRect(HWND hWnd);
+    static QRect GetWorkingRect(const QWidget* pWidget);
 
     // Gets the default window rectangle for windowed mode
-    static CRect GetDefaultWindowRect();
+    static QRect GetDefaultWindowRect();
 
     // Sets the default window rectangle for windowed mode
-    static void SetDefaultWindowRect(CRect rect);
+    static void SetDefaultWindowRect(QRect rect);
 
     // Gets the default client rectangle for windowed mode
-    static CRect GetDefaultClientRectInWindowMode(bool bAutoFitWndToImage);
+    static QRect GetDefaultClientRectInWindowMode(bool bAutoFitWndToImage);
 
 private:
-    CMultiMonitorSupport(void);
+    CMultiMonitorSupport() = delete; // Statische Klasse nicht instanziierbar
 };
-
 
 #endif // MULTIMONITORSUPPORT_H

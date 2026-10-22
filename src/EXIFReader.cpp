@@ -214,26 +214,16 @@ double ReadDoubleTag(uint8* ptr, uint8* pTIFFHeader, bool bLittleEndian) {
 
 } // namespace
 
-bool CEXIFReader::ParseDateString(SYSTEMTIME & date, const QString& str) {
-    int nYear, nMonth, nDay, nHour, nMin, nSec;
-    if (sscanf(str.toLatin1().constData(), "%d:%d:%d %d:%d:%d", &nYear, &nMonth, &nDay, &nHour, &nMin, &nSec) == 6) {
-        date.wYear = static_cast<WORD>(nYear);
-        date.wMonth = static_cast<WORD>(nMonth);
-        date.wDay = static_cast<WORD>(nDay);
-        date.wHour = static_cast<WORD>(nHour);
-        date.wMinute = static_cast<WORD>(nMin);
-        date.wSecond = static_cast<WORD>(nSec);
-        date.wMilliseconds = 0;
-        date.wDayOfWeek = 0;
-        return true;
-    }
-    return false;
+bool CEXIFReader::ParseDateString(QDateTime & date, const QString& str) {
+    // EXIF Format: "YYYY:MM:DD HH:MM:SS"
+    date = QDateTime::fromString(str.trimmed(), "yyyy:MM:dd hh:mm:ss");
+    return date.isValid();
 }
 
 CEXIFReader::CEXIFReader(void* pApp1Block, EImageFormat eImageFormat)
     : m_exposureTime{ 0, 0 },
-    m_acqDate{ 0 },
-    m_dateTime{ 0 }
+    m_acqDate{},
+    m_dateTime{}
 {
     m_bFlashFired = false;
     m_bFlashFlagPresent = false;

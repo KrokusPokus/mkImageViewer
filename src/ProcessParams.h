@@ -64,34 +64,29 @@ static inline bool GetRotationFlag(ERotationFlags eFlags, ERotationFlags eFlagTo
 // Parameters used for image rotation
 class CRotationParams {
 public:
-    CRotationParams() : Rotation(0), FreeRotation(0.0), Flags(RFLAG_None) {}
+    CRotationParams() : Rotation(0), Flags(RFLAG_None) {}
 
     explicit CRotationParams(int rotation) {
         Rotation = rotation;
-        FreeRotation = 0;
         Flags = RFLAG_None;
     }
 
-    CRotationParams(int rotation, double freeRotation, ERotationFlags flags) {
+    CRotationParams(int rotation, ERotationFlags flags) {
         Rotation = rotation;
-        FreeRotation = freeRotation;
         Flags = flags;
     }
 
     CRotationParams(const CRotationParams& other) {
         Rotation = other.Rotation;
-        FreeRotation = other.FreeRotation;
         Flags = other.Flags;
     }
 
     CRotationParams(const CRotationParams& other, int rotation) {
         Rotation = rotation;
-        FreeRotation = other.FreeRotation;
         Flags = other.Flags;
     }
 
     int Rotation; // Main rotation in degrees, must be in [0, 90, 180, 270]
-    double FreeRotation; // Free rotation in degrees, added to Rotation, must be in [-359...360]
     ERotationFlags Flags;
 };
 

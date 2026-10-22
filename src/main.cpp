@@ -7,8 +7,6 @@
 #include <QString>
 #include <QApplication>
 
-CAppModule _Module;
-
 static HWND _HWNDOtherInstance = nullptr;
 
 static BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
@@ -81,22 +79,12 @@ static QString ParseCommandLineForStartupFile(const QString& sCommandLine) {
 
 int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lpstrCmdLine, int /*nCmdShow*/)
 {
-    HRESULT hRes = ::CoInitialize(nullptr);
-
     int argc = 0;
     QApplication app(argc, nullptr); // Notwendig für QClipboard und QMessageBox
 
     // use the locale from the operating system, however for numeric input/output always use 'C' locale
     std::setlocale(LC_ALL, "");
     std::setlocale(LC_NUMERIC, "C");
-
-    // this resolves ATL window thunking problem when Microsoft Layer for Unicode (MSLU) is used
-    ::DefWindowProcW(nullptr, 0, 0, 0L);
-
-    AtlInitCommonControls(ICC_BAR_CLASSES);    // add flags to support other controls
-
-    hRes = _Module.Init(nullptr, hInstance);
-    ATLASSERT(SUCCEEDED(hRes));
 
     QString sStartupFile = ParseCommandLineForStartupFile(QString::fromWCharArray(lpstrCmdLine));
 
@@ -117,7 +105,9 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
         CMainDlg dlgMain(sStartupFile);
 
         try {
-            nRet = static_cast<int>(dlgMain.DoModal());
+            dlgMain.show();          // Hauptfenster anzeigen
+            nRet = app.exec();       // Startet die native Qt-Event-Schleife
+
             if (CSettingsProvider::This().StickyWindowSize() && !dlgMain.IsFullScreenMode()) {
                 CSettingsProvider::This().SaveStickyWindowRect(dlgMain.WindowRectOnClose());
             }
@@ -134,9 +124,5 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
     }
 
     ::CloseHandle(hMutex);
-
-    _Module.Term();
-    ::CoUninitialize();
-
     return nRet;
 }

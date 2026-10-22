@@ -39,9 +39,6 @@ static void* ApplyLDC32bpp_Core(CSize fullTargetSize, CPoint fullTargetOffset, C
     CSize ldcMapSize, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap,
     float fBlackPt, float fWhitePt, float fBlackPtSteepness, uint32* pTarget);
 
-static void* RotateHQ_Core(CPoint targetOffset, CSize targetSize, double dRotation, CSize sourceSize,
-    const void* pSourcePixels, void* pTargetPixels, int nChannels, COLORREF backColor);
-
 //---------------------------------------------------------------------------------------------
 
 // Request for upsampling or downsampling
@@ -134,27 +131,6 @@ public:
     float BlackPt;
     float WhitePt;
     float BlackPtSteepness;
-};
-
-class CRequestRotate : public CProcessingRequest {
-public:
-    CRequestRotate(const void* pSourcePixels, CPoint targetOffset, CSize targetSize, double dRotation,
-        CSize sourceSize, void* pTargetPixels, int nChannels, COLORREF backColor)
-        : CProcessingRequest(pSourcePixels, sourceSize, pTargetPixels, targetSize, targetOffset, targetSize) {
-        Rotation = dRotation;
-        Channels = nChannels;
-        BackColor = backColor;
-    }
-
-    virtual bool ProcessStrip(int offsetY, int sizeY) {
-        return NULL != RotateHQ_Core(CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
-            CSize(FullTargetSize.cx, sizeY), Rotation, SourceSize, SourcePixels,
-            (uint8*)TargetPixels + FullTargetSize.cx * 4 * offsetY, Channels, BackColor);
-    }
-
-    double Rotation;
-    int Channels;
-    COLORREF BackColor;
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -827,87 +803,6 @@ static void InterpolateBicubicBorder(const uint8* pSource, uint8* pDest, int16* 
         pSource++;
     }
     if (nChannels == 3) *pDest = 0xFF;
-}
-
-void* RotateHQ_Core(CPoint targetOffset, CSize targetSize, double dRotation, CSize sourceSize, 
-                                      const void* pSourcePixels, void* pTargetPixels, int nChannels, COLORREF backColor){
-
-    double dFirstX = -(sourceSize.cx - 1) * 0.5;
-    double dFirstY = -(sourceSize.cy - 1) * 0.5;
-    double dIncX1 = dFirstX + ((targetSize.cx == 1) ? 0 : 1);
-    double dIncY1 = dFirstY;
-    double dIncX2 = dFirstX;
-    double dIncY2 = dFirstY + ((targetSize.cy == 1) ? 0 : 1);
-    RotateInplace(dFirstX, dFirstY, -dRotation);
-    RotateInplace(dIncX1, dIncY1, -dRotation);
-    RotateInplace(dIncX2, dIncY2, -dRotation);
-    dIncX1 = dIncX1 - dFirstX;
-    dIncY1 = dIncY1 - dFirstY;
-    dIncX2 = dIncX2 - dFirstX;
-    dIncY2 = dIncY2 - dFirstY;
-
-    int32 nFirstX = Helpers::RoundToInt(65536 * (dFirstX + (sourceSize.cx - 1) * 0.5));
-    int32 nFirstY = Helpers::RoundToInt(65536 * (dFirstY + (sourceSize.cy - 1) * 0.5));
-    int32 nIncrementX1 = Helpers::RoundToInt(65536 * dIncX1);
-    int32 nIncrementY1 = Helpers::RoundToInt(65536 * dIncY1);
-    int32 nIncrementX2 = Helpers::RoundToInt(65536 * dIncX2);
-    int32 nIncrementY2 = Helpers::RoundToInt(65536 * dIncY2);
-
-    int16* pKernels = new int16[NUM_KERNELS_BICUBIC * 4];
-    CResizeFilter::GetBicubicFilterKernels(NUM_KERNELS_BICUBIC, pKernels);
-
-    uint32 nBackColor = (GetRValue(backColor) << 16) + (GetGValue(backColor) << 8) + GetBValue(backColor) + ALPHA_OPAQUE;
-    int nPaddedSourceWidth = Helpers::DoPadding(sourceSize.cx * nChannels, 4);
-    const uint8* pSrc = NULL;
-    uint8* pDst = (uint8*)pTargetPixels;
-    int32 nX = nFirstX + targetOffset.x * nIncrementX1 + targetOffset.y * nIncrementX2;
-    int32 nY = nFirstY + targetOffset.x * nIncrementY1 + targetOffset.y * nIncrementY2;
-    for (int j = 0; j < targetSize.cy; j++) {
-        int nCurX = nX;
-        int nCurY = nY;
-        for (int i = 0; i < targetSize.cx; i++) {
-            int32 nCurRealX = nCurX >> 16;
-            int32 nCurRealY = nCurY >> 16;
-            int32 nFracX = nCurX & 0xFFFF;
-            int32 nFracY = nCurY & 0xFFFF;
-            if (nCurRealX >= -1 && nCurRealX <= sourceSize.cx && nCurRealY >= -1 && nCurRealY <= sourceSize.cy) {
-                pSrc = (uint8*)pSourcePixels + nPaddedSourceWidth * nCurRealY + nCurRealX * nChannels;
-                if (nCurRealX > 0 && nCurRealX < sourceSize.cx - 2 && nCurRealY > 0 && nCurRealY < sourceSize.cy - 2) {
-                    InterpolateBicubic(pSrc, pDst + i*4, pKernels, nFracX, nFracY, nPaddedSourceWidth, nChannels);
-                } else {
-                    int nXFrom = (nCurRealX > 0) ? -1 : -nCurRealX;
-                    int nXTo = (nCurRealX < sourceSize.cx - 2) ? 2 : sourceSize.cx - nCurRealX - 1;
-                    int nYFrom = (nCurRealY > 0) ? -1 : -nCurRealY;
-                    int nYTo = (nCurRealY < sourceSize.cy - 2) ? 2 : sourceSize.cy - nCurRealY - 1;
-                    InterpolateBicubicBorder(pSrc, pDst + i*4, pKernels, nFracX, nFracY, nXFrom, nXTo, nYFrom, nYTo, nPaddedSourceWidth, nChannels, nBackColor);
-                }
-            } else {
-                *((uint32*)pDst + i) = nBackColor;
-            }
-            nCurX += nIncrementX1;
-            nCurY += nIncrementY1;
-        }
-        pDst += targetSize.cx*4;
-        nX += nIncrementX2;
-        nY += nIncrementY2;
-    }
-    delete[] pKernels;
-    return pTargetPixels;
-}
-
-void* CBasicProcessing::RotateHQ(CPoint targetOffset, CSize targetSize, double dRotation, CSize sourceSize, const void* pSourcePixels, int nChannels, COLORREF backColor) {
-     if (pSourcePixels == NULL || (nChannels != 3 && nChannels != 4)) {
-        return NULL;
-    }
-
-    uint8* pTargetPixels = new(std::nothrow) uint8[targetSize.cx * 4 * targetSize.cy];
-    if (pTargetPixels == NULL) return NULL;
-
-    CProcessingThreadPool& threadPool = CProcessingThreadPool::This();
-    CRequestRotate request(pSourcePixels, targetOffset, targetSize, dRotation, sourceSize, pTargetPixels, nChannels, backColor);
-    bool bSuccess = threadPool.Process(&request);
-
-    return bSuccess ? pTargetPixels : NULL;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////

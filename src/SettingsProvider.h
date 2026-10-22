@@ -13,12 +13,6 @@
 
 #include <memory>
 
-// Interne Qt-Typen für Kompatibilität mit bestehenden Signaturen bereitstellen/konvertieren
-// Falls CRect, CSize, COLORREF globale Typen/Klassen sind, nutzen wir deren Schnittstelle oder Casts.
-#ifndef COLORREF
-using COLORREF = unsigned long;
-#endif
-
 class QTabWidget;
 class QWidget;
 
@@ -55,8 +49,6 @@ private:
     class QComboBox* m_comboDefaultWindowRect;
     class QSpinBox*  m_spinMinWidth;
     class QSpinBox*  m_spinMinHeight;
-    class QCheckBox* m_checkWindowBorderless;
-    class QCheckBox* m_checkWindowAlwaysOnTop;
     class QCheckBox* m_checkShowFilePathInTitle;
     class QCheckBox* m_checkTitleBarUseFileIcon;
     class QSpinBox*  m_spinDisplayMonitor;
@@ -153,17 +145,15 @@ public:
     bool StoreToEXEPath() const { return m_bStoreToEXEPath; }
     bool TitleBarUseFileIcon() const { return m_bTitleBarUseFileIcon; }
     bool UseEmbeddedColorProfiles() const { return m_bUseEmbeddedColorProfiles; }
-    bool WindowAlwaysOnTopOnStartup() const { return m_bWindowAlwaysOnTopOnStartup; }
-    bool WindowBorderlessOnStartup() const { return m_bWindowBorderlessOnStartup; }
     bool WrapAroundFolder() const { return m_bWrapAroundFolder && m_eNavigation == Helpers::NM_LoopDirectory; }
 
     // Ursprüngliche Rückgabetypen für vollständige Drop-in Compatibility
-    COLORREF ColorBackground() const { return ToColorref(m_colorBackground); }
-    COLORREF ColorGUI() const { return ToColorref(m_colorGUI); }
-    COLORREF ColorTransparency() const { return ToColorref(m_colorTransparency); }
-    CRect DefaultWindowRect() const { return ToCRect(m_defaultWindowRect); }
-    CRect StickyWindowRect() const { return ToCRect(m_stickyWindowRect); }
-    CSize MinimalWindowSize() const { return ToCSize(m_minimalWindowSize); }
+    QColor ColorBackground() const { return m_colorBackground; }
+    QColor ColorGUI() const { return m_colorGUI; }
+    QColor ColorTransparency() const { return m_colorTransparency; }
+    QRect DefaultWindowRect() const { return m_defaultWindowRect; }
+    QRect StickyWindowRect() const { return m_stickyWindowRect; }
+    QSize MinimalWindowSize() const { return m_minimalWindowSize; }
 
     double AutoBrightnessAmount() const { return m_dAutoBrightnessAmount; }
     double AutoContrastAmount() const { return m_dAutoContrastAmount; }
@@ -204,7 +194,7 @@ public:
 
     void CopyUserINIFromTemplate();
     void SaveCustomSettings();
-    void SaveStickyWindowRect(CRect rect);
+    void SaveStickyWindowRect(QRect rect);
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
     void SetUseEmbeddedColorProfiles(int bUseEmbeddedColorProfiles) { m_bUseEmbeddedColorProfiles = (bUseEmbeddedColorProfiles != 0); }
 
@@ -223,11 +213,6 @@ public:
 
 private:
     static std::unique_ptr<CSettingsProvider> sm_instance;
-
-    // Hilfskonvertierungen für ursprüngliche Typen (MFC / Win32 Kompatibilität)
-    static COLORREF ToColorref(const QColor& c) { return RGB(c.red(), c.green(), c.blue()); }
-    static CRect ToCRect(const QRect& r) { return CRect(r.left(), r.top(), r.right(), r.bottom()); }
-    static CSize ToCSize(const QSize& s) { return CSize(s.width(), s.height()); }
 
     QString m_sEXEPath;
     QString m_sIniNameGlobal;
@@ -287,8 +272,6 @@ private:
     Helpers::EIniEditor m_eIniEditor;
     QString m_sIniEditor;
     double m_zoomPauseFactor{1.0};
-    bool m_bWindowBorderlessOnStartup{false};
-    bool m_bWindowAlwaysOnTopOnStartup{false};
 
     int m_nBookModePageHeight{122};
     bool m_bBookModeLaunchFullscreen{true};

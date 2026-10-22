@@ -100,11 +100,7 @@
 #define IDM_FILL_WITH_CROP    12001        // :KeyMap: fit image to fill screen with crop
 #define IDM_FIT_TO_SCREEN_NO_ENLARGE 12002
 #define IDM_FIT_WINDOW_TO_IMAGE 12005        // :KeyMap: toggle fit window automatically to image, avoiding black borders
-#define IDM_SPAN_SCREENS    12010        // :KeyMap: span over all screens
-#define IDM_TOGGLE_MONITOR    14900        // :KeyMap: move to other monitor
 #define IDM_FULL_SCREEN_MODE 12011        // :KeyMap: toggle full screen mode
-#define IDM_HIDE_TITLE_BAR  12012        // :KeyMap: toggle hiding window title bar.  Note: in this mode, the window can't be manually resized
-#define IDM_ALWAYS_ON_TOP   12013        // :KeyMap: toggle window mode to always on top
 #define IDM_ZOOM_400        12020        // :KeyMap: zoom to 400 %
 #define IDM_ZOOM_200        12030        // :KeyMap: zoom to 200 %
 #define IDM_ZOOM_100        12040        // :KeyMap: zoom to 100 %

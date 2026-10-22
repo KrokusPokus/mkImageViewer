@@ -1,126 +1,176 @@
 #include "MultiMonitorSupport.h"
 #include "SettingsProvider.h"
 
-struct EnumMonitorParams {
-    EnumMonitorParams(int nIndexMonitor) {
-        IndexMonitor = nIndexMonitor;
-        NumPixels = 0;
-        Iterations = 0;
-        rectMonitor = CRect(0, 0, 0, 0);
-    }
+#include <QGuiApplication>
+#include <QScreen>
 
-    int Iterations;
-    int IndexMonitor;
-    int NumPixels;
-    CRect rectMonitor;
-};
+static QRect defaultWindowRect = QRect(0, 0, 0, 0);
 
-static CRect defaultWindowRect = CRect(0, 0, 0, 0);
-
+// returns true if the system is a multi monitor system
 bool CMultiMonitorSupport::IsMultiMonitorSystem() {
-    return ::GetSystemMetrics(SM_CMONITORS) > 1;
+    // Prüft, ob mehr als ein Monitor im System registriert ist
+    return QGuiApplication::screens().size() > 1;
 }
 
-CRect CMultiMonitorSupport::GetVirtualDesktop() {
-    return CRect(CPoint(::GetSystemMetrics(SM_XVIRTUALSCREEN), ::GetSystemMetrics(SM_YVIRTUALSCREEN)),
-        CSize(::GetSystemMetrics(SM_CXVIRTUALSCREEN), ::GetSystemMetrics(SM_CYVIRTUALSCREEN)));
+// virtual desktop (spanning all monitors)
+QRect CMultiMonitorSupport::GetVirtualDesktop() {
+    if (QScreen* primaryScreen = QGuiApplication::primaryScreen()) {
+        // virtualGeometry() gibt das Rechteck zurück, das alle Monitore im Verbund abspannt
+        return primaryScreen->virtualGeometry();
+    }
+    
+    // Fallback, falls kein Screen verfügbar ist
+    return QRect(0, 0, 1920, 1080);
 }
 
-// Callback called during enumeration of monitors
-static BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) {
-    MONITORINFO monitorInfo;
-    monitorInfo.cbSize = sizeof(MONITORINFO);
-    EnumMonitorParams* pParams = (EnumMonitorParams*) dwData;
-    if (pParams->IndexMonitor == -1) {
-        // Use the monitor with largest number of pixels
-        int nNumPixels = (lprcMonitor->right - lprcMonitor->left)*(lprcMonitor->bottom - lprcMonitor->top);
-        if (nNumPixels > pParams->NumPixels) {
-            pParams->NumPixels = nNumPixels;
-            pParams->rectMonitor = CRect(lprcMonitor);
-        } else if (nNumPixels == pParams->NumPixels) {
-            // if same size take primary
-            ::GetMonitorInfo(hMonitor, &monitorInfo);
-            if (monitorInfo.dwFlags & MONITORINFOF_PRIMARY) {
-                pParams->rectMonitor = CRect(lprcMonitor);
+// Display rectangle of the monitor, use -1 for largest monitor, 0 for primary monitor or 
+// 1 to n for the secondary or other monitors
+QRect CMultiMonitorSupport::GetMonitorRect(int nIndex) {
+    const auto screens = QGuiApplication::screens();
+    
+    // Fallback auf primären Bildschirm oder Standardauflösung, wenn keine Screens da sind
+    if (screens.isEmpty()) {
+        QScreen* primary = QGuiApplication::primaryScreen();
+        return primary ? primary->geometry() : QRect(0, 0, 1920, 1080);
+    }
+
+    // Fall 1: Primärmonitor (Index 0)
+    if (nIndex == 0) {
+        QScreen* primary = QGuiApplication::primaryScreen();
+        return primary ? primary->geometry() : screens.first()->geometry();
+    }
+
+    // Fall 2: Spezifischer Monitor nach Index (1 bis n)
+    if (nIndex > 0 && nIndex < screens.size()) {
+        return screens.at(nIndex)->geometry();
+    }
+
+    // Fall 3: Grösster Monitor (-1 oder ungültiger Index)
+    if (nIndex == -1) {
+        QScreen* largestScreen = screens.first();
+        int maxArea = largestScreen->geometry().width() * largestScreen->geometry().height();
+
+        for (int i = 1; i < screens.size(); ++i) {
+            QRect geo = screens.at(i)->geometry();
+            int area = geo.width() * geo.height();
+            if (area > maxArea) {
+                maxArea = area;
+                largestScreen = screens.at(i);
             }
         }
-    } else {
-        ::GetMonitorInfo(hMonitor, &monitorInfo);
-        if (pParams->IndexMonitor == 0) {
-            // take primary monitor
-            if (monitorInfo.dwFlags & MONITORINFOF_PRIMARY) {
-                pParams->rectMonitor = CRect(lprcMonitor);
-                return FALSE;
-            }
-        } else {
-            // take the i-th non primary monitor
-            if (!(monitorInfo.dwFlags & MONITORINFOF_PRIMARY)) {
-                pParams->Iterations += 1;
-                if (pParams->IndexMonitor == pParams->Iterations) {
-                    pParams->rectMonitor = CRect(lprcMonitor);
-                    return FALSE;
-                }
-            }
-        }
+        return largestScreen->geometry();
     }
-    return TRUE;
+
+    // Fallback auf den Primärmonitor, falls der Index völlig out of bounds ist
+    QScreen* primary = QGuiApplication::primaryScreen();
+    return primary ? primary->geometry() : screens.first()->geometry();
 }
 
-CRect CMultiMonitorSupport::GetMonitorRect(int nIndex) {
-    if (!CMultiMonitorSupport::IsMultiMonitorSystem()) {
-        return CRect(0, 0, ::GetSystemMetrics(SM_CXSCREEN), ::GetSystemMetrics(SM_CYSCREEN));
+// Display rectangle of monitor the main part of the given window is shown on
+QRect CMultiMonitorSupport::GetMonitorRect(const QWidget* pWidget) {
+    QScreen* screen = nullptr;
+    
+    // Bildschirm über das Widget ermitteln
+    if (pWidget != nullptr) {
+        screen = pWidget->screen();
     }
-    EnumMonitorParams params(nIndex);
-    ::EnumDisplayMonitors(NULL, NULL, &MonitorEnumProc, (LPARAM) &params);
-    if (params.rectMonitor.Width() == 0) {
-        return CRect(0, 0, ::GetSystemMetrics(SM_CXSCREEN), ::GetSystemMetrics(SM_CYSCREEN));
-    } else {
-        return params.rectMonitor;
+    
+    // Fallback auf den Primärschirm, falls das Widget noch keinen Screen hat
+    if (screen == nullptr) {
+        screen = QGuiApplication::primaryScreen();
     }
+    
+    if (screen != nullptr) {
+        return screen->geometry();
+    }
+    
+    // Absoluter Notfall-Fallback, falls gar kein Screen greifbar ist
+    return QRect(0, 0, 1920, 1080);
 }
 
-CRect CMultiMonitorSupport::GetMonitorRect(HWND hWnd) {
-    HMONITOR hMonitor = ::MonitorFromWindow(hWnd, MONITOR_DEFAULTTOPRIMARY);
-    MONITORINFO monitorInfo;
-    monitorInfo.cbSize = sizeof(MONITORINFO);
-    ::GetMonitorInfo(hMonitor, &monitorInfo);
-    return CRect(monitorInfo.rcMonitor);
+// Gets the working rectangle (monitor rectangle excluding taskbar) of the monitor the given window is displayed on
+QRect CMultiMonitorSupport::GetWorkingRect(const QWidget* pWidget) {
+    QScreen* screen = nullptr;
+    
+    // Bildschirm über das Widget ermitteln
+    if (pWidget != nullptr) {
+        screen = pWidget->screen();
+    }
+    
+    // Fallback auf den Primärschirm, falls das Widget noch keinen Screen zugewiesen hat
+    if (screen == nullptr) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    
+    if (screen != nullptr) {
+        // availableGeometry() entspricht exakt dem Win32 rcWork (ohne Taskleiste)
+        return screen->availableGeometry();
+    }
+    
+    // Absoluter Fallback
+    return QRect(0, 0, 1920, 1080);
 }
 
-CRect CMultiMonitorSupport::GetWorkingRect(HWND hWnd) {
-    HMONITOR hMonitor = ::MonitorFromWindow(hWnd, MONITOR_DEFAULTTOPRIMARY);
-    MONITORINFO monitorInfo;
-    monitorInfo.cbSize = sizeof(MONITORINFO);
-    ::GetMonitorInfo(hMonitor, &monitorInfo);
-    return CRect(monitorInfo.rcWork);
-}
-
-CRect CMultiMonitorSupport::GetDefaultWindowRect() {
+// Gets the default window rectangle for windowed mode
+QRect CMultiMonitorSupport::GetDefaultWindowRect() {
     CSettingsProvider& settings = CSettingsProvider::This();
-    CRect windowRect = !defaultWindowRect.IsRectEmpty() ? defaultWindowRect : settings.StickyWindowSize() ? settings.StickyWindowRect() : settings.DefaultWindowRect();
-    CRect rectAllScreens = CMultiMonitorSupport::GetVirtualDesktop();
-    if (windowRect.IsRectEmpty() || !rectAllScreens.IntersectRect(&rectAllScreens, &windowRect)) {
-        CRect monitorRect = CMultiMonitorSupport::GetMonitorRect(settings.DisplayMonitor());
-        int nDesiredWidth = monitorRect.Width()*2/3;
-        int nDesiredHeight = nDesiredWidth*3/4;
-        CSize borderSize = Helpers::GetTotalBorderSize();
-        nDesiredWidth += borderSize.cx;
-        nDesiredHeight += borderSize.cy;
-        windowRect = CRect(CPoint(monitorRect.left + (monitorRect.Width() - nDesiredWidth) / 2, monitorRect.top + (monitorRect.Height() - nDesiredHeight) / 2), CSize(nDesiredWidth, nDesiredHeight));
+    
+    // Ermitteln, welches Basis-Rechteck geladen werden soll
+    QRect windowRect = !defaultWindowRect.isEmpty() 
+        ? defaultWindowRect 
+        : (settings.StickyWindowSize() ? settings.StickyWindowRect() : settings.DefaultWindowRect());
+    
+    QRect rectAllScreens = CMultiMonitorSupport::GetVirtualDesktop();
+    
+    // Prüfen, ob das Rechteck leer ist oder komplett außerhalb des virtuellen Desktops liegt
+    if (windowRect.isEmpty() || !rectAllScreens.intersects(windowRect)) {
+        // Monitor-Rechteck über Qt-Screens ermitteln (ersetzt GetMonitorRect & DisplayMonitor-Logik)
+        QRect monitorRect;
+        const auto screens = QGuiApplication::screens();
+        int displayIndex = settings.DisplayMonitor();
+        
+        if (displayIndex >= 0 && displayIndex < screens.size()) {
+            monitorRect = screens.at(displayIndex)->geometry();
+        } else {
+            QScreen* primary = QGuiApplication::primaryScreen();
+            monitorRect = primary ? primary->geometry() : QRect(0, 0, 1920, 1080);
+        }
+
+        int nDesiredWidth = monitorRect.width() * 2 / 3;
+        int nDesiredHeight = nDesiredWidth * 3 / 4;
+        
+        QSize borderSize = Helpers::GetTotalBorderSize();
+        nDesiredWidth += borderSize.width();
+        nDesiredHeight += borderSize.height();
+        
+        windowRect = QRect(
+            QPoint(monitorRect.left() + (monitorRect.width() - nDesiredWidth) / 2, 
+                   monitorRect.top() + (monitorRect.height() - nDesiredHeight) / 2), 
+            QSize(nDesiredWidth, nDesiredHeight)
+        );
     }
+    
     return windowRect;
 }
 
-void CMultiMonitorSupport::SetDefaultWindowRect(CRect rect) {
+// Sets the default window rectangle for windowed mode
+void CMultiMonitorSupport::SetDefaultWindowRect(QRect rect) {
     defaultWindowRect = rect;
 }
 
-CRect CMultiMonitorSupport::GetDefaultClientRectInWindowMode(bool bAutoFitWndToImage) {
+// Gets the default client rectangle for windowed mode
+QRect CMultiMonitorSupport::GetDefaultClientRectInWindowMode(bool bAutoFitWndToImage) {
     if (bAutoFitWndToImage) {
-        CRect monitorRect = CMultiMonitorSupport::GetMonitorRect(CSettingsProvider::This().DisplayMonitor());
-        return CRect(0, 0, monitorRect.Width(), monitorRect.Height());
+        QRect monitorRect = CMultiMonitorSupport::GetMonitorRect(CSettingsProvider::This().DisplayMonitor());
+        return QRect(0, 0, monitorRect.width(), monitorRect.height());
     }
-    CRect wndRect = CMultiMonitorSupport::GetDefaultWindowRect();
-    CSize borderSize = Helpers::GetTotalBorderSize();
-    return CRect(0, 0, wndRect.Width() - borderSize.cx, wndRect.Height() - borderSize.cy);
+    
+    QRect wndRect = CMultiMonitorSupport::GetDefaultWindowRect();
+    QSize borderSize = Helpers::GetTotalBorderSize();
+    
+    return QRect(
+        0, 0, 
+        wndRect.width() - borderSize.width(), 
+        wndRect.height() - borderSize.height()
+    );
 }
