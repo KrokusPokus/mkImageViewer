@@ -77,7 +77,8 @@ void* WebpReaderWriter::ReadImage(int& width,
         if (!has_animation) {
             int nStride = width * nchannels;
             size_t size = (size_t)height * nStride;
-            pPixelData = new(std::nothrow) unsigned char[size];
+            //pPixelData = new(std::nothrow) unsigned char[size]; // new[] is c++ and would require delete[].
+            pPixelData = static_cast<uint8*>(malloc(size));       // WebP uses C based memory, so malloc() and free()
             if (pPixelData == NULL) {
                 outOfMemory = true;
                 return NULL;

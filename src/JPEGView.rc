@@ -105,7 +105,7 @@ BEGIN
             MENUITEM SEPARATOR
             MENUITEM "Fit to window",               IDM_FIT_TO_SCREEN
             MENUITEM "Fill with crop",              IDM_FILL_WITH_CROP
-			MENUITEM SEPARATOR
+            MENUITEM SEPARATOR
             MENUITEM "400 %",                       IDM_ZOOM_400
             MENUITEM "200 %",                       IDM_ZOOM_200
             MENUITEM "100 %",                       IDM_ZOOM_100
@@ -205,7 +205,7 @@ BEGIN
         MENUITEM "Auto Contrast",             IDM_AUTO_CORRECTION
         MENUITEM SEPARATOR
         MENUITEM "Edit Settings",       IDM_EDIT_USER_CONFIG
-		MENUITEM "Settings Dialog",       IDM_SETTINGS_DIALOG
+        MENUITEM "Settings Dialog",       IDM_SETTINGS_DIALOG
         MENUITEM SEPARATOR
         MENUITEM "Exit\t0xffff",                IDM_EXIT
     END

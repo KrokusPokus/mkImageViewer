@@ -10,6 +10,7 @@
 #include <functional>
 #include <QString>
 #include <QAtomicInt>
+#include <memory>
 
 class CJPEGImage;
 class ZipEntry
@@ -44,8 +45,7 @@ public:
     CImageLoadThread(void);
     ~CImageLoadThread(void);
 
-    // Asynchronous loading  of an image. The message WM_IMAGE_LOAD_COMPLETED is
-    // posted to the given window's message queue when loading is finished and the given event is signaled (if not NULL).
+    // Asynchronous loading  of an image.
     // Returns identifier to query for resulting image. The query can be done as soon as the message is
     // received or the event has been signaled.
     // The file to load is given by its filename (with path) and the frame index (for multiframe images). The
@@ -53,7 +53,6 @@ public:
     int AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, std::function<void(int)> onCompleted);
 
     // Get loaded image, CImageData::Image is null if not (yet) available - use handle returned by AsyncLoad().
-    // Call after having received the WM_IMAGE_LOAD_COMPLETED message to retrieve the loaded image.
     // Marks the request for deletion - only call once with the same handle
     CImageData GetLoadedImage(int nHandle);
 
@@ -136,6 +135,8 @@ private:
 
     static void SetFileDependentProcessParams(CRequest * request);
     static bool ProcessImageAfterLoad(CRequest * request);
+
+    std::unique_ptr<char[]> m_pJxlBuffer;   // Eingabepuffer des JXL-Decoders bei Animationen
 };
 
 #endif // IMAGELOADTHREAD_H

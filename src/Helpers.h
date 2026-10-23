@@ -94,7 +94,7 @@ namespace Helpers {
     };
 
     inline float DPIScalingFactor = -1.0f; // is updated to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
-	
+    
     static QString buffAppPath;
 
     // Maximum and minimum allowed zoom factors for images
@@ -227,8 +227,8 @@ namespace Helpers {
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
     int GetFrameIndex(CJPEGImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage);
 
-	uint32_t GetTimeMs();
-	
+    uint32_t GetTimeMs();
+    
     //------------------------------------------------------------------------------------------------
 
     // Critical section that is acquired on construction and freed on destruction

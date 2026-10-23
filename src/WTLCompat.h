@@ -53,7 +53,7 @@ struct DSize {
 
     // C++20 Standard-Gleichheitsoperator
     constexpr bool operator==(const DSize&) const = default;
-	
+    
 #ifdef QT_CORE_LIB
     // Nahtlose Konvertierung von/zu QSize (falls Qt6 eingebunden ist)
     constexpr DSize(const QSize& qsize) noexcept : cx(qsize.width()), cy(qsize.height()) {}
@@ -142,7 +142,7 @@ struct DRect {
     constexpr DRect(const POINT& point, const SIZE& size) noexcept
         : left(point.x), top(point.y), right(point.x + size.cx), bottom(point.y + size.cy) {}
 
-	// Konvertierung nach RECT (Value)
+    // Konvertierung nach RECT (Value)
     constexpr operator RECT() const noexcept {
         return RECT{ left, top, right, bottom };
     }

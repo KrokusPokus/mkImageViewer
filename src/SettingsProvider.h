@@ -183,7 +183,7 @@ public:
 
     const QString DefaultGUIFont() const { return m_defaultGUIFont; }
     const QString ZoomFactorFont() const { return m_zoomFactorFont; }
-	
+    
     const QString CustomIniEditor() const { return m_sIniEditor; }
     const QString GetEXEPath() const { return m_sEXEPath; }
     const QString GetGlobalINIFileName() const { return m_sIniNameGlobal; }    // Get the file name with path of the global INI file (in EXE path)

@@ -1,8 +1,9 @@
 #ifndef MAINDLG_H
 #define MAINDLG_H
 
+#define KEY_MAGIC 2978465
+
 #include "resource.h"
-#include "MessageDef.h"
 #include "ProcessParams.h"
 #include "Helpers.h"
 
@@ -31,11 +32,14 @@ class QDropEvent;
 class CMainDlg : public QMainWindow {
     Q_OBJECT // Zwingend für Qt-Widgets/Klassen mit Signals & Slots
 
+#ifdef Q_OS_LINUX
 public slots:
-    void loadFileAsynch();
+    Q_SCRIPTABLE bool OnAnotherInstanceStarted(const QString &targetPath); // WM_COPYDATA replacement for linux
+#endif
+
+private slots:
     void onDisplayedFileChangedOnDisk();
     void onActiveDirectoryFilelistChanged();
-    void onRefreshView();
 
 public:
     enum EImagePosition {
@@ -187,6 +191,7 @@ private:
     void ExchangeProcessingParams();
     void SaveParameters();
     void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
+    void onLoadFileAsynch(); // WM_COPYDATAhandler and OnAnotherInstanceStarted() call this via invokeMethod()
 
     QRect GetZoomTextRect();
     QRect GetToastTextRect();
@@ -269,8 +274,10 @@ protected:
     void closeEvent(QCloseEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
-    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
     void timerEvent(QTimerEvent* event) override;
+#if defined(Q_OS_WIN)
+    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override; // for WM_COPYDATA
+#endif
 };
 
 

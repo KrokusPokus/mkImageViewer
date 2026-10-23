@@ -20,7 +20,7 @@ public:
 
     // Returns true if PNG is unsupported by GDI+
     static bool MustUseLibpng(const void* buffer, size_t sizebytes);
-	
+    
     // Get EXIF Block
     static void* GetEXIFBlock(void* buffer, size_t sizebytes);
 

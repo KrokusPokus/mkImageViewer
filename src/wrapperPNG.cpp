@@ -68,7 +68,7 @@ struct PngReader::png_cache {
     void* buffer;
     size_t buffer_size;
     size_t buffer_offset;
-	void* transform;
+    void* transform;
 };
 
 PngReader::png_cache PngReader::cache = { 0 };

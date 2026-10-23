@@ -111,34 +111,34 @@ namespace {
     // Tests if the CPU supports AVX2, SSE, MMX(2)
     Helpers::CPUType ProbeCPU(void) {
         static Helpers::CPUType cpuType = Helpers::CPU_Unknown;
-		
+        
         if (cpuType != Helpers::CPU_Unknown) {
-			return cpuType;
-		}
+            return cpuType;
+        }
 
-		__try {
-			// check if CPU supports AVX and the xgetbv instruction
-			int abcd[4];
-			__cpuid(abcd, 1);
-			if ((abcd[2] & 0x18000000) != 0x18000000) // AVX and OSXSAVE bits
-				return Helpers::CPU_SSE;
-			if ((abcd[2] & 0x04000000) == 0) // XSAVE bit, support for xgetbv
-				return Helpers::CPU_SSE;
+        __try {
+            // check if CPU supports AVX and the xgetbv instruction
+            int abcd[4];
+            __cpuid(abcd, 1);
+            if ((abcd[2] & 0x18000000) != 0x18000000) // AVX and OSXSAVE bits
+                return Helpers::CPU_SSE;
+            if ((abcd[2] & 0x04000000) == 0) // XSAVE bit, support for xgetbv
+                return Helpers::CPU_SSE;
 
-			// check if operating system supports AVX(2)
-			unsigned long long xcr0 = _xgetbv(0);
-			if ((xcr0 & 6) != 6)
-				return Helpers::CPU_SSE; // nope, only use SSE
+            // check if operating system supports AVX(2)
+            unsigned long long xcr0 = _xgetbv(0);
+            if ((xcr0 & 6) != 6)
+                return Helpers::CPU_SSE; // nope, only use SSE
 
-			// check if AVX2 instructions are supported
-			const int AVX2BITMASK = 1 << 5;
-			__cpuidex(abcd, 7, 0);
-			return (abcd[1] & AVX2BITMASK) ? Helpers::CPU_AVX2 : Helpers::CPU_SSE;
-		}
-		__except (EXCEPTION_EXECUTE_HANDLER) {
-			return Helpers::CPU_SSE;
-		}
-	}
+            // check if AVX2 instructions are supported
+            const int AVX2BITMASK = 1 << 5;
+            __cpuidex(abcd, 7, 0);
+            return (abcd[1] & AVX2BITMASK) ? Helpers::CPU_AVX2 : Helpers::CPU_SSE;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            return Helpers::CPU_SSE;
+        }
+    }
 
 } // namespace
 
