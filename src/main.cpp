@@ -3,9 +3,13 @@
 #include "SettingsProvider.h"
 
 #include <clocale>
-#include <gdiplus.h>
-#include <QString>
+
 #include <QApplication>
+#include <QDir>
+#include <QImageReader>
+#include <QMainWindow>
+#include <QString>
+#include <QTranslator>
 
 static HWND _HWNDOtherInstance = nullptr;
 
@@ -77,16 +81,30 @@ static QString ParseCommandLineForStartupFile(const QString& sCommandLine) {
     return sStartupFile;
 }
 
-int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lpstrCmdLine, int /*nCmdShow*/)
+int main(int argc, char *argv[])
 {
-    int argc = 0;
-    QApplication app(argc, nullptr); // Notwendig für QClipboard und QMessageBox
+    QApplication app(argc, argv);
+
+    // Qt-Standard: je nach Version 128-256 MB pro Bild. 0 = kein Limit.
+    // Die eigenen Grenzen (MAX_IMAGE_PIXELS / MAX_IMAGE_DIMENSION) greifen weiterhin vor dem Dekodieren.
+    QImageReader::setAllocationLimit(0);
 
     // use the locale from the operating system, however for numeric input/output always use 'C' locale
     std::setlocale(LC_ALL, "");
     std::setlocale(LC_NUMERIC, "C");
 
-    QString sStartupFile = ParseCommandLineForStartupFile(QString::fromWCharArray(lpstrCmdLine));
+    QString sStartupFile;
+    if (argc == 2) {
+        sStartupFile = argv[1];
+
+        // Falls der Windows-Parser den Backslash geschluckt und ein " an den String gehängt hat:
+        if (sStartupFile.endsWith('"')) {
+            sStartupFile.chop(1);  // Das falsche Anführungszeichen abschneiden
+            sStartupFile += "/";   // Einen sauberen Ordner-Abschluss hinzufügen
+        }
+
+        sStartupFile = QDir::cleanPath(sStartupFile);
+    }
 
     // Searches for other instances and asks them if *they* want to handle our startup file in our place. If not, we do it.
     HANDLE hMutex = ::CreateMutexW(nullptr, FALSE, L"JPVMtX2869");
@@ -97,11 +115,6 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
     int nRet = 0;
     // Run application
     if (_HWNDOtherInstance == nullptr) {
-        // Initialize GDI+
-        Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-        ULONG_PTR gdiplusToken;
-        Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
-
         CMainDlg dlgMain(sStartupFile);
 
         try {
@@ -116,9 +129,6 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
         catch (...) {
             ::ShowCursor(TRUE);
         }
-
-        // Shut down GDI+
-        Gdiplus::GdiplusShutdown(gdiplusToken);
     } else {
         ::SetForegroundWindow(_HWNDOtherInstance);
     }

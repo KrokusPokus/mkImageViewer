@@ -590,24 +590,6 @@ void* CBasicProcessing::Convert3To4Channels(int nWidth, int nHeight, const void*
     return pNewDIB;
 }
 
-void* CBasicProcessing::ConvertGdiplus32bppRGB(int nWidth, int nHeight, int nStride, const void* pGdiplusPixels, bool bPurgeAlpha) {
-    if (pGdiplusPixels == NULL || nWidth*4 > abs(nStride)) {
-        return NULL;
-    }
-    uint32 nAlphaFix = bPurgeAlpha == true ? ALPHA_OPAQUE : 0x0;
-    uint32* pNewDIB = new(std::nothrow) uint32[nWidth * nHeight];
-    if (pNewDIB == NULL) return NULL;
-    uint32* pTgt = pNewDIB;
-    const uint8* pSrc = (const uint8*)pGdiplusPixels;
-    for (int j = 0; j < nHeight; j++) {
-        for (int i = 0; i < nWidth; i++)
-            pTgt[i] = ((uint32*)pSrc)[i] | nAlphaFix;
-        pTgt += nWidth;
-        pSrc += nStride;
-    }
-    return pNewDIB;
-}
-
 void* CBasicProcessing::CopyRect32bpp(void* pTarget, const void* pSource,  CSize targetSize, CRect targetRect,
                                       CSize sourceSize, CRect sourceRect) {
     if (pSource == NULL || sourceRect.Size() != targetRect.Size() || 

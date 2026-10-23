@@ -1,5 +1,4 @@
 #include "ImageLoadThread.h"
-#include "BasicProcessing.h"
 #include "Helpers.h"
 #include "JPEGImage.h"
 #include "MaxImageDef.h"
@@ -16,34 +15,40 @@
 #include "wrapperTJPEG.h"
 #include "wrapperWEBP.h"
 #include "zip/zip.h"
-#include "libjpeg-turbo\include\turbojpeg.h"
+#include "libjpeg-turbo/include/turbojpeg.h"
 
 #include <algorithm>
-#include <cassert>
 #include <climits>
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <QBuffer>
+#include <QByteArray>
+#include <QColorSpace>
 #include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QImage>
+#include <QImageReader>
+#include <QSize>
 #include <QString>
-
-using namespace Gdiplus;
 
 #include "bit7z/include/bitarchivereader.hpp"
 using namespace bit7z;
 
 // static initializers
-//QAtomicInt CImageLoadThread::m_curHandle(0);
 std::atomic<int> CImageLoadThread::m_curHandle(0);
+
+// The DIBs handed to CJPEGImage are BGRA. QImage::Format_ARGB32 / Format_RGB32 have exactly this layout on little endian.
+static_assert(Q_BYTE_ORDER == Q_LITTLE_ENDIAN, "The 32bpp DIB layout (B,G,R,A) assumes a little endian platform");
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // static helpers
@@ -71,7 +76,7 @@ const uint64_t kMaxZipEntrySize = std::min<uint64_t>(
 // Flags for the decoder caches that must survive when switching to another format
 enum CacheKeep : unsigned {
     Keep_None = 0,
-    Keep_GDI  = 1u << 0,
+    Keep_Qt   = 1u << 0,
     Keep_Webp = 1u << 1,
     Keep_Png  = 1u << 2,
     Keep_Jxl  = 1u << 3,
@@ -280,102 +285,147 @@ std::string ToNativeNarrowPath(const QString& sFileName) {
 #endif
 }
 
-EImageFormat GetBitmapFormat(Gdiplus::Bitmap* pBitmap) {
-    GUID guid{ 0 };
-    pBitmap->GetRawFormat(&guid);
-    if (guid == Gdiplus::ImageFormatBMP) {
-        return IF_WindowsBMP;
-    } else if (guid == Gdiplus::ImageFormatPNG) {
-        return IF_PNG;
-    } else if (guid == Gdiplus::ImageFormatGIF) {
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Qt image decoding (QImageReader / QImage / QColorSpace)
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+// Format and frame information that is handed over to the CJPEGImage constructor
+struct CImageFrameInfo {
+    EImageFormat eFormat = IF_Unknown;
+    bool bIsAnimation = false;
+    int nFrameIndex = 0;
+    int nFrameCount = 1;
+    int nFrameTimeMs = 100;
+};
+
+// Maps the format name reported by QImageReader::format() to the image format used by CJPEGImage.
+// ICO deliberately stays IF_Unknown
+EImageFormat MapQtImageFormat(const QByteArray& sFormat) {
+    if (sFormat == "gif") {
         return IF_GIF;
-    } else if (guid == Gdiplus::ImageFormatTIFF) {
-        return IF_TIFF;
-    } else if (guid == Gdiplus::ImageFormatJPEG || guid == Gdiplus::ImageFormatEXIF) {
-        return IF_JPEG;
-    } else {
-        return IF_Unknown;
     }
+    if (sFormat == "tif" || sFormat == "tiff") {
+        return IF_TIFF;
+    }
+    if (sFormat == "png") {
+        return IF_PNG;
+    }
+    if (sFormat == "jpg" || sFormat == "jpeg") {
+        return IF_JPEG;
+    }
+    if (sFormat == "bmp") {
+        return IF_WindowsBMP;
+    }
+    return IF_Unknown;
 }
 
-CJPEGImage* ConvertGDIPlusBitmapToJPEGImage(Gdiplus::Bitmap* pBitmap, int nFrameIndex, void* pEXIFData,
-                                            __int64 nJPEGHash, bool& isOutOfMemory, bool& isAnimatedGIF,
-                                            Helpers::ETransparencyMode nTransparencyMode) {
+const QColorSpace& SrgbColorSpace() {
+    static const QColorSpace kSrgb(QColorSpace::SRgb);
+    return kSrgb;
+}
 
+std::unique_ptr<QImageReader> CreateQtImageReader(QIODevice* pDevice) {
+    auto pReader = std::make_unique<QImageReader>(pDevice);
+    pReader->setDecideFormatFromContent(true); // do not trust the file extension
+    return pReader;
+}
+
+// Checks the image size reported by the decoder *before* the pixels are decoded.
+// Returns false if the image must not be decoded. bOutOfMemory is set if it is rejected because of its pixel count.
+bool IsImageSizeAcceptable(const QSize& size, bool& bOutOfMemory) {
+    if (!size.isValid()) {
+        return true; // not known before decoding, ConvertQImageToJPEGImage() checks again afterwards
+    }
+    if (size.width() > MAX_IMAGE_DIMENSION || size.height() > MAX_IMAGE_DIMENSION) {
+        return false;
+    }
+    if (static_cast<double>(size.width()) * size.height() > MAX_IMAGE_PIXELS) {
+        bOutOfMemory = true;
+        return false;
+    }
+    return true;
+}
+
+// Converts a decoded QImage into a CJPEGImage (32bpp BGRA DIB).
+// - If enabled in the settings, the embedded ICC profile is applied (conversion to sRGB). Images without a profile,
+//   or with a profile Qt cannot use, have an invalid colorSpace() and are left untouched.
+// - Images with an alpha channel are blended onto the background according to nTransparencyMode.
+// pEXIFData is copied by CJPEGImage, the caller keeps ownership.
+CJPEGImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImageFrameInfo& frame,
+                                     bool& isOutOfMemory, Helpers::ETransparencyMode nTransparencyMode) {
     isOutOfMemory = false;
-    isAnimatedGIF = false;
-    if (pBitmap == nullptr) {
+    if (image.isNull()) {
         return nullptr;
     }
-    Gdiplus::Status lastStatus = pBitmap->GetLastStatus();
-    if (lastStatus != Gdiplus::Ok) {
-        isOutOfMemory = lastStatus == Gdiplus::OutOfMemory;
+    if (!IsImageSizeAcceptable(image.size(), isOutOfMemory)) {
         return nullptr;
     }
 
-    if (pBitmap->GetWidth() > MAX_IMAGE_DIMENSION || pBitmap->GetHeight() > MAX_IMAGE_DIMENSION) {
+    // Always work with 8 bit/channel: RGB32 for opaque images (the unused byte is 0xff), straight (not premultiplied) ARGB32 otherwise.
+    // convertTo() keeps the color space of the image.
+    const bool bHasAlphaChannel = image.hasAlphaChannel();
+    image.convertTo(bHasAlphaChannel ? QImage::Format_ARGB32 : QImage::Format_RGB32);
+    if (image.isNull()) {
+        isOutOfMemory = true; // the conversion could not allocate its target
         return nullptr;
     }
-    if (static_cast<double>(pBitmap->GetWidth()) * pBitmap->GetHeight() > MAX_IMAGE_PIXELS) {
+
+    if (CSettingsProvider::This().UseEmbeddedColorProfiles()) {
+        const QColorSpace colorSpace = image.colorSpace();
+        if (colorSpace.isValid() && colorSpace != SrgbColorSpace()) {
+            image.convertToColorSpace(SrgbColorSpace());
+        }
+    }
+
+    const int nWidth = image.width();
+    const int nHeight = image.height();
+    const size_t nRowBytes = static_cast<size_t>(nWidth) * 4;
+    std::unique_ptr<uint8_t[]> pDIB(new (std::nothrow) uint8_t[nRowBytes * static_cast<size_t>(nHeight)]);
+    if (!pDIB) {
         isOutOfMemory = true;
         return nullptr;
     }
-
-    const EImageFormat eImageFormat = GetBitmapFormat(pBitmap);
-
-    // Handle multiframe images.
-    // Note that only the first frame dimension is looked at, it is unclear if GDI+ anyway supports image formats with more dimensions
-    const UINT nDimensions = pBitmap->GetFrameDimensionsCount();
-    std::vector<GUID> dimensionIDs(nDimensions);
-    if (nDimensions > 0) {
-        pBitmap->GetFrameDimensionsList(dimensionIDs.data(), nDimensions);
+    for (int y = 0; y < nHeight; ++y) {
+        std::memcpy(pDIB.get() + static_cast<size_t>(y) * nRowBytes, image.constScanLine(y), nRowBytes);
     }
-    // GetFrameCount() returns 0 on failure, never let the upper clamp bound drop below 0
-    const int nFrameCount = (nDimensions == 0) ? 1 : std::max<int>(1, pBitmap->GetFrameCount(&dimensionIDs[0]));
-    nFrameIndex = std::clamp(nFrameIndex, 0, nFrameCount - 1);
-    int nFrameTimeMs = 100;
-    if (nFrameCount > 1) {
-        isAnimatedGIF = eImageFormat == IF_GIF;
-        const UINT nTagFrameDelaySize = pBitmap->GetPropertyItemSize(PropertyTagFrameDelay);
-        if (nTagFrameDelaySize > 0) {
-            std::unique_ptr<char[]> propertyBuffer(new char[nTagFrameDelaySize]);
-            auto* pPropertyItem = reinterpret_cast<Gdiplus::PropertyItem*>(propertyBuffer.get());
-            if (pBitmap->GetPropertyItem(PropertyTagFrameDelay, nTagFrameDelaySize, pPropertyItem) == Gdiplus::Ok) {
-                // The delays are an array of 32 bit values (in 1/100 s). Do not use 'long' here, its size is platform dependent.
-                const size_t nDelays = pPropertyItem->length / sizeof(int32_t);
-                if (static_cast<size_t>(nFrameIndex) < nDelays) {
-                    nFrameTimeMs = static_cast<const int32_t*>(pPropertyItem->value)[nFrameIndex] * 10;
-                }
-            }
-        }
-        GUID pageGuid = (eImageFormat == IF_TIFF) ? FrameDimensionPage : FrameDimensionTime;
-        pBitmap->SelectActiveFrame(&pageGuid, nFrameIndex);
+    image = QImage(); // release the decoded image before the CJPEGImage is created
+
+    if (bHasAlphaChannel) {
+        Helpers::BlendAlpha(reinterpret_cast<uint32*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
     }
-
-    // If there is an alpha channel in the original file the image must be alpha blended onto a background color
-    CJPEGImage* pJPEGImage = nullptr;
-    const Gdiplus::PixelFormat pixelFormat = pBitmap->GetPixelFormat();
-    const bool bHasAlphaChannel = (pixelFormat & (PixelFormatAlpha | PixelFormatPAlpha)) != 0;
-
-    Gdiplus::Rect bmRect(0, 0, pBitmap->GetWidth(), pBitmap->GetHeight());
-    Gdiplus::BitmapData bmData;
-    lastStatus = pBitmap->LockBits(&bmRect, Gdiplus::ImageLockModeRead, PixelFormat32bppRGB, &bmData);
-    if (lastStatus == Gdiplus::Ok) {
-        assert(bmData.PixelFormat == PixelFormat32bppRGB);
-        void* pDIB = CBasicProcessing::ConvertGdiplus32bppRGB(bmRect.Width, bmRect.Height, bmData.Stride, bmData.Scan0, !bHasAlphaChannel);
-        if (pDIB != nullptr) {
-            if (bHasAlphaChannel) {
-                Helpers::BlendAlpha(static_cast<uint32*>(pDIB), bmRect.Width, bmRect.Height, nTransparencyMode);
-            }
-            pJPEGImage = new CJPEGImage(bmRect.Width, bmRect.Height, pDIB, pEXIFData, 4, nJPEGHash, eImageFormat,
-                                        eImageFormat == IF_GIF && nFrameCount > 1, nFrameIndex, nFrameCount, nFrameTimeMs);
-        }
-        pBitmap->UnlockBits(&bmData);
-    } else if (lastStatus == Gdiplus::ValueOverflow) {
-        isOutOfMemory = true;
-    }
-
+    CJPEGImage* pJPEGImage = new CJPEGImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat,
+                                            frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs);
+    pDIB.release(); // owned by the CJPEGImage now
     return pJPEGImage;
+}
+
+// Decodes the first frame of an image that is already held in memory.
+// This is what QImage::fromData() does internally; a QImageReader is used directly because it reports the image
+// size before the pixels are decoded, which keeps the MAX_IMAGE_DIMENSION / MAX_IMAGE_PIXELS limits effective.
+// pData must stay valid for the duration of the call (it is not copied).
+CJPEGImage* DecodeBufferWithQt(const void* pData, int nSize, void* pEXIFData, const CImageFrameInfo& frame,
+                               bool& isOutOfMemory, Helpers::ETransparencyMode nTransparencyMode) {
+    isOutOfMemory = false;
+    try {
+        QByteArray data = QByteArray::fromRawData(static_cast<const char*>(pData), nSize);
+        QBuffer buffer(&data);
+        if (!buffer.open(QIODevice::ReadOnly)) {
+            return nullptr;
+        }
+        const std::unique_ptr<QImageReader> pReader = CreateQtImageReader(&buffer); // destroyed before 'buffer'
+        if (!IsImageSizeAcceptable(pReader->size(), isOutOfMemory)) {
+            return nullptr;
+        }
+        QImage image = pReader->read();
+        if (image.isNull()) {
+            qDebug() << "DecodeBufferWithQt() failed:" << pReader->errorString();
+            return nullptr;
+        }
+        return ConvertQImageToJPEGImage(std::move(image), pEXIFData, frame, isOutOfMemory, nTransparencyMode);
+    } catch (const std::bad_alloc&) {
+        isOutOfMemory = true;
+        return nullptr;
+    }
 }
 
 // Failed:       this single entry could not be read (corrupt data, CRC error, ...) -> skip it like a non-image
@@ -450,12 +500,10 @@ EEntryRead ReadZipEntry(const ZipEntry& z, bool use7z, const std::string& sArchi
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 CImageLoadThread::CImageLoadThread(void) : CWorkThread(true) {
-    m_pLastBitmap = nullptr;
 }
 
 CImageLoadThread::~CImageLoadThread(void) {
-    Terminate();
-    DeleteCachedGDIBitmap();
+    DeleteCachedQtImageReader();
     DeleteCachedWebpDecoder();
     DeleteCachedPngDecoder();
     DeleteCachedJxlDecoder();
@@ -464,11 +512,6 @@ CImageLoadThread::~CImageLoadThread(void) {
 }
 
 int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, std::function<void(int)> onCompleted) {
-    /*
-    CRequest* pRequest = new CRequest(strFileName, nFrameIndex, processParams, onCompleted);
-    const int nHandle = pRequest->RequestHandle; // Read the handle before handing the request over: the worker thread may process it right away
-    ProcessAsync(pRequest);
-    */
     auto pRequest = std::make_shared<CRequest>(strFileName, nFrameIndex, processParams, onCompleted);
     const int nHandle = pRequest->RequestHandle; // Read the handle before handing the request over: the worker thread may process it right away
     ProcessAsync(std::move(pRequest));
@@ -476,23 +519,6 @@ int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, con
 }
 
 CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
-    /*
-    Helpers::CAutoCriticalSection criticalSection(m_csList);
-    CJPEGImage* imageFound = nullptr;
-    bool bFailedMemory = false;
-    bool bFailedException = false;
-    for (CRequestBase* pBase : std::as_const(m_requestList)) {
-        CRequest* pRequest = static_cast<CRequest*>(pBase);
-        if (pRequest->Processed && !pRequest->Deleted && pRequest->RequestHandle == nHandle) {
-            imageFound = pRequest->Image;
-            bFailedMemory = pRequest->OutOfMemory;
-            bFailedException = pRequest->ExceptionError;
-            pRequest->Deleted = true;
-            break;
-        }
-    }
-    return CImageData(imageFound, bFailedMemory, bFailedException);
-    */
     return WithRequestList([&](const auto& list) -> CImageData {
         for (const auto& r : list) {
             if (r->Type == CReleaseFileRequest::ReleaseFileRequest) continue;
@@ -507,10 +533,6 @@ CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
 }
 
 void CImageLoadThread::ReleaseFile(const QString& strFileName) {
-    /*
-    CReleaseFileRequest* pRequest = new CReleaseFileRequest(strFileName);
-    ProcessAndWait(pRequest);
-    */
     try { ProcessAndWait(std::make_shared<CReleaseFileRequest>(strFileName)); } catch (...) {}
 }
 
@@ -530,7 +552,7 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
     if (request.Type == CReleaseFileRequest::ReleaseFileRequest) {
         CReleaseFileRequest& rq = static_cast<CReleaseFileRequest&>(request);
         if (rq.FileName == m_sLastFileName) {
-            DeleteCachedGDIBitmap();
+            DeleteCachedQtImageReader();
         }
         if (rq.FileName == m_sLastWebpFileName) {
             DeleteCachedWebpDecoder();
@@ -549,7 +571,7 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
 
     // Drops all cached decoders except the ones flagged in 'keep'
     auto dropCaches = [this](unsigned keep) {
-        if (!(keep & Keep_GDI))  DeleteCachedGDIBitmap();
+        if (!(keep & Keep_Qt))   DeleteCachedQtImageReader();
         if (!(keep & Keep_Webp)) DeleteCachedWebpDecoder();
         if (!(keep & Keep_Png))  DeleteCachedPngDecoder();
         if (!(keep & Keep_Jxl))  DeleteCachedJxlDecoder();
@@ -607,9 +629,9 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
         ProcessReadZipRequest(&rq);
         break;
     default:
-        // try with GDI+ (keeps the cached GDI+ bitmap for animated GIFs)
-        dropCaches(Keep_GDI | Keep_Zip);
-        ProcessReadGDIPlusRequest(&rq);
+        // GIF, TIFF, ICO and everything else: try with Qt (keeps the cached QImageReader for animated GIFs)
+        dropCaches(Keep_Qt | Keep_Zip);
+        ProcessReadQtImageRequest(&rq);
         break;
     }
     // then process the image if read was successful
@@ -647,10 +669,13 @@ static void LimitOffsets(CPoint& offsets, QSize clippingSize, const QSize & imag
     offsets.y = std::clamp<LONG>(offsets.y, -nMaxOffsetY, +nMaxOffsetY);
 }
 
-void CImageLoadThread::DeleteCachedGDIBitmap() {
-    delete m_pLastBitmap;
-    m_pLastBitmap = nullptr;
+void CImageLoadThread::DeleteCachedQtImageReader() {
+    // Order matters: the reader uses the file as its device
+    m_pLastImageReader.reset();
+    m_pLastImageFile.reset();
     m_sLastFileName.clear();
+    m_nLastQtFrameIndex = -1;
+    m_nLastQtFrameCount = 1;
 }
 
 void CImageLoadThread::DeleteCachedWebpDecoder() {
@@ -710,7 +735,7 @@ void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
             request->OutOfMemory = true;
         } else {
             pPixelData.reset();
-            ProcessReadGDIPlusRequest(request);
+            ProcessReadQtImageRequest(request);
         }
     } catch (...) {
         delete request->Image;
@@ -725,7 +750,7 @@ void CImageLoadThread::ProcessReadBMPRequest(CRequest * request) {
     if (bOutOfMemory) {
         request->OutOfMemory = true;
     } else if (request->Image == nullptr) {
-        ProcessReadGDIPlusRequest(request);
+        ProcessReadQtImageRequest(request);
     }
 }
 
@@ -823,6 +848,17 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
         } else {
             free(pEXIFData);
             DeleteCachedPngDecoder();
+
+            if (!request->OutOfMemory && pBuffer) {
+                // libpng could not decode the file: give Qt a chance, the file is already in memory
+                void* pQtEXIFData = PngReader::GetEXIFBlock(pBuffer.get(), static_cast<size_t>(nFileSize));
+                bool bQtOutOfMemory = false;
+                request->Image = DecodeBufferWithQt(pBuffer.get(), static_cast<int>(nFileSize), pQtEXIFData,
+                                                    CImageFrameInfo{ .eFormat = IF_PNG }, bQtOutOfMemory,
+                                                    request->ProcessParams.TransparencyMode);
+                free(pQtEXIFData);
+                request->OutOfMemory = request->Image == nullptr && bQtOutOfMemory;
+            }
         }
     }
     catch (...) {
@@ -1005,22 +1041,106 @@ void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
     }
 }
 
-void CImageLoadThread::ProcessReadGDIPlusRequest(CRequest * request) {
-    Gdiplus::Bitmap* pBitmap = nullptr;
+// Loads an image with Qt (QImageReader). Used for GIF, TIFF, ICO, and as a fallback if the dedicated JPEG/BMP decoders fail.
+// Multi-frame images: the frame to show is request->FrameIndex.
+//  - GIF:  Qt's GIF handler can only decode forward (jumpToImage() is not supported). The QImageReader and its file are
+//          therefore cached while the animation is shown: the next frame is a plain read(). Any other frame rewinds the
+//          file and decodes forward (frames before the requested one are decoded and thrown away).
+//          The cache is dropped by ReleaseFile() or when another file is loaded.
+//  - TIFF: pages are random access (jumpToImage()), nothing is cached.
+void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
+    try {
+        const bool bUseCachedReader = m_pLastImageReader && request->FileName == m_sLastFileName;
+        if (!bUseCachedReader) {
+            DeleteCachedQtImageReader();
+            auto pFile = std::make_unique<QFile>(request->FileName);
+            if (!pFile->open(QIODevice::ReadOnly)) {
+                return;
+            }
+            m_pLastImageFile = std::move(pFile);
+            m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get());
+            m_sLastFileName = request->FileName;
+        }
 
-    if (request->FileName == m_sLastFileName) {
-        pBitmap = m_pLastBitmap;
-    } else {
-        DeleteCachedGDIBitmap();
-        m_pLastBitmap = pBitmap = new Gdiplus::Bitmap(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), CSettingsProvider::This().UseEmbeddedColorProfiles());
-        m_sLastFileName = request->FileName;
-    }
-    bool isOutOfMemory = false;
-    bool isAnimatedGIF = false;
-    request->Image = ConvertGDIPlusBitmapToJPEGImage(pBitmap, request->FrameIndex, nullptr, 0, isOutOfMemory, isAnimatedGIF, request->ProcessParams.TransparencyMode);
-    request->OutOfMemory = request->Image == nullptr && isOutOfMemory;
-    if (!isAnimatedGIF) {
-        DeleteCachedGDIBitmap();
+        const EImageFormat eFormat = MapQtImageFormat(m_pLastImageReader->format());
+        if (!bUseCachedReader) {
+            // imageCount() has to be queried BEFORE size(): with size() called first the TIFF handler reports a single
+            // page for multi-page files (observed with Qt 6.12).
+            if (eFormat == IF_GIF || eFormat == IF_TIFF) {
+                m_nLastQtFrameCount = std::max(1, m_pLastImageReader->imageCount());
+            }
+            // reject too large images before any pixel is decoded
+            if (!IsImageSizeAcceptable(m_pLastImageReader->size(), request->OutOfMemory)) {
+                DeleteCachedQtImageReader();
+                return;
+            }
+        }
+
+        const int nFrameCount = m_nLastQtFrameCount;
+        const int nFrameIndex = std::clamp(request->FrameIndex, 0, nFrameCount - 1);
+        const bool bIsAnimatedGif = (eFormat == IF_GIF && nFrameCount > 1);
+
+        QImage image;
+        if (eFormat == IF_TIFF && nFrameCount > 1) {
+            if (m_pLastImageReader->jumpToImage(nFrameIndex)) {
+                image = m_pLastImageReader->read();
+            }
+        } else if (bIsAnimatedGif) {
+            if (nFrameIndex <= m_nLastQtFrameIndex) {
+                // rewind: a new reader on the file at position 0 starts again with the first frame
+                m_pLastImageReader.reset();
+                if (!m_pLastImageFile->seek(0)) {
+                    DeleteCachedQtImageReader();
+                    return;
+                }
+                m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get());
+                m_nLastQtFrameIndex = -1;
+            }
+            // decode (and discard) the frames in front of the requested one; for the next frame there is nothing to skip
+            for (int i = m_nLastQtFrameIndex + 1; i < nFrameIndex; ++i) {
+                if (m_pLastImageReader->read().isNull()) {
+                    break;
+                }
+            }
+            image = m_pLastImageReader->read();
+            m_nLastQtFrameIndex = nFrameIndex;
+        } else {
+            image = m_pLastImageReader->read();
+        }
+
+        if (image.isNull()) {
+            qDebug() << "ProcessReadQtImageRequest() failed:" << request->FileName << m_pLastImageReader->errorString();
+            DeleteCachedQtImageReader();
+            return;
+        }
+
+        int nFrameTimeMs = 100;
+        if (nFrameCount > 1) {
+            // delay of the frame that was just read
+            const int nDelayMs = m_pLastImageReader->nextImageDelay();
+            if (nDelayMs > 0) {
+                nFrameTimeMs = nDelayMs;
+            }
+        }
+
+        bool bOutOfMemory = false;
+        request->Image = ConvertQImageToJPEGImage(std::move(image), nullptr,
+                                                  CImageFrameInfo{ eFormat, bIsAnimatedGif, nFrameIndex, nFrameCount, nFrameTimeMs },
+                                                  bOutOfMemory, request->ProcessParams.TransparencyMode);
+        request->OutOfMemory = request->Image == nullptr && bOutOfMemory;
+        if (!bIsAnimatedGif) {
+            DeleteCachedQtImageReader();
+        }
+    } catch (const std::bad_alloc&) {
+        delete request->Image;
+        request->Image = nullptr;
+        request->OutOfMemory = true;
+        DeleteCachedQtImageReader();
+    } catch (...) {
+        delete request->Image;
+        request->Image = nullptr;
+        request->ExceptionError = true;
+        DeleteCachedQtImageReader();
     }
 }
 
@@ -1111,6 +1231,9 @@ ZipEntry::ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned 
  *   In archive mode only the first frame is shown. Their caches are dropped after every entry, so a decoder
  *   never outlives the entry buffer (JXL reads directly from it) and never leaks state into the next entry.
  *
+ * - GIF, TIFF and ICO entries have no dedicated wrapper: they are decoded from the entry buffer by Qt
+ *   (DecodeBufferWithQt), again only the first frame.
+ *
  * - These readers take it as an argument but do nothing with it and internally just hand it over to CJPEGImage():
  *        CReaderBMP::ReadBmpImage()
  *        RawReader::ReadImage()
@@ -1128,7 +1251,7 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
         bIsSameArchive = true;
     } else {
         // New ZIP. Delete all cached decoders.
-        DeleteCachedGDIBitmap();
+        DeleteCachedQtImageReader();
         DeleteCachedWebpDecoder();
         DeleteCachedPngDecoder();
         DeleteCachedJxlDecoder();
@@ -1357,8 +1480,24 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                         }
                     }
                     break;
+                    case IF_GIF:
+                    case IF_TIFF:
+                    case IF_ICO:
+                    {
+                        // No dedicated wrapper: Qt decodes the entry straight from the buffer (first frame only)
+                        bool bQtOutOfMemory = false;
+                        request->Image = DecodeBufferWithQt(pBuffer.get(), nSize, nullptr, CImageFrameInfo{ EXTRA_MANGA_PARAMS },
+                                                            bQtOutOfMemory, request->ProcessParams.TransparencyMode);
+                        if (request->Image != nullptr) {
+                            bSuccess = true;
+                        }
+                        if (bQtOutOfMemory) {
+                            request->OutOfMemory = true;
+                        }
+                    }
+                    break;
                     default:
-                        // unable to do as API reads from file and not buffer
+                        // not an image format that can be decoded from a buffer
                         break;
                     }
                 }

@@ -5,12 +5,14 @@
 #include "WorkThread.h"
 #include "bit7z/include/bittypes.hpp"
 
-#include <gdiplus.h>
-#include <vector>
 #include <functional>
-#include <QString>
-#include <QAtomicInt>
 #include <memory>
+#include <vector>
+
+#include <QAtomicInt>
+#include <QFile>
+#include <QImageReader>
+#include <QString>
 
 class CJPEGImage;
 class ZipEntry
@@ -97,7 +99,7 @@ private:
         QString FileName;
     };
 
-    Gdiplus::Bitmap* m_pLastBitmap;
+
     QString m_sLastFileName;
     QString m_sLastWebpFileName;
     QString m_sLastPngFileName;
@@ -109,7 +111,6 @@ private:
 
     virtual void ProcessRequest(CRequestBase& request) override;
     virtual void AfterFinishProcess(CRequestBase& request) override;
-    void DeleteCachedGDIBitmap();
     void DeleteCachedWebpDecoder();
     void DeleteCachedPngDecoder();
     void DeleteCachedJxlDecoder();
@@ -128,7 +129,6 @@ private:
     void ProcessReadHEIFRequest(CRequest * request);
     void ProcessReadQOIRequest(CRequest * request);
     void ProcessReadPSDRequest(CRequest * request);
-    void ProcessReadGDIPlusRequest(CRequest * request);
 
     static void SetFileDependentProcessParams(CRequest * request);
     static bool ProcessImageAfterLoad(CRequest * request);
@@ -140,6 +140,14 @@ private:
     void OnCancelled(CRequestBase&) override;
 
     std::unique_ptr<char[]> m_pJxlBuffer;   // Eingabepuffer des JXL-Decoders bei Animationen
+
+    // QImageReader
+    std::unique_ptr<QFile>        m_pLastImageFile;    // VOR dem Reader deklarieren
+    std::unique_ptr<QImageReader> m_pLastImageReader;
+    int m_nLastQtFrameIndex = -1; // GIF: zuletzt gelesenes Frame
+    int m_nLastQtFrameCount = 1;
+    void DeleteCachedQtImageReader();
+    void ProcessReadQtImageRequest(CRequest* request);
 };
 
 #endif // IMAGELOADTHREAD_H

@@ -189,11 +189,6 @@ public:
     bool IsContainer() const { return m_eContainerFormat != IF_Unknown; }
     bool ContainerHasMultipleImages() const { return (m_eContainerFormat != IF_Unknown) && (m_nNumberOfFrames > 1); }
 
-    // Gets if the image format is one of the formats supported by GDI+
-    bool IsGDIPlusFormat() const {
-        return m_eImageFormat == IF_JPEG || m_eImageFormat == IF_WindowsBMP || m_eImageFormat == IF_PNG || m_eImageFormat == IF_TIFF || m_eImageFormat == IF_GIF;
-    }
-
     // Gets if this image is part of an animation (animated GIF)
     bool IsAnimation() const { return m_bIsAnimation; }
 
