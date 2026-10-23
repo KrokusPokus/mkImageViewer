@@ -62,6 +62,7 @@ public:
 
     // Called by the different controller classes
     bool IsFullScreenMode() { return m_bFullScreenMode; }
+    bool IsMaximizedMode() { return isMaximized(); }
     bool IsKeepParams() { return m_bKeepParams; }
     int GetRotation() { return m_nRotation; }
     CJPEGImage* GetCurrentImage() { return m_pCurrentImage; }

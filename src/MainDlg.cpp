@@ -2091,6 +2091,12 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             else {
                 // Vollbild verlassen und normales Fenster wiederherstellen
                 this->showNormal();
+
+                if (sp.ExplicitWindowRect()) {
+                    QRect defaultWindowRect = CMultiMonitorSupport::GetDefaultWindowRect();
+                    this->setGeometry(defaultWindowRect.left(), defaultWindowRect.top(), defaultWindowRect.width(), defaultWindowRect.height());
+                }
+
                 UpdateWindowTitle(true); // Aktualisiert den Titel / das Icon der Titelleiste
                 this->MouseOn();
             }

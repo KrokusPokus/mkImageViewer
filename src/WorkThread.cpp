@@ -1,163 +1,260 @@
 #include "WorkThread.h"
 
+#include <algorithm>
+#include <cassert>
+#include <stdexcept>
+#include <utility>
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Public
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 CWorkThread::CWorkThread(bool bCoInitialize)
-    : m_csList{ 0 }
-{
-    m_bTerminate = false;
-    m_bCoInitialize = bCoInitialize;
-    ::InitializeCriticalSection(&m_csList);
-    m_wakeUp = ::CreateEvent(0, TRUE, FALSE, NULL);
-
-    m_hThread = (HANDLE)_beginthread(ThreadFunc, 0, this);
+    : m_bCoInitialize(bCoInitialize) {
 }
 
-CWorkThread::~CWorkThread(void) {
-    if (!m_bTerminate) {
-        Terminate();
-    }
-    
-    // キュー残留リクエストの解放
-    // Terminate 完了後はワーカースレッドが動いていないため m_csList は不要だが、安全のため取得する
-    ::EnterCriticalSection(&m_csList);
-    for (std::list<CRequestBase*>::iterator iter = m_requestList.begin(); iter != m_requestList.end(); ++iter) {
-        delete *iter;
-    }
-    m_requestList.clear();
-    ::LeaveCriticalSection(&m_csList);
-    
-    ::DeleteCriticalSection(&m_csList);
-    ::CloseHandle(m_wakeUp);
+CWorkThread::~CWorkThread() {
+    assert((!m_thread.joinable() || m_bTerminate.load())
+           && "Derived classes of CWorkThread must call Terminate() first thing in their destructor");
+    Terminate();
 }
 
-void CWorkThread::ProcessAndWait(CRequestBase* pRequest) {
-    bool bCreateEvent = pRequest->EventFinished == NULL;
-    if (bCreateEvent) {
-        pRequest->EventFinished = ::CreateEvent(0, TRUE, FALSE, NULL);
+void CWorkThread::ProcessAsync(RequestPtr request) {
+    if (!request) {
+        throw std::invalid_argument("CWorkThread::ProcessAsync: null request");
     }
 
-    ProcessAsync(pRequest);
-    ::WaitForSingleObject(pRequest->EventFinished, INFINITE);
-
-    if (bCreateEvent) {
-        ::CloseHandle(pRequest->EventFinished);
+    std::vector<RequestPtr> discarded;  // destroyed after the lock is released
+    std::vector<RequestPtr> toFinish;
+    bool bQueued = false;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_bAccepting) {
+            // Terminating: nobody will ever process this. Complete as cancelled so waiters wake up.
+            CancelLocked(request, toFinish);
+        } else {
+            StartLocked();
+            CollectDeletedLocked(discarded, toFinish);  // keeps the queue from growing
+            m_requestList.push_back(std::move(request));
+            bQueued = true;
+        }
     }
-    pRequest->Deleted = true; // make sure the request is removed from the queue
+    FinishCancelled(toFinish);
+    if (bQueued) {
+        m_cv.notify_one();  // queued under m_mutex and tested under m_mutex: no lost wake-up
+    }
 }
 
-void CWorkThread::ProcessAsync(CRequestBase* pRequest) {
-    ::EnterCriticalSection(&m_csList);
-    m_requestList.push_back(pRequest);
-    ::LeaveCriticalSection(&m_csList);
+bool CWorkThread::ProcessAndWait(RequestPtr request) {
+    if (!request) {
+        throw std::invalid_argument("CWorkThread::ProcessAndWait: null request");
+    }
+    if (std::this_thread::get_id() == m_workerId.load()) {
+        throw std::logic_error("CWorkThread::ProcessAndWait called from the worker thread (would deadlock)");
+    }
+    if (!request->EventFinished) {
+        request->EventFinished = std::make_shared<CCompletionEvent>();
+    }
+    const std::shared_ptr<CCompletionEvent> event = request->EventFinished;
 
-    // there is something to process now
-    ::SetEvent(m_wakeUp);
+    ProcessAsync(request);
+    event->Wait();
+
+    RemoveRequest(request);     // the caller keeps its own reference
+    if (request->Error) {
+        std::rethrow_exception(request->Error);
+    }
+    return !request->Cancelled;
 }
 
-void CWorkThread::Terminate() { 
-    m_bTerminate = true;
-    if (m_hThread != NULL) {
-        ::SetEvent(m_wakeUp);
-        ::WaitForSingleObject(m_hThread, 10000);
-        m_hThread = NULL;
+void CWorkThread::RemoveRequest(const RequestPtr& request) {
+    if (!request) {
+        return;
     }
+
+    std::vector<RequestPtr> toFinish;
+    RequestPtr removed;  // destroyed outside the lock
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        request->Deleted = true;
+        const auto it = std::find(m_requestList.begin(), m_requestList.end(), request);
+        if (it == m_requestList.end()) {
+            return;
+        }
+        if (it->get() != m_pCurrent) {
+            CancelLocked(*it, toFinish);    // no-op if already processed
+        }
+        removed = std::move(*it);
+        m_requestList.erase(it);
+    }
+    FinishCancelled(toFinish);  // Deleted is set: OnCancelled() is not called
+}
+
+void CWorkThread::Terminate() {
+    RequestStop();
+
+    if (m_workerId.load() == std::this_thread::get_id()) {
+        // Called from the worker itself (e.g. from a callback): it cannot join itself. The worker leaves
+        // its loop when the current callback returns; the join happens in the destructor.
+        CancelPendingRequests();
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> joinLock(m_joinMutex);
+        if (m_thread.joinable()) {
+            m_thread.join();
+        }
+    }
+    // Worker is gone (or never started): release everything that is still waiting.
+    CancelPendingRequests();
 }
 
 void CWorkThread::Abort() {
-    try {
-        if (m_hThread != NULL) {
-            ::SetEvent(m_wakeUp);
-            if (WAIT_TIMEOUT == ::WaitForSingleObject(m_hThread, 100)) {
-                ::TerminateThread(m_hThread, 1);
-                ::WaitForSingleObject(m_hThread, 100);
-            }
-            m_hThread = NULL;
-        }
-    } catch (...) {
-        // do not crash
-    }
+    RequestStop();
+    CancelPendingRequests();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Private
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-void CWorkThread::ThreadFunc(void* arg) {
-
-    CWorkThread* thisPtr = (CWorkThread*) arg;
-    if (thisPtr->m_bCoInitialize) {
-        ::CoInitialize(NULL);
+void CWorkThread::StartLocked() {
+    if (m_bStarted) {
+        return;
     }
-    do {
-        ::EnterCriticalSection(&thisPtr->m_csList);
-
-        // Delete the requests marked for deletion from request queue
-        DeleteAllRequestsMarkedForDeletion(thisPtr);
-
-        // search a request that is not yet processed
-        CRequestBase* requestHandled = NULL;
-        int nNumUnprocessedRequests = 0;
-        std::list<CRequestBase*>::iterator iter;
-        for (iter = thisPtr->m_requestList.begin( ); iter != thisPtr->m_requestList.end( ); iter++ ) {
-            if ((*iter)->Processed == false) {
-                if (requestHandled == NULL) {
-                    requestHandled = *iter;    // pick the first unprocessed in the queue
-                }
-                nNumUnprocessedRequests++;
-            }
-        }
-
-        ::LeaveCriticalSection(&thisPtr->m_csList);
-
-        // process this request
-        if (requestHandled != NULL) {
-            thisPtr->ProcessRequest(*requestHandled);
-            requestHandled->Processed = true;
-
-            // signal end of processing
-            if (requestHandled->EventFinished != NULL) {
-                if (requestHandled->EventFinishedCounter == NULL) {
-                    ::SetEvent(requestHandled->EventFinished);
-                } else {
-                    LONG nNewValue = ::InterlockedDecrement(requestHandled->EventFinishedCounter);
-                    if (nNewValue <= 0) {
-                        ::SetEvent(requestHandled->EventFinished);
-                    }
-                }
-            }
-            if (!thisPtr->m_bTerminate) {
-                thisPtr->AfterFinishProcess(*requestHandled);
-            }
-            nNumUnprocessedRequests--;
-        }
-
-        // if there are no more requests, sleep until woke up
-        if (nNumUnprocessedRequests == 0 && !thisPtr->m_bTerminate) {
-            ::WaitForSingleObject(thisPtr->m_wakeUp, INFINITE);
-            ::ResetEvent(thisPtr->m_wakeUp);
-        }
-    } while (!thisPtr->m_bTerminate);
-    if (thisPtr->m_bCoInitialize) {
-        ::CoUninitialize();
-    }
-    _endthread();
+    // The worker blocks on m_mutex until the caller releases it, so the members below are set before it runs.
+    m_thread = std::jthread([this](std::stop_token stop) { ThreadMain(std::move(stop)); });
+    m_stop = m_thread.get_stop_source();
+    m_workerId.store(m_thread.get_id());
+    m_bStarted = true;
 }
 
-void CWorkThread::DeleteAllRequestsMarkedForDeletion(CWorkThread* thisPtr) {
-    bool bDeleted = false;
-    std::list<CRequestBase*>::iterator iter;
-    for (iter = thisPtr->m_requestList.begin( ); iter != thisPtr->m_requestList.end( ); iter++ ) {
-        if ((*iter)->Deleted) {
-            delete *iter;
-            thisPtr->m_requestList.erase(iter);
-            bDeleted = true;
+void CWorkThread::ThreadMain(std::stop_token stop) {
+
+    // Declared before the lock: destroyed after it, i.e. requests die outside the lock.
+    std::vector<RequestPtr> discarded;
+    std::vector<RequestPtr> toFinish;
+
+    std::unique_lock<std::mutex> lock(m_mutex);
+    for (;;) {
+        // The predicate is evaluated under m_mutex, requests are queued under m_mutex: no lost wake-up.
+        m_cv.wait(lock, stop, [this] { return HasUnprocessedLocked(); });
+        if (stop.stop_requested()) {
             break;
         }
+
+        CollectDeletedLocked(discarded, toFinish);
+        RequestPtr request = FirstUnprocessedLocked();
+        m_pCurrent = request.get();
+        lock.unlock();
+
+        FinishCancelled(toFinish);
+        discarded.clear();
+
+        if (request) {
+            try {
+                ProcessRequest(*request);
+            } catch (...) {
+                request->Error = std::current_exception();  // rethrown by ProcessAndWait()
+            }
+            request->Processed = true;
+            SignalFinished(*request);
+            try {
+                // Also during shutdown: Terminate() joins before the derived members die, so this is safe.
+                AfterFinishProcess(*request);
+            } catch (...) {
+                // already completed and signalled, nobody left to report this to
+            }
+        }
+
+        lock.lock();
+        m_pCurrent = nullptr;
+        if (request) {
+            // Keep the request alive until after m_pCurrent is cleared (its address must not be reused
+            // while it is still compared against), but destroy it outside the lock.
+            discarded.push_back(std::move(request));
+        }
     }
-    if (bDeleted) {
-        DeleteAllRequestsMarkedForDeletion(thisPtr);
+}
+
+void CWorkThread::RequestStop() {
+    std::stop_source stop;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_bAccepting = false;   // from now on ProcessAsync() cancels instead of queueing
+        stop = m_stop;
+    }
+    m_bTerminate.store(true);
+    stop.request_stop();        // also wakes the worker from the condition variable (no-op if never started)
+}
+
+void CWorkThread::CancelPendingRequests() {
+    std::vector<RequestPtr> toFinish;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        for (const auto& r : m_requestList) {
+            if (r.get() != m_pCurrent) {    // the running request completes and signals by itself
+                CancelLocked(r, toFinish);
+            }
+        }
+    }
+    FinishCancelled(toFinish);
+}
+
+bool CWorkThread::HasUnprocessedLocked() const {
+    return std::any_of(m_requestList.begin(), m_requestList.end(),
+                       [](const RequestPtr& r) { return !r->Processed; });
+}
+
+CWorkThread::RequestPtr CWorkThread::FirstUnprocessedLocked() const {
+    for (const auto& r : m_requestList) {
+        if (!r->Processed) {
+            return r;
+        }
+    }
+    return nullptr;
+}
+
+void CWorkThread::CancelLocked(const RequestPtr& request, std::vector<RequestPtr>& toFinish) {
+    if (request->Processed) {
+        return;     // already completed or cancelled: never signal twice
+    }
+    request->Cancelled = true;
+    request->Processed = true;
+    toFinish.push_back(request);
+}
+
+void CWorkThread::CollectDeletedLocked(std::vector<RequestPtr>& discarded, std::vector<RequestPtr>& toFinish) {
+    for (auto it = m_requestList.begin(); it != m_requestList.end(); ) {
+        if ((*it)->Deleted && it->get() != m_pCurrent) {
+            CancelLocked(*it, toFinish);
+            discarded.push_back(std::move(*it));
+            it = m_requestList.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void CWorkThread::FinishCancelled(std::vector<RequestPtr>& toFinish) {
+    for (const auto& r : toFinish) {
+        SignalFinished(*r);
+        if (!r->Deleted) {
+            try {
+                OnCancelled(*r);
+            } catch (...) {
+            }
+        }
+    }
+    toFinish.clear();
+}
+
+void CWorkThread::SignalFinished(CRequestBase& request) {
+    if (!request.EventFinished) {
+        return;
+    }
+    if (!request.EventFinishedCounter || request.EventFinishedCounter->fetch_sub(1) - 1 <= 0) {
+        request.EventFinished->Set();
     }
 }

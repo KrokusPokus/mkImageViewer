@@ -10,8 +10,9 @@ CProcessingThreadPool* CProcessingThreadPool::sm_instance;
 // A request wrapping another request and adding information about the image strip to process.
 class CWrappedRequest : public CRequestBase {
 public:
-    // nOffset, nSize defines the strip to process: 'nSize' rows, starting at row 'nOffset'
-    CWrappedRequest(CProcessingRequest * pRequest, int nOffset, int nSize, HANDLE hEventFinished) : CRequestBase(hEventFinished) {
+    // Anpassung an CCompletionEvent statt HANDLE
+    CWrappedRequest(CProcessingRequest * pRequest, int nOffset, int nSize, std::shared_ptr<CCompletionEvent> eventFinished)
+        : CRequestBase(std::move(eventFinished)) {
         InnerRequest = pRequest;
         Offset = nOffset;
         SizeY = nSize;
@@ -22,21 +23,22 @@ public:
     int SizeY;
 };
 
-
 // Worker thread in thread pool, executing image processing operations on image strips
 class CProcessingThread : public CWorkThread {
 public:
-    CProcessingThread(void) : CWorkThread(false) {}
+    CProcessingThread(void) {}
     ~CProcessingThread(void) {}
 
-    // Start a processing request on this thread asynchronously, returns immediately
-    void StartProcess(CWrappedRequest* pRequest);
+    // Start a processing request on this thread asynchronously (nimmt nun shared_ptr)
+    void StartProcess(std::shared_ptr<CWrappedRequest> pRequest) {
+        ProcessAsync(pRequest);
+    }
 
     // Processes a request synchronously on the calling thread
     static void DoProcess(CProcessingRequest* pRequest, int nOffsetY, int nSizeY);
-private:
 
-    virtual void ProcessRequest(CRequestBase& request);
+private:
+    virtual void ProcessRequest(CRequestBase& request) override;
 };
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -78,34 +80,43 @@ bool CProcessingThreadPool::Process(CProcessingRequest* pRequest) {
     if (m_nNumThreads == 0) {
         CProcessingThread::DoProcess(pRequest, 0, nTargetCY);
     } else {
-        if (nTargetCX * nTargetCY < 100000 || nTargetCY < 2 * pRequest->StripPadding) { // https://github.com/sylikc/jpegview/pull/290
+        if (nTargetCX * nTargetCY < 100000 || nTargetCY < 2 * pRequest->StripPadding) {
             CProcessingThread::DoProcess(pRequest, 0, nTargetCY);
         } else {
-            // Important: All slices must have a height dividable by 'StripPadding', except the last one
-            int nNumThreadsUsed = m_nNumThreads + 1; // we also use the calling thread, thus +1
+            int nNumThreadsUsed = m_nNumThreads + 1;
             int nSliceCY;
             while ((nSliceCY = ~(pRequest->StripPadding - 1) & (nTargetCY / nNumThreadsUsed)) < pRequest->StripPadding) {
                 nNumThreadsUsed--;
             }
-            assert(nNumThreadsUsed > 1);    // https://github.com/sylikc/jpegview/pull/290
-            int nLastCY = nTargetCY - (nNumThreadsUsed - 1)*nSliceCY;
-            volatile LONG nRequestThreadCounter = nNumThreadsUsed - 1;
+            assert(nNumThreadsUsed > 1);
+            int nLastCY = nTargetCY - (nNumThreadsUsed - 1) * nSliceCY;
+
+            // Modernes atomares Counter-Objekt und CCompletionEvent statt Windows-Handles
+            auto nRequestThreadCounter = std::make_shared<std::atomic<int>>(nNumThreadsUsed - 1);
+            auto eventFinished = std::make_shared<CCompletionEvent>();
+
             int nCurrCY = 0;
-            HANDLE eventFinished = ::CreateEvent(0, TRUE, FALSE, NULL);
-            CWrappedRequest** pAllWrappedRequests = new CWrappedRequest*[nNumThreadsUsed-1];
-            for (int i = 0; i < nNumThreadsUsed-1; i++) {
-                pAllWrappedRequests[i] = new CWrappedRequest(pRequest, nCurrCY, nSliceCY, eventFinished);
-                pAllWrappedRequests[i]->EventFinishedCounter = &nRequestThreadCounter;
-                m_threads[i]->StartProcess(pAllWrappedRequests[i]);
+            // Verwendung eines std::vector statt roher Arrays zur sicheren Speicherverwaltung
+            std::vector<std::shared_ptr<CWrappedRequest>> allWrappedRequests;
+            allWrappedRequests.reserve(nNumThreadsUsed - 1);
+
+            for (int i = 0; i < nNumThreadsUsed - 1; i++) {
+                auto wrappedReq = std::make_shared<CWrappedRequest>(pRequest, nCurrCY, nSliceCY, eventFinished);
+                wrappedReq->EventFinishedCounter = nRequestThreadCounter;
+                allWrappedRequests.push_back(wrappedReq);
+                m_threads[i]->StartProcess(wrappedReq);
                 nCurrCY += nSliceCY;
             }
+
             CProcessingThread::DoProcess(pRequest, nCurrCY, nLastCY);
-            ::WaitForSingleObject(eventFinished, INFINITE);
-            ::CloseHandle(eventFinished);
-            for (int i = 0; i < nNumThreadsUsed-1; i++) {
-                pAllWrappedRequests[i]->Deleted = true; // thread pool threads will remove the requests from the queue
+
+            // Auf Beendigung warten via CCompletionEvent
+            eventFinished->Wait();
+
+            // Requests als gelöscht markieren, damit der Worker sie aus der Queue räumt
+            for (auto& req : allWrappedRequests) {
+                req->Deleted = true;
             }
-            delete [] pAllWrappedRequests;
         }
     }
     return pRequest->Success;
@@ -116,23 +127,16 @@ CProcessingThreadPool::CProcessingThreadPool(void) {
     m_nNumThreads = 0;
 }
 
-
-void CProcessingThread::StartProcess(CWrappedRequest* pRequest) {
-    ProcessAsync(pRequest);
-}
-
 void CProcessingThread::DoProcess(CProcessingRequest* pRequest, int nOffsetY, int nSizeY) {
-    // Processing is done in strips to reduce memory consumption and increase cache hit rate.
-    // The following constant gives the number of pixels to process per strip.
     const uint32 MAX_SRC_PIXELS_PER_STRIP = 1024 * 100;
     uint32 nNumberOfPixelsInSource = (uint32)((pRequest->SourceSize.cx * (double)pRequest->ClippedTargetSize.cx / pRequest->FullTargetSize.cx) *
-        (pRequest->SourceSize.cy * (double)nSizeY / pRequest->FullTargetSize.cy));
+                                               (pRequest->SourceSize.cy * (double)nSizeY / pRequest->FullTargetSize.cy));
     uint32 nStrips = 1 + nNumberOfPixelsInSource / MAX_SRC_PIXELS_PER_STRIP;
     uint32 nStripHeight = nSizeY / nStrips;
     uint32 minimalStripHeight = std::min(16, pRequest->StripPadding);
 
-    if (nStrips > 1) {
-        nStripHeight = nStripHeight & ~(pRequest->StripPadding - 1); // must be dividable by 'StripPadding', except last strip
+    if (nStrips >  1) {
+        nStripHeight = nStripHeight & ~(pRequest->StripPadding - 1);
         nStripHeight = std::min<uint32>(nSizeY, std::max(nStripHeight, minimalStripHeight));
     }
     int nSizeProcessed = 0;
@@ -149,7 +153,6 @@ void CProcessingThread::DoProcess(CProcessingRequest* pRequest, int nOffsetY, in
 }
 
 void CProcessingThread::ProcessRequest(CRequestBase& request) {
-    CWrappedRequest* pWrappedRequest = (CWrappedRequest*)&request;
-    DoProcess(pWrappedRequest->InnerRequest, pWrappedRequest->Offset, pWrappedRequest->SizeY);
+    CWrappedRequest& wrappedRequest = static_cast<CWrappedRequest&>(request);
+    DoProcess(wrappedRequest.InnerRequest, wrappedRequest.Offset, wrappedRequest.SizeY);
 }
-

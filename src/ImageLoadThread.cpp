@@ -42,7 +42,8 @@ using namespace Gdiplus;
 using namespace bit7z;
 
 // static initializers
-QAtomicInt CImageLoadThread::m_curHandle(0);
+//QAtomicInt CImageLoadThread::m_curHandle(0);
+std::atomic<int> CImageLoadThread::m_curHandle(0);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // static helpers
@@ -453,6 +454,7 @@ CImageLoadThread::CImageLoadThread(void) : CWorkThread(true) {
 }
 
 CImageLoadThread::~CImageLoadThread(void) {
+    Terminate();
     DeleteCachedGDIBitmap();
     DeleteCachedWebpDecoder();
     DeleteCachedPngDecoder();
@@ -462,14 +464,19 @@ CImageLoadThread::~CImageLoadThread(void) {
 }
 
 int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, std::function<void(int)> onCompleted) {
+    /*
     CRequest* pRequest = new CRequest(strFileName, nFrameIndex, processParams, onCompleted);
-    // Read the handle before handing the request over: the worker thread may process it right away
-    const int nHandle = pRequest->RequestHandle;
+    const int nHandle = pRequest->RequestHandle; // Read the handle before handing the request over: the worker thread may process it right away
     ProcessAsync(pRequest);
+    */
+    auto pRequest = std::make_shared<CRequest>(strFileName, nFrameIndex, processParams, onCompleted);
+    const int nHandle = pRequest->RequestHandle; // Read the handle before handing the request over: the worker thread may process it right away
+    ProcessAsync(std::move(pRequest));
     return nHandle;
 }
 
 CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
+    /*
     Helpers::CAutoCriticalSection criticalSection(m_csList);
     CJPEGImage* imageFound = nullptr;
     bool bFailedMemory = false;
@@ -485,11 +492,33 @@ CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
         }
     }
     return CImageData(imageFound, bFailedMemory, bFailedException);
+    */
+    return WithRequestList([&](const auto& list) -> CImageData {
+        for (const auto& r : list) {
+            if (r->Type == CReleaseFileRequest::ReleaseFileRequest) continue;
+            auto& rq = static_cast<CRequest&>(*r);
+            if (rq.Processed && !rq.Deleted && rq.RequestHandle == nHandle) {
+                rq.Deleted = true;
+                return CImageData(rq.Image, rq.OutOfMemory, rq.ExceptionError);
+            }
+        }
+        return CImageData(nullptr, false, false);
+    });
 }
 
 void CImageLoadThread::ReleaseFile(const QString& strFileName) {
+    /*
     CReleaseFileRequest* pRequest = new CReleaseFileRequest(strFileName);
     ProcessAndWait(pRequest);
+    */
+    try { ProcessAndWait(std::make_shared<CReleaseFileRequest>(strFileName)); } catch (...) {}
+}
+
+void CImageLoadThread::OnCancelled(CRequestBase& r) {
+    if (r.Type != CReleaseFileRequest::ReleaseFileRequest) {
+        auto& rq = static_cast<CRequest&>(r);
+        if (rq.CompletedCallback) rq.CompletedCallback(rq.RequestHandle);
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////

@@ -97,9 +97,6 @@ private:
         QString FileName;
     };
 
-    // Plattformunabhängiger atomarer Zähler statt Win32 InterlockedIncrement
-    static QAtomicInt m_curHandle;
-
     Gdiplus::Bitmap* m_pLastBitmap;
     QString m_sLastFileName;
     QString m_sLastWebpFileName;
@@ -135,6 +132,12 @@ private:
 
     static void SetFileDependentProcessParams(CRequest * request);
     static bool ProcessImageAfterLoad(CRequest * request);
+
+    // Plattformunabhängiger atomarer Zähler statt Win32 InterlockedIncrement
+    //static QAtomicInt m_curHandle;
+    static std::atomic<int> m_curHandle;
+    enum { ReadRequest = 0, ReleaseFileRequest = 1 };  // in CRequest setzen Type = ReadRequest
+    void OnCancelled(CRequestBase&) override;
 
     std::unique_ptr<char[]> m_pJxlBuffer;   // Eingabepuffer des JXL-Decoders bei Animationen
 };

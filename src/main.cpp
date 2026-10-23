@@ -108,7 +108,7 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR lp
             dlgMain.show();          // Hauptfenster anzeigen
             nRet = app.exec();       // Startet die native Qt-Event-Schleife
 
-            if (CSettingsProvider::This().StickyWindowSize() && !dlgMain.IsFullScreenMode()) {
+            if (CSettingsProvider::This().StickyWindowSize() && !dlgMain.IsFullScreenMode() && !dlgMain.IsMaximizedMode()) {
                 CSettingsProvider::This().SaveStickyWindowRect(dlgMain.WindowRectOnClose());
             }
             ::ShowCursor(TRUE);
