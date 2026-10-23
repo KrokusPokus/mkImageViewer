@@ -84,7 +84,7 @@ set(SOURCES
     src/LocalDensityCorr.cpp
     src/MainDlg.cpp
     src/MultiMonitorSupport.cpp
-    src/NLS.cpp
+
 
     src/ProcessingThreadPool.cpp
     src/ReaderBMP.cpp

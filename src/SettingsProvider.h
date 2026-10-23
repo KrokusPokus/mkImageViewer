@@ -188,7 +188,6 @@ public:
     const QString GetEXEPath() const { return m_sEXEPath; }
     const QString GetGlobalINIFileName() const { return m_sIniNameGlobal; }    // Get the file name with path of the global INI file (in EXE path)
     const QString GetUserINIFileName() const { return m_sIniNameUser; }        // Get the file name with path of the user INI file (in AppData path)
-    const QString Language() const { return m_sLanguage; }
 
     void CopyUserINIFromTemplate();
     void SaveCustomSettings();
@@ -226,7 +225,6 @@ private:
     bool m_bShowFullPathInTitle{false};
     bool m_bShowFullScreen{true};
     bool m_bKeepParams{false};
-    QString m_sLanguage;
     Helpers::CPUType m_eCPUAlgorithm;
     int m_nNumCores{1};
     int m_nNumCoresIni{0};

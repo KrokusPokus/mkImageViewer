@@ -211,11 +211,6 @@ QWidget* SettingsDialog::createProgramTab() {
     QWidget* panel = new QWidget();
     QFormLayout* layout = new QFormLayout(panel);
 
-    m_comboLanguage = new QComboBox();
-    m_comboLanguage->addItems({"auto", "en", "de", "fr", "es", "it", "ja", "zh"});
-    m_comboLanguage->setToolTip(tr("Sprache der Benutzeroberfläche ('auto' nutzt Systemsprache)."));
-    layout->addRow(tr("Sprache (Language):"), m_comboLanguage);
-
     m_comboDeleteConfirmation = new QComboBox();
     m_comboDeleteConfirmation->addItems({"Always", "OnlyWhenNoRecycleBin", "Never"});
     m_comboDeleteConfirmation->setToolTip(tr("Bestätigungstyp beim Löschen von Dateien."));
@@ -508,7 +503,6 @@ void SettingsDialog::loadFromSettings() {
     CSettingsProvider& settings = CSettingsProvider::This();
 
     // Tab 1
-    m_comboLanguage->setCurrentText(settings.m_sLanguage);
     m_comboDeleteConfirmation->setCurrentIndex(static_cast<int>(settings.m_eDeleteConfirmation));
     m_comboSingleInstance->setCurrentIndex(static_cast<int>(settings.m_eSingleInstanceMode));
     m_spinCpuCores->setValue(settings.m_nNumCoresIni);
@@ -590,7 +584,6 @@ void SettingsDialog::saveToSettings() {
     CSettingsProvider& settings = CSettingsProvider::This();
 
     // Tab 1
-    settings.WriteString("Language", m_comboLanguage->currentText());
     settings.WriteString("DeleteConfirmation", m_comboDeleteConfirmation->currentText());
     settings.WriteString("SingleInstance", m_comboSingleInstance->currentText());
     settings.WriteString("CPUType", m_comboCpuType->currentText());
@@ -843,8 +836,6 @@ CSettingsProvider::CSettingsProvider() {
     }
 
     m_minimalWindowSize = GetSize("MinimalWindowSize", QSize(320, 240));
-
-    m_sLanguage = GetString("Language", "auto");
 
     // Pure Qt-basiertes Parsing für ColorCorrections
     QString sColorCorrections = GetString("ColorCorrection", "");

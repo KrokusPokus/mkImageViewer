@@ -32,11 +32,6 @@ class QDropEvent;
 class CMainDlg : public QMainWindow {
     Q_OBJECT // Zwingend für Qt-Widgets/Klassen mit Signals & Slots
 
-#ifdef Q_OS_LINUX
-public slots:
-    Q_SCRIPTABLE bool OnAnotherInstanceStarted(const QString &targetPath); // WM_COPYDATA replacement for linux
-#endif
-
 private slots:
     void onDisplayedFileChangedOnDisk();
     void onActiveDirectoryFilelistChanged();
@@ -88,6 +83,7 @@ public:
     void EndDragging();
     void SetCursorForMoveSection();
     void ExecuteCommand(int nCommand);
+    bool ShouldAcceptFile(const QString& filePath);
 
 private:
 
@@ -276,9 +272,6 @@ protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
     void timerEvent(QTimerEvent* event) override;
-#if defined(Q_OS_WIN)
-    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override; // for WM_COPYDATA
-#endif
 };
 
 

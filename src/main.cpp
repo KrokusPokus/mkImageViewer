@@ -5,134 +5,185 @@
 #include <clocale>
 
 #include <QApplication>
+#include <QCommandLineParser>
 #include <QDir>
+#include <QFileInfo>
 #include <QImageReader>
-#include <QMainWindow>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QSharedMemory>
+#include <QSystemSemaphore>
 #include <QString>
-#include <QTranslator>
+#include <QDataStream>
 
-static HWND _HWNDOtherInstance = nullptr;
+// Eindeutige Namen für Shared Memory und Semaphor
+const QString kShmKey = "JPEGView_Instance_Registry_v1";
+const QString kSemKey = "JPEGView_Instance_Semaphore_v1";
+constexpr int kIpcTimeoutMs = 250;
 
-static BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-    const int BUF_LEN = 255;
-    WCHAR buff[BUF_LEN + 1];
-    buff[BUF_LEN] = 0;
-    ::GetWindowTextW(hwnd, buff, BUF_LEN);
-
-    if (wcsstr(buff, L" - JPEGView") != nullptr) {
-        // An already existing instance was found -> send our file path to it and wait how it reacts.
-        // If it returns NULL, it doesn't want that file and we can open it ourselves.
-        // If it returns KEY_MAGIC, it will handle that file and we can close again.
-
-        COPYDATASTRUCT copyData{ 0 };
-        copyData.dwData = KEY_MAGIC;
-        copyData.cbData = static_cast<DWORD>((wcslen(reinterpret_cast<LPCWSTR>(lParam)) + 1) * sizeof(WCHAR));
-        copyData.lpData = reinterpret_cast<LPVOID>(const_cast<WCHAR*>(reinterpret_cast<LPCWSTR>(lParam)));
-
-        ULONG_PTR result = 0;
-        PDWORD_PTR resultPtr = &result;
-        LRESULT res = ::SendMessageTimeoutW(hwnd, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&copyData), 0, 250, resultPtr);
-
-        if (*resultPtr == static_cast<ULONG_PTR>(KEY_MAGIC)) {
-            _HWNDOtherInstance = hwnd;
-            return FALSE;    // stop enumerating windows
-        }
+// Hilfsfunktion: Liest die Liste aktiver PIDs aus dem Shared Memory
+QList<qint64> GetActivePids(QSharedMemory& shm, QSystemSemaphore& sem) {
+    QList<qint64> pids;
+    sem.acquire();
+    if (shm.attach(QSharedMemory::ReadOnly)) {
+        QByteArray buffer(static_cast<const char*>(shm.constData()), shm.size());
+        QDataStream stream(&buffer, QIODevice::ReadOnly);
+        stream >> pids;
+        shm.detach();
     }
-    return TRUE;        // continue enumerating windows
+    sem.release();
+    return pids;
 }
 
-static QString ParseCommandLineForStartupFile(const QString& sCommandLine) {
-    QString sStartupFile = sCommandLine.trimmed();
-    if (sStartupFile.isEmpty()) {
-        return QString();
-    }
-    if (sStartupFile.startsWith(QLatin1Char('/'))) { // parameter
-        return QString();
+// Hilfsfunktion: Fügt die eigene PID hinzu oder entfernt sie
+void RegisterPid(qint64 myPid, bool registerInstance, QSharedMemory& shm, QSystemSemaphore& sem) {
+    sem.acquire();
+    QList<qint64> pids;
+
+    if (shm.attach(QSharedMemory::ReadWrite)) {
+        QByteArray buffer(static_cast<const char*>(shm.constData()), shm.size());
+        QDataStream stream(&buffer, QIODevice::ReadOnly);
+        stream >> pids;
+        shm.detach();
     }
 
-    // Extract the startup file or directory from the command line parameter string
-    int nHyphen = sStartupFile.indexOf(QLatin1Char('"'));
-    if (nHyphen == -1) {
-        // not enclosed with "", use part until first space is found
-        int nSpace = sStartupFile.indexOf(QLatin1Char(' '));
-        if (nSpace > 0) {
-            sStartupFile = sStartupFile.left(nSpace);
-        } // else we use the whole command line (as there is no space character in it)
+    if (registerInstance) {
+        if (!pids.contains(myPid)) pids.append(myPid);
     } else {
-        // enclosed in "", take first string enclosed in ""
-        int nHyphenNext = sStartupFile.indexOf(QLatin1Char('"'), nHyphen + 1);
-        if (nHyphenNext > nHyphen) {
-            sStartupFile = sStartupFile.mid(nHyphen + 1, nHyphenNext - nHyphen - 1);
-        }
-    }
-    // if it's a directory, add a trailing backslash
-    if (!sStartupFile.isEmpty()) {
-        DWORD nAttributes = ::GetFileAttributesW(reinterpret_cast<LPCWSTR>(sStartupFile.utf16()));
-        if (nAttributes != INVALID_FILE_ATTRIBUTES && (nAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-            if (!sStartupFile.endsWith(QLatin1Char('\\')) && !sStartupFile.endsWith(QLatin1Char('/'))) {
-                sStartupFile += QLatin1Char('\\');
-            }
-        }
+        pids.removeAll(myPid);
     }
 
-    if (!sStartupFile.contains(QLatin1Char('\\')) && !sStartupFile.contains(QLatin1Char('/')))
-        return QStringLiteral(".\\") + sStartupFile;
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream << pids;
 
-    return sStartupFile;
+    if (shm.isAttached()) shm.detach();
+    if (shm.create(buffer.size())) {
+        memcpy(shm.data(), buffer.constData(), buffer.size());
+    } else if (shm.attach(QSharedMemory::ReadWrite)) {
+        shm.detach();
+        shm.create(buffer.size());
+        shm.attach(QSharedMemory::ReadWrite);
+        memcpy(shm.data(), buffer.constData(), buffer.size());
+        shm.detach();
+    }
+    sem.release();
 }
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    QApplication::setApplicationName("JPEGView");
 
-    // Qt-Standard: je nach Version 128-256 MB pro Bild. 0 = kein Limit.
-    // Die eigenen Grenzen (MAX_IMAGE_PIXELS / MAX_IMAGE_DIMENSION) greifen weiterhin vor dem Dekodieren.
     QImageReader::setAllocationLimit(0);
-
-    // use the locale from the operating system, however for numeric input/output always use 'C' locale
     std::setlocale(LC_ALL, "");
     std::setlocale(LC_NUMERIC, "C");
 
+    // Kommandozeilen-Parsing mit Qt6
+    QCommandLineParser parser;
+    parser.setApplicationDescription("JPEGView Qt6 Port");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addPositionalArgument("file", "Image file or directory to open.");
+    parser.process(app);
+
+    const QStringList args = parser.positionalArguments();
     QString sStartupFile;
-    if (argc == 2) {
-        sStartupFile = argv[1];
-
-        // Falls der Windows-Parser den Backslash geschluckt und ein " an den String gehängt hat:
-        if (sStartupFile.endsWith('"')) {
-            sStartupFile.chop(1);  // Das falsche Anführungszeichen abschneiden
-            sStartupFile += "/";   // Einen sauberen Ordner-Abschluss hinzufügen
+    if (!args.isEmpty()) {
+        sStartupFile = QDir::cleanPath(args.first());
+        QFileInfo fileInfo(sStartupFile);
+        if (fileInfo.isDir()) {
+            if (!sStartupFile.endsWith('/') && !sStartupFile.endsWith('\\')) {
+                sStartupFile.append('/');
+            }
         }
-
-        sStartupFile = QDir::cleanPath(sStartupFile);
     }
 
-    // Searches for other instances and asks them if *they* want to handle our startup file in our place. If not, we do it.
-    HANDLE hMutex = ::CreateMutexW(nullptr, FALSE, L"JPVMtX2869");
-    if (::GetLastError() == ERROR_ALREADY_EXISTS) {
-        ::EnumWindows(reinterpret_cast<WNDENUMPROC>(EnumWindowsProc), reinterpret_cast<LPARAM>(sStartupFile.utf16()));
+    const qint64 myPid = QCoreApplication::applicationPid();
+    QSystemSemaphore sem(kSemKey, 1, QSystemSemaphore::Open);
+    QSharedMemory shm(kShmKey);
+
+    // --- SCHRITT 1: Broadcast an alle laufenden Instanzen ---
+    bool instanceAccepted = false;
+    if (!sStartupFile.isEmpty()) {
+        const QList<qint64> activePids = GetActivePids(shm, sem);
+        qDebug() << "As Client: I can see activePids:" << activePids;
+        for (qint64 pid : activePids) {
+            if (pid == myPid) continue;
+
+            QString pipeName = QString("JPEGView_Pipe_%1").arg(pid);
+            QLocalSocket socket;
+            socket.connectToServer(pipeName);
+
+            if (socket.waitForConnected(kIpcTimeoutMs)) {
+                // Frage diese Instanz, ob sie die Datei übernehmen will
+                socket.write(sStartupFile.toUtf8());
+                socket.waitForBytesWritten(kIpcTimeoutMs);
+
+                if (socket.waitForReadyRead(kIpcTimeoutMs)) {
+                    if (socket.readAll() == "ACK") {
+                        instanceAccepted = true;
+                        socket.disconnectFromServer();
+                        break; // Eine Instanz hat es übernommen!
+                    }
+                }
+                socket.disconnectFromServer();
+            } else {
+                // Instanz antwortet nicht mehr -> Automatisch aus der Registry werfen (Crash-Cleanup)
+                RegisterPid(pid, false, shm, sem);
+            }
+        }
     }
+
+    // Wenn eine andere Instanz die Datei übernommen hat, beenden wir uns
+    if (instanceAccepted) {
+        qDebug() << "As Client: Server has accepted the file. Client will exit.";
+        return 0;
+    }
+
+    // --- SCHRITT 2: Keine Instanz wollte sie -> Wir werden selbst zur aktiven Instanz ---
+    RegisterPid(myPid, true, shm, sem);
+
+    // Eigenen lokalen Server aufspannen (mit unserer PID im Namen)
+    QString myPipeName = QString("JPEGView_Pipe_%1").arg(myPid);
+    QLocalServer::removeServer(myPipeName); // Sicherheishalber aufräumen
+    QLocalServer localServer;
+    localServer.listen(myPipeName);
 
     int nRet = 0;
-    // Run application
-    if (_HWNDOtherInstance == nullptr) {
+    try {
         CMainDlg dlgMain(sStartupFile);
 
-        try {
-            dlgMain.show();          // Hauptfenster anzeigen
-            nRet = app.exec();       // Startet die native Qt-Event-Schleife
+        QObject::connect(&localServer, &QLocalServer::newConnection, &dlgMain, [&localServer, &dlgMain]() {
+            auto* clientSocket = localServer.nextPendingConnection();
+            if (!clientSocket) return;
 
-            if (CSettingsProvider::This().StickyWindowSize() && !dlgMain.IsFullScreenMode() && !dlgMain.IsMaximizedMode()) {
-                CSettingsProvider::This().SaveStickyWindowRect(dlgMain.WindowRectOnClose());
+            clientSocket->waitForReadyRead(kIpcTimeoutMs);
+            QString sCopyDataFile = QString::fromUtf8(clientSocket->readAll());
+            qDebug() << "As Server: Client sent path to evaluate:" << sCopyDataFile;
+            if (dlgMain.ShouldAcceptFile(sCopyDataFile)) {
+                qDebug() << "As Server: I accept that file. The client should exit.";
+                clientSocket->write("ACK");
+            } else {
+                qDebug() << "As Server: I won't accept that file. The client may open it.";
+                clientSocket->write("NACK");
             }
-            ::ShowCursor(TRUE);
+            clientSocket->waitForBytesWritten(kIpcTimeoutMs);
+            clientSocket->deleteLater();
+        });
+
+        dlgMain.show();
+        nRet = app.exec();
+
+        if (CSettingsProvider::This().StickyWindowSize() && !dlgMain.IsFullScreenMode() && !dlgMain.IsMaximizedMode()) {
+            CSettingsProvider::This().SaveStickyWindowRect(dlgMain.WindowRectOnClose());
         }
-        catch (...) {
-            ::ShowCursor(TRUE);
-        }
-    } else {
-        ::SetForegroundWindow(_HWNDOtherInstance);
+    }
+    catch (...) {
+        // Exception Handling
     }
 
-    ::CloseHandle(hMutex);
+    // Sauberer Exit: Eigene PID aus dem Shared Memory austragen
+    RegisterPid(myPid, false, shm, sem);
     return nRet;
 }

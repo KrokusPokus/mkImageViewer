@@ -12,35 +12,32 @@
 #include "HistogramCorr.h"
 #include "Clipboard.h"
 #include "ProcessParams.h"
-#include "NLS.h"
 #include "ResizeFilter.h"
 #include "ProcessingThreadPool.h"
 #include "KeyMap.h"
 #include "DirectoryWatcher.h"
 
+#include <QActionGroup>
 #include <QApplication>
 #include <QBuffer>
-#include <QDBusConnection>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
+#include <QKeyEvent>
 #include <QList>
+#include <QMenu>
 #include <QMessageBox>
-#include <QMessageBox>
+#include <QMimeData>
 #include <QPainter>
+#include <QPainterPath>
 #include <QProcess>
 #include <QPushButton>
 #include <QRect>
 #include <QRegularExpression>
 #include <QString>
+#include <QThread>
 #include <QUrl>
 #include <QtGlobal>
-#include <QKeyEvent>
-#include <QMimeData>
-#include <QMenu>
-#include <QThread>
-#include <QPainterPath>
-#include <QActionGroup>
 
 namespace {
 
@@ -229,7 +226,6 @@ namespace {
     }
 
     // Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
-    // Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
     void DrawImageLoadErrorText(QPainter& painter, const QRect& clientRect, const QString& failedFileName, int nFileLoadError, int nLoadErrorDetail) {
         const bool bOutOfMemory = (nLoadErrorDetail & FileLoad_OutOfMemory) != 0;
         const bool bExceptionError = (nLoadErrorDetail & FileLoad_ExceptionError) != 0;
@@ -305,80 +301,6 @@ namespace {
         ::SelectObject(dc, hDefaultZoomFactorFont);
     }
 
-    void TranslateMenuStrings(HMENU hMenu, CKeyMap* pKeyMap) {
-        int nMenuItemCount = ::GetMenuItemCount(hMenu);
-        for (int i = 0; i < nMenuItemCount; i++) {
-            const int TEXT_BUFF_LEN = 128;
-            wchar_t menuText[TEXT_BUFF_LEN];
-            ::GetMenuStringW(hMenu, i, menuText, TEXT_BUFF_LEN, MF_BYPOSITION);
-            menuText[TEXT_BUFF_LEN - 1] = 0;
-
-            QString menuTextStr = QString::fromWCharArray(menuText);
-            QString sBaseMenuText = menuTextStr;
-            QString sTabPart;
-
-            int tabIdx = menuTextStr.indexOf(QChar('\t'));
-            if (tabIdx != -1) {
-                sBaseMenuText = menuTextStr.left(tabIdx);
-                sTabPart = menuTextStr.mid(tabIdx + 1);
-            }
-
-            QString sKeyDesc;
-            if (pKeyMap != NULL) {
-                int nMenuItemId = ::GetMenuItemID(hMenu, i);
-                sKeyDesc = pKeyMap->GetKeyStringForCommand(nMenuItemId);
-            }
-
-            QString sNewMenuText = CNLS::GetString(sBaseMenuText);
-
-            bool hasTab = !sTabPart.isEmpty();
-            if (sNewMenuText != sBaseMenuText || !sKeyDesc.isEmpty() || hasTab) {
-                if (hasTab) {
-                    sNewMenuText += QLatin1Char('\t');
-                    if (sTabPart.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive)) {
-                        // Hexadezimale Mappings auswerten (äquivalent zu _stscanf)
-                        bool ok = false;
-
-                        // 16 steht hier für die Hexadezimal-Basis (entspricht %x in swscanf)
-                        int nCommand = sTabPart.toInt(&ok, 16);
-                        if (!ok) {
-                            nCommand = 0;
-                        }
-
-                        if (nCommand == 0xFFFF) {
-                            // Exit JPEGView is special
-                            QString shortCutExit = pKeyMap ? pKeyMap->GetKeyStringForCommand(0xFF) : QString();
-                            if (shortCutExit.isEmpty() && pKeyMap) {
-                                shortCutExit = pKeyMap->GetKeyStringForCommand(IDM_EXIT);
-                            }
-                            sNewMenuText += shortCutExit;
-                        } else if (pKeyMap) {
-                            sNewMenuText += pKeyMap->GetKeyStringForCommand(nCommand);
-                        }
-                    } else {
-                        // Wenn nach dem \t kein Hex-Code steht, diesen Teil übersetzt anhängen
-                        QString translatedTab = CNLS::GetString(sTabPart);
-                        sNewMenuText += translatedTab;
-                    }
-                } else if (!sKeyDesc.isEmpty()) {
-                    sNewMenuText += QLatin1Char('\t');
-                    sNewMenuText += sKeyDesc;
-                }
-
-                MENUITEMINFO menuInfo{ 0 };
-                menuInfo.cbSize = sizeof(MENUITEMINFO);
-                menuInfo.fMask = MIIM_STRING;
-                menuInfo.dwTypeData = const_cast<LPWSTR>(reinterpret_cast<LPCWSTR>(sNewMenuText.utf16()));
-                ::SetMenuItemInfoW(hMenu, i, TRUE, &menuInfo);
-            }
-
-            HMENU hSubMenu = ::GetSubMenu(hMenu, i);
-            if (hSubMenu != NULL) {
-                TranslateMenuStrings(hSubMenu, pKeyMap);
-            }
-        }
-    }
-
     // Draws a 32 bit DIB centered in the given target area, filling the remaining area with the given brush
     // The bmInfo struct will be initialized by this method and does not need to be preinitialized.
     // Return value is the top, left coordinate of the painted DIB in the target area
@@ -432,9 +354,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     CSettingsProvider& sp = CSettingsProvider::This();
 
     CResizeFilterCache::This(); // Access before multiple threads are created
-
-    // Read the string table for the requested language if one is present
-    CNLS::ReadStringTable(CNLS::GetStringTableFileName(sp.Language()));
 
     m_pImageProcParams = new CImageProcessingParams(GetDefaultProcessingParams());
     InitFromProcessingFlags(GetDefaultProcessingFlags(), m_bHQResampling, m_bAutoContrast);
@@ -666,19 +585,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     this->update();
 
     this->setAcceptDrops(true);
-    this->setMouseTracking(true); // Aktiviert permanente Mouse-Move-Events
-
-#ifdef Q_OS_LINUX
-    qint64 pid = QCoreApplication::applicationPid();
-    QString serviceName = QString("org.mkFolderWidget.pid%1").arg(pid);
-
-    if (QDBusConnection::sessionBus().registerService(serviceName)) {
-        QDBusConnection::sessionBus().registerObject("/Main", this, QDBusConnection::ExportScriptableSlots | QDBusConnection::ExportScriptableSignals | QDBusConnection::ExportScriptableProperties );
-        qDebug() << "DBus-Service erfolgreich registriert:" << serviceName;
-    } else {
-        qWarning() << "Konnte DBus-Service nicht registrieren:" << serviceName;
-    }
-#endif
+    //this->setMouseTracking(true); // Aktiviert permanente Mouse-Move-Events
 
     connect(m_pDirectoryWatcher, &CDirectoryWatcher::DirectoryFileListChanged, this, &CMainDlg::onActiveDirectoryFilelistChanged);
     connect(m_pDirectoryWatcher, &CDirectoryWatcher::DisplayedFileChangedOnDisk, this, &CMainDlg::onDisplayedFileChangedOnDisk);
@@ -4256,84 +4163,42 @@ void CMainDlg::onLoadFileAsynch() {
     }
 }
 
-//######################################################################################
-// Functions to receive data from other applications
+bool CMainDlg::ShouldAcceptFile(const QString& testFilePath) {
+    bool bSameImageFolder = false;
+    const QString sCurrentFile = CurrentFileName(false);
 
-// Note: Only on windows, reacts to WM_COPYDATA message.
-// If the message contains a file path, we can either open it and send back KEY_MAGIC, or ignore it and return NULL.
-// The hidden assumption being that if the WM_COPYDATA came from newly launched instance, that instance will,
-// upon receiving KEY_MAGIC, dutifully close itself, since we answered it "I got this" by returning KEY_MAGIC.
-// If we return NULL, the new instance is free to do as it pleases and show the image itself or whatever.
-#if defined(Q_OS_WIN)
-bool CMainDlg::nativeEvent(const QByteArray &eventType, void *message, qintptr *result) {
-    if (eventType == "windows_generic_MSG" || eventType == "windows_dispatcher_MSG") {
-        MSG* msg = static_cast<MSG*>(message);
-        if (msg->message == WM_COPYDATA) {
-            // Todo: Handle via QLocalServer/QLocalSocket or QSharedMemory
-            auto* pData = reinterpret_cast<COPYDATASTRUCT*>(msg->lParam);
-            if (pData != nullptr) {
-                if (pData->dwData == KEY_MAGIC && pData->cbData > 0) {
-                    bool bSameImageFolder = false;
-
-                    const auto* pWCharData = static_cast<const wchar_t*>(pData->lpData);
-                    const int charCount = static_cast<int>((pData->cbData / sizeof(wchar_t)) - 1);
-                    const QString sCopyDataFile = QString::fromWCharArray(pWCharData, charCount);
-
-                    const QString sCurrentFile = CurrentFileName(false);
-
-                    if (!sCurrentFile.isEmpty()) {
-                        if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-                            if (sCopyDataFile.compare(sCurrentFile, Qt::CaseInsensitive) == 0) {
-                                *result = KEY_MAGIC;
-                                showNormal();
-                                raise();
-                                activateWindow();
-                                return true; // Handled
-                            } else {
-                                *result = 0;
-                                return true;
-                            }
-                        } else {
-                            const QString copyDataPath = QFileInfo(sCopyDataFile).path();
-                            const QString currentPath  = QFileInfo(sCurrentFile).path();
-                            bSameImageFolder = (copyDataPath.compare(currentPath, Qt::CaseInsensitive) == 0);
-                        }
-                    }
-
-                    const bool bNoCurrentFile = sCurrentFile.isEmpty();
-                    const bool bSingleFullScreen = m_bFullScreenMode && CSettingsProvider::This().SingleFullScreenInstance();
-                    const bool bSingleInstanceAlways = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_Always);
-                    const bool bSingleInstancePerFolder = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_PerFolder) && bSameImageFolder;
-
-                    if (bNoCurrentFile || bSingleFullScreen || bSingleInstanceAlways || bSingleInstancePerFolder) {
-                        m_sStartupFile = sCopyDataFile;
-
-                        QMetaObject::invokeMethod(this, &CMainDlg::onLoadFileAsynch, Qt::QueuedConnection);
-
-                        showNormal();
-                        raise();
-                        activateWindow();
-                        *result = KEY_MAGIC;
-                        return true;
-                    }
-                }
+    if (!sCurrentFile.isEmpty()) {
+        if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
+            if (testFilePath.compare(sCurrentFile, Qt::CaseInsensitive) == 0) {
+                showNormal();
+                raise();
+                activateWindow();
+                return true; // We tell the client that we handle it, client should exit.
+            } else {
+                return false; // We tell the client that it should open the file.
             }
-            *result = 0;
-            return true;
+        } else {
+            const QString copyDataPath = QFileInfo(testFilePath).path();
+            const QString currentPath  = QFileInfo(sCurrentFile).path();
+            bSameImageFolder = (copyDataPath.compare(currentPath, Qt::CaseInsensitive) == 0);
         }
     }
-    return QMainWindow::nativeEvent(eventType, message, result);
-}
 
-#elif defined(Q_OS_LINUX)
-// Q_SCRIPTABLE public slot
-// Serves the same purpose as the WM_COPYDATA mechanism on Windows.. Can be used in Linux like this:
-//    qdbus6 org.mkFolderWidget.pid$WINDOW_PID /Main OnAnotherInstanceStarted "$targetPath"
-bool CMainDlg::OnAnotherInstanceStarted(const QString &targetPath) {
-    // todo: implement
-    if (1) {
-        return true;  // Erfolgreich geladen
+    const bool bNoCurrentFile = sCurrentFile.isEmpty();
+    const bool bSingleFullScreen = m_bFullScreenMode && CSettingsProvider::This().SingleFullScreenInstance();
+    const bool bSingleInstanceAlways = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_Always);
+    const bool bSingleInstancePerFolder = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_PerFolder) && bSameImageFolder;
+
+    if (bNoCurrentFile || bSingleFullScreen || bSingleInstanceAlways || bSingleInstancePerFolder) {
+        m_sStartupFile = testFilePath;
+
+        QMetaObject::invokeMethod(this, &CMainDlg::onLoadFileAsynch, Qt::QueuedConnection);
+
+        showNormal();
+        raise();
+        activateWindow();
+        return true; // We tell the client that we handle it, client should exit.
     }
-    return false; // Fehler beim Laden
+
+    return false;
 }
-#endif
