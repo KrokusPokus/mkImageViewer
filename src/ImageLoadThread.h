@@ -146,6 +146,8 @@ private:
     std::unique_ptr<QImageReader> m_pLastImageReader;
     int m_nLastQtFrameIndex = -1; // GIF: zuletzt gelesenes Frame
     int m_nLastQtFrameCount = 1;
+    EImageFormat m_eLastQtFormat = IF_Unknown;
+    bool m_bLastQtAnimation = false;
     void DeleteCachedQtImageReader();
     void ProcessReadQtImageRequest(CRequest* request);
 };

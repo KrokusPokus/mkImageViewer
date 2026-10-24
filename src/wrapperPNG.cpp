@@ -4,7 +4,14 @@
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 
-#include <stdexcept>
+#include <algorithm>
+#include <csetjmp>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <new>
 
 // Uncomment to build without APNG support
 //#undef PNG_APNG_SUPPORTED
@@ -16,7 +23,7 @@
  * loads APNG from memory one frame at a time (32bpp), restarts when done
  * including frames composition.
  *
- * needs apng-patched libpng.
+ * needs libpng with APNG support (libpng >= 1.6.4x official, or the apng-patched libpng).
  *
  * Copyright (c) 2012-2014 Max Stepin
  * maxst at users.sourceforge.net
@@ -42,422 +49,568 @@
  *
  */
 
-struct PngReader::png_cache {
-    png_structp png_ptr;
-    png_infop info_ptr;
-    png_uint_32 w0;
-    png_uint_32 h0;
-    png_uint_32 x0;
-    png_uint_32 y0;
-    unsigned short delay_num;
-    unsigned short delay_den;
-    unsigned char dop;
-    unsigned char bop;
-    unsigned int first;
-    png_bytepp rows_image;
-    png_bytepp rows_frame;
-    unsigned char* p_image;
-    unsigned char* p_frame;
-    unsigned char* p_temp;
-    size_t size;
-    unsigned int width;
-    unsigned int height;
-    unsigned int channels;
-    unsigned int frame_index;
-    png_uint_32 frame_count;
-    void* buffer;
-    size_t buffer_size;
-    size_t buffer_offset;
-    void* transform;
-};
+namespace {
 
-PngReader::png_cache PngReader::cache = { 0 };
+constexpr std::size_t kSignatureSize = 8;           // PNG signature, libpng is told to skip it
+constexpr std::uint32_t kMaxChunkSize = 0x7FFFFFFFu; // PNG_UINT_31_MAX
+constexpr std::uint32_t kMaxExifSize = 65528;        // + 8 bytes of APP1 header must fit into the 16 bit segment length
+constexpr std::size_t kSameFileCheckBytes = 256;
 
-#ifdef PNG_APNG_SUPPORTED
-void BlendOver(unsigned char** rows_dst, unsigned char** rows_src, unsigned int x, unsigned int y, unsigned int w, unsigned int h)
-{
-    unsigned int  i, j;
-    int u, v, al;
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Byte order independent helpers (PNG is big endian, no unaligned reads, no MSVC intrinsics)
+/////////////////////////////////////////////////////////////////////////////////////////////
 
-    for (j = 0; j < h; j++)
-    {
-        unsigned char* sp = rows_src[j];
-        unsigned char* dp = rows_dst[j + y] + x * 4;
-
-        for (i = 0; i < w; i++, sp += 4, dp += 4)
-        {
-            if (sp[3] == 255)
-                memcpy(dp, sp, 4);
-            else if (sp[3] != 0)
-            {
-                if (dp[3] != 0)
-                {
-                    u = sp[3] * 255;
-                    v = (255 - sp[3]) * dp[3];
-                    al = u + v;
-                    dp[0] = (sp[0] * u + dp[0] * v) / al;
-                    dp[1] = (sp[1] * u + dp[1] * v) / al;
-                    dp[2] = (sp[2] * u + dp[2] * v) / al;
-                    dp[3] = al / 255;
-                }
-                else
-                    memcpy(dp, sp, 4);
-            }
-        }
-    }
-}
-#endif
-
-void* PngReader::ReadNextFrame(void** exif_chunk, png_uint_32* exif_size)
-{
-    unsigned int j;
-    if (exif_chunk != NULL && exif_size != NULL) {
-        png_get_eXIf_1(cache.png_ptr, cache.info_ptr, exif_size, (png_bytep*)exif_chunk);
-    }
-#ifdef PNG_APNG_SUPPORTED
-    if (png_get_valid(cache.png_ptr, cache.info_ptr, PNG_INFO_acTL))
-    {
-        png_read_frame_head(cache.png_ptr, cache.info_ptr);
-        png_get_next_frame_fcTL(cache.png_ptr, cache.info_ptr, &cache.w0, &cache.h0, &cache.x0, &cache.y0, &cache.delay_num, &cache.delay_den, &cache.dop, &cache.bop);
-    }
-    if (cache.frame_index == cache.first)
-    {
-        cache.bop = PNG_fcTL_BLEND_OP_SOURCE;
-        if (cache.dop == PNG_fcTL_DISPOSE_OP_PREVIOUS)
-            cache.dop = PNG_fcTL_DISPOSE_OP_BACKGROUND;
-    }
-#endif
-    png_read_image(cache.png_ptr, cache.rows_frame);
-
-#ifdef PNG_APNG_SUPPORTED
-    if (cache.dop == PNG_fcTL_DISPOSE_OP_PREVIOUS)
-        memcpy(cache.p_temp, cache.p_image, cache.size);
-
-    if (cache.bop == PNG_fcTL_BLEND_OP_OVER)
-        BlendOver(cache.rows_image, cache.rows_frame, cache.x0, cache.y0, cache.w0, cache.h0);
-    else
-#endif
-        for (j = 0; j < cache.h0; j++)
-            memcpy(cache.rows_image[j + cache.y0] + cache.x0 * 4, cache.rows_frame[j], cache.w0 * 4);
-
-    void* pixels = malloc((size_t)cache.width * cache.height * cache.channels);
-    if (pixels == NULL)
-        return NULL;
-    for (j = 0; j < cache.height; j++)
-        memcpy((char*)pixels + (size_t)j * cache.width * cache.channels, cache.rows_image[j], cache.width * cache.channels);
-
-#ifdef PNG_APNG_SUPPORTED
-    if (cache.dop == PNG_fcTL_DISPOSE_OP_PREVIOUS)
-        memcpy(cache.p_image, cache.p_temp, cache.size);
-    else
-        if (cache.dop == PNG_fcTL_DISPOSE_OP_BACKGROUND)
-            for (j = 0; j < cache.h0; j++)
-                memset(cache.rows_image[j + cache.y0] + cache.x0 * 4, 0, cache.w0 * 4);
-#endif
-    cache.frame_index++;
-    cache.frame_index %= cache.frame_count;
-
-    if (cache.transform != NULL && pixels != NULL) {
-        ICCProfileTransform::DoTransform(cache.transform, pixels, pixels, cache.width, cache.height);
-    }
-
-    return pixels;
+constexpr std::uint32_t ReadBE32(const unsigned char* p) noexcept {
+    return (std::uint32_t(p[0]) << 24) | (std::uint32_t(p[1]) << 16) | (std::uint32_t(p[2]) << 8) | std::uint32_t(p[3]);
 }
 
-bool PngReader::BeginReading(void* buffer, size_t sizebytes, bool& outOfMemory)
-{
-    unsigned int    width, height, channels, rowbytes, size, j;
-    png_bytepp      rows_image;
-    png_bytepp      rows_frame;
-    unsigned char*  p_image;
-    unsigned char*  p_frame;
-    unsigned char*  p_temp;
-
-
-    png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    png_infop   info_ptr = png_create_info_struct(png_ptr);
-
-    if (png_ptr && info_ptr)
-    {
-        // don't cache ptrs until image is valid or else causes a double-free later when destroying object in DeleteCacheInternal()
-
-        if (setjmp(png_jmpbuf(png_ptr)))
-        {
-            PngReader::DeleteCache();
-            throw std::runtime_error("Image contains errors.");
+// Calls visit(type, length, payload) for every complete chunk beginning at 'offset', until visit returns true.
+// Stops at the first chunk that is damaged or reaches over the end of the buffer.
+template <typename Visitor>
+void ForEachChunk(const unsigned char* p, std::size_t size, std::size_t offset, Visitor&& visit) {
+    while (offset <= size && size - offset >= 8) {
+        const std::uint32_t length = ReadBE32(p + offset);
+        if (length > kMaxChunkSize || size - offset - 8 < length) {
+            return;
         }
-        // skip png signature since we already checked it
-        png_set_sig_bytes(png_ptr, 8);
-        // custom read function so we can read from memory
-        png_rw_ptr read_data_fn = [](png_structp png_ptr, png_bytep outbuffer, png_size_t sizebytes)
-        {
-            png_voidp io_ptr = png_get_io_ptr(png_ptr);
-            if (io_ptr == NULL)
-                png_error(png_ptr, "png_get_io_ptr returned NULL");
-            else if (cache.buffer_offset + sizebytes > cache.buffer_size)
-                png_error(png_ptr, "Attempted to read out of bounds");
-            else
-            {
-                memcpy(outbuffer, (char*)io_ptr + cache.buffer_offset, sizebytes);
-                cache.buffer_offset += sizebytes;
-            }
-        };
-        png_set_read_fn(png_ptr, (char*)buffer, read_data_fn);
-        png_read_info(png_ptr, info_ptr);
-
-        // icc start
-        png_charp name = NULL;
-        int compression_type = 0;
-        png_bytep profile = NULL;
-        png_uint_32 proflen = 0;
-        if (png_get_iCCP(png_ptr, info_ptr, &name, &compression_type, &profile, &proflen) == PNG_INFO_iCCP) {
-            // Da libpng über png_set_bgr ein BGRA-Layout im Puffer erzeugt:
-            cache.transform = ICCProfileTransform::CreateTransform(profile, proflen, ICCProfileTransform::FORMAT_BGRA);
+        if (visit(p + offset + 4, length, p + offset + 8)) {
+            return;
         }
-        // icc end
+        // 12 = 4 bytes chunk size + 4 bytes chunk name + 4 bytes CRC32
+        const std::size_t advance = std::size_t(length) + 12;
+        if (size - offset < advance) {
+            return;
+        }
+        offset += advance;
+    }
+}
 
-        png_set_expand(png_ptr);
-        png_set_strip_16(png_ptr);
-        png_set_gray_to_rgb(png_ptr);
-        png_set_add_alpha(png_ptr, 0xff, PNG_FILLER_AFTER);
-        png_set_bgr(png_ptr);
-        (void)png_set_interlace_handling(png_ptr);
-        png_read_update_info(png_ptr, info_ptr);
-        width = png_get_image_width(png_ptr, info_ptr);
-        height = png_get_image_height(png_ptr, info_ptr);
-        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-            png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+// Builds a JPEG APP1 segment (FF E1, big endian length, "Exif\0\0", TIFF data) from the payload of an eXIf chunk
+void* BuildExifSegment(const unsigned char* exif, std::uint32_t exifSize) {
+    constexpr std::size_t kHeaderSize = 10;
+    auto* segment = static_cast<unsigned char*>(std::malloc(kHeaderSize + exifSize));
+    if (segment == nullptr) {
+        return nullptr;
+    }
+    const unsigned segmentLength = exifSize + 8; // length field (2) + "Exif\0\0" (6) + data
+    segment[0] = 0xFF;
+    segment[1] = 0xE1;
+    segment[2] = static_cast<unsigned char>(segmentLength >> 8);
+    segment[3] = static_cast<unsigned char>(segmentLength & 0xFF);
+    std::memcpy(segment + 4, "Exif\0\0", 6);
+    std::memcpy(segment + kHeaderSize, exif, exifSize);
+    return segment;
+}
+
+// Searches the chunks starting at 'offset' for an eXIf chunk
+void* FindExifSegment(const unsigned char* p, std::size_t size, std::size_t offset) {
+    void* segment = nullptr;
+    ForEachChunk(p, size, offset, [&](const unsigned char* type, std::uint32_t length, const unsigned char* payload) {
+        if (std::memcmp(type, "eXIf", 4) != 0) {
             return false;
         }
-        if (abs((double)width * height) > MAX_IMAGE_PIXELS) {
-            png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        if (length > 8 && length < kMaxExifSize) {
+            segment = BuildExifSegment(payload, length);
+        }
+        return true; // there is only one eXIf chunk
+    });
+    return segment;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Decoder state
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+struct MemorySource {
+    const unsigned char* data = nullptr;
+    std::size_t size = 0;
+    std::size_t offset = 0;
+};
+
+// Values of the fcTL chunk of the current frame
+struct FrameHeader {
+    png_uint_32 w0 = 0;
+    png_uint_32 h0 = 0;
+    png_uint_32 x0 = 0;
+    png_uint_32 y0 = 0;
+    png_uint_16 delayNum = 1;
+    png_uint_16 delayDen = 10;
+    png_byte dop = 0;
+    png_byte bop = 0;
+};
+
+struct Decoder {
+    png_structp png = nullptr;
+    png_infop info = nullptr;
+    MemorySource source;
+    void* transform = nullptr; // ICC transform or nullptr
+
+    unsigned width = 0;
+    unsigned height = 0;
+    unsigned channels = 0;
+    std::size_t imageBytes = 0;      // width * height * 4
+
+    bool apng = false;               // file has an acTL chunk (frames are composed on 'canvas')
+    unsigned frameIndex = 0;
+    unsigned frameCount = 0;
+    unsigned firstFrame = 0;         // 1 if the default image is not part of the animation
+    FrameHeader frameHeader;
+
+    std::unique_ptr<png_bytep[]> rowsFrame;       // row pointers handed to libpng
+    // only for APNG:
+    std::unique_ptr<unsigned char[]> canvas;      // composed image
+    std::unique_ptr<unsigned char[]> frame;       // the frame as decoded
+    std::unique_ptr<unsigned char[]> savedCanvas; // for APNG_fcTL_DISPOSE_OP_PREVIOUS
+};
+
+struct PngCache {
+    std::unique_ptr<unsigned char[]> data; // the file without the PNG signature, libpng reads from here
+    std::size_t dataSize = 0;
+    Decoder decoder;
+};
+
+PngCache g_cache;
+
+void FreeDecoder(Decoder& d) noexcept {
+    if (d.transform != nullptr) {
+        ICCProfileTransform::DeleteTransform(d.transform);
+        d.transform = nullptr;
+    }
+    if (d.png != nullptr) {
+        png_destroy_read_struct(&d.png, &d.info, nullptr);
+    }
+    d = Decoder{};
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// libpng callbacks and the functions that use setjmp.
+//
+// libpng reports errors with longjmp() to the setjmp() that is active for the png_ptr. The jump buffer lives in the
+// frame of the function that called setjmp, so every function that calls libpng needs its own setjmp and the
+// functions must not own objects with destructors (that is why they only take raw pointers).
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+void ReadFromMemory(png_structp png, png_bytep out, std::size_t length) {
+    auto* source = static_cast<MemorySource*>(png_get_io_ptr(png));
+    if (source == nullptr) {
+        png_error(png, "png_get_io_ptr returned NULL");
+    }
+    if (length > source->size - source->offset) {
+        png_error(png, "Attempted to read out of bounds");
+    }
+    std::memcpy(out, source->data + source->offset, length);
+    source->offset += length;
+}
+
+// libpng would print to stderr by default
+void IgnoreWarning(png_structp, png_const_charp) {
+}
+
+void RaiseError(png_structp png, png_const_charp) {
+    png_longjmp(png, 1); // back to the setjmp() of the active function
+}
+
+bool ReadInfo(png_structp png, png_infop info, MemorySource* source) {
+    if (setjmp(png_jmpbuf(png))) {
+        return false;
+    }
+    png_set_sig_bytes(png, kSignatureSize); // the signature is not in our copy of the file, it was checked before
+    png_set_read_fn(png, source, ReadFromMemory);
+    png_read_info(png, info);
+    return true;
+}
+
+// Output is always 8 bit BGRA
+bool SetupTransforms(png_structp png, png_infop info) {
+    if (setjmp(png_jmpbuf(png))) {
+        return false;
+    }
+    png_set_expand(png);
+    png_set_strip_16(png);
+    png_set_gray_to_rgb(png);
+    png_set_add_alpha(png, 0xff, PNG_FILLER_AFTER);
+    png_set_bgr(png);
+    (void)png_set_interlace_handling(png);
+    png_read_update_info(png, info);
+    return true;
+}
+
+// Reads the next frame into 'rows'. For an APNG the frame header is read as well.
+bool DecodeFrame(png_structp png, png_infop info, png_bytepp rows, bool apng, FrameHeader* header) {
+    if (setjmp(png_jmpbuf(png))) {
+        return false;
+    }
+#ifdef PNG_APNG_SUPPORTED
+    if (apng) {
+        png_read_frame_head(png, info);
+        png_get_next_frame_fcTL(png, info, &header->w0, &header->h0, &header->x0, &header->y0,
+                                &header->delayNum, &header->delayDen, &header->dop, &header->bop);
+    }
+#else
+    (void)info;
+    (void)apng;
+    (void)header;
+#endif
+    png_read_image(png, rows);
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// APNG composition
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef PNG_APNG_SUPPORTED
+void BlendOver(unsigned char* canvas, const unsigned char* frame, std::size_t stride, const FrameHeader& h) {
+    for (png_uint_32 j = 0; j < h.h0; j++) {
+        const unsigned char* sp = frame + std::size_t(j) * stride;
+        unsigned char* dp = canvas + (std::size_t(j) + h.y0) * stride + std::size_t(h.x0) * 4;
+
+        for (png_uint_32 i = 0; i < h.w0; i++, sp += 4, dp += 4) {
+            if (sp[3] == 255) {
+                std::memcpy(dp, sp, 4);
+            } else if (sp[3] != 0) {
+                if (dp[3] != 0) {
+                    const int u = sp[3] * 255;
+                    const int v = (255 - sp[3]) * dp[3];
+                    const int al = u + v;
+                    dp[0] = static_cast<unsigned char>((sp[0] * u + dp[0] * v) / al);
+                    dp[1] = static_cast<unsigned char>((sp[1] * u + dp[1] * v) / al);
+                    dp[2] = static_cast<unsigned char>((sp[2] * u + dp[2] * v) / al);
+                    dp[3] = static_cast<unsigned char>(al / 255);
+                } else {
+                    std::memcpy(dp, sp, 4);
+                }
+            }
+        }
+    }
+}
+#endif
+
+// Decodes the next frame of an APNG and draws it onto the canvas. Call DisposeFrame() afterwards.
+bool ComposeNextFrame(Decoder& d) {
+#ifdef PNG_APNG_SUPPORTED
+    FrameHeader header = d.frameHeader;
+    if (!DecodeFrame(d.png, d.info, d.rowsFrame.get(), true, &header)) {
+        return false;
+    }
+    if (header.x0 > d.width || header.w0 > d.width - header.x0 || header.y0 > d.height || header.h0 > d.height - header.y0) {
+        return false; // frame outside of the canvas
+    }
+    if (d.frameIndex == d.firstFrame) {
+        header.bop = PNG_fcTL_BLEND_OP_SOURCE;
+        if (header.dop == PNG_fcTL_DISPOSE_OP_PREVIOUS) {
+            header.dop = PNG_fcTL_DISPOSE_OP_BACKGROUND;
+        }
+    }
+    d.frameHeader = header;
+
+    const std::size_t stride = std::size_t(d.width) * 4;
+    if (header.dop == PNG_fcTL_DISPOSE_OP_PREVIOUS) {
+        std::memcpy(d.savedCanvas.get(), d.canvas.get(), d.imageBytes);
+    }
+    if (header.bop == PNG_fcTL_BLEND_OP_OVER) {
+        BlendOver(d.canvas.get(), d.frame.get(), stride, header);
+    } else {
+        for (png_uint_32 j = 0; j < header.h0; j++) {
+            std::memcpy(d.canvas.get() + (std::size_t(j) + header.y0) * stride + std::size_t(header.x0) * 4,
+                        d.frame.get() + std::size_t(j) * stride, std::size_t(header.w0) * 4);
+        }
+    }
+    return true;
+#else
+    (void)d;
+    return false;
+#endif
+}
+
+// Applies the dispose operation of the frame that was just shown and advances to the next frame
+void DisposeFrame(Decoder& d) {
+#ifdef PNG_APNG_SUPPORTED
+    const FrameHeader& header = d.frameHeader;
+    const std::size_t stride = std::size_t(d.width) * 4;
+    if (header.dop == PNG_fcTL_DISPOSE_OP_PREVIOUS) {
+        std::memcpy(d.canvas.get(), d.savedCanvas.get(), d.imageBytes);
+    } else if (header.dop == PNG_fcTL_DISPOSE_OP_BACKGROUND) {
+        for (png_uint_32 j = 0; j < header.h0; j++) {
+            std::memset(d.canvas.get() + (std::size_t(j) + header.y0) * stride + std::size_t(header.x0) * 4, 0, std::size_t(header.w0) * 4);
+        }
+    }
+#endif
+    d.frameIndex = (d.frameIndex + 1) % d.frameCount;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Start reading
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+// Returns false if the file can not be read. 'outOfMemory' is set if it failed because of the image size / memory.
+// The caller releases everything on failure.
+bool BeginReading(PngCache& c, bool& outOfMemory) {
+    Decoder& d = c.decoder;
+
+    d.png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    if (d.png == nullptr) {
+        outOfMemory = true;
+        return false;
+    }
+    png_set_error_fn(d.png, nullptr, RaiseError, IgnoreWarning);
+    d.info = png_create_info_struct(d.png);
+    if (d.info == nullptr) {
+        outOfMemory = true;
+        return false;
+    }
+
+    d.source = MemorySource{ c.data.get(), c.dataSize, 0 };
+    if (!ReadInfo(d.png, d.info, &d.source)) {
+        return false;
+    }
+
+    const unsigned width = png_get_image_width(d.png, d.info);
+    const unsigned height = png_get_image_height(d.png, d.info);
+    if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        return false;
+    }
+    if (static_cast<double>(width) * height > MAX_IMAGE_PIXELS) {
+        outOfMemory = true;
+        return false;
+    }
+
+    if (!SetupTransforms(d.png, d.info)) {
+        return false;
+    }
+    const unsigned channels = png_get_channels(d.png, d.info);
+    const std::size_t rowBytes = png_get_rowbytes(d.png, d.info);
+    if (channels != 4 || rowBytes != std::size_t(width) * 4) {
+        return false;
+    }
+    if (height > std::numeric_limits<std::size_t>::max() / rowBytes) {
+        outOfMemory = true;
+        return false;
+    }
+    d.width = width;
+    d.height = height;
+    d.channels = channels;
+    d.imageBytes = rowBytes * height;
+
+    png_uint_32 frames = 1;
+#ifdef PNG_APNG_SUPPORTED
+    if (png_get_valid(d.png, d.info, PNG_INFO_acTL)) {
+        png_uint_32 plays = 0;
+        png_get_acTL(d.png, d.info, &frames, &plays);
+        d.apng = true;
+        d.firstFrame = (png_get_first_frame_is_hidden(d.png, d.info) != 0) ? 1 : 0;
+    }
+#endif
+    if (frames == 0) {
+        return false;
+    }
+    d.frameCount = frames;
+    d.frameHeader.w0 = width;
+    d.frameHeader.h0 = height;
+
+    d.rowsFrame.reset(new (std::nothrow) png_bytep[height]);
+    if (!d.rowsFrame) {
+        outOfMemory = true;
+        return false;
+    }
+    if (d.apng) {
+        // The canvas starts transparent. Only an animation needs the extra buffers, a plain PNG is decoded directly into the result.
+        d.canvas.reset(new (std::nothrow) unsigned char[d.imageBytes]());
+        d.frame.reset(new (std::nothrow) unsigned char[d.imageBytes]);
+        d.savedCanvas.reset(new (std::nothrow) unsigned char[d.imageBytes]);
+        if (!d.canvas || !d.frame || !d.savedCanvas) {
             outOfMemory = true;
             return false;
         }
-        channels = png_get_channels(png_ptr, info_ptr);
-        if (channels != 4)
-        {
-            png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-            return false;
+        for (unsigned j = 0; j < height; j++) {
+            d.rowsFrame[j] = d.frame.get() + std::size_t(j) * rowBytes;
         }
-        rowbytes = (unsigned int)png_get_rowbytes(png_ptr, info_ptr);
-        size = height * rowbytes;
-        p_image = (unsigned char*)malloc(size);
-        p_frame = (unsigned char*)malloc(size);
-        p_temp = (unsigned char*)malloc(size);
-        rows_image = (png_bytepp)malloc(height * sizeof(png_bytep));
-        rows_frame = (png_bytepp)malloc(height * sizeof(png_bytep));
-        if (p_image && p_frame && p_temp && rows_image && rows_frame)
-        {
-            png_uint_32     frames = 1;
-            png_uint_32     x0 = 0;
-            png_uint_32     y0 = 0;
-            png_uint_32     w0 = width;
-            png_uint_32     h0 = height;
-#ifdef PNG_APNG_SUPPORTED
-            png_uint_32     plays = 0;
-            unsigned short  delay_num = 1;
-            unsigned short  delay_den = 10;
-            unsigned char   dop = 0;
-            unsigned char   bop = 0;
-            unsigned int    first = (png_get_first_frame_is_hidden(png_ptr, info_ptr) != 0) ? 1 : 0;
-            if (png_get_valid(png_ptr, info_ptr, PNG_INFO_acTL))
-                png_get_acTL(png_ptr, info_ptr, &frames, &plays);
-#endif
-            for (j = 0; j < height; j++)
-                rows_image[j] = p_image + j * rowbytes;
-
-            for (j = 0; j < height; j++)
-                rows_frame[j] = p_frame + j * rowbytes;
-
-#ifdef PNG_APNG_SUPPORTED
-            cache.bop = bop;
-            // cache.plays = plays
-            cache.delay_den = delay_den;
-            cache.delay_num = delay_num;
-            cache.dop = dop;
-            cache.first = first;
-#endif
-            cache.channels = channels;
-            cache.h0 = h0;
-            cache.height = height;
-            // cache ptrs here, only if valid
-            cache.info_ptr = info_ptr;
-            cache.png_ptr = png_ptr;
-            cache.p_image = p_image;
-            cache.p_frame = p_frame;
-            cache.p_temp = p_temp;
-            cache.rows_frame = rows_frame;
-            cache.rows_image = rows_image;
-            cache.size = size;
-            cache.w0 = w0;
-            cache.width = width;
-            cache.x0 = x0;
-            cache.y0 = y0;
-            cache.frame_count = frames;
-            return frames > 0;
-        }
-        free(p_image);
-        free(rows_image);
-        free(rows_frame);
-        free(p_frame);
-        free(p_temp);
     }
-    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-    return false;
+
+    // ICC profile (libpng converts to BGRA with png_set_bgr)
+    png_charp name = nullptr;
+    int compressionType = 0;
+    png_bytep profile = nullptr;
+    png_uint_32 profileLength = 0;
+    if (png_get_iCCP(d.png, d.info, &name, &compressionType, &profile, &profileLength) == PNG_INFO_iCCP) {
+        d.transform = ICCProfileTransform::CreateTransform(profile, profileLength, ICCProfileTransform::FORMAT_BGRA);
+    }
+    return true;
 }
 
-void* PngReader::ReadImage(int& width,
-    int& height,
-    int& nchannels,
-    bool& has_animation,
-    int& frame_count,
-    int& frame_time,
-    void*& exif_chunk,
-    bool& outOfMemory,
-    void* buffer,
-    size_t sizebytes)
-{
-    exif_chunk = NULL;
-    if (!cache.buffer) {
-        if (sizebytes < 8)
-            return NULL;
-        cache.buffer = malloc(sizebytes-8);
-        if (!cache.buffer)
-            return NULL;
-        // copy everything except the PNG signature (first 8 bytes)
-        memcpy(cache.buffer, (char*)buffer+8, sizebytes-8);
-        cache.buffer_size = sizebytes-8;
+// Copy of the canvas as the result for the caller, with ICC transform
+void* CopyCanvas(const Decoder& d, bool& outOfMemory) {
+    void* pixels = std::malloc(d.imageBytes);
+    if (pixels == nullptr) {
+        outOfMemory = true;
+        return nullptr;
     }
-    buffer = cache.buffer;
-    sizebytes = cache.buffer_size;
-    if (!cache.png_ptr || cache.frame_index == 0) {
-        DeleteCacheInternal(false);
-        if (!buffer || !BeginReading(buffer, sizebytes, outOfMemory)) {
-            return NULL;
-        }
-
+    std::memcpy(pixels, d.canvas.get(), d.imageBytes);
+    if (d.transform != nullptr) {
+        ICCProfileTransform::DoTransform(d.transform, pixels, pixels, d.width, d.height);
     }
-
-    void* exif = NULL;
-    unsigned int exif_size = 0;
-    bool read_two = cache.frame_index < cache.first;
-    void* pixels = ReadNextFrame(&exif, &exif_size);
-    if (pixels && read_two)
-        pixels = ReadNextFrame(&exif, &exif_size);
-    
-    width = cache.width;
-    height = cache.height;
-    nchannels = cache.channels;
-    has_animation = (cache.frame_count > 1);
-    frame_count = cache.frame_count;
-
-    // https://wiki.mozilla.org/APNG_Specification
-    // "If the denominator is 0, it is to be treated as if it were 100"
-    if (!cache.delay_den)
-        cache.delay_den = 100;
-    frame_time = (int)(1000.0 * cache.delay_num / cache.delay_den);
-
-    if (exif_size > 8 && exif_size < 65528 && exif != NULL) {
-        exif_chunk = malloc(exif_size + 10);
-        if (exif_chunk != NULL) {
-            memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
-            *((unsigned short*)exif_chunk + 1) = _byteswap_ushort(exif_size + 8);
-            memcpy((uint8_t*)exif_chunk + 10, exif, exif_size);
-        }
-        
-    }
-    if (!has_animation)
-        DeleteCache();
     return pixels;
 }
 
-void PngReader::DeleteCacheInternal(bool free_buffer)
+// Plain PNG: decoded directly into the result
+void* DecodeSingleImage(Decoder& d, bool& outOfMemory) {
+    auto* pixels = static_cast<unsigned char*>(std::malloc(d.imageBytes));
+    if (pixels == nullptr) {
+        outOfMemory = true;
+        return nullptr;
+    }
+    const std::size_t stride = std::size_t(d.width) * 4;
+    for (unsigned j = 0; j < d.height; j++) {
+        d.rowsFrame[j] = pixels + std::size_t(j) * stride;
+    }
+    if (!DecodeFrame(d.png, d.info, d.rowsFrame.get(), false, nullptr)) {
+        std::free(pixels);
+        return nullptr;
+    }
+    if (d.transform != nullptr) {
+        ICCProfileTransform::DoTransform(d.transform, pixels, pixels, d.width, d.height);
+    }
+    return pixels;
+}
+
+// Is 'src' the file that is cached (compares the size and the beginning, which contains IHDR/acTL)?
+bool IsCachedFile(const PngCache& c, const unsigned char* src, std::size_t size) {
+    return c.dataSize == size - kSignatureSize
+           && std::memcmp(c.data.get(), src + kSignatureSize, std::min(c.dataSize, kSameFileCheckBytes)) == 0;
+}
+
+} // namespace
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// PngReader
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+void* PngReader::ReadImage(int& width,
+                           int& height,
+                           int& nchannels,
+                           bool& has_animation,
+                           int& frame_count,
+                           int& frame_time,
+                           void*& exif_chunk,
+                           bool& outOfMemory,
+                           const void* buffer,
+                           std::size_t size)
 {
-    if (cache.transform) {
-        ICCProfileTransform::DeleteTransform(cache.transform);
-        cache.transform = NULL;
+    exif_chunk = nullptr;
+    const auto* src = static_cast<const unsigned char*>(buffer);
+    const bool haveBuffer = (src != nullptr && size > 0);
+
+    PngCache& c = g_cache;
+    // With a cached animation the caller does not have to supply the file again
+    if (c.data && haveBuffer && (size < kSignatureSize || !IsCachedFile(c, src, size))) {
+        DeleteCache(); // a different file than the cached animation
+    }
+    if (!c.data) {
+        if (!haveBuffer || size < kSignatureSize) {
+            return nullptr;
+        }
+        c.data.reset(new (std::nothrow) unsigned char[size - kSignatureSize]);
+        if (!c.data) {
+            outOfMemory = true;
+            return nullptr;
+        }
+        // copy everything except the PNG signature (first 8 bytes)
+        std::memcpy(c.data.get(), src + kSignatureSize, size - kSignatureSize);
+        c.dataSize = size - kSignatureSize;
     }
 
-    // png_read_end(cache.png_ptr, cache.info_ptr);
-    free(cache.rows_frame);
-    free(cache.rows_image);
-    free(cache.p_temp);
-    free(cache.p_frame);
-    free(cache.p_image);
-    png_destroy_read_struct(&cache.png_ptr, &cache.info_ptr, NULL);
-    void* temp_buffer = cache.buffer;
-    size_t temp_buffer_size = cache.buffer_size;
-    cache = { 0 };
-    if (free_buffer) {
-        free(temp_buffer);
+    Decoder& d = c.decoder;
+    if (d.png == nullptr || d.frameIndex == 0) {
+        // (re)start: libpng can only read forward
+        FreeDecoder(d);
+        if (!BeginReading(c, outOfMemory)) {
+            DeleteCache();
+            return nullptr;
+        }
+    }
+
+    void* pixels = nullptr;
+    if (d.apng) {
+        bool ok = true;
+        if (d.frameIndex < d.firstFrame) {
+            // the default image is not part of the animation: decode it (it may be the base of the next frame), but do not return it
+            ok = ComposeNextFrame(d);
+            if (ok) {
+                DisposeFrame(d);
+            }
+        }
+        ok = ok && ComposeNextFrame(d);
+        if (ok) {
+            pixels = CopyCanvas(d, outOfMemory);
+            DisposeFrame(d);
+        }
     } else {
-        cache.buffer = temp_buffer;
-        cache.buffer_size = temp_buffer_size;
+        pixels = DecodeSingleImage(d, outOfMemory);
     }
+    if (pixels == nullptr) {
+        DeleteCache();
+        return nullptr;
+    }
+
+    width = static_cast<int>(d.width);
+    height = static_cast<int>(d.height);
+    nchannels = static_cast<int>(d.channels);
+    has_animation = (d.frameCount > 1);
+    frame_count = static_cast<int>(d.frameCount);
+
+    // https://wiki.mozilla.org/APNG_Specification
+    // "If the denominator is 0, it is to be treated as if it were 100"
+    const unsigned delayDen = d.frameHeader.delayDen != 0 ? d.frameHeader.delayDen : 100;
+    frame_time = static_cast<int>(1000.0 * d.frameHeader.delayNum / delayDen);
+
+    exif_chunk = FindExifSegment(c.data.get(), c.dataSize, 0);
+
+    if (!has_animation) {
+        DeleteCache();
+    }
+    return pixels;
 }
 
-void PngReader::DeleteCache() {
-    DeleteCacheInternal(true);
+void PngReader::DeleteCache()
+{
+    FreeDecoder(g_cache.decoder);
+    g_cache.data.reset();
+    g_cache.dataSize = 0;
 }
 
-bool PngReader::MustUseLibpng(const void* bufferIn, size_t sizebytes) {
-    const char* buffer = (const char*)bufferIn;
+bool PngReader::MustUseLibpng(const void* buffer, std::size_t size)
+{
+    const auto* p = static_cast<const unsigned char*>(buffer);
 
-    // GDI+ fails if the uncompressed image size is over INT_MAX
-    if (sizebytes < 24) {
+    // IHDR: signature (8) + length (4) + "IHDR" (4), then width and height
+    if (p == nullptr || size < 24) {
         return false;
     }
-    unsigned int width = _byteswap_ulong(*(unsigned int*)(buffer + 16));
-    unsigned int height = _byteswap_ulong(*(unsigned int*)(buffer + 20));
-    if (4.0 * width * height > INT_MAX) {
+    // QImage can not hold more than INT_MAX bytes
+    const double width = ReadBE32(p + 16);
+    const double height = ReadBE32(p + 20);
+    if (4.0 * width * height > std::numeric_limits<int>::max()) {
         return true;
     }
 
-    // GDI+ does not support APNG
+    // QImageReader does not support APNG
     // Valid APNGs must have an acTL chunk before the first IDAT chunk, this lets us quickly determine if a PNG is animated
-    size_t offset = 8; // skip PNG signature
-    while (offset + 7 < sizebytes) {
-        if (memcmp(buffer + offset + 4, "acTL", 4) == 0)
+    bool animated = false;
+    ForEachChunk(p, size, kSignatureSize, [&](const unsigned char* type, std::uint32_t, const unsigned char*) {
+        if (std::memcmp(type, "acTL", 4) == 0) {
+            animated = true;
             return true;
-        if (memcmp(buffer + offset + 4, "IDAT", 4) == 0)
-            return false;
-        unsigned int chunksize = *(unsigned int*)(buffer + offset);
-
-        // PNG chunk sizes are big-endian and must be converted to little-endian
-        chunksize = _byteswap_ulong(chunksize);
-
-        // Prevent infinite loop
-        if (chunksize > PNG_UINT_31_MAX) return false;
-
-        // 12 comes from 4 bytes for chunk size, 4 for chunk name, and 4 for CRC32
-        offset += chunksize + 12;
-    }
-    return false;
+        }
+        return std::memcmp(type, "IDAT", 4) == 0;
+    });
+    return animated;
 }
 
-void* PngReader::GetEXIFBlock(void* buffer, size_t sizebytes) {
-    size_t offset = 8; // skip PNG signature
-    while (offset + 7 < sizebytes) {
-        unsigned int chunksize = *(unsigned int*)((char*)buffer + offset);
-        // PNG chunk sizes are big-endian and must be converted to little-endian
-        chunksize = _byteswap_ulong(chunksize);
-
-        if (memcmp((char*)buffer + offset + 4, "eXIf", 4) == 0 && chunksize < 65528 && offset + chunksize + 7 < sizebytes) {
-            void* exif_chunk = malloc(chunksize + 10);
-            if (exif_chunk != NULL) {
-                memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
-                *((unsigned short*)exif_chunk + 1) = _byteswap_ushort(chunksize + 8);
-                memcpy((char*)exif_chunk + 10, (char*)buffer + offset + 8, chunksize);
-            }
-            return exif_chunk;
-        }
-
-        // Prevent infinite loop
-        if (chunksize > PNG_UINT_31_MAX) return NULL;
-
-        // 12 comes from 4 bytes for chunk size, 4 for chunk name, and 4 for CRC32
-        offset += chunksize + 12;
+void* PngReader::GetEXIFBlock(const void* buffer, std::size_t size)
+{
+    const auto* p = static_cast<const unsigned char*>(buffer);
+    if (p == nullptr) {
+        return nullptr;
     }
-    return NULL;
+    return FindExifSegment(p, size, kSignatureSize);
 }

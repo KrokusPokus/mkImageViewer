@@ -103,6 +103,8 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
         RemoveUnusedImages(false);
     }
 
+    qDebug() << "CJPEGProvider::RequestImage() m_requestList.size:" << m_requestList.size();
+
     bOutOfMemory = pRequest->OutOfMemory;
     bExceptionError = pRequest->ExceptionError;
     return pRequest->Image;

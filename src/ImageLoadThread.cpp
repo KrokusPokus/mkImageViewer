@@ -299,23 +299,47 @@ struct CImageFrameInfo {
 };
 
 // Maps the format name reported by QImageReader::format() to the image format used by CJPEGImage.
-// ICO deliberately stays IF_Unknown
 EImageFormat MapQtImageFormat(const QByteArray& sFormat) {
-    if (sFormat == "gif") {
-        return IF_GIF;
-    }
-    if (sFormat == "tif" || sFormat == "tiff") {
-        return IF_TIFF;
-    }
-    if (sFormat == "png") {
-        return IF_PNG;
-    }
-    if (sFormat == "jpg" || sFormat == "jpeg") {
-        return IF_JPEG;
+    if (sFormat == "avif") {
+        return IF_AVIF;
     }
     if (sFormat == "bmp") {
         return IF_WindowsBMP;
     }
+    if (sFormat == "gif") {
+        return IF_GIF;
+    }
+    if (sFormat == "heif" || sFormat == "heic" || sFormat == "hif") {
+        return IF_HEIF;
+    }
+    if (sFormat == "ico") {
+        return IF_ICO;
+    }
+    if (sFormat == "jpg" || sFormat == "jpeg" || sFormat == "jfif") {
+        return IF_JPEG;
+    }
+    if (sFormat == "jxl") {
+        return IF_JXL;
+    }
+    if (sFormat == "png") {
+        return IF_PNG;
+    }
+    if (sFormat == "psd") {
+        return IF_PSD;
+    }
+    if (sFormat == "qoi") {
+        return IF_QOI;
+    }
+    if (sFormat == "tga") {
+        return IF_TGA;
+    }
+    if (sFormat == "tif" || sFormat == "tiff") {
+        return IF_TIFF;
+    }
+    if (sFormat == "webp") {
+        return IF_WEBP;
+    }
+
     return IF_Unknown;
 }
 
@@ -324,9 +348,12 @@ const QColorSpace& SrgbColorSpace() {
     return kSrgb;
 }
 
-std::unique_ptr<QImageReader> CreateQtImageReader(QIODevice* pDevice) {
+// bApplyEXIFOrientation: let Qt rotate/mirror the image according to its EXIF orientation (if enabled in the settings).
+// Pass false if the caller hands the EXIF data to the CJPEGImage, which then does the rotation itself (otherwise it would be done twice).
+std::unique_ptr<QImageReader> CreateQtImageReader(QIODevice* pDevice, bool bApplyEXIFOrientation) {
     auto pReader = std::make_unique<QImageReader>(pDevice);
     pReader->setDecideFormatFromContent(true); // do not trust the file extension
+    pReader->setAutoTransform(bApplyEXIFOrientation && CSettingsProvider::This().AutoRotateEXIF());
     return pReader;
 }
 
@@ -412,7 +439,7 @@ CJPEGImage* DecodeBufferWithQt(const void* pData, int nSize, void* pEXIFData, co
         if (!buffer.open(QIODevice::ReadOnly)) {
             return nullptr;
         }
-        const std::unique_ptr<QImageReader> pReader = CreateQtImageReader(&buffer); // destroyed before 'buffer'
+        const std::unique_ptr<QImageReader> pReader = CreateQtImageReader(&buffer, pEXIFData == nullptr); // destroyed before 'buffer'
         if (!IsImageSizeAcceptable(pReader->size(), isOutOfMemory)) {
             return nullptr;
         }
@@ -680,6 +707,8 @@ void CImageLoadThread::DeleteCachedQtImageReader() {
     m_pLastImageReader.reset();
     m_pLastImageFile.reset();
     m_sLastFileName.clear();
+    m_eLastQtFormat = IF_Unknown;
+    m_bLastQtAnimation = false;
     m_nLastQtFrameIndex = -1;
     m_nLastQtFrameCount = 1;
 }
@@ -841,9 +870,11 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
         void* pEXIFData = nullptr;
 
         // Note: PngReader allocates the pixel data with malloc(), it is handed over to the CJPEGImage as is.
-        uint8* pPixelData = static_cast<uint8*>(
-            PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData,
-                                 request->OutOfMemory, pBuffer.get(), static_cast<size_t>(nFileSize)));
+        uint8* pPixelData = static_cast<uint8*>(PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation,
+                                                                      nFrameCount, nFrameTimeMs, pEXIFData,
+                                                                      request->OutOfMemory,
+                                                                      pBuffer.get(),
+                                                                      static_cast<size_t>(nFileSize)));
         if (pPixelData != nullptr) {
             if (bHasAnimation) {
                 m_sLastPngFileName = request->FileName;
@@ -905,8 +936,11 @@ void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
                                  request->OutOfMemory, pBuffer.get(), static_cast<int>(nFileSize))));
         if (pPixelData) {
             if (bHasAnimation) {
-                // the decoder still points into this buffer
-                m_pJxlBuffer = std::move(pBuffer);
+                // The decoder still points into this buffer. Only the first call has one: with a cached decoder pBuffer
+                // is empty, and moving it would release the buffer the decoder is reading from (use after free).
+                if (pBuffer) {
+                    m_pJxlBuffer = std::move(pBuffer);
+                }
                 m_sLastJxlFileName = request->FileName;
             }
             Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
@@ -1049,9 +1083,10 @@ void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
 
 // Loads an image with Qt (QImageReader). Used for GIF, TIFF, ICO, and as a fallback if the dedicated JPEG/BMP decoders fail.
 // Multi-frame images: the frame to show is request->FrameIndex.
-//  - GIF:  Qt's GIF handler can only decode forward (jumpToImage() is not supported). The QImageReader and its file are
-//          therefore cached while the animation is shown: the next frame is a plain read(). Any other frame rewinds the
-//          file and decodes forward (frames before the requested one are decoded and thrown away).
+//  - Animations (every format whose reader reports supportsAnimation() and more than one image: GIF, WebP, and e.g. AVIF / JXL
+//          if a plugin provides them): the handlers can only decode forward (jumpToImage() does not work for GIF / WebP).
+//          The QImageReader and its file are therefore cached while the animation is shown: the next frame is a plain read().
+//          Any other frame rewinds the file and decodes forward (frames before the requested one are decoded and thrown away).
 //          The cache is dropped by ReleaseFile() or when another file is loaded.
 //  - TIFF: pages are random access (jumpToImage()), nothing is cached.
 void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
@@ -1064,17 +1099,23 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
                 return;
             }
             m_pLastImageFile = std::move(pFile);
-            m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get());
+            m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get(), true);
             m_sLastFileName = request->FileName;
+            // Determine the format once: QImageReader::format() returns an empty name again as soon as the reader has
+            // read the last frame of an animation, which made the second loop look like an unknown format.
+            m_eLastQtFormat = MapQtImageFormat(m_pLastImageReader->format());
         }
 
-        const EImageFormat eFormat = MapQtImageFormat(m_pLastImageReader->format());
+        const EImageFormat eFormat = m_eLastQtFormat;
         if (!bUseCachedReader) {
             // imageCount() has to be queried BEFORE size(): with size() called first the TIFF handler reports a single
             // page for multi-page files (observed with Qt 6.12).
-            if (eFormat == IF_GIF || eFormat == IF_TIFF) {
+            // A format that can not tell its number of images (0) is shown as a still image.
+            const bool bSupportsAnimation = m_pLastImageReader->supportsAnimation();
+            if (bSupportsAnimation || eFormat == IF_TIFF) {
                 m_nLastQtFrameCount = std::max(1, m_pLastImageReader->imageCount());
             }
+            m_bLastQtAnimation = bSupportsAnimation && m_nLastQtFrameCount > 1;
             // reject too large images before any pixel is decoded
             if (!IsImageSizeAcceptable(m_pLastImageReader->size(), request->OutOfMemory)) {
                 DeleteCachedQtImageReader();
@@ -1084,14 +1125,14 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
 
         const int nFrameCount = m_nLastQtFrameCount;
         const int nFrameIndex = std::clamp(request->FrameIndex, 0, nFrameCount - 1);
-        const bool bIsAnimatedGif = (eFormat == IF_GIF && nFrameCount > 1);
+        const bool bIsAnimation = m_bLastQtAnimation;
 
         QImage image;
         if (eFormat == IF_TIFF && nFrameCount > 1) {
             if (m_pLastImageReader->jumpToImage(nFrameIndex)) {
                 image = m_pLastImageReader->read();
             }
-        } else if (bIsAnimatedGif) {
+        } else if (bIsAnimation) {
             if (nFrameIndex <= m_nLastQtFrameIndex) {
                 // rewind: a new reader on the file at position 0 starts again with the first frame
                 m_pLastImageReader.reset();
@@ -1099,7 +1140,7 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
                     DeleteCachedQtImageReader();
                     return;
                 }
-                m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get());
+                m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get(), true);
                 m_nLastQtFrameIndex = -1;
             }
             // decode (and discard) the frames in front of the requested one; for the next frame there is nothing to skip
@@ -1131,10 +1172,10 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
 
         bool bOutOfMemory = false;
         request->Image = ConvertQImageToJPEGImage(std::move(image), nullptr,
-                                                  CImageFrameInfo{ eFormat, bIsAnimatedGif, nFrameIndex, nFrameCount, nFrameTimeMs },
+                                                  CImageFrameInfo{ eFormat, bIsAnimation, nFrameIndex, nFrameCount, nFrameTimeMs },
                                                   bOutOfMemory, request->ProcessParams.TransparencyMode);
         request->OutOfMemory = request->Image == nullptr && bOutOfMemory;
-        if (!bIsAnimatedGif) {
+        if (!bIsAnimation) {
             DeleteCachedQtImageReader();
         }
     } catch (const std::bad_alloc&) {

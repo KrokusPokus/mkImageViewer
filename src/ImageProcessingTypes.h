@@ -25,7 +25,6 @@ enum EFilterType {
     Filter_Upsampling_Bicubic
 };
 
-// Image formats (can be other than JPEG...)
 enum EImageFormat {
     IF_JPEG,
     IF_WindowsBMP,

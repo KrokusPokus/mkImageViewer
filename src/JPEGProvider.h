@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QMutex>
 #include <QWaitCondition>
+#include <QDebug>
 
 class CJPEGImage;
 class CImageLoadThread;
