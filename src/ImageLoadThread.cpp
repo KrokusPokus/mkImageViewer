@@ -580,9 +580,15 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
     };
 
     CRequest& rq = static_cast<CRequest&>(request);
-    const UINT startTimeMs = Helpers::GetTimeMs();
+    const uint64_t startTimeMs = Helpers::GetTimeMs();
+
+    EImageFormat eFormat = GetImageFormat(rq.FileName);
+    if (eFormat != IF_ZIP && CSettingsProvider::This().ForceQImageReader()) {
+        eFormat = IF_Unknown; // der default-Zweig des switch ist der Qt-Pfad
+    }
+
     // Get image format and read the image
-    switch (GetImageFormat(rq.FileName)) {
+    switch (eFormat) {
     case IF_JPEG:
         dropCaches(Keep_None);
         ProcessReadJPEGRequest(&rq);
@@ -746,7 +752,7 @@ void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
 
 void CImageLoadThread::ProcessReadBMPRequest(CRequest * request) {
     bool bOutOfMemory = false;
-    request->Image = CReaderBMP::ReadBmpImage(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), bOutOfMemory);
+    request->Image = CReaderBMP::ReadBmpImage(request->FileName, bOutOfMemory);
     if (bOutOfMemory) {
         request->OutOfMemory = true;
     } else if (request->Image == nullptr) {

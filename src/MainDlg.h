@@ -147,20 +147,18 @@ private:
     bool m_bFullScreenMode;
     bool m_bLockPaint;
     int m_nCurrentTimeout;
-    POINT m_startMouse;
+    QPoint m_startMouse;
     QSize m_virtualImageSize;
     bool m_bInZooming;
     bool m_bTemporaryLowQ;
     bool m_bShowZoomFactor;
     bool m_bSpanVirtualDesktop;
-    bool m_bPanMouseCursorSet;
     bool m_bMouseOn;
     bool m_bKeepParametersBeforeAnimation;
     bool m_bIsAnimationPlaying;
     int m_nLastAnimationOffset;
     qint64 m_nExpectedNextAnimationTickCount;
     int m_nMonitor;
-    WINDOWPLACEMENT m_storedWindowPlacement;
     QRect m_monitorRect;
     QRect m_clientRect;
     QRect m_windowRectOnClose;
@@ -186,7 +184,6 @@ private:
     void StartLowQTimer(int nTimeout);
     void InitParametersForNewImage();
     void ExchangeProcessingParams();
-    void SaveParameters();
     void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
     void onLoadFileAsynch(); // WM_COPYDATAhandler and OnAnotherInstanceStarted() call this via invokeMethod()
 
@@ -206,14 +203,8 @@ private:
     void AdjustAnimationFrameTime();
     void StopAnimation();
 
-    BOOL m_bDWMenabled;
-    typedef HRESULT (WINAPI *MyDwmIsCompositionEnabledType)(BOOL*);
-    typedef HRESULT (WINAPI *MyDwmFlushType)(void);
-    MyDwmFlushType m_DynDwmFlush;
-
     bool m_bIsRunningInWine;
 
-    WINDOWPLACEMENT m_storedWindowPlacement2;    // position for windowed mode
     bool m_bShowInfo;
     bool m_bPanTimerActive;
     int m_nBookModePageHeight;
@@ -231,10 +222,13 @@ private:
     QString GetMultiframeIndex(CJPEGImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
     QString FormatFileSize(qint64 nFileSize);
     QString formatOutputZoomFactor(double m_dZoom);
+    void onShowContextMenu(const QPoint &pos);
+
+#if defined(Q_OS_WIN)
     bool isRunningInWine();
     bool IsLinuxBinaryAvailable(const QString& unixPath);
     QString GetUnixPathFromWine(const QString& szDosPath);
-    void onShowContextMenu(const QPoint &pos);
+#endif
 
     // [sdneon] Toast stuff
     QString m_strToast;
@@ -247,7 +241,6 @@ private:
         HICON hBig = nullptr;
         HICON hSmall = nullptr;
     };
-    inline static QHash<QString, IconResult> s_iconCache; // Klassenweiter Cache pro Datei-Endung
 
     QFileIconProvider m_iconProvider;
 

@@ -39,12 +39,11 @@ private:
     class QComboBox* m_comboCpuType;
     class QSpinBox*  m_spinCpuCores;
     class QSpinBox*  m_spinCacheRange;
-    class QComboBox* m_comboIniEditor;
-    class QLineEdit* m_editCustomIniEditor;
     class QCheckBox* m_checkStoreToExe;
 
     // Fenster & Verhalten
-    class QComboBox* m_comboShowFullScreen;
+    class QCheckBox* m_checkShowFullScreen;
+    class QCheckBox* m_checkBookModeLaunchFullscreen;
     class QCheckBox* m_checkSingleFullScreenInstance;
     class QComboBox* m_comboDefaultWindowRect;
     class QSpinBox*  m_spinMinWidth;
@@ -71,7 +70,6 @@ private:
     class QCheckBox* m_checkWrapAroundFolder;
     class QCheckBox* m_checkNavigateMouseWheel;
     class QDoubleSpinBox* m_spinMouseWheelZoomSpeed;
-    class QCheckBox* m_checkExchangeXButtons;
 
     // Bildanzeige & Zoom
     class QCheckBox* m_checkReloadWhenImageChanged;
@@ -79,11 +77,11 @@ private:
     class QComboBox* m_comboDownSamplingFilter;
     class QCheckBox* m_checkAutoRotateExif;
     class QCheckBox* m_checkUseEmbeddedColorProfiles;
+    class QCheckBox* m_checkForceQImageReader;
     class QComboBox* m_comboAutoZoomMode;
     class QComboBox* m_comboAutoZoomModeFullscreen;
     class QSpinBox*  m_spinZoomPausePercent;
     class QSpinBox*  m_spinBookModePageHeight;
-    class QCheckBox* m_checkBookModeLaunchFullscreen;
     class QCheckBox* m_checkSmoothPanning;
     class QCheckBox* m_checkSmartPanningKeys;
 
@@ -127,7 +125,6 @@ public:
     bool AutoRotateEXIF() const { return m_bAutoRotateEXIF; }
     bool BookModeLaunchFullscreen() const { return m_bBookModeLaunchFullscreen; }
     bool DefaultMaximized() const { return m_bDefaultMaximized; }
-    bool ExchangeXButtons() const { return m_bExchangeXButtons; }
     bool ExistsUserINI() const;
     bool ExplicitWindowRect() const { return m_bExplicitWindowRect; }
     bool HighQualityResampling() const { return m_bHQRS; }
@@ -143,6 +140,7 @@ public:
     bool StoreToEXEPath() const { return m_bStoreToEXEPath; }
     bool TitleBarUseFileIcon() const { return m_bTitleBarUseFileIcon; }
     bool UseEmbeddedColorProfiles() const { return m_bUseEmbeddedColorProfiles; }
+    bool ForceQImageReader() const { return m_bForceQImageReader; }
     bool WrapAroundFolder() const { return m_bWrapAroundFolder && m_eNavigation == Helpers::NM_LoopDirectory; }
 
     // Ursprüngliche Rückgabetypen für vollständige Drop-in Compatibility
@@ -167,7 +165,6 @@ public:
     Helpers::EAutoZoomMode AutoZoomMode() const { return m_eAutoZoomMode; }
     Helpers::EAutoZoomMode AutoZoomModeFullscreen() const { return m_eAutoZoomModeFullscreen; }
     Helpers::EDeleteConfirmation DeleteConfirmation() const { return m_eDeleteConfirmation; }
-    Helpers::EIniEditor IniEditor() const { return m_eIniEditor; }
     Helpers::ENavigationMode Navigation() const { return m_eNavigation; }
     Helpers::ESingleInstanceMode SingleInstanceMode() const { return m_eSingleInstanceMode; }
     Helpers::ESorting Sorting() const { return m_eSorting; }
@@ -183,8 +180,6 @@ public:
 
     const QString DefaultGUIFont() const { return m_defaultGUIFont; }
     const QString ZoomFactorFont() const { return m_zoomFactorFont; }
-    
-    const QString CustomIniEditor() const { return m_sIniEditor; }
     const QString GetEXEPath() const { return m_sEXEPath; }
     const QString GetGlobalINIFileName() const { return m_sIniNameGlobal; }    // Get the file name with path of the global INI file (in EXE path)
     const QString GetUserINIFileName() const { return m_sIniNameUser; }        // Get the file name with path of the user INI file (in AppData path)
@@ -248,7 +243,6 @@ private:
     bool m_bSingleFullScreenInstance{true};
     bool m_bWrapAroundFolder{true};
     Helpers::EDeleteConfirmation m_eDeleteConfirmation;
-    bool m_bExchangeXButtons{true};
     bool m_bAutoRotateEXIF{true};
     bool m_bUseEmbeddedColorProfiles{false};
     QRect m_defaultWindowRect;
@@ -256,6 +250,7 @@ private:
     bool m_bDefaultMaximized{false};
     bool m_bStickyWindowSize{false};
     bool m_bExplicitWindowRect{false};
+    bool m_bForceQImageReader{false};
     QColor m_colorBackground;
     QColor m_colorGUI;
     QColor m_colorTransparency;
@@ -263,8 +258,7 @@ private:
     QString m_zoomFactorFont;
     bool m_bReloadWhenDisplayedImageChanged{true};
     QSize m_minimalWindowSize;
-    Helpers::EIniEditor m_eIniEditor;
-    QString m_sIniEditor;
+
     double m_zoomPauseFactor{1.0};
 
     int m_nBookModePageHeight{122};

@@ -86,13 +86,6 @@ namespace Helpers {
         DC_Never
     };
 
-    // Editor for INI files
-    enum EIniEditor {
-        INI_Notepad,
-        INI_System,
-        INI_Custom
-    };
-
     inline float DPIScalingFactor = -1.0f; // is updated to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
     
     static QString buffAppPath;
@@ -184,10 +177,6 @@ namespace Helpers {
     // Gets the image size to be used when fitting the image to screen according to the auto zoom mode given
     QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom);
 
-    // Gets the total border size of a window. This includes the frame sizes and the size of the window caption area.
-    // The window size equals the client area size plus this border size
-    QSize GetTotalBorderSize();
-
     // Gets the path where JPEGView stores its application data, including a trailing backslash
     QString JPEGViewAppDataPath();
 
@@ -221,30 +210,10 @@ namespace Helpers {
     // Gets the content of the JPEG comment tag, empty string if no comment
     QString GetJPEGComment(const void* pJPEGStream, int nStreamLength);
 
-    // file size for file with handle
-    __int64 GetFileSize(HANDLE hFile);
-
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
     int GetFrameIndex(CJPEGImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage);
 
-    uint32_t GetTimeMs();
-    
-    //------------------------------------------------------------------------------------------------
-
-    // Critical section that is acquired on construction and freed on destruction
-    class CAutoCriticalSection {
-    public:
-        // The critical section mush have been initialized prior to using it with this class
-        CAutoCriticalSection(CRITICAL_SECTION & cs) : m_cs(cs) {
-            ::EnterCriticalSection(&m_cs);
-        }
-
-        ~CAutoCriticalSection() {
-            ::LeaveCriticalSection(&m_cs);
-        }
-    private:
-        CRITICAL_SECTION & m_cs;
-    };
+    uint64_t GetTimeMs();
 
 } // namespace Helpers
 

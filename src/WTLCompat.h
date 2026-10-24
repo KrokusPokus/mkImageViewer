@@ -124,7 +124,7 @@ struct DRect {
     constexpr DRect(const DPoint& point, const DSize& size) noexcept
         : left(point.x), top(point.y), right(point.x + size.cx), bottom(point.y + size.cy) {}
 
-#if defined(_WIN32) || defined(POINT) || defined(RECT)
+#if defined(_WINDEF_)
     // Konvertierungskonstruktor für RECT / tagRECT
     constexpr DRect(const RECT& rc) noexcept
         : left(rc.left), top(rc.top), right(rc.right), bottom(rc.bottom) {}

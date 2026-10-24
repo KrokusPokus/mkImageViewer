@@ -5,7 +5,7 @@
 const unsigned int MAX_IMAGE_DIMENSION = 65535;
 
 // Sizes are in bytes
-const unsigned int MAX_JPEG_FILE_SIZE = 1024 * 1024 * 300;
+const unsigned int MAX_JPEG_FILE_SIZE = 1024 * 1024 * 500;
 const unsigned int MAX_PNG_FILE_SIZE = 1024 * 1024 * 300;
 const unsigned int MAX_WEBP_FILE_SIZE = 1024 * 1024 * 150;
 const unsigned int MAX_JXL_FILE_SIZE = 1024 * 1024 * 150;

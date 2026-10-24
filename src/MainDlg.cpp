@@ -17,6 +17,10 @@
 #include "KeyMap.h"
 #include "DirectoryWatcher.h"
 
+#if defined(Q_OS_WIN)
+//#include <windows.h>
+#endif
+
 #include <QActionGroup>
 #include <QApplication>
 #include <QBuffer>
@@ -38,6 +42,7 @@
 #include <QThread>
 #include <QUrl>
 #include <QtGlobal>
+#include <QLibrary>
 
 namespace {
 
@@ -83,65 +88,6 @@ namespace {
         FileLoad_OutOfMemory = 65536,
         FileLoad_ExceptionError = 32768
     };
-
-    // Creates a font from the INI file description:
-    // "Font face" fontSizePoints [bold]
-    // Returns NULL if default font shall be used
-    HFONT CreateFontFromINIDescription(HDC dc, const QString& sIniFileDescription)
-    {
-        QString sIniDesc = sIniFileDescription.trimmed();
-
-        if (sIniDesc.compare(QStringLiteral("default"), Qt::CaseInsensitive) == 0 || sIniDesc.isEmpty()) {
-            return nullptr;
-        }
-
-        QString sFontName;
-        float fFontSize = 9.0f;
-        bool isBold = false;
-
-        // RegEx: Sucht optional nach "Font Name" oder FontName, gefolgt von der Schriftgröße und optional "bold"
-        static const QRegularExpression rx(
-            QStringLiteral("(?:\"([^\"]+)\"|(\\S+))\\s+(?:(\\d+(?:\\.\\d+)?)\\s*)?(bold)?"),
-            QRegularExpression::CaseInsensitiveOption
-        );
-
-        QRegularExpressionMatch match = rx.match(sIniDesc);
-        if (match.hasMatch()) {
-            // Schriftname (Gruppe 1 bei Anführungszeichen, Gruppe 2 ohne)
-            sFontName = !match.captured(1).isEmpty() ? match.captured(1) : match.captured(2);
-
-            // Schriftgröße (Gruppe 3)
-            if (!match.captured(3).isEmpty()) {
-                bool ok = false;
-                float parsedSize = match.captured(3).toFloat(&ok);
-                if (ok && parsedSize > 0.0f) {
-                    fFontSize = std::clamp(parsedSize, 7.0f, 30.0f);
-                }
-            }
-
-            // Bold-Flag (Gruppe 4)
-            isBold = !match.captured(4).isEmpty();
-        } else {
-            // Fallback: Nur ein Font-Name ohne Größenangabe
-            sFontName = sIniDesc.trimmed().remove(QLatin1Char('"'));
-        }
-
-        if (sFontName.isEmpty()) {
-            return nullptr;
-        }
-
-        const int nHeight = -static_cast<int>(0.5f + fFontSize * ::GetDeviceCaps(dc, LOGPIXELSY) / 72.0f);
-
-        return ::CreateFontW(
-            nHeight, 0, 0, 0,
-            isBold ? FW_BOLD : FW_NORMAL,
-            FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
-            CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-            VARIABLE_PITCH,
-            reinterpret_cast<LPCWSTR>(sFontName.utf16())
-        );
-    }
 
     // Gets default image processing parameters as set in INI file
     CImageProcessingParams GetDefaultProcessingParams() {
@@ -272,33 +218,10 @@ namespace {
         }
 
         QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), clientRect.height());
-
+        qDebug() << "DrawImageLoadErrorText:" << message << "at" << rectText;
+        painter.setFont(QFont("Consolas", 10));
+        painter.setPen(Qt::white);
         painter.drawText(rectText, Qt::AlignHCenter | Qt::TextWordWrap, message);
-    }
-
-    void SelectDefaultGUIFont(HDC dc) {
-        if (hDefaultGUIFont == nullptr) {
-            hDefaultGUIFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().DefaultGUIFont());
-            if (hDefaultGUIFont == nullptr)
-                hDefaultGUIFont = (HFONT)::GetStockObject(DEFAULT_GUI_FONT);
-        }
-        ::SelectObject(dc, hDefaultGUIFont);
-    }
-
-    void SelectDefaultToastFont(HDC dc) {
-        if (hToastFont == nullptr) {
-            hToastFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 12.0 bold"));
-        }
-        ::SelectObject(dc, hToastFont);
-    }
-
-    void SelectDefaultZoomFactorFont(HDC dc) {
-        if (hDefaultZoomFactorFont == nullptr) {
-            hDefaultZoomFactorFont = CreateFontFromINIDescription(dc, CSettingsProvider::This().ZoomFactorFont());
-            if (hDefaultZoomFactorFont == nullptr)
-                hDefaultZoomFactorFont = CreateFontFromINIDescription(dc, QStringLiteral("\"Arial\" 10.0 bold"));
-        }
-        ::SelectObject(dc, hDefaultZoomFactorFont);
     }
 
     // Draws a 32 bit DIB centered in the given target area, filling the remaining area with the given brush
@@ -417,13 +340,11 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_bFullScreenMode = sp.ShowFullScreen();
     m_bLockPaint = true;
     m_nCurrentTimeout = 0;
-    m_startMouse.x = m_startMouse.y = -1;
+    m_startMouse = QPoint(-1, -1);
     m_virtualImageSize = QSize(-1, -1);
     m_bInZooming = false;
     m_bTemporaryLowQ = false;
     m_bShowZoomFactor = false;
-    m_bPanMouseCursorSet = false;
-    m_storedWindowPlacement.length = sizeof(WINDOWPLACEMENT);
     m_nMonitor = 0;
     m_monitorRect = QRect(0, 0, 0, 0);
     m_windowRectOnClose = QRect(0, 0, 0, 0);
@@ -444,14 +365,9 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     /*############################################*/
     /* Custom variables of the linear scaling mod */
     /*############################################*/
-
-    m_bDWMenabled = FALSE;
-    m_DynDwmFlush = 0;
-
+#if defined(Q_OS_WIN)
     m_bIsRunningInWine = isRunningInWine();
-    
-    m_storedWindowPlacement2.length = sizeof(WINDOWPLACEMENT);
-    memset(&m_storedWindowPlacement2, 0, sizeof(WINDOWPLACEMENT));
+#endif
     m_bShowInfo = false;
     m_bPanTimerActive = false;
     m_nBookModePageHeight = sp.BookModePageHeight();
@@ -599,16 +515,6 @@ CMainDlg::~CMainDlg() {
     delete m_pImageProcParams;
     delete m_pImageProcParamsKept;
     delete m_pKeyMap;
-
-    for (auto it = s_iconCache.begin(); it != s_iconCache.end(); ++it) {
-        if (it->hBig != nullptr) {
-            ::DestroyIcon(it->hBig);
-        }
-        if (it->hSmall != nullptr) {
-            ::DestroyIcon(it->hSmall);
-        }
-    }
-    s_iconCache.clear();
 }
 
 void CMainDlg::paintEvent(QPaintEvent* /*event*/)
@@ -829,8 +735,6 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         painter.setBrush(Qt::white);
         painter.drawPath(textPath);
     }
-
-    SetCursorForMoveSection();
 }
 
 /*
@@ -952,13 +856,15 @@ void CMainDlg::closeEvent(QCloseEvent* event) {
     event->accept(); // Erlaubt das Schließen des Fensters (entspricht bHandled = FALSE)
 }
 
-//LRESULT CMainDlg::OnLButtonDown(UINT /*uMsg*/, WPARAM /*wParam*/, LPARAM lParam, BOOL& /*bHandled*/) {
 void CMainDlg::mousePressEvent(QMouseEvent* event) {
+    m_nMouseX = event->pos().x();
+    m_nMouseY = event->pos().y();
+
     if (event->button() == Qt::LeftButton) {
-        QPoint pos = event->pos(); // statt GET_X_LPARAM(lParam)
+        QPoint pos = event->pos();
 
         this->grabMouse();
-        CPoint pointClicked(pos.x(), pos.y()); // Direkt über das Qt-Event aufgelöst
+        CPoint pointClicked(pos.x(), pos.y());
 
         bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
         bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
@@ -976,14 +882,10 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
         } else if (bDraggingRequired) {
             StartDragging(pointClicked.x, pointClicked.y, false);
         }
-
-        SetCursorForMoveSection();
         return;
     }
     else if (event->button() == Qt::RightButton) {
-        // Entspricht OnRButtonDown
         if (HandleMouseButtonByKeymap(VK_RBUTTON)) {
-            event->accept();
             return;
         }
     }
@@ -1005,18 +907,21 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
             return;
         }
 
-        bool bExchangeXButtons = CSettingsProvider::This().ExchangeXButtons();
         if (isXButton1) {
-            GotoImage(bExchangeXButtons ? POS_Next : POS_Previous);
+            GotoImage(POS_Previous);
         } else {
-            GotoImage(bExchangeXButtons ? POS_Previous : POS_Next);
+            GotoImage(POS_Next);
         }
+        return;
     }
 
     QMainWindow::mousePressEvent(event);
 }
 
 void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
+    m_nMouseX = event->pos().x();
+    m_nMouseY = event->pos().y();
+
     if (event->button() == Qt::LeftButton) {
         if (m_bZoomMode) {
             m_bZoomMode = false;
@@ -1025,23 +930,26 @@ void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
             EndDragging();
         }
         this->releaseMouse();
+        return;
     }
     else if (event->button() == Qt::RightButton) {
-        // Entspricht OnRButtonUp (bExecuteCommand = false)
         if (HandleMouseButtonByKeymap(VK_RBUTTON, false)) {
-            event->accept();
             return;
         }
     }
     else if (event->button() == Qt::MiddleButton) {
         EndDragging();
         this->releaseMouse();
+        return;
     }
 
     QMainWindow::mouseReleaseEvent(event);
 }
 
 void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
+    m_nMouseX = event->pos().x();
+    m_nMouseY = event->pos().y();
+
     if (event->button() == Qt::LeftButton) {
         if (m_pCurrentImage != NULL) {
             if (HandleMouseButtonByKeymap(VK_LBUTTONDBLCLK)) {
@@ -1066,18 +974,17 @@ void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
     m_nMouseY = event->pos().y();
 
     if (!m_bDragging) {
-        if (m_startMouse.x == -1 && m_startMouse.y == -1) {
-            m_startMouse.x = m_nMouseX;
-            m_startMouse.y = m_nMouseY;
+        if (m_startMouse.x() == -1 && m_startMouse.y() == -1) {
+            m_startMouse.setX(m_nMouseX);
+            m_startMouse.setY(m_nMouseY);
         } else {
-            if (abs(m_nMouseX - m_startMouse.x) + abs(m_nMouseY - m_startMouse.y) > 50) {
+            if (abs(m_nMouseX - m_startMouse.x()) + abs(m_nMouseY - m_startMouse.y()) > 50) {
                 MouseOn();
             }
         }
     }
 
     // Do dragging when needed, else pass event to panel manager and zoom navigator
-    bool bMouseCursorSet = false;
     if (m_bZoomMode) {
         int nDX = m_nMouseX - m_nCapturedX;
         double dFactor = 1 + pow(nDX * nDX, 0.8) / 1500;
@@ -1085,9 +992,6 @@ void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
         PerformZoom(m_dStartZoom * dFactor, false, true);
     } else if (m_bDragging) {
         DoDragging();
-    }
-    if (!m_bPanMouseCursorSet && !bMouseCursorSet) {
-        ::SetCursor(::LoadCursor(NULL, IDC_ARROW));
     }
 }
 
@@ -1913,9 +1817,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
             }
             break;
-        case IDM_SAVE_PARAMETERS:
-            SaveParameters();
-            break;
         case IDM_FIT_TO_SCREEN:
         case IDM_FIT_TO_SCREEN_NO_ENLARGE:
             ResetZoomToFitScreen(false, nCommand == IDM_FIT_TO_SCREEN, true);
@@ -2229,16 +2130,19 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_CONTEXT_MENU:
             {
-                QPoint screenPoint;
-                // Prüfen, ob m_nMouseX/Y gültig sind, oder alternativ den aktuellen Cursor-Punkt nehmen
-                if (m_nMouseX >= 0 && m_nMouseY >= 0 && m_nMouseX < width() && m_nMouseY < height()) {
-                    screenPoint = this->mapToGlobal(QPoint(m_nMouseX, m_nMouseY));
-                } else {
-                    // Fallback: Aktuelle echte Cursor-Position auf dem Bildschirm (ideal für Tastatur-Shortcuts)
-                    screenPoint = QCursor::pos();
+                QPoint globalMousePos = QCursor::pos();
+
+                // 2. Das lokale Rechteck deines Fensters (ClientArea) in globale Koordinaten umrechnen
+                QRect globalClientRectangle = QRect(this->mapToGlobal(QPoint(0, 0)), this->size());
+
+                // 3. Prüfen, ob sich der Mauszeiger innerhalb dieses globalen Rechtecks befindet
+                bool isOverMyWindow = globalClientRectangle.contains(globalMousePos);
+
+                if (!isOverMyWindow) {
+                    globalMousePos = this->mapToGlobal(QPoint(0, 0));
                 }
-                qDebug() << "screenPoint:" << screenPoint << "m_nMouseX:" << m_nMouseX << "m_nMouseY:" << m_nMouseY << "width():" << width() << "height()" << height();
-                onShowContextMenu(screenPoint);
+
+                onShowContextMenu(globalMousePos);
             }
             break;
         case IDM_TOGGLE_SORT_RANDOM:
@@ -2378,6 +2282,7 @@ void CMainDlg::OpenDefaultEditor() {
     }
 
     // 2. Datei im Editor öffnen
+#if defined(Q_OS_WIN)
     if (m_bIsRunningInWine) {
         QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
         if (!sUnixPath.isEmpty()) {
@@ -2386,8 +2291,9 @@ void CMainDlg::OpenDefaultEditor() {
             arguments << "/unix" << "/usr/bin/gimp" << sUnixPath;
             QProcess::startDetached("start.exe", arguments);
         }
-    }
-    else {
+    } else
+#endif
+    {
         // Der moderne, plattformunabhängige Qt-Weg, um Dateien mit der Standard-App zu öffnen
         // (Ersetzt das Windows-spezifische "ShellExecuteW" mit dem "edit"-Verb)
         QDesktopServices::openUrl(QUrl::fromLocalFile(sCurrentFileName));
@@ -2515,17 +2421,16 @@ void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
     }
-    m_startMouse.x = m_startMouse.y = -1;
+    m_startMouse = QPoint(-1, -1);
     MouseOff();
     this->update();
 }
 
 void CMainDlg::StartDragging(int nX, int nY, bool bDragWithZoomNavigator) {
-    m_startMouse.x = m_startMouse.y = -1;
+    m_startMouse = QPoint(-1, -1);
     m_bDragging = true;
     m_nCapturedX = nX;
     m_nCapturedY = nY;
-    SetCursorForMoveSection();
 }
 
 void CMainDlg::DoDragging() {
@@ -2552,7 +2457,6 @@ void CMainDlg::EndDragging() {
     if (m_DIBOffsets != QPoint(0, 0)) {
         update();
     }
-    SetCursorForMoveSection();
 }
 
 void CMainDlg::GotoImage(EImagePosition ePos) {
@@ -3106,17 +3010,15 @@ void CMainDlg::MouseOff() {
                 this->setCursor(Qt::BlankCursor);
             }
 
-            m_startMouse.x = m_startMouse.y = -1;
             // Verwendung von QPoint statt Win32-Structs
-            //m_startMouse.setX(-1);
-            //m_startMouse.setY(-1);
+            m_startMouse = QPoint(-1, -1);
             m_bMouseOn = false;
         }
     }
 }
 void CMainDlg::MouseOn() {
     if (!m_bMouseOn) {
-        ::ShowCursor(TRUE);
+        this->unsetCursor(); // oder this->setCursor(Qt::ArrowCursor);
         m_bMouseOn = true;
     }
 }
@@ -3191,38 +3093,12 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
     }
 }
 
-void CMainDlg::SaveParameters() {
-    if (m_bMovieMode) {
-        return;
-    }
-
-    EProcessingFlags eFlags = CreateDefaultProcessingFlags(m_bKeepParams);
-    CSettingsProvider::This().SaveSettings(*m_pImageProcParams,
-                                           eFlags,
-                                           m_pFileList->GetNavigationMode(),
-                                           m_pFileList->GetSorting(),
-                                           m_pFileList->IsSortedAscending(),
-                                           m_eAutoZoomModeWindowed,
-                                           m_eAutoZoomModeFullscreen,
-                                           m_eTransitionEffect);
-}
-
 // Get current filename or filepath
 QString CMainDlg::CurrentFileName(bool bFileNameOnly) {
     if (m_pFileList != nullptr) {
         return bFileNameOnly ? m_pFileList->CurrentFileTitle() : m_pFileList->Current();
     } else {
         return QString();
-    }
-}
-
-void CMainDlg::SetCursorForMoveSection() {
-    if (m_bDragging) {
-        ::SetCursor(::LoadCursor(NULL, IDC_SIZEALL));
-        m_bPanMouseCursorSet = true;
-    } else if (m_bPanMouseCursorSet) {
-        ::SetCursor(::LoadCursor(NULL, IDC_ARROW));
-        m_bPanMouseCursorSet = false;
     }
 }
 
@@ -3252,9 +3128,8 @@ void CMainDlg::EditINIFile(bool bGlobalINI) {
         : CSettingsProvider::This().GetUserINIFileName();
 
     if (!bGlobalINI && !CSettingsProvider::This().ExistsUserINI()) {
-        // Natürlicher Qt Dialog anstelle von ::MessageBox
         const auto result = QMessageBox::question(
-            nullptr, // Später "this" (QWidget*), sobald CMainDlg von QWidget erbt
+            this,
             QStringLiteral(JPEGVIEW_TITLE),
             QStringLiteral("No user INI file exists yet. Create user INI file from INI file template?"),
             QMessageBox::Yes | QMessageBox::No
@@ -3266,25 +3141,8 @@ void CMainDlg::EditINIFile(bool bGlobalINI) {
             return;
         }
     }
-
-    const Helpers::EIniEditor iniEditor = CSettingsProvider::This().IniEditor();
-
-    if (iniEditor == Helpers::INI_Notepad) {
-        // Notepad explizit mit der INI-Datei starten
-        QProcess::startDetached(QStringLiteral("notepad.exe"), { sINIFileName });
-    }
-    else if (iniEditor == Helpers::INI_System) {
-        // Plattformunabhängiges Öffnen der Datei mit der Standard-Systemanwendung
-        QDesktopServices::openUrl(QUrl::fromLocalFile(sINIFileName));
-    }
-    else {
-        // Benutzerdefinierter Editor mit Ersetzung von %exepath%
-        QString command = CSettingsProvider::This().CustomIniEditor();
-        command.replace(QStringLiteral("%exepath%"), CSettingsProvider::This().GetEXEPath(), Qt::CaseInsensitive);
-
-        // Aufruf von externem Prozess mit Argument
-        QProcess::startDetached(command, { sINIFileName });
-    }
+    
+    QDesktopServices::openUrl(QUrl::fromLocalFile(sINIFileName));
 }
 
 void CMainDlg::UpdateWindowTitle(bool bForce) {
@@ -3300,12 +3158,14 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
         sWindowText = QStringLiteral(JPEGVIEW_TITLE);
     } else {
         QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
+#if defined(Q_OS_WIN)
         if (m_bIsRunningInWine && bShowFullPathInTitle) {
             QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
             if (!sUnixPath.isEmpty()) {
                 visibleName = sUnixPath;
             }
         }
+#endif
         sWindowText = visibleName
                       + QString(GetMultiframeIndex(m_pCurrentImage))
                       + QStringLiteral(" - ")
@@ -3413,9 +3273,11 @@ EProcessingFlags CMainDlg::CreateDefaultProcessingFlags(bool bKeepParams) {
 }
 
 bool CMainDlg::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteCommand) {
-    bool bAlt = (::GetKeyState(VK_MENU) & 0x8000) != 0;
-    bool bCtrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
-    bool bShift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+    Qt::KeyboardModifiers modifiers = QGuiApplication::queryKeyboardModifiers();
+    bool bAlt = modifiers.testFlag(Qt::AltModifier);
+    bool bCtrl = modifiers.testFlag(Qt::ControlModifier);
+    bool bShift = modifiers.testFlag(Qt::ShiftModifier);
+
     int nCommand = m_pKeyMap->GetCommandIdForKey(nMouseButtonCode, bAlt, bCtrl, bShift);
     if (nCommand > 0) {
         if (bExecuteCommand) {
@@ -3571,6 +3433,20 @@ void CMainDlg::AnimateTransition() {
 }
 */
 void CMainDlg::CleanupAndTerminate() {
+    /*
+    if (!m_bMovieMode) {
+        EProcessingFlags eFlags = CreateDefaultProcessingFlags(m_bKeepParams);
+        CSettingsProvider::This().SaveSettings(*m_pImageProcParams,
+                                               eFlags,
+                                               m_pFileList->GetNavigationMode(),
+                                               m_pFileList->GetSorting(),
+                                               m_pFileList->IsSortedAscending(),
+                                               m_eAutoZoomModeWindowed,
+                                               m_eAutoZoomModeFullscreen,
+                                               m_eTransitionEffect);
+    }
+    */
+
     SaveBookmark();
     CSettingsProvider::This().SaveCustomSettings();
     StopMovieMode();
@@ -3921,25 +3797,21 @@ QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
     return QString::number(qRound(m_dZoom * 100)) + " %";
 }
 
-
-bool CMainDlg::isRunningInWine() {
 #if defined(Q_OS_WIN)
-    // ntdll.dll ist in jedem Windows-Prozess bereits geladen
-    HMODULE hNtDll = GetModuleHandleA("ntdll.dll");
-    if (!hNtDll) {
-        return false;
-    }
+bool CMainDlg::isRunningInWine() {
+    // Funktionszeiger-Definition für wine_get_version
+    typedef const char* (__cdecl* pwine_get_version)(void);
 
-    // Check if wine-specific function exists
-    pwine_get_version wine_get_version =
-        (pwine_get_version)GetProcAddress(hNtDll, "wine_get_version");
+    // QLibrary kann Symbole aus bereits geladenen System-DLLs wie ntdll.dll auflösen
+    auto wine_get_version = reinterpret_cast<pwine_get_version>(
+        QLibrary::resolve("ntdll", "wine_get_version")
+        );
 
     if (wine_get_version) {
-        // Optional: Version auslesen (z.B. "9.0")
-        // const char* version = wine_get_version();
+        // Optional: Version auslesen (z. B. "9.0")
+        // QString wineVersion = QString::fromUtf8(wine_get_version());
         return true;
     }
-#endif
     return false;
 }
 
@@ -3981,22 +3853,18 @@ bool CMainDlg::IsLinuxBinaryAvailable(const QString& unixPath) {
 }
 
 
-// Konvertiert einen Windows-Pfad (z.B. Z:\home\...) in einen Unix-Pfad (/home/...)
 QString CMainDlg::GetUnixPathFromWine(const QString& szDosPath) {
     if (szDosPath.isEmpty()) {
         return QString();
     }
 
-    HMODULE hKernel32 = GetModuleHandle(TEXT("kernel32.dll"));
-    if (!hKernel32) {
-        return QString();
-    }
-
-    // Wine-Signatur: Nimmt LPCWSTR (UTF-16), liefert char* (UTF-8 POSIX-Pfad)
+    // Funktionszeiger-Definition für wine_get_unix_file_name
     using pwine_get_unix_file_name = char* (__cdecl*)(LPCWSTR);
+
+    // Symbol direkt über QLibrary aus kernel32 auflösen
     auto wine_get_unix_file_name = reinterpret_cast<pwine_get_unix_file_name>(
-        GetProcAddress(hKernel32, "wine_get_unix_file_name")
-    );
+        QLibrary::resolve("kernel32", "wine_get_unix_file_name")
+        );
 
     if (wine_get_unix_file_name) {
         // QString sicher als LPCWSTR (const wchar_t*) an Wine übergeben
@@ -4016,6 +3884,7 @@ QString CMainDlg::GetUnixPathFromWine(const QString& szDosPath) {
 
     return QString();
 }
+#endif
 
 bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bRecycleOnly) {
     QString sTitle;
@@ -4045,7 +3914,7 @@ bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bR
         }
     }
 
-    QMessageBox msgBox(nullptr); // todo: use "this" instead of "nullptr"
+    QMessageBox msgBox(this);
     msgBox.setWindowTitle(sTitle);
     msgBox.setIcon(iIcon);
 

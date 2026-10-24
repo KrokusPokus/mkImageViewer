@@ -4,15 +4,8 @@
 #include <QObject>
 #include <QString>
 #include <QDateTime>
-
-#if defined(Q_OS_WIN)
-#include <QMutex>
-#include <QThread>
-#include <QWaitCondition>
-#else
 #include <QFileSystemWatcher>
 #include <QTimer>
-#endif
 
 class CDirectoryWatcher : public QObject {
     Q_OBJECT
@@ -38,18 +31,8 @@ private:
 
     static QDateTime GetLastModificationTime(const QString& fileName);
 
-#if defined(Q_OS_WIN)
-    QMutex m_lock;
-    QThread* m_workerThread{nullptr};
-    QWaitCondition m_waitCondition;
-    bool m_terminateRequested{false};
-    bool m_newDirectoryRequested{false};
-
-    void RunThread();
-#else
     QFileSystemWatcher* m_fileSystemWatcher{nullptr};
     QString m_watchedDirectory;
-#endif
 };
 
 #endif // DIRECTORYWATCHER_H

@@ -143,7 +143,7 @@ CJPEGImage* CReaderBMP::ReadBmpImage(void* pBuffer, int bufsize, bool& bOutOfMem
     return pImage;
 }
 
-CJPEGImage* CReaderBMP::ReadBmpImage(LPCTSTR strFileName, bool& bOutOfMemory) {
+CJPEGImage* CReaderBMP::ReadBmpImage(QString fileName, bool& bOutOfMemory) {
     BMHEADER header;
     BMINFOHEADER infoheader;
     FILE *fptr;
@@ -151,7 +151,7 @@ CJPEGImage* CReaderBMP::ReadBmpImage(LPCTSTR strFileName, bool& bOutOfMemory) {
     bOutOfMemory = false;
 
     /* Open file */
-    if ((fptr = _tfopen(strFileName,_T("rb"))) == NULL) {
+    if ((fptr = _tfopen(reinterpret_cast<LPCWSTR>(fileName.utf16()),_T("rb"))) == NULL) {
         return NULL;
     }
 

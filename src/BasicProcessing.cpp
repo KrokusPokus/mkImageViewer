@@ -984,9 +984,9 @@ inline static const float* RotateLineToDIB_1(const float* pSource, uint8* pTarge
 
     for (int i = 0; i < simdPixelsPerRegister - 1; i++)
     {
-        *((uint8*)pTarget) = LinRGB12_sRGB8[(INT)(*pSource)]; pSource++;  pTarget += nIncTargetLine;
+        *((uint8*)pTarget) = LinRGB12_sRGB8[(int)(*pSource)]; pSource++;  pTarget += nIncTargetLine;
     }
-    *((uint8*)pTarget) = LinRGB12_sRGB8[(INT)(*pSource)]; pSource++;
+    *((uint8*)pTarget) = LinRGB12_sRGB8[(int)(*pSource)]; pSource++;
 
     return pSource;
 }
@@ -995,9 +995,9 @@ inline static const float* RotateLineToDIB(const float* pSource, uint8* pTarget,
 
     for (int i = 0; i < simdPixelsPerRegister - 1; i++)
     {
-        *pTarget = LinRGB12_sRGB8[(INT)(*pSource++)]; pTarget += nIncTargetLine;
+        *pTarget = LinRGB12_sRGB8[(int)(*pSource++)]; pTarget += nIncTargetLine;
     }
-    *pTarget = LinRGB12_sRGB8[(INT)(*pSource++)];
+    *pTarget = LinRGB12_sRGB8[(int)(*pSource++)];
 
     return pSource;
 }

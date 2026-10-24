@@ -34,9 +34,13 @@ public:
 
     // Gets the default client rectangle for windowed mode
     static QRect GetDefaultClientRectInWindowMode();
-
+    
 private:
     CMultiMonitorSupport() = delete; // Statische Klasse nicht instanziierbar
+
+    // Gets the total border size of a window. This includes the frame sizes and the size of the window caption area.
+    // The window size equals the client area size plus this border size
+    static QSize GetTotalBorderSize();
 };
 
 #endif // MULTIMONITORSUPPORT_H

@@ -2,6 +2,8 @@
 #include "Helpers.h"
 #include "LookupTables.h"    // needed for sRGB8_LinRGB12[256]
 
+#include <new> // Für std::align_val_t
+
 CXMMImage::CXMMImage(int nWidth, int nHeight, int padding) {
     Init(nWidth, nHeight, false, padding);
 }
@@ -56,7 +58,8 @@ CXMMImage::CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirs
 CXMMImage::~CXMMImage(void) {
     if (m_pMemory != NULL) {
         // free the memory pages
-        ::VirtualFree(m_pMemory, 0, MEM_RELEASE);
+        //::VirtualFree(m_pMemory, 0, MEM_RELEASE);
+        ::operator delete(m_pMemory, std::align_val_t(4096));
         m_pMemory = NULL;
     }
 }
@@ -77,10 +80,15 @@ void CXMMImage::Init(int nWidth, int nHeight, bool bPadHeight, int padding) {
     m_nHeight = nHeight;
     int nMemSize = GetMemSize();
 
+    /*
     // Allocate memory aligned on page boundaries
     m_pMemory = ::VirtualAlloc(
                         NULL,      // let the call determine the start address
                         nMemSize, // the size
                         MEM_RESERVE | MEM_COMMIT,    // I want that memory, now
                         PAGE_READWRITE);            // need both read and write
+    */
+
+    // Speicher seiten- bzw. block-aligned allokieren (z.B. auf 4096 Bytes / Page-Boundary wie bei VirtualAlloc)
+    m_pMemory = static_cast<char*>(::operator new(nMemSize, std::align_val_t(4096)));
 }

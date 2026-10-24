@@ -95,7 +95,6 @@
 #define IDM_MIRROR_V        9300        // :KeyMap: mirror image vertically
 #define IDM_AUTO_CORRECTION    10000        // :KeyMap: toggle auto color and contrast correction
 #define IDM_KEEP_PARAMETERS    11000        // :KeyMap: toogle keep parameters between images
-#define IDM_SAVE_PARAMETERS 11010        // :KeyMap: save to parameter DB
 #define IDM_FIT_TO_SCREEN    12000        // :KeyMap: fit image to screen
 #define IDM_FILL_WITH_CROP    12001        // :KeyMap: fit image to fill screen with crop
 #define IDM_FIT_TO_SCREEN_NO_ENLARGE 12002

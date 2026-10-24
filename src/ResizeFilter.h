@@ -3,10 +3,12 @@
 
 #include "ImageProcessingTypes.h"
 
+#include <cassert>
 #include <list>
+#include <mutex>
 
 // Maximal length of filter kernels. The kernels may be shorter but never longer.
-#define MAX_FILTER_LEN 64
+inline constexpr int MAX_FILTER_LEN = 64;
 
 enum FilterSIMDType {
     FilterSIMDType_None, // filter is not for SIMD processing
@@ -74,21 +76,24 @@ struct AVXFilterKernelBlock {
 // Class for resize filters. These filters are one dimensional FIR filters. Because these filters are separable,
 // resizing a 2D image can be done by applying a CResizeFilter to all x-rows, then another CResizeFilter to the
 // y-columns of the resulting image.
-// Resize filters are represented as filter blocks. In a filter block, for each index t in the target 1D array, 
+// Resize filters are represented as filter blocks. In a filter block, for each index t in the target 1D array,
 // a filter kernel is present. The element t in the 1D target array is calculated by applying the filter with
 // index t to position (s - filter[t].FilterOffset) in the source image, where s is the integer position in the
 // source array corresponding to position t in the target array.
 class CResizeFilter
 {
 public:
-    enum {
-        // 1.0 in our fixed point format (thus using 2.14 FP format)
-        FP_ONE = 16383
-    };
+    // 1.0 in our fixed point format (thus using 2.14 FP format)
+    // (a static constexpr int instead of an enum: arithmetic between an enum and a double is deprecated in C++20)
+    static constexpr int FP_ONE = 16383;
 
-    // Creates a filter for resizing from nSourceSize to nTargetSize 
+    // Creates a filter for resizing from nSourceSize to nTargetSize
     CResizeFilter(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType);
     ~CResizeFilter();
+
+    // The kernel blocks own raw memory, copying would free it twice
+    CResizeFilter(const CResizeFilter&) = delete;
+    CResizeFilter& operator=(const CResizeFilter&) = delete;
 
     // Gets a block of kernels for resizing from the source size to the target size.
     // The returned filter must not be deleted by the caller and is only valid during the
@@ -120,7 +125,7 @@ private:
     XMMFilterKernelBlock m_kernelsXMM;
     AVXFilterKernelBlock m_kernelsAVX;
     FilterSIMDType m_filterSIMDType;
-    int m_nRefCnt;
+    mutable int m_nRefCnt; // only accessed by CResizeFilterCache, under its lock (mutable: filters are handed out as const)
 
     void CalculateFilterKernels();
     void CalculateXMMFilterKernels();
@@ -146,24 +151,23 @@ public:
     void ReleaseFilter(const CResizeFilter& filter);
 
 private:
-    static CResizeFilterCache* sm_instance;
-
-    CRITICAL_SECTION m_csList; // access to list must be thread safe
+    std::mutex m_mutex; // access to the list must be thread safe
     std::list<CResizeFilter*> m_filterList;
 
-    CResizeFilterCache();
+    CResizeFilterCache() = default;
     ~CResizeFilterCache();
-    static void Delete() { delete sm_instance; }
+    CResizeFilterCache(const CResizeFilterCache&) = delete;
+    CResizeFilterCache& operator=(const CResizeFilterCache&) = delete;
 };
 
 // Helper class for accessing filters from filter cache, automatically releasing the filter when object goes out of scope
 class CAutoFilter {
 public:
-    CAutoFilter(int nSourceSize, int nTargetSize, EFilterType eFilter) 
+    CAutoFilter(int nSourceSize, int nTargetSize, EFilterType eFilter)
         : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, eFilter, FilterSIMDType_None)) {}
-    
+
     const FilterKernelBlock& Kernels() { return m_filter.GetFilterKernels(); }
-    
+
     ~CAutoFilter() { CResizeFilterCache::This().ReleaseFilter(m_filter); }
 private:
     const CResizeFilter& m_filter;
@@ -172,11 +176,11 @@ private:
 // Helper class for accessing filters from filter cache, automatically releasing the filter when object goes out of scope
 class CAutoXMMFilter {
 public:
-    CAutoXMMFilter(int nSourceSize, int nTargetSize, EFilterType eFilter) 
+    CAutoXMMFilter(int nSourceSize, int nTargetSize, EFilterType eFilter)
         : m_filter(CResizeFilterCache::This().GetFilter(nSourceSize, nTargetSize, eFilter, FilterSIMDType_SSE)) {}
-    
+
     const XMMFilterKernelBlock& Kernels() { return m_filter.GetXMMFilterKernels(); }
-    
+
     ~CAutoXMMFilter() { CResizeFilterCache::This().ReleaseFilter(m_filter); }
 private:
     const CResizeFilter& m_filter;

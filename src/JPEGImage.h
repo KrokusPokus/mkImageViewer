@@ -213,11 +213,11 @@ public:
     static CPoint ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset);
 
     // Debug: Ticks (milliseconds) of the last GetDIB
-    UINT GetDIBLoadDelayMs() const { return m_dibLoadDelayMs; }
+    uint64_t GetDIBLoadDelayMs() const { return m_dibLoadDelayMs; }
 
     // Debug: Loading time of image in ms
-    void SetFileLoadDelayMs(UINT tc) { m_fileLoadDelayMs = tc; }
-    UINT GetFileLoadDelayMs() { return m_fileLoadDelayMs; }
+    void SetFileLoadDelayMs(uint64_t tc) { m_fileLoadDelayMs = tc; }
+    uint64_t GetFileLoadDelayMs() { return m_fileLoadDelayMs; }
 
 private:
 
@@ -285,8 +285,8 @@ private:
     bool m_bHasZoomStoredInParamDB; // true if image in param DB and entry contains zoom and offset values
     bool m_bFirstReprocessing; // true if never reprocessed before, some optimizations may be not done initially
 
-    UINT m_dibLoadDelayMs;
-    UINT m_fileLoadDelayMs;
+    uint64_t m_dibLoadDelayMs;
+    uint64_t m_fileLoadDelayMs;
 
     // stuff needed to perform LUT and LDC processing
     uint8* m_pLUTAllChannels; // for global contrast and brightness correction

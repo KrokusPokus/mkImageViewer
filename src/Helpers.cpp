@@ -267,19 +267,6 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
         : QString();
 }
 
-    QSize GetTotalBorderSize() {
-        const int SM_CXP_ADDEDBORDER = 92;  // in MSDN this is SM_CXPADDEDBORDER, but for some reason it's not always available depending on configuration
-        int nBorderWidth = (::GetSystemMetrics(SM_CXSIZEFRAME) + ::GetSystemMetrics(SM_CXP_ADDEDBORDER)) * 2;
-        int nBorderHeight = (::GetSystemMetrics(SM_CYSIZEFRAME) + ::GetSystemMetrics(SM_CXP_ADDEDBORDER)) * 2 + ::GetSystemMetrics(SM_CYCAPTION);
-        return QSize(nBorderWidth, nBorderHeight);
-    }
-
-    __int64 GetFileSize(HANDLE hFile) {
-        __int64 fileSize = 0;
-        ::GetFileSizeEx(hFile, (PLARGE_INTEGER)&fileSize);
-        return fileSize;
-    }
-
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
     int GetFrameIndex(CJPEGImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage) {
         bool isMultiFrame = pImage != NULL && pImage->NumberOfFrames() > 1;
@@ -347,10 +334,9 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
         }
     }
 
-    uint32_t GetTimeMs() {
+    uint64_t Helpers::GetTimeMs() {
         using namespace std::chrono;
-        auto now = steady_clock::now();
-        return static_cast<uint32_t>(duration_cast<milliseconds>(now.time_since_epoch()).count());
+        return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
     }
 
 } // namespace Helpers

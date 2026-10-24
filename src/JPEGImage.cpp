@@ -450,7 +450,7 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
     m_ClippingSize = clippingSize;
     m_TargetOffset = targetOffset;
 
-    UINT startTimeMs = Helpers::GetTimeMs();
+    uint64_t startTimeMs = Helpers::GetTimeMs();
 
     // Check if only the LUT must be reapplied but no resampling (resampling is much slower than the LUTs)
     void * pDIB = NULL;
@@ -500,7 +500,7 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
         }
     }
 
-    UINT dibLoadDelayMs = Helpers::GetTimeMs() - startTimeMs; 
+    uint64_t dibLoadDelayMs = Helpers::GetTimeMs() - startTimeMs; 
     if (dibLoadDelayMs > 1) {
         m_dibLoadDelayMs = dibLoadDelayMs;
     }
