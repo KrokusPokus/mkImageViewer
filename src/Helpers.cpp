@@ -19,7 +19,7 @@ namespace Helpers {
         return (int)(value * DPIScalingFactor + 0.5f);
     }
 
-    QString JPEGViewAppDataPath() {
+    QString SettingsPath() {
 
         if (!buffAppPath.isEmpty()) {
             return buffAppPath;
@@ -43,7 +43,7 @@ namespace Helpers {
         return path;
     }
 
-    void SetJPEGViewAppDataPath(const QString& sPath) {
+    void SetSettingsPath(const QString& sPath) {
         buffAppPath = sPath;
     }
 
@@ -334,7 +334,7 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
         }
     }
 
-    uint64_t Helpers::GetTimeMs() {
+    uint64_t GetTimeMs() {
         using namespace std::chrono;
         return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
     }

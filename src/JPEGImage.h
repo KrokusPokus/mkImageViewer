@@ -2,12 +2,13 @@
 #define JPEGIMAGE_H
 
 #include "ProcessParams.h"
+#include "libjpeg-turbo/include/turbojpeg.h" // for enum TJSAMP
+
 #include <QString>
 
 class CHistogram;
 class CLocalDensityCorr;
 class CEXIFReader;
-enum TJSAMP;
 
 // Represents a rectangle to dim out in the image
 struct CDimRect {

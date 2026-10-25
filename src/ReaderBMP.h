@@ -9,12 +9,15 @@ class CJPEGImage;
 class CReaderBMP
 {
 public:
-    // Returns NULL in case of errors
-    static CJPEGImage* ReadBmpImage(QString strFileName, bool& bOutOfMemory);
-    static CJPEGImage* ReadBmpImage(void * pBuffer, int bufsize, bool& bOutOfMemory, EImageFormat eContainerFormat = IF_Unknown, bool bIsAnimation = false, int nFrameIndex = 0, int nNumberOfFrames = 1, int nFrameTimeMs = 0);
+    static void* ReadImage(int& width,   // width of the image loaded.
+                 int& height,  // height of the image loaded.
+                 int& bpp,     // BYTES (not bits) PER PIXEL.
+                 bool& outOfMemory, // set to true when no memory to read image
+                 const void* buffer, // memory address containing bmp data.
+                 std::size_t sizebytes); // size of data.
+
 private:
     CReaderBMP(void);
 };
-
 
 #endif // READERBMP_H

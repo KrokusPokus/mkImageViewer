@@ -1,4 +1,4 @@
-// This file defines the key mapping for JPEGView
+// This file defines the key mapping for mkImageViewer
 // Make sure not to corrupt it - or else no keys will work anymore!
 // See KeyMap-README.html for more information on how to customize this file.
 

@@ -28,7 +28,7 @@ class QCloseEvent;
 class QDropEvent;
 
 // The main dialog is a full screen modal dialog with no border and no window title.
-// This dialog is the main window of the JPEGView application.
+// This dialog is the main window of the application.
 class CMainDlg : public QMainWindow {
     Q_OBJECT // Zwingend für Qt-Widgets/Klassen mit Signals & Slots
 
@@ -107,7 +107,7 @@ private:
     bool m_bResizeForNewImage;
     double m_dZoom, m_dRealizedZoom;
     double m_dStartZoom; // zoom when start zoomin in zoom mode
-    double m_dZoomAtResizeStart; // zoom factor when user started resizing JPEGView main window
+    double m_dZoomAtResizeStart; // zoom factor when user started resizing main window
     double m_dZoomMult;
     bool m_bZoomMode;
     bool m_bZoomModeOnLeftMouse;
@@ -252,10 +252,16 @@ private:
     int m_toastTimerId = 0;
     int m_panTimerId = 0;
 
+    bool m_bPanKeyUp = false;
+    bool m_bPanKeyDown = false;
+    bool m_bPanKeyLeft = false;
+    bool m_bPanKeyRight = false;
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;

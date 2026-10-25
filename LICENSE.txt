@@ -1,6 +1,7 @@
-JPEGView <https://github.com/sylikc/jpegview/> 
-Lean and fast image viewer with minimal GUI
+mkImageViewer <https://github.com/KrokusPokus/mkImageViewer/>
+Minimalist Qt6 image viewer based on JPEGView_L <https://github.com/KrokusPokus/JPEGView_L/> 
 
+Copyright (C) 2026 Gernot F (KrokusPokus) <https://github.com/KrokusPokus>
 Copyright (C) 2020-2023 Kevin M (sylikc) <https://github.com/sylikc>
 Copyright (C) 2006-2018 David Kleiner (dkleiner) <https://sourceforge.net/u/dkleiner/profile/>
 

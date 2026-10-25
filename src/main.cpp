@@ -17,8 +17,8 @@
 #include <QDataStream>
 
 // Eindeutige Namen für Shared Memory und Semaphor
-const QString kShmKey = "JPEGView_Instance_Registry_v1";
-const QString kSemKey = "JPEGView_Instance_Semaphore_v1";
+const QString kShmKey = "mkImageViewer_Instance_Registry_v1";
+const QString kSemKey = "mkImageViewer_Instance_Semaphore_v1";
 constexpr int kIpcTimeoutMs = 250;
 
 // Hilfsfunktion: Liest die Liste aktiver PIDs aus dem Shared Memory
@@ -73,7 +73,7 @@ void RegisterPid(qint64 myPid, bool registerInstance, QSharedMemory& shm, QSyste
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    QApplication::setApplicationName("JPEGView");
+    QApplication::setApplicationName(APP_TITLE);
 
     QImageReader::setAllocationLimit(0);
     std::setlocale(LC_ALL, "");
@@ -81,7 +81,6 @@ int main(int argc, char *argv[])
 
     // Kommandozeilen-Parsing mit Qt6
     QCommandLineParser parser;
-    parser.setApplicationDescription("JPEGView Qt6 Port");
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument("file", "Image file or directory to open.");
@@ -111,7 +110,7 @@ int main(int argc, char *argv[])
         for (qint64 pid : activePids) {
             if (pid == myPid) continue;
 
-            QString pipeName = QString("JPEGView_Pipe_%1").arg(pid);
+            QString pipeName = QString("mkImageViewer_Pipe_%1").arg(pid);
             QLocalSocket socket;
             socket.connectToServer(pipeName);
 
@@ -145,7 +144,7 @@ int main(int argc, char *argv[])
     RegisterPid(myPid, true, shm, sem);
 
     // Eigenen lokalen Server aufspannen (mit unserer PID im Namen)
-    QString myPipeName = QString("JPEGView_Pipe_%1").arg(myPid);
+    QString myPipeName = QString("mkImageViewer_Pipe_%1").arg(myPid);
     QLocalServer::removeServer(myPipeName); // Sicherheishalber aufräumen
     QLocalServer localServer;
     localServer.listen(myPipeName);

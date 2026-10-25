@@ -144,22 +144,22 @@ static QString _GetKeyShortcutName(int nShortcut) {
 // before settling for the default
 //
 // First tries to see if /keymap parameter was passed on command line
-// Then tries %AppData%\JPEGView\KeyMap.txt
-// Then tries (JPEGView root)\KeyMap.txt
-// if none of those, then (JPEGView root)\KeyMap.txt.default
+// Then tries %AppData%\mkImageViewer\KeyMap.txt
+// Then tries (mkImageViewer root)\KeyMap.txt
+// if none of those, then (mkImageViewer root)\KeyMap.txt.default
 CKeyMap::CKeyMap() {
     QString exePath = CSettingsProvider::This().GetEXEPath();
     if (!exePath.endsWith('/') && !exePath.endsWith('\\')) {
         exePath += QLatin1Char('/');
     }
 
-    QString appDataPath = Helpers::JPEGViewAppDataPath();
-    if (!appDataPath.endsWith('/') && !appDataPath.endsWith('\\')) {
-        appDataPath += QLatin1Char('/');
+    QString settingsPath = Helpers::SettingsPath();
+    if (!settingsPath.endsWith('/') && !settingsPath.endsWith('\\')) {
+        settingsPath += QLatin1Char('/');
     }
 
     // 1. KeyMap-Datei ermitteln (%AppData% -> App-Root -> Default)
-    QString keyMapFilePath = appDataPath + KEYMAP_USER_FILE_NAME;
+    QString keyMapFilePath = settingsPath + KEYMAP_USER_FILE_NAME;
     if (!QFile::exists(keyMapFilePath)) {
         keyMapFilePath = exePath + KEYMAP_USER_FILE_NAME;
         if (!QFile::exists(keyMapFilePath)) {

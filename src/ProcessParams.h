@@ -2,6 +2,7 @@
 #define PROCESSPARAMS_H
 
 #include "Helpers.h"
+#include "WTLCompat.h"
 
 // Processing flags for image processing
 enum EProcessingFlags {

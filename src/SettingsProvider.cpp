@@ -1,5 +1,15 @@
 #include "SettingsProvider.h"
 
+#include <cstdint>
+
+// Einziger minimaler Header-Abfang für x86-Intrinsics über alle Compiler hinweg
+#if defined(_MSC_VER)
+#include <intrin.h>
+#elif defined(__GNUC__) || defined(__clang__)
+#include <cpuid.h>
+#include <x86intrin.h>
+#endif
+
 #include <QApplication>
 #include <QCheckBox>
 #include <QColorDialog>
@@ -27,8 +37,8 @@
 
 namespace {
 
-    constexpr const char* DEFAULT_INI_FILE_NAME = "JPEGView.ini";
-    constexpr const char* SECTION_NAME = "JPEGView";
+    constexpr const char* DEFAULT_INI_FILE_NAME = "mkImageViewer.ini";
+    constexpr const char* SECTION_NAME = "mkImageViewer";
 
     constexpr float COLOR_CORR_DEFAULT_FACTORS[6] = {0.2f, 0.1f, 0.3f, 0.3f, 0.3f, 0.15f};
 
@@ -108,36 +118,46 @@ namespace {
         return stringMap.value(effect, "None");
     }
 
-    // Tests if the CPU supports AVX2, SSE, MMX(2)
+    // Tests if the CPU supports AVX2, SSE, MMX(2) - Einheitlich für alle x86-Compiler
     Helpers::CPUType ProbeCPU(void) {
         static Helpers::CPUType cpuType = Helpers::CPU_Unknown;
-        
+
         if (cpuType != Helpers::CPU_Unknown) {
             return cpuType;
         }
 
-        __try {
-            // check if CPU supports AVX and the xgetbv instruction
-            int abcd[4];
-            __cpuid(abcd, 1);
-            if ((abcd[2] & 0x18000000) != 0x18000000) // AVX and OSXSAVE bits
-                return Helpers::CPU_SSE;
-            if ((abcd[2] & 0x04000000) == 0) // XSAVE bit, support for xgetbv
-                return Helpers::CPU_SSE;
+        int abcd[4] = { 0 };
 
-            // check if operating system supports AVX(2)
-            unsigned long long xcr0 = _xgetbv(0);
-            if ((xcr0 & 6) != 6)
-                return Helpers::CPU_SSE; // nope, only use SSE
+        // 1. Check if CPU supports AVX and the xgetbv instruction
+#if defined(_MSC_VER)
+        __cpuid(abcd, 1);
+#else
+        __get_cpuid(1, (unsigned int*)&abcd[0], (unsigned int*)&abcd[1], (unsigned int*)&abcd[2], (unsigned int*)&abcd[3]);
+#endif
 
-            // check if AVX2 instructions are supported
-            const int AVX2BITMASK = 1 << 5;
-            __cpuidex(abcd, 7, 0);
-            return (abcd[1] & AVX2BITMASK) ? Helpers::CPU_AVX2 : Helpers::CPU_SSE;
+        if ((abcd[2] & 0x18000000) != 0x18000000) { // AVX and OSXSAVE bits
+            return (cpuType = Helpers::CPU_SSE);
         }
-        __except (EXCEPTION_EXECUTE_HANDLER) {
-            return Helpers::CPU_SSE;
+        if ((abcd[2] & 0x04000000) == 0) { // XSAVE bit, support for xgetbv
+            return (cpuType = Helpers::CPU_SSE);
         }
+
+        // 2. Check if operating system supports AVX(2) via xgetbv (Standard auf allen x86-Compilern)
+        unsigned long long xcr0 = _xgetbv(0);
+        if ((xcr0 & 6) != 6) {
+            return (cpuType = Helpers::CPU_SSE);
+        }
+
+        // 3. Check if AVX2 instructions are supported
+        const int AVX2BITMASK = 1 << 5;
+#if defined(_MSC_VER)
+        __cpuidex(abcd, 7, 0);
+#else
+        __cpuid_count(7, 0, abcd[0], abcd[1], abcd[2], abcd[3]);
+#endif
+
+        cpuType = (abcd[1] & AVX2BITMASK) ? Helpers::CPU_AVX2 : Helpers::CPU_SSE;
+        return cpuType;
     }
 
 } // namespace
@@ -181,7 +201,7 @@ void CSettingsProvider::ReloadAllSettings() {
 // ============================================================================
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
-    setWindowTitle(tr("JPEGView - Einstellungen"));
+    setWindowTitle(tr("mkImageViewer - Einstellungen"));
     resize(750, 580);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
@@ -615,23 +635,10 @@ const float* CSettingsProvider::ColorCorrectionAmounts() {
 
 CSettingsProvider::CSettingsProvider() {
     // parse command line to find the process startup path
-    // win32 variant
-    wchar_t pathBuffer[MAX_PATH];
-    ::GetModuleFileNameW(NULL, pathBuffer, MAX_PATH);
-    QString exeFilePath = QString::fromWCharArray(pathBuffer);
-
-    QFileInfo exeInfo(exeFilePath);
-    m_sEXEPath = exeInfo.absolutePath();
-    if (!m_sEXEPath.endsWith('/') && !m_sEXEPath.endsWith('\\')) {
-        m_sEXEPath += '/';
-    }
-    /*
-    // Qt variant
     m_sEXEPath = QCoreApplication::applicationDirPath();
     if (!m_sEXEPath.endsWith('/') && !m_sEXEPath.endsWith('\\')) {
         m_sEXEPath += '/';
     }
-    */
 
     // Check if a custom INI file name is specified on the command line
     m_sIniFileTitle = DEFAULT_INI_FILE_NAME;
@@ -645,14 +652,14 @@ CSettingsProvider::CSettingsProvider() {
 
     if (!m_bStoreToEXEPath) {
         // User INI file
-        QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        if (!appDataPath.endsWith('/') && !appDataPath.endsWith('\\')) {
-            appDataPath += '/';
+        QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        if (!settingsPath.endsWith('/') && !settingsPath.endsWith('\\')) {
+            settingsPath += '/';
         }
-        m_sIniNameUser = appDataPath + m_sIniFileTitle;
+        m_sIniNameUser = settingsPath + m_sIniFileTitle;
         m_bUserINIExists = QFileInfo::exists(m_sIniNameUser);
     } else {
-        Helpers::SetJPEGViewAppDataPath(m_sEXEPath);
+        Helpers::SetSettingsPath(m_sEXEPath);
     }
 
     /*
@@ -949,7 +956,7 @@ void CSettingsProvider::MakeSureUserINIExists() {
         return; // no user INI file needed
     }
 
-    // Create JPEGView appdata directory and copy INI file if it does not exist
+    // Create app folder in appdata directory and copy INI file if it does not exist
     QFileInfo userFile(m_sIniNameUser);
     QDir().mkpath(userFile.absolutePath());
     if (!QFileInfo::exists(m_sIniNameUser)) {

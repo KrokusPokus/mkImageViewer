@@ -6,6 +6,17 @@
 #include "ApplyFilterAVX.h"
 #include "LookupTables.h"    // needed for LinRGB12_sRGB8[4096]
 
+#include <immintrin.h> // Beinhaltet alle SSE/AVX-Intrinsics und _mm_round_ps für GCC/Clang/MSVC
+
+// Fallback für _MM_ALIGN16, falls der Compiler es nicht bereitstellt
+#ifndef _MM_ALIGN16
+    #if defined(_MSC_VER)
+        #define _MM_ALIGN16 __declspec(align(16))
+    #else
+        #define _MM_ALIGN16 __attribute__((aligned(16)))
+    #endif
+#endif
+
 #include <cmath>
 
 // This macro allows for aligned definition of a 16 byte value with initialization of the 8 components
@@ -52,7 +63,7 @@ public:
         Filter = eFilter;
         SIMD = simd;
         //StripPadding = (simd == CBasicProcessing::AVX2) ? 16 : 8; // important to set for AVX
-        // For linear processing, we use double the data size, so can process only half as many pixels at once, so one strip can only be half the height of vanilla JpegView.
+        // For linear processing, we use double the data size, so can process only half as many pixels at once, so one strip can only be half the height of than in SSE.
         // (All slices must have a height dividable by 'StripPadding', except the last one)
         StripPadding = (simd == CBasicProcessing::AVX2) ? 8 : 4;
     }

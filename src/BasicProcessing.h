@@ -2,6 +2,7 @@
 #define BASICPROCESSING_H
 
 #include "ImageProcessingTypes.h"
+#include "WTLCompat.h"
 
 // Basic image processing methods processing the image pixel data
 class CBasicProcessing

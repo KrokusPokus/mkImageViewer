@@ -1,18 +1,9 @@
-//{{NO_DEPENDENCIES}}
-// Microsoft Visual C++ generated include file.
-// Used by JPEGView.RC
-//
-
 // scripts in the extras directory will search this for strings as to which keys to include in KeyMap
 // if a define is to be included in the publicly-exposed definitions, start the comment with ":KeyMap:"
 // don't worry about the formatting, the script that auto-generates the definition will take care of it
 
-#define JPEGVIEW_VERSION "1.4.0.7\0"
 // title for main window and msgbox so it can be change via actions
-#define JPEGVIEW_TITLE "JPEGView"
-
-#define IDR_MAINFRAME                128
-#define IDD_MAINDLG                  129
+#define APP_TITLE "mkImageViewer"
 
 // this is not used anywhere in code, but defined in KeyMap as an "invalid command", so make sure the defined number doesn't match anything!
 #define IDM_DONOTHING        1            // :KeyMap: do nothing (can be used to disable a standard command for a mouse button)
@@ -122,7 +113,7 @@
 #define IDM_AUTO_ZOOM_FILL    12540        // :KeyMap: set auto zoom mode fill screen
 #define IDM_AUTO_ZOOM_BOOK_MODE    12550        // :KeyMap: set auto zoom mode to book mode
 #define IDM_EDIT_USER_CONFIG   12610        // :KeyMap: edit user configuration
-#define IDM_EXIT            13000        // :KeyMap: exit JPEGView application
+#define IDM_EXIT            13000        // :KeyMap: exit application
 #define IDM_HELP            14000
 #define IDM_COLOR_CORRECTION_INC    14200        // :KeyMap: increase color correction amount
 #define IDM_COLOR_CORRECTION_DEC    14201        // :KeyMap: decrease color correction amount
@@ -138,22 +129,3 @@
 #define IDM_PAN_RIGHT    15202        // :KeyMap: pan right
 #define IDM_PAN_LEFT    15203        // :KeyMap: pan left
 #define IDM_CONTEXT_MENU    16000        // :KeyMap: display context menu
-
-// in the main menu, these position MUST be changed if menu items are inserted/removed
-#define SUBMENU_POS_TRANSFORM 2
-#define SUBMENU_POS_WINDOW 3
-#define SUBMENU_POS_MOVIE 5
-#define SUBMENU_POS_FOLDERS 14
-#define SUBMENU_POS_SORTMODE 15
-#define SUBMENU_POS_AUTOZOOMMODE 16
-
-// Next default values for new objects
-// 
-#ifdef APSTUDIO_INVOKED
-#ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE    2000
-#define _APS_NEXT_CONTROL_VALUE        2000
-#define _APS_NEXT_SYMED_VALUE        101
-#define _APS_NEXT_COMMAND_VALUE        32772
-#endif
-#endif

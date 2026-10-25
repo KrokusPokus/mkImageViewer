@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(JPEGView LANGUAGES C CXX RC)
+project(mkImageViewer LANGUAGES C CXX)
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "This project only supports 64-bit systems.")
@@ -64,58 +64,51 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools N
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON)
 
-# Quelldateien definieren
-set(SOURCES
-    src/ApplyFilterAVX.cpp
-    src/BasicProcessing.cpp
-    src/Clipboard.cpp
-    src/DirectoryWatcher.cpp
-    src/EXIFReader.cpp
-    src/FileList.cpp
-    src/Helpers.cpp
-
-    src/HistogramCorr.cpp
-    src/ICCProfileTransform.cpp
-    src/ImageLoadThread.cpp
-    src/JPEGImage.cpp
-    src/JPEGProvider.cpp
+qt_add_executable(mkImageViewer WIN32
     src/main.cpp
-    src/KeyMap.cpp
-    src/LocalDensityCorr.cpp
-    src/MainDlg.cpp
-    src/MultiMonitorSupport.cpp
-
-
-    src/ProcessingThreadPool.cpp
-    src/ReaderBMP.cpp
-    src/ReaderTGA.cpp
-    src/ResizeFilter.cpp
-    src/SettingsProvider.cpp
-    src/stdafx.cpp
-    src/WorkThread.cpp
-
-    src/wrapperAVIF.cpp
-    src/wrapperHEIF.cpp
-    src/wrapperJXL.cpp
-    src/wrapperPNG.cpp
-    src/wrapperPSD.cpp
-    src/wrapperQOI.cpp
-    src/wrapperTJPEG.cpp
-    src/wrapperWEBP.cpp
-
-    src/XMMImage.cpp
-    src/zip/zip.c
+    src/ApplyFilterAVX.h src/ApplyFilterAVX.cpp
+    src/BasicProcessing.h src/BasicProcessing.cpp
+    src/Clipboard.h src/Clipboard.cpp
+    src/DirectoryWatcher.h src/DirectoryWatcher.cpp
+    src/EXIFReader.h src/EXIFReader.cpp
+    src/FileList.h src/FileList.cpp
+    src/Helpers.h src/Helpers.cpp
+    src/HistogramCorr.h src/HistogramCorr.cpp
+    src/ICCProfileTransform.h src/ICCProfileTransform.cpp
+    src/ImageLoadThread.h src/ImageLoadThread.cpp
+    src/JPEGImage.h src/JPEGImage.cpp
+    src/JPEGProvider.h src/JPEGProvider.cpp
+    src/KeyMap.h src/KeyMap.cpp
+    src/LocalDensityCorr.h src/LocalDensityCorr.cpp
+    src/MainDlg.h src/MainDlg.cpp
+    src/MultiMonitorSupport.h src/MultiMonitorSupport.cpp
+    src/ProcessingThreadPool.h src/ProcessingThreadPool.cpp
+    src/ReaderBMP.h src/ReaderBMP.cpp
+    src/ReaderTGA.h src/ReaderTGA.cpp
+    src/ResizeFilter.h src/ResizeFilter.cpp
+    src/SettingsProvider.h src/SettingsProvider.cpp
+    src/WorkThread.h src/WorkThread.cpp
+    src/wrapperAVIF.h src/wrapperAVIF.cpp
+    src/wrapperHEIF.h src/wrapperHEIF.cpp
+    src/wrapperJXL.h src/wrapperJXL.cpp
+    src/wrapperPNG.h src/wrapperPNG.cpp
+    src/wrapperQOI.h src/wrapperQOI.cpp
+    src/wrapperTJPEG.h src/wrapperTJPEG.cpp
+    src/wrapperWEBP.h src/wrapperWEBP.cpp
+    src/XMMImage.h src/XMMImage.cpp
+    src/zip/zip.h src/zip/zip.c
+    
+    src/ImageProcessingTypes.h
+    src/LookupTables.h
+    src/MaxImageDef.h
+    src/ProcessParams.h
+    src/resource.h
+    src/WTLCompat.h
+    
+    res/resources.qrc
 )
 
-# Windows-spezifische Ressourcen (.rc)
-if(WIN32)
-    enable_language(RC)
-    list(APPEND SOURCES src/JPEGView.rc)
-endif()
-
-add_executable(JPEGView WIN32 ${SOURCES})
-
-target_compile_definitions(JPEGView PRIVATE
+target_compile_definitions(mkImageViewer PRIVATE
     WIN32
     _WINDOWS
     STRICT
@@ -125,9 +118,8 @@ target_compile_definitions(JPEGView PRIVATE
 )
 
 # Header-Suchpfade (mit src/ erweitert)
-target_include_directories(JPEGView PRIVATE
+target_include_directories(mkImageViewer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/WTL-sf/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/include
@@ -138,7 +130,7 @@ target_include_directories(JPEGView PRIVATE
 )
 
 # Bibliothekspfade (mit src/ erweitert)
-target_link_directories(JPEGView PRIVATE
+target_link_directories(mkImageViewer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libjpeg-turbo/${ARCH_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/${ARCH_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/${ARCH_DIR}
@@ -150,7 +142,7 @@ target_link_directories(JPEGView PRIVATE
 )
 
 # Bibliotheken verknuepfen
-target_link_libraries(JPEGView PRIVATE
+target_link_libraries(mkImageViewer PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Concurrent
@@ -172,19 +164,5 @@ target_link_libraries(JPEGView PRIVATE
     bit7z
 )
 
-# Precompiled Header (PCH) - Pfad auf src/stdafx.h angepasst
-target_precompile_headers(JPEGView PRIVATE src/stdafx.h)
-
 # C-Datei src/zip/zip.c von PCH ausschliessen
-set_source_files_properties(src/zip/zip.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
-
-# Spezifische Einstellungen fuer den MSVC-Compiler
-if(MSVC)
-    # AVX2 fuer ApplyFilterAVX.cpp aktivieren
-    set_source_files_properties(src/ApplyFilterAVX.cpp PROPERTIES COMPILE_FLAGS "/arch:AVX2")
-
-    # Linker-Optionen: PDB-Warnung unterdruecken & konfligierende Release-Bibliothek LIBCMT im Debug-Build ausschliessen
-    target_link_options(JPEGView PRIVATE
-        "/IGNORE:4099"
-    )
-endif()
+#set_source_files_properties(src/zip/zip.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)

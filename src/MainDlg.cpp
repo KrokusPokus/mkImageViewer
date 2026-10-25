@@ -381,7 +381,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     QSize minimalSize = sp.MinimalWindowSize();
     setMinimumSize(std::max(0, minimalSize.width()), std::max(0, minimalSize.height()));
 
-    this->setWindowTitle("JPEGView");
+    this->setWindowTitle(APP_TITLE);
 
     // DPI-Skalierung über den aktuellen Screen ermitteln
     QScreen* currentScreen = this->screen();
@@ -1057,7 +1057,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
         } else if (bCtrl && bShift) { // Zoom
             if (m_dZoom > 0) {
                 PerformZoom(
-                    CSettingsProvider::This().MouseWheelZoomSpeed() * double(nDelta) / WHEEL_DELTA,
+                    CSettingsProvider::This().MouseWheelZoomSpeed() * double(nDelta) / 120.0,
                     true,
                     m_bMouseOn
                     );
@@ -1089,7 +1089,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
         }
     } else if (m_dZoom > 0) {
         PerformZoom(
-            CSettingsProvider::This().MouseWheelZoomSpeed() * double(nDelta) / WHEEL_DELTA,
+            CSettingsProvider::This().MouseWheelZoomSpeed() * double(nDelta) / 120.0,
             true,
             m_bMouseOn
             );
@@ -1108,6 +1108,18 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
     int vkCode = event->nativeVirtualKey();
     if (vkCode == 0) {
         vkCode = event->key(); // Fallback
+    }
+
+    if (!event->isAutoRepeat()) {
+        if (vkCode == Qt::Key_Up) {
+            m_bPanKeyUp = true;
+        } else if (vkCode == Qt::Key_Down) {
+            m_bPanKeyDown = true;
+        } else if (vkCode == Qt::Key_Left) {
+            m_bPanKeyLeft = true;
+        } else if (vkCode == Qt::Key_Right) {
+            m_bPanKeyRight = true;
+        }
     }
 
     if (!bCtrl && vkCode != Qt::Key_Escape && m_nLastLoadError == FileLoad_NoFilesInDirectory && !m_sStartupFile.isEmpty()) {
@@ -1148,6 +1160,25 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
     }
 
     QMainWindow::keyPressEvent(event);
+}
+void CMainDlg::keyReleaseEvent(QKeyEvent* event) {
+    int vkCode = event->nativeVirtualKey();
+    if (vkCode == 0) {
+        vkCode = event->key(); // Fallback
+    }
+
+    if (!event->isAutoRepeat()) {
+        if (vkCode == Qt::Key_Up) {
+            m_bPanKeyUp = true;
+        } else if (vkCode == Qt::Key_Down) {
+            m_bPanKeyDown = true;
+        } else if (vkCode == Qt::Key_Left) {
+            m_bPanKeyLeft = true;
+        } else if (vkCode == Qt::Key_Right) {
+            m_bPanKeyRight = true;
+        }
+    }
+    QMainWindow::keyReleaseEvent(event);
 }
 
 void CMainDlg::dragEnterEvent(QDragEnterEvent* event) {
@@ -1242,15 +1273,8 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
     }
     else if (timerId == m_panTimerId) {
         if (m_pCurrentImage != nullptr) {
-            // In Qt prüfen wir Tastendrücke idealerweise über Qt-Events oder plattformunabhängig.
-            // Für den Beibehalt von GetAsyncKeyState unter Windows:
-            bool bUp = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
-            bool bDown = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
-            bool bLeft = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-            bool bRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
-
             // Wenn keine Taste mehr gedrückt wird, stoppen wir den Pan-Timer
-            if (!bUp && !bDown && !bLeft && !bRight) {
+            if (!m_bPanKeyUp && !m_bPanKeyDown && !m_bPanKeyLeft && !m_bPanKeyRight) {
                 killTimer(m_panTimerId);
                 m_panTimerId = 0;
                 m_bPanTimerActive = false;
@@ -1259,23 +1283,23 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
 
             int PanXbase = 0;
             int PanYbase = 0;
-            INT BorderDistanceY = 0;
+            int BorderDistanceY = 0;
             int PanX = 0;
             int PanY = 0;
-            INT iRealHeight = INT(m_dZoom * (m_pCurrentImage->OrigHeight()));
-            INT iRealWidth = INT(m_dZoom * (m_pCurrentImage->OrigWidth()));
+            int iRealHeight = int(m_dZoom * (m_pCurrentImage->OrigHeight()));
+            int iRealWidth = int(m_dZoom * (m_pCurrentImage->OrigWidth()));
 
             if (GetAutoZoomMode() == Helpers::ZM_BookMode && iRealHeight > m_clientRect.height() && iRealWidth <= m_clientRect.width()) {
-                if ((bLeft && !bRight) || (bUp && !bDown)) PanYbase = 10;
-                else if ((!bLeft && bRight) || (!bUp && bDown)) PanYbase = -10;
+                if ((m_bPanKeyLeft && !m_bPanKeyRight) || (m_bPanKeyUp && !m_bPanKeyDown)) PanYbase = 10;
+                else if ((!m_bPanKeyLeft && m_bPanKeyRight) || (!m_bPanKeyUp && m_bPanKeyDown)) PanYbase = -10;
                 else PanYbase = 0;
             } else {
-                if (bUp && !bDown) PanYbase = 10;
-                else if (!bUp && bDown) PanYbase = -10;
+                if (m_bPanKeyUp && !m_bPanKeyDown) PanYbase = 10;
+                else if (!m_bPanKeyUp && m_bPanKeyDown) PanYbase = -10;
                 else PanYbase = 0;
 
-                if (bLeft && !bRight) PanXbase = 10;
-                else if (!bLeft && bRight) PanXbase = -10;
+                if (m_bPanKeyLeft && !m_bPanKeyRight) PanXbase = 10;
+                else if (!m_bPanKeyLeft && m_bPanKeyRight) PanXbase = -10;
                 else PanXbase = 0;
             }
 
@@ -3130,7 +3154,7 @@ void CMainDlg::EditINIFile(bool bGlobalINI) {
     if (!bGlobalINI && !CSettingsProvider::This().ExistsUserINI()) {
         const auto result = QMessageBox::question(
             this,
-            QStringLiteral(JPEGVIEW_TITLE),
+            QStringLiteral(APP_TITLE),
             QStringLiteral("No user INI file exists yet. Create user INI file from INI file template?"),
             QMessageBox::Yes | QMessageBox::No
         );
@@ -3155,7 +3179,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     // 1. Fenstertitel aktualisieren
     QString sWindowText;
     if (sCurrentFileName.isEmpty() || m_pCurrentImage == nullptr) {
-        sWindowText = QStringLiteral(JPEGVIEW_TITLE);
+        sWindowText = QStringLiteral(APP_TITLE);
     } else {
         QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
 #if defined(Q_OS_WIN)
@@ -3169,7 +3193,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
         sWindowText = visibleName
                       + QString(GetMultiframeIndex(m_pCurrentImage))
                       + QStringLiteral(" - ")
-                      + QStringLiteral(JPEGVIEW_TITLE);
+                      + QStringLiteral(APP_TITLE);
     }
 
     if ((s_PrevTitleText != sWindowText) || bForce) {
@@ -3544,8 +3568,8 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
         return QString();
     }
 
-    const QString appDataPath = Helpers::JPEGViewAppDataPath();
-    const QString bookmarkFilePath = QDir(appDataPath).filePath(QStringLiteral("Bookmarks.ini"));
+    const QString settingsPath = Helpers::SettingsPath();
+    const QString bookmarkFilePath = QDir(settingsPath).filePath(QStringLiteral("Bookmarks.ini"));
 
     if (!QFileInfo::exists(bookmarkFilePath)) {
         return QString();
@@ -3573,7 +3597,7 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
 
     // Auslesen der INI-Datei
     QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
-    iniSettings.beginGroup(QStringLiteral("JPEGView"));
+    iniSettings.beginGroup(QStringLiteral("mkImageViewer"));
 
     QString value = iniSettings.value(keyName, QString()).toString();
     iniSettings.endGroup();
@@ -3593,8 +3617,8 @@ void CMainDlg::SaveBookmark() {
     }
 
     // 1. Pfade konfigurieren (QDir erstellt fehlende Pfade bei Bedarf automatisch)
-    const QString appDataPath = Helpers::JPEGViewAppDataPath();
-    const QDir bookmarkDir(appDataPath);
+    const QString settingsPath = Helpers::SettingsPath();
+    const QDir bookmarkDir(settingsPath);
 
     if (!bookmarkDir.exists()) {
         if (!bookmarkDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
@@ -3652,7 +3676,7 @@ void CMainDlg::SaveBookmark() {
 
     // 4. INI-Datei mit QSettings verarbeiten (Ersetzt Get/WritePrivateProfileString)
     QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
-    iniSettings.beginGroup(QStringLiteral("JPEGView"));
+    iniSettings.beginGroup(QStringLiteral("mkImageViewer"));
 
     const QString oldValueStr = iniSettings.value(keyNameCleaned, QString()).toString();
 
@@ -3858,28 +3882,37 @@ QString CMainDlg::GetUnixPathFromWine(const QString& szDosPath) {
         return QString();
     }
 
-    // Funktionszeiger-Definition für wine_get_unix_file_name
-    using pwine_get_unix_file_name = char* (__cdecl*)(LPCWSTR);
+    // Funktionszeiger-Definition mit Standard-Typen (ohne Windows-Header)
+    using pwine_get_unix_file_name = char* (*)(const wchar_t*);
 
     // Symbol direkt über QLibrary aus kernel32 auflösen
     auto wine_get_unix_file_name = reinterpret_cast<pwine_get_unix_file_name>(
         QLibrary::resolve("kernel32", "wine_get_unix_file_name")
         );
 
-    if (wine_get_unix_file_name) {
-        // QString sicher als LPCWSTR (const wchar_t*) an Wine übergeben
-        const auto* pwszDosPath = reinterpret_cast<LPCWSTR>(szDosPath.utf16());
-        char* unixPathUtf8 = wine_get_unix_file_name(pwszDosPath);
+    if (!wine_get_unix_file_name) {
+        return QString();
+    }
 
-        if (unixPathUtf8) {
-            // UTF-8 char* Stream direkt in einen Qt6 QString umwandeln
-            QString sResult = QString::fromUtf8(unixPathUtf8);
+    const wchar_t* pwszDosPath = reinterpret_cast<const wchar_t*>(szDosPath.utf16());
+    char* unixPathUtf8 = wine_get_unix_file_name(pwszDosPath);
 
-            // Den von Wine auf dem Prozess-Heap allokierten Speicher freigeben
-            HeapFree(GetProcessHeap(), 0, unixPathUtf8);
+    if (unixPathUtf8) {
+        // UTF-8 char* Stream direkt in einen Qt6 QString umwandeln
+        QString sResult = QString::fromUtf8(unixPathUtf8);
 
-            return sResult;
+        // GetProcessHeap und HeapFree dynamisch auflösen, um Heap-Speicher freizugeben
+        using pfnGetProcessHeap = void* (*)();
+        using pfnHeapFree = int (*)(void*, uint32_t, void*);
+
+        auto getProcessHeap = reinterpret_cast<pfnGetProcessHeap>(QLibrary::resolve("kernel32", "GetProcessHeap"));
+        auto heapFree = reinterpret_cast<pfnHeapFree>(QLibrary::resolve("kernel32", "HeapFree"));
+
+        if (getProcessHeap && heapFree) {
+            heapFree(getProcessHeap(), 0, unixPathUtf8);
         }
+
+        return sResult;
     }
 
     return QString();

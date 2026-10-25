@@ -1,6 +1,5 @@
 
 #include "wrapperTJPEG.h"
-#include "libjpeg-turbo\include\turbojpeg.h"
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 

@@ -2,7 +2,7 @@
 
 This autogenerates the "KeyMap_internal.config"
 
-The file is meant to be read by JPEGView on startup, and basically defines the string->number mapping, so that
+The file is meant to be read on startup, and basically defines the string->number mapping, so that
 CMainDlg can be called with a specific number to execute a command.  It uses the same names as the internal code
 in resource.h.
 
@@ -61,7 +61,7 @@ def keymap_generate_internal_config():
 //
 // !!! THIS FILE WAS AUTO-GENERATED and can differ between releases.  DO NOT MODIFY !!!
 //
-// For the curious: JPEGView reads this file on startup to define the internally mapped values to KeyMap definitions.
+// For the curious: The app reads this file on startup to define the internally mapped values to KeyMap definitions.
 //
 // NOTE: This file does NOT need to be localized, as users do not (should not) interact with this file.
 //
@@ -78,7 +78,7 @@ def keymap_generate_internal_config():
 def keymap_generate_reference_readme():
     """ this will generate the reference readme for what to do with the KeyMap.txt
 
-    the generated file is NOT PARSED by JPEGView at all, it's only a readme, so it can be translated without worry of a bad edit
+    the generated file is NOT PARSED by the app at all, it's only a readme, so it can be translated without worry of a bad edit
     """
     TARGET_FILE = CFG_PATH / r"KeyMap-README.html"
 
@@ -99,7 +99,7 @@ def keymap_generate_reference_readme():
         f.write(f"""<html>
 <head>
     <title>
-        JPEGView - KeyMap.txt README
+        mkImageViewer - KeyMap.txt README
     </title>
     <style>""")
 
@@ -125,7 +125,7 @@ def keymap_generate_reference_readme():
     </h1>
 </header>
 
-JPEGView allows customizing what each key and key combination will do.
+mkImageViewer allows customizing what each key and key combination will do.
 
 <h2>
     Translator Credits
@@ -216,7 +216,7 @@ but not with other keys or other mouse buttons.
 </h1>
 
 <p>
-    The following is a list of available JPEGView commands which can be mapped to keys/mouse
+    The following is a list of available mkImageViewer commands which can be mapped to keys/mouse
     On the left is the command, on the right is a brief description of the command.
 </p>
 

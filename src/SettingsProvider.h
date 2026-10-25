@@ -190,7 +190,7 @@ public:
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
     void SetUseEmbeddedColorProfiles(int bUseEmbeddedColorProfiles) { m_bUseEmbeddedColorProfiles = (bUseEmbeddedColorProfiles != 0); }
 
-    // This will only save a subset of settings to the INI file located in AppData\JPEGView\JPEGView.ini.
+    // This will only save a subset of settings to the INI file located in AppData\mkImageViewer\mkImageViewer.ini.
     // Note that this INI file has precedence over the INI file at the program directory
     void SaveSettings(const CImageProcessingParams& procParams,
                       EProcessingFlags eProcFlags,

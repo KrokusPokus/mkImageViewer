@@ -2,6 +2,10 @@
 #define HELPERS_H
 
 #include "ImageProcessingTypes.h" // defines int8, uint8, int16, uint16, int32, uint32, EFilterType, EImageFormat
+#include "WTLCompat.h"
+
+#include <cfloat>
+
 #include <QString>
 #include <QRgb>
 
@@ -177,12 +181,12 @@ namespace Helpers {
     // Gets the image size to be used when fitting the image to screen according to the auto zoom mode given
     QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom);
 
-    // Gets the path where JPEGView stores its application data, including a trailing backslash
-    QString JPEGViewAppDataPath();
+    // Gets the path where mkImageViewer stores its application data, including a trailing backslash
+    QString SettingsPath();
 
-    // Sets the path where JPEGView stores its application data, including a trailing backslash.
-    // Default if not set is CSIDL_APPDATA/JPEGView/
-    void SetJPEGViewAppDataPath(const QString& sPath);
+    // Sets the path where mkImageViewer stores its application data, including a trailing backslash.
+    // Default if not set is CSIDL_APPDATA/mkImageViewer/
+    void SetSettingsPath(const QString& sPath);
 
     // Pad the given value to the next multiple of padvalue. padvalue must be a power of 2.
     inline int DoPadding(int value, int padvalue) {

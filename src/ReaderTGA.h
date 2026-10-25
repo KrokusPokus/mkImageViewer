@@ -9,8 +9,10 @@ class CJPEGImage;
 class CReaderTGA
 {
 public:
-    // Returns NULL in case of errors. backgroundColor is used for blending transparent parts of the image.
-    static CJPEGImage* ReadTgaImage(LPCTSTR strFileName, Helpers::ETransparencyMode nTransparencyMode, bool& bOutOfMemory);
+    // Geändert von LPCTSTR strFileName zu const void* pBuffer, std::size_t bufsize
+    static void* ReadImage(int& width, int& height, int& targetChannels, bool& bOutOfMemory, const void* pBuffer, std::size_t bufsize);
+    static bool IsAlphaChannelValid(int width, int height, uint32* pImageData);
+
 private:
     CReaderTGA(void);
 };

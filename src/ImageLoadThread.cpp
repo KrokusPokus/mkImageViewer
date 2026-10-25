@@ -10,7 +10,6 @@
 #include "wrapperHEIF.h"
 #include "wrapperJXL.h"
 #include "wrapperPNG.h"
-#include "wrapperPSD.h"
 #include "wrapperQOI.h"
 #include "wrapperTJPEG.h"
 #include "wrapperWEBP.h"
@@ -164,8 +163,7 @@ EImageFormat GetImageFormatFromName(const QString& sFileName) {
                                                                   { QStringLiteral("cbz"),  IF_ZIP },
                                                                   { QStringLiteral("7z"),   IF_ZIP },
                                                                   { QStringLiteral("cb7"),  IF_ZIP },
-                                                                  { QStringLiteral("qoi"),  IF_QOI },
-                                                                  { QStringLiteral("psd"),  IF_PSD },
+                                                                  { QStringLiteral("qoi"),  IF_QOI }
                                                                   };
     return kFormatBySuffix.value(QFileInfo(sFileName).suffix().toLower(), IF_Unknown);
 }
@@ -216,8 +214,6 @@ EImageFormat GetImageFormatInMemory(Header16 h, const QString& sFileName) {
         }
     } else if (HasSig(h, 0, "qoif"sv)) {
         return IF_QOI;
-    } else if (HasSig(h, 0, "8BPS"sv)) {
-        return IF_PSD;
     } else if (HasSig(h, 0, "PK\x03\x04"sv)) {
         return IF_ZIP;
     }
@@ -323,9 +319,6 @@ EImageFormat MapQtImageFormat(const QByteArray& sFormat) {
     }
     if (sFormat == "png") {
         return IF_PNG;
-    }
-    if (sFormat == "psd") {
-        return IF_PSD;
     }
     if (sFormat == "qoi") {
         return IF_QOI;
@@ -648,10 +641,6 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
         dropCaches(Keep_None);
         ProcessReadHEIFRequest(&rq);
         break;
-    case IF_PSD:
-        dropCaches(Keep_None);
-        ProcessReadPSDRequest(&rq);
-        break;
     case IF_QOI:
         dropCaches(Keep_None);
         ProcessReadQOIRequest(&rq);
@@ -781,19 +770,73 @@ void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
 
 void CImageLoadThread::ProcessReadBMPRequest(CRequest * request) {
     bool bOutOfMemory = false;
-    request->Image = CReaderBMP::ReadBmpImage(request->FileName, bOutOfMemory);
-    if (bOutOfMemory) {
-        request->OutOfMemory = true;
-    } else if (request->Image == nullptr) {
-        ProcessReadQtImageRequest(request);
+    qint64 nFileSize = 0;
+    std::unique_ptr<char[]> pBuffer = ReadWholeFile(request->FileName, MAX_BMP_FILE_SIZE, nFileSize, bOutOfMemory);
+    if (!pBuffer) {
+        request->OutOfMemory = bOutOfMemory;
+        return;
+    }
+    const std::size_t nSize = static_cast<std::size_t>(nFileSize);
+
+    try {
+        int nWidth = 0, nHeight = 0, nBPP = 0;
+        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
+            CReaderBMP::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer.get(), nSize)));
+        if (pPixelData) {
+            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_WindowsBMP, false, 0, 1, 0);
+            pPixelData.release();
+        } else {
+            pPixelData.reset();
+            ProcessReadQtImageRequest(request);
+        }
+    } catch (...) {
+        delete request->Image;
+        request->Image = nullptr;
+        request->ExceptionError = true;
     }
 }
 
 void CImageLoadThread::ProcessReadTGARequest(CRequest * request) {
     bool bOutOfMemory = false;
-    request->Image = CReaderTGA::ReadTgaImage(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), request->ProcessParams.TransparencyMode, bOutOfMemory);
-    if (bOutOfMemory) {
-        request->OutOfMemory = true;
+    qint64 nFileSize = 0;
+    std::unique_ptr<char[]> pBuffer = ReadWholeFile(request->FileName, MAX_BMP_FILE_SIZE, nFileSize, bOutOfMemory);
+    if (!pBuffer) {
+        request->OutOfMemory = bOutOfMemory;
+        return;
+    }
+    const std::size_t nSize = static_cast<std::size_t>(nFileSize);
+
+    try {
+        bool bOutOfMemory = false;
+        int nWidth = 0, nHeight = 0, nBPP = 0;
+        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
+            CReaderTGA::ReadImage(nWidth, nHeight, nBPP, bOutOfMemory, pBuffer.get(), nSize)));
+        if (pPixelData) {
+            if (nBPP == 4) {
+                uint32* pImage32 = (uint32*)pPixelData.get();
+                Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                if (CReaderTGA::IsAlphaChannelValid(nWidth, nHeight, (uint32*)pImage32)) {
+                    Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
+                }
+                else { // no valid alpha channel - set all A to 255
+                    for (int i = 0; i < nWidth*nHeight; i++) {
+                        *pImage32 = *pImage32 | 0xFF000000; // Mask out the alpha channel from the 32 bit RGBA pixel;
+                        pImage32++;
+                    }
+                }
+            }
+            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_TGA, false, 0, 1, 0);
+            pPixelData.release();
+        } else if (bOutOfMemory) {
+            request->OutOfMemory = true;
+        } else {
+            pPixelData.reset();
+            ProcessReadQtImageRequest(request);
+        }
+    } catch (...) {
+        delete request->Image;
+        request->Image = nullptr;
+        request->ExceptionError = true;
     }
 }
 
@@ -1047,13 +1090,6 @@ void CImageLoadThread::ProcessReadHEIFRequest(CRequest* request) {
     }
 }
 
-void CImageLoadThread::ProcessReadPSDRequest(CRequest* request) {
-    request->Image = PsdReader::ReadImage(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), request->ProcessParams.TransparencyMode, request->OutOfMemory);
-    if (request->Image == nullptr && !request->OutOfMemory) {
-        request->Image = PsdReader::ReadThumb(reinterpret_cast<LPCWSTR>(request->FileName.utf16()), request->OutOfMemory);
-    }
-}
-
 void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
     bool bOutOfMemory = false;
     qint64 nFileSize = 0;
@@ -1280,10 +1316,6 @@ ZipEntry::ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned 
  *
  * - GIF, TIFF and ICO entries have no dedicated wrapper: they are decoded from the entry buffer by Qt
  *   (DecodeBufferWithQt), again only the first frame.
- *
- * - These readers take it as an argument but do nothing with it and internally just hand it over to CJPEGImage():
- *        CReaderBMP::ReadBmpImage()
- *        RawReader::ReadImage()
  */
 void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
     bool bIsSameArchive = false;
@@ -1480,13 +1512,13 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                     break;
                     case IF_WindowsBMP:
                     {
-                        bool bDecodeOutOfMemory = false;
-                        request->Image = CReaderBMP::ReadBmpImage(pBuffer.get(), nSize, bDecodeOutOfMemory, EXTRA_MANGA_PARAMS);
-                        if (request->Image != nullptr) {
+                        int nWidth = 0, nHeight = 0, nBPP = 0;
+                        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
+                            CReaderBMP::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer.get(), nSize)));
+                        if (pPixelData) {
+                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_WindowsBMP, EXTRA_MANGA_PARAMS);
+                            pPixelData.release();
                             bSuccess = true;
-                        }
-                        if (bDecodeOutOfMemory) {
-                            request->OutOfMemory = true;
                         }
                     }
                     break;

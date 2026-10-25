@@ -2,6 +2,7 @@
 #define PROCESSINGTHREADPOOL_H
 
 #include "WorkThread.h"
+#include "WTLCompat.h"
 
 class CProcessingThread;
 
