@@ -148,21 +148,17 @@ target_link_libraries(mkImageViewer PRIVATE
     Qt6::Concurrent
     Qt6::DBus
     Qt6::Network
-    dbghelp
-    gdiplus
-    winmm
-    turbojpeg-static
-    libpng18_static
-    zlib
-    jxl_dec
-    jxl_threads
-    heif
-    libwebp
-    libwebpdemux
-    avif
-    lcms2
-    bit7z
+    
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/lib64/liblcms2.dll.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/lib64/libavif.dll.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libbit7z/lib64/libbit7z64.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/lib64/libheif.dll.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjpeg-turbo/lib64/libturbojpeg.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_dec.dll.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_threads.dll.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/lib64/libpng.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/lib64/libzs.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebp.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebpdemux.a
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libsharpyuv.a
 )
-
-# C-Datei src/zip/zip.c von PCH ausschliessen
-#set_source_files_properties(src/zip/zip.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)

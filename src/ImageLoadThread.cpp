@@ -40,7 +40,7 @@
 #include <QSize>
 #include <QString>
 
-#include "bit7z/include/bitarchivereader.hpp"
+#include "libbit7z/include/bitarchivereader.hpp"
 using namespace bit7z;
 
 // static initializers

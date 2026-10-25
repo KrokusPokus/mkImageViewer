@@ -3,7 +3,7 @@
 
 #include "ProcessParams.h"
 #include "WorkThread.h"
-#include "bit7z/include/bittypes.hpp"
+#include "libbit7z/include/bittypes.hpp"
 
 #include <functional>
 #include <memory>
