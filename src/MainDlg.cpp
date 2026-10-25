@@ -38,6 +38,7 @@
 #include <QPushButton>
 #include <QRect>
 #include <QRegularExpression>
+#include <QStandardPaths>
 #include <QString>
 #include <QThread>
 #include <QUrl>
@@ -1544,7 +1545,6 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     menu.addSeparator();
 
     // 8. Einstellungen & Beenden
-    menu.addAction(tr("Edit Settings"))->setData(IDM_EDIT_USER_CONFIG);
     menu.addAction(tr("Settings Dialog"))->setData(IDM_SETTINGS_DIALOG);
 
     menu.addSeparator();
@@ -1978,9 +1978,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 this->update();
                 break;
             }
-        case IDM_EDIT_USER_CONFIG:
-            EditINIFile(false);
-            break;
         case IDM_EXIT:
             CleanupAndTerminate();
             break;
@@ -3146,28 +3143,6 @@ QRect CMainDlg::GetToastTextRect() {
     return QRect(nStartX, nStartY,  nEndX - nStartX, nEndY - nStartY);
 }
 
-void CMainDlg::EditINIFile(bool bGlobalINI) {
-    const QString sINIFileName = bGlobalINI
-        ? CSettingsProvider::This().GetGlobalINIFileName()
-        : CSettingsProvider::This().GetUserINIFileName();
-
-    if (!bGlobalINI && !CSettingsProvider::This().ExistsUserINI()) {
-        const auto result = QMessageBox::question(
-            this,
-            QStringLiteral(APP_TITLE),
-            QStringLiteral("No user INI file exists yet. Create user INI file from INI file template?"),
-            QMessageBox::Yes | QMessageBox::No
-        );
-
-        if (result == QMessageBox::Yes) {
-            CSettingsProvider::This().CopyUserINIFromTemplate();
-        } else {
-            return;
-        }
-    }
-    
-    QDesktopServices::openUrl(QUrl::fromLocalFile(sINIFileName));
-}
 
 void CMainDlg::UpdateWindowTitle(bool bForce) {
     static QString s_PrevFileExt;
@@ -3568,8 +3543,8 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
         return QString();
     }
 
-    const QString settingsPath = Helpers::SettingsPath();
-    const QString bookmarkFilePath = QDir(settingsPath).filePath(QStringLiteral("Bookmarks.ini"));
+    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    const QString bookmarkFilePath = QDir(settingsPath).filePath(QStringLiteral("bookmarks.ini"));
 
     if (!QFileInfo::exists(bookmarkFilePath)) {
         return QString();
@@ -3617,9 +3592,8 @@ void CMainDlg::SaveBookmark() {
     }
 
     // 1. Pfade konfigurieren (QDir erstellt fehlende Pfade bei Bedarf automatisch)
-    const QString settingsPath = Helpers::SettingsPath();
+    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
     const QDir bookmarkDir(settingsPath);
-
     if (!bookmarkDir.exists()) {
         if (!bookmarkDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
             return;
@@ -3676,7 +3650,7 @@ void CMainDlg::SaveBookmark() {
 
     // 4. INI-Datei mit QSettings verarbeiten (Ersetzt Get/WritePrivateProfileString)
     QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
-    iniSettings.beginGroup(QStringLiteral("mkImageViewer"));
+    iniSettings.beginGroup(QStringLiteral("Bookmarks"));
 
     const QString oldValueStr = iniSettings.value(keyNameCleaned, QString()).toString();
 

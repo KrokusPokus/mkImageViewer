@@ -1,6 +1,7 @@
 # mkImageViewer
 
 Minimalist Qt6 image viewer based on JPEGView_L <https://github.com/KrokusPokus/JPEGView_L/> which in turn is based on JPEGView <https://github.com/sylikc/jpegview>.
+It still builds in MSVC, but in the future will hopefully become a multi-platform app.
 
 ## System Requirements
 

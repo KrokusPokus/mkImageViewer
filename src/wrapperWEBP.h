@@ -1,6 +1,8 @@
 #ifndef WEBPWRAPPER_H
 #define WEBPWRAPPER_H
 
+#include <cstddef>
+
 class WebpReaderWriter
 {
 public:

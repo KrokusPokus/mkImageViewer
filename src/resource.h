@@ -112,7 +112,6 @@
 #define IDM_AUTO_ZOOM_FIT    12530        // :KeyMap: set auto zoom mode fit to screen
 #define IDM_AUTO_ZOOM_FILL    12540        // :KeyMap: set auto zoom mode fill screen
 #define IDM_AUTO_ZOOM_BOOK_MODE    12550        // :KeyMap: set auto zoom mode to book mode
-#define IDM_EDIT_USER_CONFIG   12610        // :KeyMap: edit user configuration
 #define IDM_EXIT            13000        // :KeyMap: exit application
 #define IDM_HELP            14000
 #define IDM_COLOR_CORRECTION_INC    14200        // :KeyMap: increase color correction amount

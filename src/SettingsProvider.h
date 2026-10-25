@@ -39,7 +39,6 @@ private:
     class QComboBox* m_comboCpuType;
     class QSpinBox*  m_spinCpuCores;
     class QSpinBox*  m_spinCacheRange;
-    class QCheckBox* m_checkStoreToExe;
 
     // Fenster & Verhalten
     class QCheckBox* m_checkShowFullScreen;
@@ -125,7 +124,6 @@ public:
     bool AutoRotateEXIF() const { return m_bAutoRotateEXIF; }
     bool BookModeLaunchFullscreen() const { return m_bBookModeLaunchFullscreen; }
     bool DefaultMaximized() const { return m_bDefaultMaximized; }
-    bool ExistsUserINI() const;
     bool ExplicitWindowRect() const { return m_bExplicitWindowRect; }
     bool HighQualityResampling() const { return m_bHQRS; }
     bool IsSortedAscending() const { return m_bIsSortedAscending; }
@@ -137,7 +135,6 @@ public:
     bool SingleFullScreenInstance() const { return m_bSingleFullScreenInstance; }
     bool SmartPanningKeys() const { return m_bSmartPanningKeys; }
     bool StickyWindowSize() const { return m_bStickyWindowSize; }
-    bool StoreToEXEPath() const { return m_bStoreToEXEPath; }
     bool TitleBarUseFileIcon() const { return m_bTitleBarUseFileIcon; }
     bool UseEmbeddedColorProfiles() const { return m_bUseEmbeddedColorProfiles; }
     bool ForceQImageReader() const { return m_bForceQImageReader; }
@@ -180,11 +177,7 @@ public:
 
     const QString DefaultGUIFont() const { return m_defaultGUIFont; }
     const QString ZoomFactorFont() const { return m_zoomFactorFont; }
-    const QString GetEXEPath() const { return m_sEXEPath; }
-    const QString GetGlobalINIFileName() const { return m_sIniNameGlobal; }    // Get the file name with path of the global INI file (in EXE path)
-    const QString GetUserINIFileName() const { return m_sIniNameUser; }        // Get the file name with path of the user INI file (in AppData path)
 
-    void CopyUserINIFromTemplate();
     void SaveCustomSettings();
     void SaveStickyWindowRect(QRect rect);
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
@@ -206,19 +199,15 @@ public:
 private:
     static std::unique_ptr<CSettingsProvider> sm_instance;
 
-    QString m_sEXEPath;
-    QString m_sIniNameGlobal;
-    QString m_sIniNameUser;
-    QString m_sIniFileTitle;
-    bool m_bUserINIExists{false};
-    bool m_bStoreToEXEPath{false};
+    QString m_settingsFileFullPath;
+    QString m_stateFileFullPath;
 
     double m_dContrast{0.0};
     double m_dGamma{1.0};
     double m_dSaturation{1.0};
     bool m_bHQRS{true};
     bool m_bShowFullPathInTitle{false};
-    bool m_bShowFullScreen{true};
+    bool m_bShowFullScreen{false};
     bool m_bKeepParams{false};
     Helpers::CPUType m_eCPUAlgorithm;
     int m_nNumCores{1};
@@ -269,9 +258,8 @@ private:
     int m_nCacheRange{2};
     Helpers::ETransparencyMode m_eTransparencyMode;
 
-    QString GetINITemplateName() const;
-    void MakeSureUserINIExists();
     void ReadWriteableINISettings();
+    void ReadStickyWindowRect();
 
     QString GetString(const QString& sKey, const QString& sDefault) const;
     int GetInt(const QString& sKey, int nDefault, int nMin, int nMax) const;

@@ -38,7 +38,7 @@ def keymap_resource_parse():
             # remove the newlines captured by readline()
             line = line.strip()
 
-            m = re.fullmatch(r"(#define)\s+(\w+)\s+(\d+)\s+// :KeyMap: (.*)", line)
+            m = re.fullmatch(r"(#define)\s+(\w+)\s+(\d+)\s+// :keymap: (.*)", line)
             if m:
                 d_int[m.group(2)] = int(m.group(3))
                 d_comment[m.group(2)] = m.group(4)
@@ -80,7 +80,7 @@ def keymap_generate_reference_readme():
 
     the generated file is NOT PARSED by the app at all, it's only a readme, so it can be translated without worry of a bad edit
     """
-    TARGET_FILE = CFG_PATH / r"KeyMap-README.html"
+    TARGET_FILE = CFG_PATH / r"keymap-readme.html"
 
     (d_index, d_comment) = keymap_resource_parse()
 
@@ -99,7 +99,7 @@ def keymap_generate_reference_readme():
         f.write(f"""<html>
 <head>
     <title>
-        mkImageViewer - KeyMap.txt README
+        mkImageViewer - keymap.txt README
     </title>
     <style>""")
 
@@ -139,7 +139,7 @@ Last Updated: 31-JAN-2023<br />
     Basics
 </h1>
 <p>
-    Edit "KeyMap.txt" to change keys and actions to your preference.
+    Edit "keymap.txt" to change keys and actions to your preference.
 </p>
 
 <p>

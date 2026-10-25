@@ -189,7 +189,6 @@ private:
 
     QRect GetZoomTextRect();
     QRect GetToastTextRect();
-    void EditINIFile(bool bGlobalINI);
     int GetLoadErrorAfterOpenFile();
     void PrefetchDIB(const QRect& clientRect);
     bool HandleMouseButtonByKeymap(int nMouseButton, bool bExecuteCommand = true);

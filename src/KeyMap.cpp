@@ -3,21 +3,18 @@
 #include "Helpers.h"
 #include "SettingsProvider.h"
 
+#include <QCoreApplication>
 #include <QFile>
 #include <QTextStream>
 #include <QDir>
 #include <QRegularExpression>
+#include <QStandardPaths>
 #include <list>
 #include <iterator>
 
 #define M_SHIFT 0x10000
 #define M_ALT   0x20000
 #define M_CTRL  0x40000
-
-// KeyMap filename constants
-static const QString KEYMAP_USER_FILE_NAME = QStringLiteral("KeyMap.txt");
-static const QString KEYMAP_DEFAULT_FILE_NAME = QStringLiteral("KeyMap.txt.default");
-static const QString KEYMAP_SYMBOLS_FILE_NAME = QStringLiteral("symbols.km");
 
 struct SKey {
     QString Name;
@@ -148,33 +145,20 @@ static QString _GetKeyShortcutName(int nShortcut) {
 // Then tries (mkImageViewer root)\KeyMap.txt
 // if none of those, then (mkImageViewer root)\KeyMap.txt.default
 CKeyMap::CKeyMap() {
-    QString exePath = CSettingsProvider::This().GetEXEPath();
-    if (!exePath.endsWith('/') && !exePath.endsWith('\\')) {
-        exePath += QLatin1Char('/');
-    }
-
-    QString settingsPath = Helpers::SettingsPath();
-    if (!settingsPath.endsWith('/') && !settingsPath.endsWith('\\')) {
-        settingsPath += QLatin1Char('/');
-    }
-
-    // 1. KeyMap-Datei ermitteln (%AppData% -> App-Root -> Default)
-    QString keyMapFilePath = settingsPath + KEYMAP_USER_FILE_NAME;
+    const QString exePath = QCoreApplication::applicationDirPath();
+    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    
+    QString keyMapFilePath = QDir(settingsPath).filePath(QStringLiteral("keymap.txt"));
     if (!QFile::exists(keyMapFilePath)) {
-        keyMapFilePath = exePath + KEYMAP_USER_FILE_NAME;
-        if (!QFile::exists(keyMapFilePath)) {
-            keyMapFilePath = exePath + KEYMAP_DEFAULT_FILE_NAME;
-        }
+        keyMapFilePath = QDir(exePath).filePath(QStringLiteral("keymap.txt"));
     }
-
-    // Wenn keine KeyMap-Datei gefunden wurde -> Fallback
     if (!QFile::exists(keyMapFilePath)) {
         AddDefaultEscapeHandling();
         return;
     }
 
     // 2. Symbole-Datei prüfen
-    QString symbolsFilePath = exePath + KEYMAP_SYMBOLS_FILE_NAME;
+    QString symbolsFilePath = QDir(exePath).filePath(QStringLiteral("symbols.km"));
     if (!QFile::exists(symbolsFilePath)) {
         AddDefaultEscapeHandling();
         return;

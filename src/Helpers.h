@@ -92,8 +92,6 @@ namespace Helpers {
 
     inline float DPIScalingFactor = -1.0f; // is updated to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
     
-    static QString buffAppPath;
-
     // Maximum and minimum allowed zoom factors for images
     const double ZoomMax = DBL_MAX; // unbound the maximum zoom, previously set at 16.0 (1600%)
     const double ZoomMin = DBL_MIN; // unbound the minimum zoom, previously set at 0.1 (10%)
@@ -180,13 +178,6 @@ namespace Helpers {
 
     // Gets the image size to be used when fitting the image to screen according to the auto zoom mode given
     QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, EAutoZoomMode eAutoZoomMode, double & dZoom);
-
-    // Gets the path where mkImageViewer stores its application data, including a trailing backslash
-    QString SettingsPath();
-
-    // Sets the path where mkImageViewer stores its application data, including a trailing backslash.
-    // Default if not set is CSIDL_APPDATA/mkImageViewer/
-    void SetSettingsPath(const QString& sPath);
 
     // Pad the given value to the next multiple of padvalue. padvalue must be a power of 2.
     inline int DoPadding(int value, int padvalue) {

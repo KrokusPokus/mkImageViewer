@@ -6,6 +6,8 @@
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 
+#include <cstring>
+
 static int CountJxlFrames(const uint8_t* jxl_data, size_t size) {
     auto decoder = JxlDecoderMake(nullptr);
     if (!decoder) return 1;

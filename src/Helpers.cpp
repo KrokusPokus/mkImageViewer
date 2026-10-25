@@ -9,7 +9,6 @@
 #include <QString>
 #include <QStringDecoder>
 #include <QtEndian>
-#include <QStandardPaths>
 #include <QDir>
 
 namespace Helpers {
@@ -17,34 +16,6 @@ namespace Helpers {
     int ScaleWithDPI(int value)
     {
         return (int)(value * DPIScalingFactor + 0.5f);
-    }
-
-    QString SettingsPath() {
-
-        if (!buffAppPath.isEmpty()) {
-            return buffAppPath;
-        }
-
-        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-
-        // Stellt sicher, dass das Verzeichnis tatsächlich auf dem Dateisystem existiert
-        QDir dir(path);
-        if (!dir.exists()) {
-            dir.mkpath(".");
-        }
-
-        // Qt nutzt intern immer '/', sorgt aber auf allen Betriebssystemen für die Konvertierung
-        if (!path.endsWith('/')) {
-            path += '/';
-        }
-
-        buffAppPath = path;
-
-        return path;
-    }
-
-    void SetSettingsPath(const QString& sPath) {
-        buffAppPath = sPath;
     }
 
     QSize GetImageRect(int nWidth, int nHeight, int nScreenWidth, int nScreenHeight, 

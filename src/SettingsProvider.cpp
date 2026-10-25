@@ -37,9 +37,6 @@
 
 namespace {
 
-    constexpr const char* DEFAULT_INI_FILE_NAME = "mkImageViewer.ini";
-    constexpr const char* SECTION_NAME = "mkImageViewer";
-
     constexpr float COLOR_CORR_DEFAULT_FACTORS[6] = {0.2f, 0.1f, 0.3f, 0.3f, 0.3f, 0.15f};
 
     // Scrollbereich um jeden Tab legen für kleine Bildschirmauflösungen
@@ -229,10 +226,6 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
 QWidget* SettingsDialog::createProgramTab() {
     QWidget* panel = new QWidget();
     QFormLayout* layout = new QFormLayout(panel);
-
-    m_checkStoreToExe = new QCheckBox(tr("Einstellungen im App-Ordner speichern"));
-    m_checkStoreToExe->setToolTip(tr("Benutzer muß Schreibrechte im App-Ordner haben!"));
-    layout->addRow(m_checkStoreToExe);
 
     m_comboDeleteConfirmation = new QComboBox();
     m_comboDeleteConfirmation->addItems({"Always", "OnlyWhenNoRecycleBin", "Never"});
@@ -506,7 +499,7 @@ void SettingsDialog::loadFromSettings() {
     m_comboSingleInstance->setCurrentIndex(static_cast<int>(settings.m_eSingleInstanceMode));
     m_spinCpuCores->setValue(settings.m_nNumCoresIni);
     m_spinCacheRange->setValue(settings.m_nCacheRange);
-    m_checkStoreToExe->setChecked(settings.m_bStoreToEXEPath);
+
 
     // Tab 3
     m_checkShowFullScreen->setChecked(settings.m_bShowFullScreen);
@@ -592,7 +585,6 @@ void SettingsDialog::saveToSettings() {
     settings.WriteBool("SingleFullScreenInstance", m_checkSingleFullScreenInstance->isChecked());
     settings.WriteBool("SmartPanningKeys", m_checkSmartPanningKeys->isChecked());
     settings.WriteBool("SmoothPanning", m_checkSmoothPanning->isChecked());
-    settings.WriteBool("StoreToEXEPath", m_checkStoreToExe->isChecked());
     settings.WriteBool("TitleBarUseFileIcon", m_checkTitleBarUseFileIcon->isChecked());
     settings.WriteBool("UseEmbeddedColorProfiles", m_checkUseEmbeddedColorProfiles->isChecked());
     settings.WriteBool("WrapAroundFolder", m_checkWrapAroundFolder->isChecked());
@@ -633,48 +625,66 @@ const float* CSettingsProvider::ColorCorrectionAmounts() {
     return (m_fColorCorrections[0] < 0) ? COLOR_CORR_DEFAULT_FACTORS : m_fColorCorrections;
 }
 
-CSettingsProvider::CSettingsProvider() {
-    // parse command line to find the process startup path
-    m_sEXEPath = QCoreApplication::applicationDirPath();
-    if (!m_sEXEPath.endsWith('/') && !m_sEXEPath.endsWith('\\')) {
-        m_sEXEPath += '/';
+void CSettingsProvider::ReadStickyWindowRect() {
+    m_stickyWindowRect = QRect(0, 0, 0, 0);
+
+    if (m_stateFileFullPath.isEmpty() || !QFileInfo::exists(m_stateFileFullPath)) {
+        return;
     }
 
-    // Check if a custom INI file name is specified on the command line
-    m_sIniFileTitle = DEFAULT_INI_FILE_NAME;
+    QSettings stateSettings(m_stateFileFullPath, QSettings::IniFormat);
+    stateSettings.beginGroup("State");
+    const QString s = stateSettings.value("StickyWindowRect").toString();
+    stateSettings.endGroup();
 
-    // Global INI file (at EXE location)
-    m_sIniNameGlobal = m_sEXEPath + m_sIniFileTitle; // use current dir as startup path
-
-    // Read if the user INI file shall be used
-    m_sIniNameUser = m_sIniNameGlobal;
-    m_bStoreToEXEPath = GetBool("StoreToEXEPath", false);
-
-    if (!m_bStoreToEXEPath) {
-        // User INI file
-        QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        if (!settingsPath.endsWith('/') && !settingsPath.endsWith('\\')) {
-            settingsPath += '/';
+    // Format: "left top right bottom", z.B. "302 93 1412 950"
+    const auto tokens = s.split(' ', Qt::SkipEmptyParts);
+    if (tokens.size() == 4) {
+        bool ok1, ok2, ok3, ok4;
+        const int left   = tokens[0].toInt(&ok1);
+        const int top    = tokens[1].toInt(&ok2);
+        const int right  = tokens[2].toInt(&ok3);
+        const int bottom = tokens[3].toInt(&ok4);
+        if (ok1 && ok2 && ok3 && ok4) {
+            m_stickyWindowRect = QRect(QPoint(left, top), QPoint(right, bottom)).normalized();
         }
-        m_sIniNameUser = settingsPath + m_sIniFileTitle;
-        m_bUserINIExists = QFileInfo::exists(m_sIniNameUser);
-    } else {
-        Helpers::SetSettingsPath(m_sEXEPath);
+    }
+}
+
+CSettingsProvider::CSettingsProvider() {
+    // Load main settings
+
+    // ----------------------------------------------------------------------------------
+    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    const QDir settingsDir(settingsPath);
+    if (!settingsDir.exists()) {
+        if (!settingsDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
+            return;
+        }
+    }
+    
+    m_settingsFileFullPath = QDir(settingsPath).filePath(QStringLiteral("settings.ini"));
+
+    // ----------------------------------------------------------------------------------
+
+    const QString statePath = QStandardPaths::writableLocation(QStandardPaths::StateLocation);
+    const QDir stateDir(statePath);
+    if (!stateDir.exists()) {
+        if (!stateDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
+            return;
+        }
     }
 
-    /*
-    qDebug() << "m_sEXEPath:" << m_sEXEPath;
-    qDebug() << "m_sIniFileTitle:" << m_sIniFileTitle;
-    qDebug() << "m_sIniNameGlobal:" << m_sIniNameGlobal;
-    qDebug() << "m_sIniNameUser:" << m_sIniNameUser;
-    qDebug() << "m_bStoreToEXEPath:" << m_bStoreToEXEPath;
-    qDebug() << "m_bUserINIExists:" << m_bUserINIExists;
-    */
+    m_stateFileFullPath = QDir(statePath).filePath(QStringLiteral("state.ini"));
 
+    // ----------------------------------------------------------------------------------
     // Read settings that can be written with SaveSettings()
     ReadWriteableINISettings();
 
-    m_bShowFullScreen = GetBool("ShowFullScreen", true);
+    // Read sticky window position (StateLocation)
+    ReadStickyWindowRect();
+    
+    m_bShowFullScreen = GetBool("ShowFullScreen", false);
     m_bShowFullPathInTitle = GetBool("ShowFilePathInTitle", false);
 
     QString sCPU = GetString("CPUType", "AutoDetect");
@@ -765,7 +775,6 @@ CSettingsProvider::CSettingsProvider() {
     m_dAutoBrightnessAmount = GetDouble("AutoBrightnessCorrectionAmount", 0.2, 0.0, 1.0);
 
     m_defaultWindowRect = GetRect("DefaultWindowRect", QRect(0, 0, 0, 0));
-    m_stickyWindowRect = GetRect("StickyWindowRect", QRect(0, 0, 0, 0));
     m_bDefaultMaximized = false;
     m_bStickyWindowSize = false;
     m_bExplicitWindowRect = false;
@@ -870,9 +879,7 @@ void CSettingsProvider::ReadWriteableINISettings() {
 }
 
 void CSettingsProvider::SaveCustomSettings() {
-    MakeSureUserINIExists();
     WriteInt("BookModePageHeight", m_nBookModePageHeight);
-    m_bUserINIExists = true;
 }
 
 void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
@@ -883,7 +890,6 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
                                      Helpers::EAutoZoomMode eAutoZoomMode,
                                      Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
                                      Helpers::ETransitionEffect eSlideShowTransitionEffect) {
-    MakeSureUserINIExists();
 
     WriteDouble("Contrast", procParams.Contrast);
     WriteDouble("Gamma", procParams.Gamma);
@@ -919,72 +925,38 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
 
     WriteString("SlideShowTransitionEffect", ConvertTransitionEffectToString(eSlideShowTransitionEffect));
 
-    m_bUserINIExists = true;
     ReadWriteableINISettings();
 }
 
 void CSettingsProvider::SaveStickyWindowRect(QRect rect) {
-    if (m_stickyWindowRect != rect && !rect.isEmpty()) {
-        QString sRect = QString("%1 %2 %3 %4")
-                            .arg(rect.left())
-                            .arg(rect.top())
-                            .arg(rect.right())
-                            .arg(rect.bottom());
-
-        MakeSureUserINIExists();
-        WriteString("StickyWindowRect", sRect);
-        m_bUserINIExists = true;
-    }
-}
-
-bool CSettingsProvider::ExistsUserINI() const {
-    return QFileInfo::exists(m_sIniNameUser);
-}
-
-void CSettingsProvider::CopyUserINIFromTemplate() {
-    if (m_bStoreToEXEPath) {
-        return; // no user INI file
+    qDebug() << "SaveStickyWindowRect() rect:" << rect << "to:" << m_stateFileFullPath;
+    if (m_stateFileFullPath.isEmpty() || rect.isEmpty() || m_stickyWindowRect == rect) {
+        return;
     }
 
-    QFileInfo userFile(m_sIniNameUser);
-    QDir().mkpath(userFile.absolutePath());
-    QFile::copy(GetINITemplateName(), m_sIniNameUser);
-}
+    const QString sRect = QString("%1 %2 %3 %4")
+                              .arg(rect.left())
+                              .arg(rect.top())
+                              .arg(rect.right())
+                              .arg(rect.bottom());
 
-void CSettingsProvider::MakeSureUserINIExists() {
-    if (m_bStoreToEXEPath) {
-        return; // no user INI file needed
-    }
+    QSettings stateSettings(m_stateFileFullPath, QSettings::IniFormat);
+    stateSettings.beginGroup("State");
+    stateSettings.setValue("StickyWindowRect", sRect);
+    stateSettings.endGroup();
+    stateSettings.sync();
 
-    // Create app folder in appdata directory and copy INI file if it does not exist
-    QFileInfo userFile(m_sIniNameUser);
-    QDir().mkpath(userFile.absolutePath());
-    if (!QFileInfo::exists(m_sIniNameUser)) {
-        QFile::copy(GetINITemplateName(), m_sIniNameUser);
-    }
-}
-
-QString CSettingsProvider::GetINITemplateName() const {
-    return m_sEXEPath + DEFAULT_INI_FILE_NAME + ".tpl";
+    m_stickyWindowRect = rect;
 }
 
 QString CSettingsProvider::GetString(const QString& sKey, const QString& sDefault) const {
-    if (m_bUserINIExists && QFileInfo::exists(m_sIniNameUser)) {
-        QSettings userSettings(m_sIniNameUser, QSettings::IniFormat);
-        userSettings.beginGroup(SECTION_NAME);
+    if (QFileInfo::exists(m_settingsFileFullPath)) {
+        QSettings userSettings(m_settingsFileFullPath, QSettings::IniFormat);
+        userSettings.beginGroup("Settings");
         if (userSettings.contains(sKey)) {
             return userSettings.value(sKey).toString();
         }
         userSettings.endGroup();
-    }
-
-    if (QFileInfo::exists(m_sIniNameGlobal)) {
-        QSettings globalSettings(m_sIniNameGlobal, QSettings::IniFormat);
-        globalSettings.beginGroup(SECTION_NAME);
-        if (globalSettings.contains(sKey)) {
-            return globalSettings.value(sKey).toString();
-        }
-        globalSettings.endGroup();
     }
 
     return sDefault;
@@ -1098,8 +1070,8 @@ Helpers::EAutoZoomMode CSettingsProvider::GetAutoZoomMode(const QString& sKey, H
 }
 
 void CSettingsProvider::WriteString(const QString& sKey, const QString& sString) {
-    QSettings settings(m_sIniNameUser, QSettings::IniFormat);
-    settings.beginGroup(SECTION_NAME);
+    QSettings settings(m_settingsFileFullPath, QSettings::IniFormat);
+    settings.beginGroup("Settings");
     if (settings.value(sKey).toString() != sString) {
         settings.setValue(sKey, sString);
     }
