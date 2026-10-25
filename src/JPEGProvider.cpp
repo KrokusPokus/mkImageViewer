@@ -28,6 +28,10 @@ bool CanReadAhead(CJPEGImage* pImage) {
 
 } // namespace
 
+CJPEGProvider::CImageRequest::~CImageRequest() {
+    delete Image; // CJPEGImage is a complete type here (JPEGImage.h)
+}
+
 CJPEGProvider::CJPEGProvider(QObject* pParent, int nNumThreads, int nNumBuffers)
     : QObject(pParent),
     m_nNumThread(std::max(1, nNumThreads)),
@@ -101,6 +105,8 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
             StartNewRequestBundle(pFileList, eDirection, processParams, m_nNumBuffers - 1, pRequest);
         }
         RemoveUnusedImages(false);
+    } else {
+        RemoveUnusedImages(true);
     }
 
     qDebug() << "CJPEGProvider::RequestImage() m_requestList.size:" << m_requestList.size();

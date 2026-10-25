@@ -66,9 +66,9 @@ private:
             AccessTimeStamp(-1),
             HandlingThread(nullptr) {}
 
-        ~CImageRequest() {
-            delete Image;
-        }
+        // Defined in JPEGProvider.cpp: CJPEGImage is only forward declared here, so a delete in the header
+        // would not run ~CJPEGImage() (undefined behavior, all pixel buffers of the image would leak).
+        ~CImageRequest();
     };
 
     using RequestPtr = std::shared_ptr<CImageRequest>;
