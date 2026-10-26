@@ -52,14 +52,10 @@ private:
     class QSpinBox*  m_spinDisplayMonitor;
 
     // Erscheinungsbild & GUI
-    class QLineEdit* m_editDefaultGuiFont;
-    class QLineEdit* m_editZoomFactorFont;
     class QPushButton* m_btnBgColor;
-    class QPushButton* m_btnGuiColor;
     class QPushButton* m_btnTransColor;
     class QComboBox* m_comboTransparencyMode;
     QColor m_colorBg;
-    QColor m_colorGui;
     QColor m_colorTrans;
 
     // Navigation
@@ -142,7 +138,6 @@ public:
 
     // Ursprüngliche Rückgabetypen für vollständige Drop-in Compatibility
     QColor ColorBackground() const { return m_colorBackground; }
-    QColor ColorGUI() const { return m_colorGUI; }
     QColor ColorTransparency() const { return m_colorTransparency; }
     QRect DefaultWindowRect() const { return m_defaultWindowRect; }
     QRect StickyWindowRect() const { return m_stickyWindowRect; }
@@ -174,9 +169,6 @@ public:
     int MaxSlideShowFileListSize() const { return m_nMaxSlideShowFileListSize; }
     int NumberOfCoresToUse() const { return m_nNumCores; }
     int SlideShowEffectTimeMs() const { return m_nSlideShowEffectTimeMs; }
-
-    const QString DefaultGUIFont() const { return m_defaultGUIFont; }
-    const QString ZoomFactorFont() const { return m_zoomFactorFont; }
 
     void SaveCustomSettings();
     void SaveStickyWindowRect(QRect rect);
@@ -241,10 +233,7 @@ private:
     bool m_bExplicitWindowRect{false};
     bool m_bForceQImageReader{false};
     QColor m_colorBackground;
-    QColor m_colorGUI;
     QColor m_colorTransparency;
-    QString m_defaultGUIFont;
-    QString m_zoomFactorFont;
     bool m_bReloadWhenDisplayedImageChanged{true};
     QSize m_minimalWindowSize;
 

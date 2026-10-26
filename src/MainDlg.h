@@ -219,15 +219,8 @@ private:
     bool IsBookModeFile(const QString& filePath);
     float MaxRatio(float valA, float valB);
     QString GetMultiframeIndex(CJPEGImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
-    QString FormatFileSize(qint64 nFileSize);
     QString formatOutputZoomFactor(double m_dZoom);
     void onShowContextMenu(const QPoint &pos);
-
-#if defined(Q_OS_WIN)
-    bool isRunningInWine();
-    bool IsLinuxBinaryAvailable(const QString& unixPath);
-    QString GetUnixPathFromWine(const QString& szDosPath);
-#endif
 
     // [sdneon] Toast stuff
     QString m_strToast;
@@ -266,6 +259,5 @@ protected:
     void dropEvent(QDropEvent* event) override;
     void timerEvent(QTimerEvent* event) override;
 };
-
 
 #endif // MAINDLG_H

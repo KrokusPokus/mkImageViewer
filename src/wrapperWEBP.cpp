@@ -56,8 +56,9 @@ void* WebpReaderWriter::ReadImage(int& width,
         WebPChunkIterator chunk_iter;
         void* transform = NULL;
         
-        if (WebPDemuxGetChunk(demuxer, "ICCP", 1, &chunk_iter))
+        if (WebPDemuxGetChunk(demuxer, "ICCP", 1, &chunk_iter)) {
             transform = ICCProfileTransform::CreateTransform(chunk_iter.chunk.bytes, chunk_iter.chunk.size, ICCProfileTransform::FORMAT_BGRA);
+        }
         WebPDemuxReleaseChunkIterator(&chunk_iter);
         if (WebPDemuxGetChunk(demuxer, "EXIF", 1, &chunk_iter)) {
             WebPData exif = chunk_iter.chunk;
@@ -77,17 +78,29 @@ void* WebpReaderWriter::ReadImage(int& width,
         if (!has_animation) {
             int nStride = width * nchannels;
             size_t size = (size_t)height * nStride;
-            //pPixelData = new(std::nothrow) unsigned char[size]; // new[] is c++ and would require delete[].
-            pPixelData = static_cast<uint8*>(malloc(size));       // WebP uses C based memory, so malloc() and free()
+            pPixelData = new (std::nothrow) uint8[size];   // WebPDecodeBGRAInto schreibt in unseren Puffer
             if (pPixelData == NULL) {
                 outOfMemory = true;
+                if (transform) {
+                    ICCProfileTransform::DeleteTransform(transform);
+                }
                 return NULL;
             }
-            WebPDecodeBGRAInto((const uint8_t*)buffer, sizebytes, pPixelData, size, nStride);
+
+            uint8_t* decodeResult = WebPDecodeBGRAInto((const uint8_t*)buffer, sizebytes, pPixelData, size, nStride);
+            if (decodeResult == NULL) { // Decoding fehlgeschlagen (z.B. beschädigte Datei)
+                delete[] pPixelData;
+                if (transform) {
+                    ICCProfileTransform::DeleteTransform(transform);
+                }
+                return NULL;
+            }
 
             // ICCP transform in place
-            ICCProfileTransform::DoTransform(transform, pPixelData, pPixelData, width, height);
-            ICCProfileTransform::DeleteTransform(transform);
+            if (transform) {
+                ICCProfileTransform::DoTransform(transform, pPixelData, pPixelData, width, height);
+                ICCProfileTransform::DeleteTransform(transform);
+            }
 
             return pPixelData;
         }

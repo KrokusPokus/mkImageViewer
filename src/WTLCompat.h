@@ -1,135 +1,12 @@
 #ifndef WTLCOMPAT_H
 #define WTLCOMPAT_H
 
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-
 #include <algorithm>
-#include <cwchar>
-#include <cwctype>
-#include <string>
-#include <vector>
 
-#ifdef QT_CORE_LIB
 #include <QPoint>
 #include <QRect>
 #include <QSize>
 #include <QString>
-#endif
-
-#// Falls keine Windows-Header geladen sind, definieren wir die benötigten VK_-Makros manuell
-#ifndef _WINUSER_
-#define VK_LBUTTON          0x01
-#define VK_RBUTTON          0x02
-#define VK_CANCEL           0x03
-#define VK_MBUTTON          0x04
-#define VK_XBUTTON1         0x05
-#define VK_XBUTTON2         0x06
-#define VK_BACK             0x08
-#define VK_TAB              0x09
-#define VK_RETURN           0x0D
-#define VK_SHIFT            0x10
-#define VK_CONTROL          0x11
-#define VK_MENU             0x12
-#define VK_ESCAPE           0x1B
-#define VK_SPACE            0x20
-#define VK_PAGE_UP          0x21
-#define VK_PAGE_DOWN        0x22
-#define VK_END              0x23
-#define VK_HOME             0x24
-#define VK_LEFT             0x25
-#define VK_UP               0x26
-#define VK_RIGHT            0x27
-#define VK_DOWN             0x28
-#define VK_INSERT           0x2D
-#define VK_DELETE           0x2E
-#define VK_NUMPAD0          0x60
-#define VK_NUMPAD1          0x61
-#define VK_NUMPAD2          0x62
-#define VK_NUMPAD3          0x63
-#define VK_NUMPAD4          0x64
-#define VK_NUMPAD5          0x65
-#define VK_NUMPAD6          0x66
-#define VK_NUMPAD7          0x67
-#define VK_NUMPAD8          0x68
-#define VK_NUMPAD9          0x69
-#define VK_MULTIPLY         0x6A
-#define VK_ADD              0x6B
-#define VK_SEPARATOR        0x6C
-#define VK_SUBTRACT         0x6D
-#define VK_DECIMAL          0x6E
-#define VK_DIVIDE           0x6F
-#define VK_LBUTTONDBLCLK    0x0201 // Fallback-Definition für Doppelklick falls nicht vorhanden
-#endif
-
-// Spezielle Symbole (Plus/Minus/Comma/Period) sind im Win32-Standard oft 
-// tastaturlayoutabhängig oder als OEM definiert. Falls sie fehlen, mappen wir sie sauber:
-#ifndef VK_PLUS
-#define VK_PLUS             0x6B
-#endif
-#ifndef VK_MINUS
-#define VK_MINUS            0x6D
-#endif
-#ifndef VK_OEM_COMMA
-#define VK_OEM_COMMA        0xBC
-#endif
-#ifndef VK_OEM_PERIOD
-#define VK_OEM_PERIOD       0xBE
-#endif
-
-#ifndef VK_F1
-#define VK_F1               0x70
-#define VK_F2               0x71
-#define VK_F3               0x72
-#define VK_F4               0x73
-#define VK_F5               0x74
-#define VK_F6               0x75
-#define VK_F7               0x76
-#define VK_F8               0x77
-#define VK_F9               0x78
-#define VK_F10              0x79
-#define VK_F11              0x7A
-#define VK_F12              0x7B
-#define VK_F13              0x7C
-#define VK_F14              0x7D
-#define VK_F15              0x7E
-#define VK_F16              0x7F
-#define VK_F17              0x80
-#define VK_F18              0x81
-#define VK_F19              0x82
-#define VK_F20              0x83
-#define VK_F21              0x84
-#define VK_F22              0x85
-#define VK_F23              0x86
-#define VK_F24              0x87
-#endif
-
-//-----------------------------------------------------------------
-/*
-struct POINT {
-    long x;
-    long y;
-};
-
-struct SIZE {
-    long cx;
-    long cy;
-};
-
-struct RECT {
-    long left;
-    long top;
-    long right;
-    long bottom;
-};
-
-using LPCRECT = const RECT*;
-using LPRECT = RECT*;
-using LPPOINT = POINT*;
-using LPSIZE = SIZE*;
-*/
-//-----------------------------------------------------------------
 
 struct DSize {
     int cx{0};
@@ -152,8 +29,6 @@ struct DSize {
 #endif
 
 };
-
-//-----------------------------------------------------------------
 
 struct DPoint {
     int x{0};
@@ -199,8 +74,6 @@ struct DPoint {
 #endif
 };
 
-//-----------------------------------------------------------------
-
 struct DRect {
     int left{0};
     int top{0};
@@ -214,30 +87,6 @@ struct DRect {
 
     constexpr DRect(const DPoint& point, const DSize& size) noexcept
         : left(point.x), top(point.y), right(point.x + size.cx), bottom(point.y + size.cy) {}
-
-#if defined(_WINDEF_)
-    // Konvertierungskonstruktor für RECT / tagRECT
-    constexpr DRect(const RECT& rc) noexcept
-        : left(rc.left), top(rc.top), right(rc.right), bottom(rc.bottom) {}
-
-    // Konvertierungskonstruktor für Zeiger (RECT* / LPCRECT)
-    constexpr DRect(LPCRECT lprc) noexcept {
-        if (lprc) {
-            left = lprc->left; top = lprc->top;
-            right = lprc->right; bottom = lprc->bottom;
-        } else {
-            SetRectEmpty();
-        }
-    }
-
-    constexpr DRect(const POINT& point, const SIZE& size) noexcept
-        : left(point.x), top(point.y), right(point.x + size.cx), bottom(point.y + size.cy) {}
-
-    // Konvertierung nach RECT (Value)
-    constexpr operator RECT() const noexcept {
-        return RECT{ left, top, right, bottom };
-    }
-#endif
 
     // --- C++20 Vergleichsoperatoren ---
     constexpr bool operator==(const DRect&) const noexcept = default;
@@ -306,8 +155,6 @@ struct DRect {
 };
 
 //-----------------------------------------------------------------
-using LPCTSTR = const wchar_t*;
-using LPTSTR = wchar_t*;
 
 using CSize = DSize;
 using CPoint = DPoint;

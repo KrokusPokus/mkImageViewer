@@ -1,7 +1,5 @@
 #include "KeyMap.h"
 #include "resource.h"
-#include "Helpers.h"
-#include "SettingsProvider.h"
 
 #include <QCoreApplication>
 #include <QFile>
@@ -10,7 +8,6 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <list>
-#include <iterator>
 
 #define M_SHIFT 0x10000
 #define M_ALT   0x20000
@@ -25,44 +22,46 @@ static SKey KeyTable[] = {
     { QStringLiteral("Alt"), M_ALT },
     { QStringLiteral("Ctrl"), M_CTRL },
     { QStringLiteral("Shift"), M_SHIFT },
-    { QStringLiteral("Esc"), VK_ESCAPE },
-    { QStringLiteral("Return"), VK_RETURN },
-    { QStringLiteral("Space"), VK_SPACE },
-    { QStringLiteral("End"), VK_END },
-    { QStringLiteral("Home"), VK_HOME },
-    { QStringLiteral("Back"), VK_BACK },
-    { QStringLiteral("Tab"), VK_TAB },
-    { QStringLiteral("PgDn"), VK_PAGE_DOWN },
-    { QStringLiteral("PgUp"), VK_PAGE_UP },
-    { QStringLiteral("Left"), VK_LEFT },
-    { QStringLiteral("Right"), VK_RIGHT },
-    { QStringLiteral("Up"), VK_UP },
-    { QStringLiteral("Down"), VK_DOWN },
-    { QStringLiteral("Insert"), VK_INSERT },
-    { QStringLiteral("Del"), VK_DELETE },
-    { QStringLiteral("Plus"), VK_PLUS },
-    { QStringLiteral("Minus"), VK_MINUS },
-    { QStringLiteral("Mul"), VK_MULTIPLY },
-    { QStringLiteral("Div"), VK_DIVIDE },
-    { QStringLiteral("Comma"), VK_OEM_COMMA },
-    { QStringLiteral("Period"), VK_OEM_PERIOD },
-    { QStringLiteral("MouseL"), VK_LBUTTON },
-    { QStringLiteral("MouseR"), VK_RBUTTON },
-    { QStringLiteral("MouseM"), VK_MBUTTON },
-    { QStringLiteral("MouseX1"), VK_XBUTTON1 },
-    { QStringLiteral("MouseX2"), VK_XBUTTON2 },
-    { QStringLiteral("MouseDblClk"), VK_LBUTTONDBLCLK },
-    { QStringLiteral("Numpad0"), VK_NUMPAD0 },
-    { QStringLiteral("Numpad1"), VK_NUMPAD1 },
-    { QStringLiteral("Numpad2"), VK_NUMPAD2 },
-    { QStringLiteral("Numpad3"), VK_NUMPAD3 },
-    { QStringLiteral("Numpad4"), VK_NUMPAD4 },
-    { QStringLiteral("Numpad5"), VK_NUMPAD5 },
-    { QStringLiteral("Numpad6"), VK_NUMPAD6 },
-    { QStringLiteral("Numpad7"), VK_NUMPAD7 },
-    { QStringLiteral("Numpad8"), VK_NUMPAD8 },
-    { QStringLiteral("Numpad9"), VK_NUMPAD9 }
+    { QStringLiteral("Esc"), Qt::Key_Escape },
+    { QStringLiteral("Return"), Qt::Key_Return },
+    { QStringLiteral("Space"), Qt::Key_Space },
+    { QStringLiteral("End"), Qt::Key_End },
+    { QStringLiteral("Home"), Qt::Key_Home },
+    { QStringLiteral("Back"), Qt::Key_Backspace },
+    { QStringLiteral("Tab"), Qt::Key_Tab },
+    { QStringLiteral("PgDn"), Qt::Key_PageDown },
+    { QStringLiteral("PgUp"), Qt::Key_PageUp },
+    { QStringLiteral("Left"), Qt::Key_Left },
+    { QStringLiteral("Right"), Qt::Key_Right },
+    { QStringLiteral("Up"), Qt::Key_Up },
+    { QStringLiteral("Down"), Qt::Key_Down },
+    { QStringLiteral("Insert"), Qt::Key_Insert },
+    { QStringLiteral("Del"), Qt::Key_Delete },
+    { QStringLiteral("Plus"), Qt::Key_Plus },
+    { QStringLiteral("Minus"), Qt::Key_Minus },
+    { QStringLiteral("Mul"), Qt::Key_Asterisk },
+    { QStringLiteral("Div"), Qt::Key_Slash },
+    { QStringLiteral("Comma"), Qt::Key_Comma },
+    { QStringLiteral("Period"), Qt::Key_Period },
+    { QStringLiteral("Numpad0"), Qt::Key_0 },
+    { QStringLiteral("Numpad1"), Qt::Key_1 },
+    { QStringLiteral("Numpad2"), Qt::Key_2 },
+    { QStringLiteral("Numpad3"), Qt::Key_3 },
+    { QStringLiteral("Numpad4"), Qt::Key_4 },
+    { QStringLiteral("Numpad5"), Qt::Key_5 },
+    { QStringLiteral("Numpad6"), Qt::Key_6 },
+    { QStringLiteral("Numpad7"), Qt::Key_7 },
+    { QStringLiteral("Numpad8"), Qt::Key_8 },
+    { QStringLiteral("Numpad9"), Qt::Key_9 },
+    // Maustasten mit eigenen internen Codes:
+    { QStringLiteral("MouseL"), Mouse_Left },
+    { QStringLiteral("MouseR"), Mouse_Right },
+    { QStringLiteral("MouseM"), Mouse_Middle },
+    { QStringLiteral("MouseX1"), Mouse_X1 },
+    { QStringLiteral("MouseX2"), Mouse_X2 },
+    { QStringLiteral("MouseDblClk"), Mouse_DblClk }
 };
+
 
 static int _GetKeyCode(const QString& sKey) {
     for (const auto& keyItem : KeyTable) {
@@ -74,9 +73,9 @@ static int _GetKeyCode(const QString& sKey) {
     // Prüfen auf F-Tasten (F1 bis F24)
     if (sKey.startsWith(QLatin1Char('F'), Qt::CaseInsensitive)) {
         bool ok = false;
-        int nFNumber = sKey.mid(1).toInt(&ok);
-        if (ok && nFNumber >= 1 && nFNumber <= 24) {
-            return VK_F1 + nFNumber - 1;
+        int nFNumber = QStringView(sKey).sliced(1).toInt(&ok);
+        if (ok && nFNumber >= 1 && nFNumber <= 35) {
+            return Qt::Key_F1 + nFNumber - 1;
         }
     }
 
@@ -92,7 +91,7 @@ static int _GetKeyCode(const QString& sKey) {
 
 static int _ParseKeys(const QString& sKeysStr) {
     int nKeyCode = 0;
-    QStringList parts = sKeysStr.split(QLatin1Char('+'), Qt::SkipEmptyParts);
+    const QStringList parts = sKeysStr.split(QLatin1Char('+'), Qt::SkipEmptyParts);
     for (const QString& part : parts) {
         nKeyCode += _GetKeyCode(part.trimmed());
     }
@@ -116,7 +115,8 @@ static QString _GetKeyShortcutName(int nShortcut) {
     if ((nShortcut & M_CTRL) != 0) sKeyDesc += QStringLiteral("Ctrl+");
     if ((nShortcut & M_SHIFT) != 0) sKeyDesc += QStringLiteral("Shift+");
 
-    int nRealShortcut = nShortcut & 0xFF;
+    int nRealShortcut = nShortcut & 0xFFFF; // Maskiert die Modifikatoren weg
+
     for (const auto& keyItem : KeyTable) {
         if (keyItem.KeyCode == nRealShortcut) {
             if (keyItem.Name == QStringLiteral("Plus")) {
@@ -128,9 +128,12 @@ static QString _GetKeyShortcutName(int nShortcut) {
             }
         }
     }
-    if (nRealShortcut >= VK_F1 && nRealShortcut <= VK_F24) {
-        sKeyDesc += QString("F%1").arg(nRealShortcut - VK_F1 + 1);
+
+    // F-Tasten-Erkennung mit Qt-Keycodes
+    if (nRealShortcut >= Qt::Key_F1 && nRealShortcut <= Qt::Key_F35) {
+        sKeyDesc += QString("F%1").arg(nRealShortcut - Qt::Key_F1 + 1);
     }
+
     if ((nRealShortcut >= '0' && nRealShortcut <= '9') || (nRealShortcut >= 'A' && nRealShortcut <= 'Z')) {
         sKeyDesc += QChar(nRealShortcut);
     }
@@ -239,8 +242,8 @@ int CKeyMap::GetCombinedKeyCode(int keyCode, bool alt, bool control, bool shift)
 }
 
 void CKeyMap::AddDefaultEscapeHandling() {
-    if (m_keyMap.find(VK_ESCAPE) == m_keyMap.end()) {
-        m_keyMap[VK_ESCAPE] = IDM_DEFAULT_ESC;
+    if (m_keyMap.find(Qt::Key_Escape) == m_keyMap.end()) {
+        m_keyMap[Qt::Key_Escape] = IDM_DEFAULT_ESC;
     }
 }
 

@@ -440,7 +440,7 @@ bool BeginReading(PngCache& c, bool& outOfMemory) {
 
 // Copy of the canvas as the result for the caller, with ICC transform
 void* CopyCanvas(const Decoder& d, bool& outOfMemory) {
-    void* pixels = std::malloc(d.imageBytes);
+    auto* pixels = new (std::nothrow) unsigned char[d.imageBytes];
     if (pixels == nullptr) {
         outOfMemory = true;
         return nullptr;
@@ -454,7 +454,7 @@ void* CopyCanvas(const Decoder& d, bool& outOfMemory) {
 
 // Plain PNG: decoded directly into the result
 void* DecodeSingleImage(Decoder& d, bool& outOfMemory) {
-    auto* pixels = static_cast<unsigned char*>(std::malloc(d.imageBytes));
+    auto* pixels = new (std::nothrow) unsigned char[d.imageBytes];
     if (pixels == nullptr) {
         outOfMemory = true;
         return nullptr;
@@ -464,7 +464,7 @@ void* DecodeSingleImage(Decoder& d, bool& outOfMemory) {
         d.rowsFrame[j] = pixels + std::size_t(j) * stride;
     }
     if (!DecodeFrame(d.png, d.info, d.rowsFrame.get(), false, nullptr)) {
-        std::free(pixels);
+        delete[] pixels;
         return nullptr;
     }
     if (d.transform != nullptr) {

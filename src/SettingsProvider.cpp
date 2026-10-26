@@ -301,20 +301,9 @@ QWidget* SettingsDialog::createGuiTab() {
     m_spinDisplayMonitor->setToolTip(tr("-1 = Größte Auflösung, 0 = Primär, 1..n = Monitor Index"));
     layout->addRow(tr("Start-Monitor Index:"), m_spinDisplayMonitor);
 
-    m_editDefaultGuiFont = new QLineEdit();
-    m_editDefaultGuiFont->setToolTip(tr("Format: \"font name\" fontSize [bold], z.B. \"Arial\" 9.0 bold"));
-    layout->addRow(tr("GUI Schriftart:"), m_editDefaultGuiFont);
-
-    m_editZoomFactorFont = new QLineEdit();
-    layout->addRow(tr("Zoomfaktor Schriftart:"), m_editZoomFactorFont);
-
     m_btnBgColor = new QPushButton();
     connect(m_btnBgColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorBg, m_btnBgColor); });
     layout->addRow(tr("Hintergrundfarbe:"), m_btnBgColor);
-
-    m_btnGuiColor = new QPushButton();
-    connect(m_btnGuiColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorGui, m_btnGuiColor); });
-    layout->addRow(tr("GUI Farbe:"), m_btnGuiColor);
 
     m_btnTransColor = new QPushButton();
     connect(m_btnTransColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorTrans, m_btnTransColor); });
@@ -510,13 +499,9 @@ void SettingsDialog::loadFromSettings() {
     m_checkShowFilePathInTitle->setChecked(settings.m_bShowFullPathInTitle);
     m_checkTitleBarUseFileIcon->setChecked(settings.m_bTitleBarUseFileIcon);
     m_spinDisplayMonitor->setValue(settings.m_nDisplayMonitor);
-    m_editDefaultGuiFont->setText(settings.m_defaultGUIFont);
-    m_editZoomFactorFont->setText(settings.m_zoomFactorFont);
     m_colorBg = settings.m_colorBackground;
-    m_colorGui = settings.m_colorGUI;
     m_colorTrans = settings.m_colorTransparency;
     updateButtonColor(m_btnBgColor, m_colorBg);
-    updateButtonColor(m_btnGuiColor, m_colorGui);
     updateButtonColor(m_btnTransColor, m_colorTrans);
 
     // Tab 4
@@ -606,19 +591,16 @@ void SettingsDialog::saveToSettings() {
     settings.WriteString("BackgroundColor", QString("%1 %2 %3").arg(m_colorBg.red()).arg(m_colorBg.green()).arg(m_colorBg.blue()));
     settings.WriteString("CPUType", m_comboCpuType->currentText());
     settings.WriteString("ColorCorrection", m_editColorCorrection->text());
-    settings.WriteString("DefaultGUIFont", m_editDefaultGuiFont->text());
     settings.WriteString("DefaultWindowRect", m_comboDefaultWindowRect->currentText());
     settings.WriteString("DeleteConfirmation", m_comboDeleteConfirmation->currentText());
     settings.WriteString("DownSamplingFilter", m_comboDownSamplingFilter->currentText());
     settings.WriteString("FileDisplayOrder", m_comboFileDisplayOrder->currentText());
     settings.WriteString("FolderNavigation", m_comboFolderNavigation->currentText());
-    settings.WriteString("GUIColor", QString("%1 %2 %3").arg(m_colorGui.red()).arg(m_colorGui.green()).arg(m_colorGui.blue()));
     settings.WriteString("MinimalWindowSize", QString("%1 %2").arg(m_spinMinWidth->value()).arg(m_spinMinHeight->value()));
     settings.WriteString("SingleInstance", m_comboSingleInstance->currentText());
     settings.WriteString("SlideShowTransitionEffect", m_comboSlideShowTransitionEffect->currentText());
     settings.WriteString("TransparencyColor", QString("%1 %2 %3").arg(m_colorTrans.red()).arg(m_colorTrans.green()).arg(m_colorTrans.blue()));
     settings.WriteString("TransparencyMode", m_comboTransparencyMode->currentText());
-    settings.WriteString("ZoomFactorFont", m_editZoomFactorFont->text());
 }
 
 const float* CSettingsProvider::ColorCorrectionAmounts() {
@@ -685,7 +667,7 @@ CSettingsProvider::CSettingsProvider() {
     ReadStickyWindowRect();
     
     m_bShowFullScreen = GetBool("ShowFullScreen", false);
-    m_bShowFullPathInTitle = GetBool("ShowFilePathInTitle", false);
+    m_bShowFullPathInTitle = GetBool("ShowFilePathInTitle", true);
 
     QString sCPU = GetString("CPUType", "AutoDetect");
     if (sCPU.compare("Generic", Qt::CaseInsensitive) == 0) {
@@ -750,7 +732,7 @@ CSettingsProvider::CSettingsProvider() {
         m_eTransparencyMode = Helpers::TP_CHECKERBOARD;
     }
 
-    m_bNavigateMouseWheel = GetBool("NavigateWithMouseWheel", false);
+    m_bNavigateMouseWheel = GetBool("NavigateWithMouseWheel", true);
     m_dMouseWheelZoomSpeed = GetDouble("MouseWheelZoomSpeed", 1.0, 0.1, 10.0);
 
     QString sDeleteConfirmation = GetString("DeleteConfirmation", "OnlyWhenNoRecycleBin");
@@ -768,7 +750,7 @@ CSettingsProvider::CSettingsProvider() {
     m_bWrapAroundFolder = GetBool("WrapAroundFolder", true);
     m_zoomPauseFactor = GetInt("ZoomPausePercent", 100, 0, 6553500) / 100.0;  // can't have a % larger than the MAX_IMAGE_DIMENSION %, and convert to a scale factor (double/double division) only once
     m_bAutoRotateEXIF = GetBool("AutoRotateEXIF", true);
-    m_bUseEmbeddedColorProfiles = GetBool("UseEmbeddedColorProfiles", false);
+    m_bUseEmbeddedColorProfiles = GetBool("UseEmbeddedColorProfiles", true);
     m_bForceQImageReader = GetBool("ForceQImageReader", false);
     m_nDisplayMonitor = GetInt("DisplayMonitor", -1, -1, 16);
     m_dAutoContrastAmount = GetDouble("AutoContrastCorrectionAmount", 0.5, 0.0, 1.0);
@@ -792,11 +774,7 @@ CSettingsProvider::CSettingsProvider() {
     }
 
     m_colorBackground = GetColor("BackgroundColor", QColor(0, 0, 0));
-    m_colorGUI = GetColor("GUIColor", QColor(243, 242, 231));
-    m_colorTransparency = GetColor("TransparencyColor", m_colorBackground);
-
-    m_defaultGUIFont = GetString("DefaultGUIFont", "Default");
-    m_zoomFactorFont = GetString("ZoomFactorFont", "Default");
+    m_colorTransparency = GetColor("TransparencyColor", QColor(255, 0, 255));
 
     m_bReloadWhenDisplayedImageChanged = GetBool("ReloadWhenDisplayedImageChanged", true);
 

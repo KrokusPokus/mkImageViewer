@@ -6,7 +6,6 @@
 #include "FileList.h"
 #include "JPEGProvider.h"
 #include "JPEGImage.h"
-#include "MaxImageDef.h"
 #include "SettingsProvider.h"
 #include "MultiMonitorSupport.h"
 #include "HistogramCorr.h"
@@ -16,10 +15,6 @@
 #include "ProcessingThreadPool.h"
 #include "KeyMap.h"
 #include "DirectoryWatcher.h"
-
-#if defined(Q_OS_WIN)
-//#include <windows.h>
-#endif
 
 #include <QActionGroup>
 #include <QApplication>
@@ -72,10 +67,6 @@ namespace {
 
     const CSize HUGE_SIZE = CSize(99999999, 99999999);
 
-#if defined(Q_OS_WIN)
-    typedef const char* (__cdecl* pwine_get_version)(void); // Define function pointer type for wine_get_version
-#endif
-
     // Errors that occur during loading a file
     enum EFileLoadError {
         FileLoad_Ok = 0,
@@ -87,6 +78,34 @@ namespace {
         FileLoad_OutOfMemory = 65536,
         FileLoad_ExceptionError = 32768
     };
+
+    QString FormatFileSize(qint64 bytes) {
+        static const QLocale locale = QLocale::system();
+
+        if (bytes < 1024) {
+            return locale.toString(bytes) + " Bytes";
+        }
+
+        double size = static_cast<double>(bytes);
+        static const QStringList units = {"Bytes", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"};
+        int unitIndex = 0;
+
+        while (size >= 1024.0 && unitIndex < units.size() - 1) {
+            size /= 1024.0;
+            unitIndex++;
+        }
+
+        int precision = 0;
+        if (size < 10.0) {
+            precision = 2; // z.B. 1,23 MiB
+        } else if (size < 100.0) {
+            precision = 1; // z.B. 12,3 MiB
+        } else {
+            precision = 0; // z.B. 123 MiB
+        }
+
+        return locale.toString(size, 'f', precision) + " " + units[unitIndex];
+    }
 
     // Gets default image processing parameters as set in INI file
     CImageProcessingParams GetDefaultProcessingParams() {
@@ -179,17 +198,19 @@ namespace {
 
         switch (nFileLoadError) {
         case FileLoad_LoadError:
-            message = QStringLiteral("The file '%1' could not be read!").arg(failedFileName);
+            {
+            QFileInfo fileInfo(failedFileName);
+            QString sFileSize = FormatFileSize(fileInfo.size());
+            message = QStringLiteral("File could not be read:\n\n%1\nFile size: %2").arg(failedFileName, sFileSize);
             break;
+            }
 
         case FileLoad_SlideShowListInvalid:
-            message = QStringLiteral("The file '%1' does not contain a list of file names!").arg(failedFileName);
+            message = QStringLiteral("File does not contain a list of file names:\n\n%1").arg(failedFileName);
             break;
 
         case FileLoad_NoFilesInDirectory:
-            message = QStringLiteral("The directory '%1' does not contain any image files!").arg(failedFileName) +
-                      QLatin1Char('\n') +
-                      QStringLiteral("Press any key to search the subdirectories for image files.");
+            message = QStringLiteral("Directory does not contain any image files to display:\n\n%1").arg(failedFileName);
             break;
 
         default:
@@ -202,24 +223,19 @@ namespace {
                        QStringLiteral("Not enough memory available");
         }
         else if (nFileLoadError == FileLoad_LoadError) {
-            const QString ext = QFileInfo(failedFileName).suffix();
-
-            if (ext.compare(QStringLiteral("JXL"), Qt::CaseInsensitive) == 0 ||
-                ext.compare(QStringLiteral("HEIF"), Qt::CaseInsensitive) == 0 ||
-                ext.compare(QStringLiteral("HEIC"), Qt::CaseInsensitive) == 0 ||
-                ext.compare(QStringLiteral("AVIF"), Qt::CaseInsensitive) == 0) {
-
-                if (bExceptionError) {
-                    message += QLatin1Char('\n');
-                    message += QStringLiteral("Decoding this format requires the Microsoft Visual C++ Redistributable.");
-                }
+            if (bExceptionError) {
+                message += QLatin1Char('\n');
+                message += QStringLiteral("An exception error has occured.");
             }
         }
 
         QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), clientRect.height());
-        qDebug() << "DrawImageLoadErrorText:" << message << "at" << rectText;
-        painter.setFont(QFont("Consolas", 10));
-        painter.setPen(Qt::white);
+
+        QFont font = QApplication::font();
+        //font.setBold(true);
+        font.setPointSize(10);
+        painter.setFont(font);
+        painter.setPen(Qt::red);
         painter.drawText(rectText, Qt::AlignHCenter | Qt::TextWordWrap, message);
     }
 
@@ -364,9 +380,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     /*############################################*/
     /* Custom variables of the linear scaling mod */
     /*############################################*/
-#if defined(Q_OS_WIN)
-    m_bIsRunningInWine = isRunningInWine();
-#endif
+
     m_bShowInfo = false;
     m_bPanTimerActive = false;
     m_nBookModePageHeight = sp.BookModePageHeight();
@@ -661,14 +675,15 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     if (m_bInZooming || m_bShowZoomFactor) {
         /*
         painter.setFont(QFont("Arial", 12, QFont::Bold));
-        painter.setPen(CSettingsProvider::This().ColorGUI());
         painter.drawText(GetZoomTextRect(), Qt::AlignRight | Qt::AlignVCenter, formatOutputZoomFactor(m_dZoom));
         */
         QString zoomText = formatOutputZoomFactor(m_dZoom);
 
         QRect zoomRect = GetZoomTextRect();
 
-        QFont font("Arial", 12, QFont::Bold);
+        QFont font = QApplication::font();
+        font.setBold(true);
+        font.setPointSize(12);
         painter.setFont(font);
         painter.setRenderHint(QPainter::Antialiasing, true);
 
@@ -702,12 +717,13 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     if (!m_strToast.isEmpty()) {
         /*
         painter.setFont(QFont("Arial", 12, QFont::Bold));
-        painter.setPen(CSettingsProvider::This().ColorGUI());
         painter.drawText(GetToastTextRect(), Qt::AlignRight | Qt::AlignVCenter, m_strToast);
         */
         QRect toastRect = GetToastTextRect();
 
-        QFont font("Arial", 14, QFont::Bold);
+        QFont font = QApplication::font();
+        font.setBold(true);
+        font.setPointSize(14);
         painter.setFont(font);
         painter.setRenderHint(QPainter::Antialiasing, true);
 
@@ -734,6 +750,8 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         painter.setBrush(Qt::white);
         painter.drawPath(textPath);
     }
+
+    DisplayErrors(m_pCurrentImage, m_clientRect, painter);
 }
 
 /*
@@ -788,17 +806,15 @@ void CMainDlg::PaintToDC(QPainter& painter) {
 
 void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const QRect& clientRect, QPainter& painter)
 {
-    // Textfarbe aus den Einstellungen setzen
-    painter.setPen(CSettingsProvider::This().ColorGUI());
-
     // Einheitliche Schriftart für Fehlermeldungen setzen (z. B. Arial oder Standard-GUI-Font)
-    painter.setFont(QFont("Arial", 12, QFont::Bold));
+    QFont font = QApplication::font();
+    //font.setBold(true);
+    font.setPointSize(12);
+    painter.setFont(font);
 
     if (m_sStartupFile.isEmpty() && m_pCurrentImage == NULL) {
         QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), Helpers::ScaleWithDPI(80));
-        QString message = QStringLiteral("No image loaded!\n\nPress ESC to exit...");
-
-        // Mit QPainter zentriert und mit Wortumbruch zeichnen
+        QString message = QStringLiteral("No image loaded!\nPress ESC to exit...");
         painter.drawText(rectText, Qt::AlignCenter | Qt::TextWordWrap, message);
     }
     else if (pCurrentImage == NULL) {
@@ -811,8 +827,6 @@ void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const QRect& clientRect,
             sFileName = CurrentFileName(false);
         }
 
-        // Falls DrawImageLoadErrorText ebenfalls CDC verwendet, muss diese Funktion
-        // im nächsten Schritt ebenfalls auf QPainter& umgestellt werden!
         DrawImageLoadErrorText(painter, clientRect, sFileName, m_nLastLoadError,
                                (m_bOutOfMemoryLastImage ? FileLoad_OutOfMemory : 0) | (m_bExceptionErrorLastImage ? FileLoad_ExceptionError : 0));
     }
@@ -870,7 +884,7 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
 
         bool bDraggingRequired = m_virtualImageSize.width() > m_clientRect.width() || m_virtualImageSize.height() > m_clientRect.height();
 
-        if (!m_bZoomModeOnLeftMouse && HandleMouseButtonByKeymap(VK_LBUTTON)) {
+        if (!m_bZoomModeOnLeftMouse && HandleMouseButtonByKeymap(Mouse_Left)) {
             return;
         }
         bool bZoomMode = (bShift || m_bZoomModeOnLeftMouse) && !bCtrl;
@@ -884,14 +898,14 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
         return;
     }
     else if (event->button() == Qt::RightButton) {
-        if (HandleMouseButtonByKeymap(VK_RBUTTON)) {
+        if (HandleMouseButtonByKeymap(Mouse_Right)) {
             return;
         }
     }
     else if (event->button() == Qt::MiddleButton) {
         this->grabMouse();
 
-        if (HandleMouseButtonByKeymap(VK_MBUTTON)) {
+        if (HandleMouseButtonByKeymap(Mouse_Middle)) {
             return;
         }
 
@@ -900,7 +914,7 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
     }
     else if (event->button() == Qt::BackButton || event->button() == Qt::ForwardButton) {
         bool isXButton1 = (event->button() == Qt::BackButton);
-        int vkCode = isXButton1 ? VK_XBUTTON1 : VK_XBUTTON2;
+        int vkCode = isXButton1 ? Mouse_X1 : Mouse_X2;
 
         if (HandleMouseButtonByKeymap(vkCode)) {
             return;
@@ -932,7 +946,7 @@ void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
         return;
     }
     else if (event->button() == Qt::RightButton) {
-        if (HandleMouseButtonByKeymap(VK_RBUTTON, false)) {
+        if (HandleMouseButtonByKeymap(Mouse_Right, false)) {
             return;
         }
     }
@@ -951,7 +965,7 @@ void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
 
     if (event->button() == Qt::LeftButton) {
         if (m_pCurrentImage != NULL) {
-            if (HandleMouseButtonByKeymap(VK_LBUTTONDBLCLK)) {
+            if (HandleMouseButtonByKeymap(Mouse_DblClk)) {
                 return;
             }
             double dZoom = -1.0;
@@ -1102,12 +1116,7 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
     bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
     bool bAlt = event->modifiers().testFlag(Qt::AltModifier);
 
-    // Qt-Key in den alten Win32 Virtual-Key übersetzen (falls m_pKeyMap noch VK_* erwartet)
-    // Alternativ: Nutze event->key(), falls dein KeyMap bereits Qt-Keys versteht.
-    int vkCode = event->nativeVirtualKey();
-    if (vkCode == 0) {
-        vkCode = event->key(); // Fallback
-    }
+    int vkCode = event->key();
 
     if (!event->isAutoRepeat()) {
         if (vkCode == Qt::Key_Up) {
@@ -1160,11 +1169,9 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
 
     QMainWindow::keyPressEvent(event);
 }
+
 void CMainDlg::keyReleaseEvent(QKeyEvent* event) {
-    int vkCode = event->nativeVirtualKey();
-    if (vkCode == 0) {
-        vkCode = event->key(); // Fallback
-    }
+    int vkCode = event->key();
 
     if (!event->isAutoRepeat()) {
         if (vkCode == Qt::Key_Up) {
@@ -1573,7 +1580,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             ExploreFile();
             break;
         case IDM_SETTINGS_DIALOG:
-            sp.ShowSettingsDialog();
+            sp.ShowSettingsDialog(this);
             break;
         case IDM_RELOAD:
             ReloadImage(false);
@@ -1921,12 +1928,13 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             else {
                 // Vollbild verlassen und normales Fenster wiederherstellen
                 this->showNormal();
-
+/*
+// Disabled since this caused gaphical glitches in KDE Plasma.
                 if (sp.ExplicitWindowRect()) {
                     QRect defaultWindowRect = CMultiMonitorSupport::GetDefaultWindowRect();
                     this->setGeometry(defaultWindowRect.left(), defaultWindowRect.top(), defaultWindowRect.width(), defaultWindowRect.height());
                 }
-
+*/
                 UpdateWindowTitle(true); // Aktualisiert den Titel / das Icon der Titelleiste
                 this->MouseOn();
             }
@@ -2284,7 +2292,7 @@ void CMainDlg::OpenDefaultEditor() {
         return;
     }
 
-    // 1. Vollbildmodus verlassen (falls aktiv)
+    // Vollbildmodus verlassen (falls aktiv)
     if (m_bFullScreenMode) {
         m_bFullScreenMode = false;
 
@@ -2300,23 +2308,7 @@ void CMainDlg::OpenDefaultEditor() {
         StartLowQTimer(ZOOM_TIMEOUT);
     }
 
-    // 2. Datei im Editor öffnen
-#if defined(Q_OS_WIN)
-    if (m_bIsRunningInWine) {
-        QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
-        if (!sUnixPath.isEmpty()) {
-            // Unter Wine via QProcess starten statt rohem ShellExecuteW
-            QStringList arguments;
-            arguments << "/unix" << "/usr/bin/gimp" << sUnixPath;
-            QProcess::startDetached("start.exe", arguments);
-        }
-    } else
-#endif
-    {
-        // Der moderne, plattformunabhängige Qt-Weg, um Dateien mit der Standard-App zu öffnen
-        // (Ersetzt das Windows-spezifische "ShellExecuteW" mit dem "edit"-Verb)
-        QDesktopServices::openUrl(QUrl::fromLocalFile(sCurrentFileName));
-    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(sCurrentFileName));
 }
 
 void CMainDlg::ExploreFile() {
@@ -2325,47 +2317,11 @@ void CMainDlg::ExploreFile() {
         return;
     }
 
-#if defined(Q_OS_WIN)
-    if (m_bIsRunningInWine) {
-        const QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
-
-        if (!sUnixPath.isEmpty()) {
-            if (IsLinuxBinaryAvailable(QStringLiteral("~/.local/bin/mkFolderWidget"))) {
-                QStringList args;
-                args << QStringLiteral("/unix") << QStringLiteral("/bin/sh") << QStringLiteral("-c")
-                     << QStringLiteral("mkFolderWidget -f \"%1\"").arg(sUnixPath);
-                QProcess::startDetached(QStringLiteral("start.exe"), args);
-            }
-            else if (IsLinuxBinaryAvailable(QStringLiteral("/usr/bin/dolphin"))) {
-                QStringList args;
-                args << QStringLiteral("/unix") << QStringLiteral("/usr/bin/dolphin")
-                     << QStringLiteral("--new-window") << QStringLiteral("--select") << sUnixPath;
-                QProcess::startDetached(QStringLiteral("start.exe"), args);
-            }
-            else {
-                const QString sFolderPath = QFileInfo(sCurrentFileName).path();
-                QStringList args;
-                args << sFolderPath;
-                QProcess::startDetached(QStringLiteral("winebrowser.exe"), args);
-            }
-        }
-    } else {
-        // Nativer Windows-Build: explorer.exe mit /select über QProcess aufrufen
-        QString nativePath = QDir::toNativeSeparators(sCurrentFileName);
-        QStringList args;
-        args << QStringLiteral("/select,") << nativePath;
-
-        qDebug() << "ExploreFile(): explorer.exe" << args;
-        QProcess::startDetached(QStringLiteral("explorer.exe"), args);
-    }
-#elif defined(Q_OS_LINUX)
-    // --- Nativer Linux-Build (ohne Wine / reines Qt6) ---
-    if (QFileInfo(sCurrentFileName).exists()) {
+    if (QFileInfo::exists(sCurrentFileName)) {
         QStringList args;
         args << QStringLiteral("--select") << sCurrentFileName;
         QProcess::startDetached(QStringLiteral("dolphin"), args);
     }
-#endif
 }
 
 void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
@@ -3073,7 +3029,6 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
     if (bSynchronize) {
         // after loading an image, the per image processing parameters must be synchronized with
         // the current processing parameters
-        bool bLastWasInParamDB = m_bCurrentImageInParamDB;
         m_bCurrentImageInParamDB = false;
 
         if (m_pCurrentImage != NULL) {
@@ -3151,22 +3106,20 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
 
     // 1. Fenstertitel aktualisieren
     QString sWindowText;
-    if (sCurrentFileName.isEmpty() || m_pCurrentImage == nullptr) {
+    if (sCurrentFileName.isEmpty()) {
         sWindowText = QStringLiteral(APP_TITLE);
     } else {
         QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
-#if defined(Q_OS_WIN)
-        if (m_bIsRunningInWine && bShowFullPathInTitle) {
-            QString sUnixPath = GetUnixPathFromWine(sCurrentFileName);
-            if (!sUnixPath.isEmpty()) {
-                visibleName = sUnixPath;
-            }
+
+        QString indexStr;
+        if (m_pCurrentImage != nullptr) {
+            indexStr = QString(GetMultiframeIndex(m_pCurrentImage));
         }
-#endif
-        sWindowText = visibleName
-                      + QString(GetMultiframeIndex(m_pCurrentImage))
-                      + QStringLiteral(" - ")
-                      + QStringLiteral(APP_TITLE);
+
+        sWindowText = QStringLiteral("%1%2 - %3")
+                          .arg(visibleName)
+                          .arg(indexStr)
+                          .arg(QStringLiteral(APP_TITLE));
     }
 
     if ((s_PrevTitleText != sWindowText) || bForce) {
@@ -3181,7 +3134,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
         QString cacheKey = QStringLiteral("__default__");
         QString currentCheckExt = QStringLiteral("__default__");
 
-        if (!sCurrentFilePath.isEmpty() && m_pCurrentImage != nullptr) {
+        if (!sCurrentFilePath.isEmpty()) {
             const QFileInfo fileInfo(sCurrentFilePath);
             const QString ext = fileInfo.suffix(); // z.B. "jpg"
 
@@ -3469,12 +3422,14 @@ void CMainDlg::StartAnimation() {
 
     m_nLastAnimationOffset = 0;
     
+    /*
     int usedFrameTime;
     if (m_customAnimationFrameTime < 250) {
         usedFrameTime = m_customAnimationFrameTime;
     } else {
         usedFrameTime = m_pCurrentImage->FrameTimeMs();
     }
+    */
     
     int nTimerDelay = std::max(10, m_pCurrentImage->FrameTimeMs());
     m_nExpectedNextAnimationTickCount = QDateTime::currentMSecsSinceEpoch() + nTimerDelay;
@@ -3743,34 +3698,6 @@ QString CMainDlg::GetMultiframeIndex(CJPEGImage* pImage) {
     return QString();
 }
 
-QString CMainDlg::FormatFileSize(qint64 bytes) {
-    static const QLocale locale = QLocale::system();
-
-    if (bytes < 1024) {
-        return locale.toString(bytes) + " Bytes";
-    }
-
-    double size = static_cast<double>(bytes);
-    static const QStringList units = {"Bytes", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"};
-    int unitIndex = 0;
-
-    while (size >= 1024.0 && unitIndex < units.size() - 1) {
-        size /= 1024.0;
-        unitIndex++;
-    }
-
-    int precision = 0;
-    if (size < 10.0) {
-        precision = 2; // z.B. 1,23 MiB
-    } else if (size < 100.0) {
-        precision = 1; // z.B. 12,3 MiB
-    } else {
-        precision = 0; // z.B. 123 MiB
-    }
-
-    return locale.toString(size, 'f', precision) + " " + units[unitIndex];
-}
-
 QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
     // Skalierungsfaktor-Ausgabe für Werte > 200%
     if (m_dZoom > 100.0) {
@@ -3792,104 +3719,6 @@ QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
     // Fallback
     return QString::number(qRound(m_dZoom * 100)) + " %";
 }
-
-#if defined(Q_OS_WIN)
-bool CMainDlg::isRunningInWine() {
-    // Funktionszeiger-Definition für wine_get_version
-    typedef const char* (__cdecl* pwine_get_version)(void);
-
-    // QLibrary kann Symbole aus bereits geladenen System-DLLs wie ntdll.dll auflösen
-    auto wine_get_version = reinterpret_cast<pwine_get_version>(
-        QLibrary::resolve("ntdll", "wine_get_version")
-        );
-
-    if (wine_get_version) {
-        // Optional: Version auslesen (z. B. "9.0")
-        // QString wineVersion = QString::fromUtf8(wine_get_version());
-        return true;
-    }
-    return false;
-}
-
-bool CMainDlg::IsLinuxBinaryAvailable(const QString& unixPath) {
-    if (unixPath.isEmpty()) {
-        return false;
-    }
-
-    QString dosPath;
-
-    if (unixPath.startsWith(QLatin1Char('~'))) {
-        // Unter Wine enthält USERNAME (oder USER) den Linux-Host-Benutzernamen
-        QString user = qEnvironmentVariable("USERNAME");
-        if (user.isEmpty()) {
-            user = qEnvironmentVariable("USER");
-        }
-
-        if (!user.isEmpty()) {
-            // '~' zu 'Z:\home\<username>\...' auflösen (mit mid(1) für den Restpfad)
-            dosPath = QStringLiteral("Z:\\home\\%1%2").arg(user, unixPath.mid(1));
-        } else {
-            return false;
-        }
-    }
-    else if (unixPath.startsWith(QLatin1Char('/'))) {
-        // Absolute Unix-Pfade wie /usr/bin/... auf Laufwerk Z:\ mappen
-        dosPath = QStringLiteral("Z:%1").arg(unixPath);
-    }
-    else {
-        dosPath = unixPath;
-    }
-
-    // Unix-Slashes '/' in Windows-Backslashes '\' umwandeln
-    dosPath.replace(QLatin1Char('/'), QLatin1Char('\\'));
-
-    // Existenz als reguläre Datei prüfen (plattformunabhängig und ohne GetFileAttributes)
-    const QFileInfo fileInfo(dosPath);
-    return fileInfo.exists() && fileInfo.isFile();
-}
-
-
-QString CMainDlg::GetUnixPathFromWine(const QString& szDosPath) {
-    if (szDosPath.isEmpty()) {
-        return QString();
-    }
-
-    // Funktionszeiger-Definition mit Standard-Typen (ohne Windows-Header)
-    using pwine_get_unix_file_name = char* (*)(const wchar_t*);
-
-    // Symbol direkt über QLibrary aus kernel32 auflösen
-    auto wine_get_unix_file_name = reinterpret_cast<pwine_get_unix_file_name>(
-        QLibrary::resolve("kernel32", "wine_get_unix_file_name")
-        );
-
-    if (!wine_get_unix_file_name) {
-        return QString();
-    }
-
-    const wchar_t* pwszDosPath = reinterpret_cast<const wchar_t*>(szDosPath.utf16());
-    char* unixPathUtf8 = wine_get_unix_file_name(pwszDosPath);
-
-    if (unixPathUtf8) {
-        // UTF-8 char* Stream direkt in einen Qt6 QString umwandeln
-        QString sResult = QString::fromUtf8(unixPathUtf8);
-
-        // GetProcessHeap und HeapFree dynamisch auflösen, um Heap-Speicher freizugeben
-        using pfnGetProcessHeap = void* (*)();
-        using pfnHeapFree = int (*)(void*, uint32_t, void*);
-
-        auto getProcessHeap = reinterpret_cast<pfnGetProcessHeap>(QLibrary::resolve("kernel32", "GetProcessHeap"));
-        auto heapFree = reinterpret_cast<pfnHeapFree>(QLibrary::resolve("kernel32", "HeapFree"));
-
-        if (getProcessHeap && heapFree) {
-            heapFree(getProcessHeap(), 0, unixPathUtf8);
-        }
-
-        return sResult;
-    }
-
-    return QString();
-}
-#endif
 
 bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bRecycleOnly) {
     QString sTitle;

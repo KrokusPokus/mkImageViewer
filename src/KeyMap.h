@@ -4,6 +4,15 @@
 #include <unordered_map>
 #include <QString>
 
+enum InternalMouseCodes {
+    Mouse_Left = 0x1000,
+    Mouse_Right,
+    Mouse_Middle,
+    Mouse_X1,
+    Mouse_X2,
+    Mouse_DblClk
+};
+
 // KeyMap
 class CKeyMap
 {

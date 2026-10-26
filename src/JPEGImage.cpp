@@ -77,10 +77,11 @@ CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
         m_nOriginalChannels = nChannels;
     } else if (nChannels == 1) {
         m_pOrigPixels = CBasicProcessing::Convert1To4Channels(nWidth, nHeight, pPixels);
-        delete[] pPixels;
+        delete[] static_cast<uint8_t*>(pPixels);
         m_nOriginalChannels = 4;
     } else {
         assert(false);
+        delete[] static_cast<uint8_t*>(pPixels);
         m_pOrigPixels = NULL;
         m_nOriginalChannels = 0;
     }

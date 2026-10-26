@@ -57,11 +57,8 @@ namespace {
 
 using namespace std::string_view_literals;
 
-#ifdef Q_OS_WIN
-constexpr const char* k7zLibraryName = "7z.dll";
-#else
 constexpr const char* k7zLibraryName = "7z.so";
-#endif
+
 
 // Upper bound for a single archive entry we are willing to inflate into memory.
 // The size stored in an archive is attacker controlled, so it must be checked before allocating.
@@ -99,16 +96,8 @@ private:
 // Restores the previous error mode on every exit path. No-op on non-Windows platforms.
 class CErrorModeGuard {
 public:
-#ifdef Q_OS_WIN
-    CErrorModeGuard() : m_nPrevErrorMode(::SetErrorMode(SEM_FAILCRITICALERRORS)) {}
-    ~CErrorModeGuard() { ::SetErrorMode(m_nPrevErrorMode); }
-private:
-    UINT m_nPrevErrorMode;
-#else
     CErrorModeGuard() {}
     ~CErrorModeGuard() {}
-#endif
-public:
     CErrorModeGuard(const CErrorModeGuard&) = delete;
     CErrorModeGuard& operator=(const CErrorModeGuard&) = delete;
 };
@@ -273,12 +262,7 @@ uint64_t MaxFileSizeForFormat(EImageFormat eFormat) {
 }
 
 std::string ToNativeNarrowPath(const QString& sFileName) {
-#ifdef Q_OS_WIN
-    // TODO: non-ASCII paths: zip_open() uses fopen() on Windows
-    return sFileName.toUtf8().toStdString();
-#else
     return QFile::encodeName(sFileName).toStdString();
-#endif
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -912,7 +896,6 @@ void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
         bool bHasAnimation = false;
         void* pEXIFData = nullptr;
 
-        // Note: PngReader allocates the pixel data with malloc(), it is handed over to the CJPEGImage as is.
         uint8* pPixelData = static_cast<uint8*>(PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation,
                                                                       nFrameCount, nFrameTimeMs, pEXIFData,
                                                                       request->OutOfMemory,
@@ -1468,9 +1451,11 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                         int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
                         bool bHasAnimation = false;
                         void* pEXIFData = nullptr;
-                        // Note: PngReader allocates the pixel data with malloc(), it is handed over to the CJPEGImage as is.
-                        uint8* pPixelData = static_cast<uint8*>(
-                            PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer.get(), static_cast<size_t>(z.size)));
+                        uint8* pPixelData = static_cast<uint8*>(PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation,
+                                                                                      nFrameCount, nFrameTimeMs, pEXIFData,
+                                                                                      request->OutOfMemory,
+                                                                                      pBuffer.get(),
+                                                                                      static_cast<size_t>(z.size)));
                         if (pPixelData != nullptr) {
                             Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData), nWidth, nHeight, request->ProcessParams.TransparencyMode);
                             request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, EXTRA_MANGA_PARAMS);
