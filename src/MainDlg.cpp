@@ -546,6 +546,8 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     painter.fillRect(m_clientRect, backColor);
 
     if (m_pCurrentImage != NULL) {
+        qint64 startTime = QDateTime::currentMSecsSinceEpoch();
+
         m_pCurrentImage->VerifyRotation(CRotationParams(m_pCurrentImage->GetRotationParams(), m_nRotation));
 
         if (m_dZoomMult < 0.0) {
@@ -588,6 +590,8 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         // 1. Info-Overlay (m_bShowInfo) über QPainter zeichnen
         // -------------------------------------------------------------------------
         if (m_bShowInfo) {
+            qint64 paintTime = QDateTime::currentMSecsSinceEpoch() - startTime;
+
             CSettingsProvider& sp = CSettingsProvider::This();
             int iNumThreads = sp.NumberOfCoresToUse();
             Helpers::CPUType cpu = sp.AlgorithmImplementation();
@@ -620,29 +624,29 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
 
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     if (m_bIsAnimationPlaying) {
-                        infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms")
+                        infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms\nPainting Image:  %18 ms")
                         .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
                             .arg(m_pCurrentImage->FrameTimeMs()).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                             .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
                     } else {
-                        infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms")
+                        infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms\nPainting Image:  %17 ms")
                         .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
                             .arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                             .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
                     }
                 } else {
-                    infoText = QString("%1\nFile Size:   %2\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms")
+                    infoText = QString("%1\nFile Size:   %2\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms\nPainting Image:  %15 ms")
                     .arg(visiblePath).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                         .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                        .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                        .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
                 }
             } else {
-                infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms")
+                infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms\nPainting Image:  %13 ms")
                 .arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                     .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                    .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs());
+                    .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
             }
 
             // QPainter Konfiguration für Text
@@ -1224,7 +1228,6 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
         // In Qt läuft die Event-Queue sequenziell ab, das manuelle Herausfischen
         // von WM_TIMER-Messages via PeekMessage entfällt hier in der Regel.
 
-        // Ersetze ::GetTickCount() durch Qt / C++ Standard (Millisekunden)
         qint64 currentTick = QDateTime::currentMSecsSinceEpoch();
         qint64 nRealDisplayTimeMs = currentTick - m_nLastSlideShowImageTickCount;
 

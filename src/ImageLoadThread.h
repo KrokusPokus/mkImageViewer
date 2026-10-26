@@ -117,23 +117,22 @@ private:
     void DeleteCachedAvifDecoder();
     void DeleteCachedZip();
 
-    void ProcessReadJPEGRequest(CRequest * request);
-    void ProcessReadPNGRequest(CRequest * request);
-    bool ValidateZipFrameIndex(int nInitialIndex, int &nFrameIndex);
-    void ProcessReadZipRequest(CRequest* request);
+    void ProcessReadAVIFRequest(CRequest* request);
     void ProcessReadBMPRequest(CRequest * request);
+    void ProcessReadHEIFRequest(CRequest * request);
+    void ProcessReadJPEGRequest(CRequest * request);
+    void ProcessReadJXLRequest(CRequest* request);
+    void ProcessReadPNGRequest(CRequest * request);
+    void ProcessReadPSDRequest(CRequest * request);
+    void ProcessReadQOIRequest(CRequest * request);
     void ProcessReadTGARequest(CRequest * request);
     void ProcessReadWEBPRequest(CRequest * request);
-    void ProcessReadJXLRequest(CRequest* request);
-    void ProcessReadAVIFRequest(CRequest* request);
-    void ProcessReadHEIFRequest(CRequest * request);
-    void ProcessReadQOIRequest(CRequest * request);
-    void ProcessReadPSDRequest(CRequest * request);
+    void ProcessReadZipRequest(CRequest* request);
+    bool ValidateZipFrameIndex(int nInitialIndex, int &nFrameIndex);
 
     static void SetFileDependentProcessParams(CRequest * request);
     static bool ProcessImageAfterLoad(CRequest * request);
 
-    // Plattformunabhängiger atomarer Zähler statt Win32 InterlockedIncrement
     //static QAtomicInt m_curHandle;
     static std::atomic<int> m_curHandle;
     enum { ReadRequest = 0, ReleaseFileRequest = 1 };  // in CRequest setzen Type = ReadRequest

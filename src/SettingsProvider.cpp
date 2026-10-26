@@ -750,7 +750,7 @@ CSettingsProvider::CSettingsProvider() {
     m_bWrapAroundFolder = GetBool("WrapAroundFolder", true);
     m_zoomPauseFactor = GetInt("ZoomPausePercent", 100, 0, 6553500) / 100.0;  // can't have a % larger than the MAX_IMAGE_DIMENSION %, and convert to a scale factor (double/double division) only once
     m_bAutoRotateEXIF = GetBool("AutoRotateEXIF", true);
-    m_bUseEmbeddedColorProfiles = GetBool("UseEmbeddedColorProfiles", true);
+    m_bUseEmbeddedColorProfiles = GetBool("UseEmbeddedColorProfiles", true); // This can drastically slow down image loading/decoding.
     m_bForceQImageReader = GetBool("ForceQImageReader", false);
     m_nDisplayMonitor = GetInt("DisplayMonitor", -1, -1, 16);
     m_dAutoContrastAmount = GetDouble("AutoContrastCorrectionAmount", 0.5, 0.0, 1.0);
@@ -841,7 +841,7 @@ void CSettingsProvider::ReadWriteableINISettings() {
     }
 
     m_bIsSortedAscending = GetBool("FileSortAscending", true);
-    m_eAutoZoomMode = GetAutoZoomMode("AutoZoomMode", Helpers::ZM_FitToScreenNoZoom);
+    m_eAutoZoomMode = GetAutoZoomMode("AutoZoomMode", Helpers::ZM_FitToScreen);
     m_eAutoZoomModeFullscreen = GetAutoZoomMode("AutoZoomModeFullscreen", m_eAutoZoomMode);
 
     m_bHQRS = GetBool("HighQualityResampling", true);

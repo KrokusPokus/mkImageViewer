@@ -7,22 +7,54 @@
 #define TYPE_LabA_8 (COLORSPACE_SH(PT_Lab)|EXTRA_SH(1)|CHANNELS_SH(3)|BYTES_SH(1))
 
 
-void* ICCProfileTransform::sRGBProfile = NULL;
+void* ICCProfileTransform::sRGBProfile = nullptr;
+
+// Hilfsfunktion zur Prüfung, ob ein Profil sRGB ist
+static bool IsStandardsRGB(cmsHPROFILE hProfile) {
+    if (hProfile == nullptr) return false;
+
+    // 1. Prüfen über die Profil-Beschreibung (z.B. "sRGB IEC61966-2.1")
+    char desc[128] = {0};
+    cmsGetProfileInfoASCII(hProfile, cmsInfoDescription, "en", "US", desc, sizeof(desc));
+    if (std::strstr(desc, "sRGB") != nullptr) {
+        return true;
+    }
+
+    // 2. Optional: Alternativer Check über Farbraum-Signatur und Matrix-Eigenschaften
+    if (cmsGetColorSpace(hProfile) == cmsSigRgbData && cmsIsMatrixShaper(hProfile)) {
+        // Man könnte hier optional noch weitere Heuriken einbauen,
+        // aber der Beschreibungstext deckt 99% der Standard-JPEGs ab.
+    }
+
+    return false;
+}
 
 void* ICCProfileTransform::CreateTransform(const void* profile, unsigned int size, PixelFormat format)
 {
-    if (profile == NULL || size == 0)
-        return NULL; // No ICC Profile
-    if (sRGBProfile == NULL) {
+    if (profile == nullptr || size == 0) {
+        return nullptr; // No ICC Profile
+    }
+
+    if (sRGBProfile == nullptr) {
         try {
             sRGBProfile = cmsCreate_sRGBProfile();
         } catch (...) {}
     }
-    if (sRGBProfile == NULL)
-        return NULL; // lcms2.dll not found or out of memory
+
+    if (sRGBProfile == nullptr) {
+        return nullptr; // lcms2.dll not found or out of memory
+    }
+
     cmsHPROFILE hInProfile = cmsOpenProfileFromMem(profile, size);
-    if (hInProfile == NULL)
-        return NULL; // Invalid profile
+    if (hInProfile == nullptr) {
+        return nullptr; // Invalid profile
+    }
+
+    // Already sRGB?
+    if (IsStandardsRGB(hInProfile)) {
+        cmsCloseProfile(hInProfile);
+        return nullptr;
+    }
 
     // Create transform from embedded profile to sRGB
     cmsUInt32Number flags = cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_COPY_ALPHA;
@@ -46,7 +78,7 @@ void* ICCProfileTransform::CreateTransform(const void* profile, unsigned int siz
             break;
         default:
             cmsCloseProfile(hInProfile);
-            return NULL;
+            return nullptr;
     }
     cmsHTRANSFORM transform = cmsCreateTransform(hInProfile, inFormat, sRGBProfile, outFormat, INTENT_RELATIVE_COLORIMETRIC, flags);
     cmsCloseProfile(hInProfile);
@@ -56,7 +88,7 @@ void* ICCProfileTransform::CreateTransform(const void* profile, unsigned int siz
 bool ICCProfileTransform::DoTransform(void* transform, const void* inputBuffer, void* outputBuffer, unsigned int width, unsigned int height, unsigned int stride)
 {
     unsigned int numPixels = width * height;
-    if (transform == NULL || inputBuffer == NULL || outputBuffer == NULL || numPixels == 0 || !CSettingsProvider::This().UseEmbeddedColorProfiles())
+    if (transform == nullptr || inputBuffer == nullptr || outputBuffer == nullptr || numPixels == 0 || !CSettingsProvider::This().UseEmbeddedColorProfiles())
         return false;
     cmsUInt32Number inFormat = cmsGetTransformInputFormat(transform);
     int nchannels;
@@ -82,22 +114,22 @@ bool ICCProfileTransform::DoTransform(void* transform, const void* inputBuffer, 
 
 void ICCProfileTransform::DeleteTransform(void* transform)
 {
-    if (transform != NULL)
+    if (transform != nullptr)
         cmsDeleteTransform(transform);
 }
 
 void* ICCProfileTransform::CreateLabTransform(PixelFormat format) {
-    cmsHTRANSFORM transform = NULL;
-    cmsHPROFILE hLabProfile = NULL;
+    cmsHTRANSFORM transform = nullptr;
+    cmsHPROFILE hLabProfile = nullptr;
     try {
         hLabProfile = cmsCreateLab4Profile(cmsD50_xyY());
-        if (sRGBProfile == NULL) {
+        if (sRGBProfile == nullptr) {
             sRGBProfile = cmsCreate_sRGBProfile();
         }
     } catch (...) {}
 
-    if (hLabProfile == NULL || sRGBProfile == NULL)
-        return NULL; // Could not create profile
+    if (hLabProfile == nullptr || sRGBProfile == nullptr)
+        return nullptr; // Could not create profile
 
     // Create transform from CIELAB D50 (Photoshop "Lab mode") to sRGB
     cmsUInt32Number flags = cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_COPY_ALPHA;
@@ -113,7 +145,7 @@ void* ICCProfileTransform::CreateLabTransform(PixelFormat format) {
             break;
         default:
             cmsCloseProfile(hLabProfile);
-            return NULL;
+            return nullptr;
     }
     transform = cmsCreateTransform(hLabProfile, inFormat, sRGBProfile, outFormat, INTENT_RELATIVE_COLORIMETRIC, flags);
     cmsCloseProfile(hLabProfile);
