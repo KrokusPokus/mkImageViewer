@@ -108,7 +108,7 @@ CLocalDensityCorr::CLocalDensityCorr(const CJPEGImage & image, bool bFullConstru
     if (nSumValue == 0) {
         m_nPixelHash = 0;
     } else {
-        m_nPixelHash = ((__int64)crcValue << 32) + nSumValue;
+        m_nPixelHash = ((int64_t)crcValue << 32) + nSumValue;
     }
 
     // Calculate grey black and white points

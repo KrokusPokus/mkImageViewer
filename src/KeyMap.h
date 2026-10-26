@@ -4,8 +4,6 @@
 #include <unordered_map>
 #include <QString>
 
-#define VK_LBUTTONDBLCLK 7
-
 // KeyMap
 class CKeyMap
 {

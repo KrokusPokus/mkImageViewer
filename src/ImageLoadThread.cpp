@@ -687,8 +687,8 @@ void CImageLoadThread::AfterFinishProcess(CRequestBase& request) {
 static void LimitOffsets(CPoint& offsets, QSize clippingSize, const QSize & imageSize) {
     const int nMaxOffsetX = std::max(0, (imageSize.width() - clippingSize.width()) / 2);
     const int nMaxOffsetY = std::max(0, (imageSize.height() - clippingSize.height()) / 2);
-    offsets.x = std::clamp<LONG>(offsets.x, -nMaxOffsetX, +nMaxOffsetX);
-    offsets.y = std::clamp<LONG>(offsets.y, -nMaxOffsetY, +nMaxOffsetY);
+    offsets.x = std::clamp(offsets.x, -nMaxOffsetX, +nMaxOffsetX);
+    offsets.y = std::clamp(offsets.y, -nMaxOffsetY, +nMaxOffsetY);
 }
 
 void CImageLoadThread::DeleteCachedQtImageReader() {

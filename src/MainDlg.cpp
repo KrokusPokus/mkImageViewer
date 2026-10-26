@@ -72,11 +72,9 @@ namespace {
 
     const CSize HUGE_SIZE = CSize(99999999, 99999999);
 
-    HFONT hDefaultGUIFont = nullptr;
-    HFONT hToastFont = nullptr;
-    HFONT hDefaultZoomFactorFont = nullptr;
-
+#if defined(Q_OS_WIN)
     typedef const char* (__cdecl* pwine_get_version)(void); // Define function pointer type for wine_get_version
+#endif
 
     // Errors that occur during loading a file
     enum EFileLoadError {

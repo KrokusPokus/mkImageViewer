@@ -21,7 +21,7 @@ public:
     // Returns the pixel hash value. Note that for compressed images, using the pixel hash is
     // not a good identifier because the value depends on the implementation of the decompression.
     // For JPEG files use the method Helpers::CalculateJPEGFileHash() instead.
-    __int64 GetPixelHash() const { return m_nPixelHash; }
+    int64_t GetPixelHash() const { return m_nPixelHash; }
 
 private:
     CHistogram* m_pHistogramm;
@@ -31,7 +31,7 @@ private:
     uint8* m_pLDCMapMultiplied;
     float m_fBlackPt, m_fWhitePt;
     float m_fMiddleGrey;
-    __int64 m_nPixelHash;
+    int64_t m_nPixelHash;
 
     uint16* m_pPointSampledImage;
     int m_nPSIWidth;

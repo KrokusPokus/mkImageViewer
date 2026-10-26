@@ -6,7 +6,7 @@
 #include "HistogramCorr.h"
 #include "LocalDensityCorr.h"
 #include "EXIFReader.h"
-#include "libjpeg-turbo\include\turbojpeg.h"
+#include "libjpeg-turbo/include/turbojpeg.h"
 
 #include <cmath>
 #include <cassert>
@@ -59,14 +59,14 @@ static CBasicProcessing::SIMDArchitecture ToSIMDArchitecture(Helpers::CPUType cp
 
 // Overloaded version without the argument EImageFormat eContainerFormat. It will be set to "IF_Unknown"
 // if (eContainerFormat != IF_Unknown) m_bIsAnimation will be set to "false"
-CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, __int64 nJPEGHash,
+CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, int64_t nJPEGHash,
                        EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs)
     : CJPEGImage(nWidth, nHeight, pPixels, pEXIFData, nChannels, nJPEGHash,
         eImageFormat, IF_Unknown, bIsAnimation, nFrameIndex, nNumberOfFrames, nFrameTimeMs)
 {
 }
 
-CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, __int64 nJPEGHash,
+CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, int64_t nJPEGHash,
                     EImageFormat eImageFormat, EImageFormat eContainerFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs)
     : m_rotationParams{ 0 },
     m_fColorCorrectionFactorsNull{ 0 },

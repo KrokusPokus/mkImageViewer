@@ -1,5 +1,6 @@
 .git/
 .qtcreator/
+bin/
 build/
 extras/
 

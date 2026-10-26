@@ -1,4 +1,4 @@
-﻿#ifndef WTLCOMPAT_H
+#ifndef WTLCOMPAT_H
 #define WTLCOMPAT_H
 
 #ifndef NOMINMAX

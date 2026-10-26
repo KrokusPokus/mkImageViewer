@@ -9,8 +9,8 @@ float CHistogramCorr::sm_BrightnessCorrStrength = 0.2f;
 
 
 // Calculates sum of pixel values using the histogram
-static __int64 CalculateSum(const int* pHistogram) {
-    __int64 nSum = 0;
+static int64_t CalculateSum(const int* pHistogram) {
+    int64_t nSum = 0;
     for (int i = 0; i < 256; i++) {
         nSum += pHistogram[i] * i;
     }

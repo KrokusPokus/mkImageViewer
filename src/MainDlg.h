@@ -236,11 +236,6 @@ private:
     
     int m_customAnimationFrameTime;
 
-    struct IconResult {
-        HICON hBig = nullptr;
-        HICON hSmall = nullptr;
-    };
-
     QFileIconProvider m_iconProvider;
 
     // Member-Variablen zur Verwaltung der Qt-Timer-IDs

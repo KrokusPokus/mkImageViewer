@@ -4,6 +4,7 @@
 #include "ICCProfileTransform.h"
 
 #include <cmath>
+#include <climits>
 
 void * TurboJpeg::ReadImage(int &width,
                        int &height,

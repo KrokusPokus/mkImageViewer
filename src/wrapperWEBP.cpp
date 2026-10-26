@@ -1,5 +1,5 @@
 
-#include "wrapperwebp.h"
+#include "wrapperWEBP.h"
 #include "webp/decode.h"
 #include "webp/encode.h"
 #include "webp/demux.h"
@@ -65,7 +65,7 @@ void* WebpReaderWriter::ReadImage(int& width,
                 exif_chunk = malloc(exif.size + 10);
                 if (exif_chunk != NULL) {
                     memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
-                    *((unsigned short*)exif_chunk + 1) = _byteswap_ushort(exif.size + 8);
+                    *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(exif.size + 8);
                     memcpy((uint8_t*)exif_chunk + 10, exif.bytes, exif.size);
                 }
             }

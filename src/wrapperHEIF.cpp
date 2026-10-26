@@ -2,6 +2,9 @@
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 
+#include <bit>
+#include <cstring>
+
 void * HeifReader::ReadImage(int &width,
                        int &height,
                        int &nchannels,
@@ -56,7 +59,7 @@ void * HeifReader::ReadImage(int &width,
             unsigned int* p = (unsigned int*)(data + i * stride);
             for (j = 0; j < width; j++) {
                 // RGBA -> BGRA conversion
-                *o = _rotr(_byteswap_ulong(*p), 8);
+                *o = std::rotr(__builtin_bswap32(*p), 8);
                 p++;
                 o++;
             }
@@ -87,8 +90,8 @@ void * HeifReader::ReadImage(int &width,
             exif_chunk = malloc(exif.size());
             if (exif_chunk != NULL) {
                 memcpy(exif_chunk, exif.data(), exif.size());
-                *((unsigned short*)exif_chunk) = _byteswap_ushort(0xFFE1);
-                *((unsigned short*)exif_chunk + 1) = _byteswap_ushort(exif.size() - 2);
+                *((unsigned short*)exif_chunk) = __builtin_bswap16(0xFFE1);
+                *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(exif.size() - 2);
             }
         }
     }

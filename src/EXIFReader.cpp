@@ -12,7 +12,7 @@ namespace {
 uint32 ReadUInt(void * ptr, bool bLittleEndian) {
     uint32 nValue = *static_cast<uint32*>(ptr);
     if (!bLittleEndian) {
-        return _byteswap_ulong(nValue);
+        return __builtin_bswap32(nValue);
     } else {
         return nValue;
     }
@@ -21,7 +21,7 @@ uint32 ReadUInt(void * ptr, bool bLittleEndian) {
 void WriteUInt(void * ptr, uint32 nValue, bool bLittleEndian) {
     uint32 nVal = nValue;
     if (!bLittleEndian) {
-        nVal = _byteswap_ulong(nVal);
+        nVal = __builtin_bswap32(nVal);
     }
     *static_cast<uint32*>(ptr) = nVal;
 }
@@ -29,7 +29,7 @@ void WriteUInt(void * ptr, uint32 nValue, bool bLittleEndian) {
 uint16 ReadUShort(void * ptr, bool bLittleEndian) {
     uint16 nValue = *static_cast<uint16*>(ptr);
     if (!bLittleEndian) {
-        return _byteswap_ushort(nValue);
+        return __builtin_bswap16(nValue);
     } else {
         return nValue;
     }
@@ -38,7 +38,7 @@ uint16 ReadUShort(void * ptr, bool bLittleEndian) {
 void WriteUShort(void * ptr, uint16 nValue, bool bLittleEndian) {
     uint16 nVal = nValue;
     if (!bLittleEndian) {
-        nVal = _byteswap_ushort(nVal);
+        nVal = __builtin_bswap16(nVal);
     }
     *static_cast<uint16*>(ptr) = nVal;
 }

@@ -197,7 +197,7 @@ namespace Helpers {
     // Calculates a hash value over the given JPEG stream having the given length (in bytes).
     // All blocks and tables in the JPEG stream are not included into the hash to allow
     // e.g. commenting the JPEG or changing some EXIF information without changing the hash.
-    __int64 CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength);
+    int64_t CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength);
 
     // try to convert a string from UTF-8. Returns empty string if no valid UTF-8 encoded string.
     QString TryConvertFromUTF8(const uint8_t* pComment, int nLengthInBytes);

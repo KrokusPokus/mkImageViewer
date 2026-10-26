@@ -33,6 +33,6 @@
 /* Version string */
 #define LIBHEIF_VERSION "1.23.1"
 
-#define LIBHEIF_PLUGIN_DIRECTORY "C:/Program Files/libheif/lib/libheif"
+#define LIBHEIF_PLUGIN_DIRECTORY "/usr/local/lib/libheif"
 
 #endif  // LIBHEIF_HEIF_VERSION_H

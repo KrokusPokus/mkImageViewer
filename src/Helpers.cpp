@@ -130,7 +130,7 @@ namespace Helpers {
         return pEXIFBlock;
     }
 
-    __int64 CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength) {
+    int64_t CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength) {
         uint8* pStream = (uint8*) pJPEGStream;
         const void* pPixelStart = FindJPEGMarker(pJPEGStream, nStreamLength, 0);
         if (pPixelStart == NULL) {
@@ -160,7 +160,7 @@ namespace Helpers {
             nIndex += nIncrement;
         }
 
-        return ((__int64)crcValue << 32) + sumValue;
+        return ((int64_t)crcValue << 32) + sumValue;
     }
 
 

@@ -36,10 +36,10 @@ public:
     // If RAW metadata is specified, ownership of this memory is transferred to this class.
 
     CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
-        __int64 nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs);
+        int64_t nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs);
 
     CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
-        __int64 nJPEGHash, EImageFormat eImageFormat, EImageFormat eContainerFormat = IF_Unknown, bool bIsAnimation = false, int nFrameIndex = 9, int nNumberOfFrames = 1, int nFrameTimeMs = 0);
+        int64_t nJPEGHash, EImageFormat eImageFormat, EImageFormat eContainerFormat = IF_Unknown, bool bIsAnimation = false, int nFrameIndex = 9, int nNumberOfFrames = 1, int nFrameTimeMs = 0);
 
     ~CJPEGImage(void);
 
@@ -74,7 +74,7 @@ public:
     bool Rotate(int nRotation);
 
     // Gets the hash value of the pixels, for JPEGs the hash is on the compressed pixels
-    __int64 GetPixelHash() const { return m_nPixelHash; }
+    int64_t GetPixelHash() const { return m_nPixelHash; }
 
     // Original image size. Operations on the original pixels will change this size!
     int OrigWidth() const { return m_nOrigWidth; }
@@ -239,7 +239,7 @@ private:
     int m_nOrigWidth, m_nOrigHeight; // these may changes by rotation
     int m_nInitOrigWidth, m_nInitOrigHeight; // original width of image when constructed (before any rotation and crop)
     int m_nOriginalChannels;
-    __int64 m_nPixelHash;
+    int64_t m_nPixelHash;
     EImageFormat m_eImageFormat, m_eContainerFormat;
     TJSAMP m_eJPEGChromoSampling;
 

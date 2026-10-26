@@ -23,7 +23,7 @@
  *
  * To avoid all these issues, we define the required Win32 API structs, constants, and type aliases,
  * with the same definitions as in the MyWindows.h header.
- * We will use only this header and avoid including "MyWindows.h" or similar headers (e.g., stdafx.h). */
+ * We will use only this header and avoid including "MyWindows.h" or similar headers (e.g., StdAfx.h). */
 #include <cerrno>
 #include <cstdint>
 #include <cstddef>

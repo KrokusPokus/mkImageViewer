@@ -5,18 +5,10 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "This project only supports 64-bit systems.")
 endif()
 
-# Optional: Explizit Makros für den gesamten Code definieren
-add_compile_definitions(PROJECT_IS_64BIT=1)
 # C++20 Standard erzwingen
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# MSVC Statische C/C++-Laufzeitbibliothek (/MT fuer Release, /MTd fuer Debug) erzwingen
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
-# Unicode-Unterstuetzung
-add_compile_definitions(UNICODE _UNICODE)
 
 # Plattform dependent folder mapping for libs
 set(ARCH_DIR "lib64")
@@ -29,42 +21,31 @@ endif()
 include(CheckIPOSupported)
 check_ipo_supported(RESULT result)
 if(result)
-    if(MINGW)
-        # MinGW hat einen bekannten Bug mit LTO bei statischen Phasen ("plugin needed to handle lto object").
-        # Da wir ohnehin -O3 nutzen, schalten wir IPO hier fuer Windows/MinGW ab.
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
-    else()
-        # Unter Linux (GCC/Clang) oder mit MSVC laeuft es sauber durch
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
-    endif()
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 endif()
 
-if(MSVC)
-    add_compile_options(
-        $<$<NOT:$<CONFIG:Debug>>:/O2>
-        $<$<NOT:$<CONFIG:Debug>>:/Ot>
-        $<$<NOT:$<CONFIG:Debug>>:/GL>
-        /arch:AVX2
-    )
-else()
-    # -O3: Aggressive Optimierung
-    # -march=native: Nutzt SSE/AVX der aktuellen CPU
-    # -flto: Link Time Optimization (removed here, since enabled by "set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)" above
-    # -fomit-frame-pointer: Befreit ein Register fuer Daten (statt Stack-Tracking)
-    add_compile_options(
-        $<$<NOT:$<CONFIG:Debug>>:-O3>
-        $<$<NOT:$<CONFIG:Debug>>:-march=native>
-        $<$<NOT:$<CONFIG:Debug>>:-fomit-frame-pointer>
-    )
-endif()
+# -O3: Aggressive Optimierung
+# -march=native: Nutzt SSE/AVX der aktuellen CPU
+# -flto: Link Time Optimization (removed here, since enabled by "set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)" above
+# -fomit-frame-pointer: Befreit ein Register fuer Daten (statt Stack-Tracking)
+add_compile_options(
+    $<$<NOT:$<CONFIG:Debug>>:-O3>
+    $<$<NOT:$<CONFIG:Debug>>:-march=native>
+    $<$<NOT:$<CONFIG:Debug>>:-fomit-frame-pointer>
+)
+
 
 # --- 2. QT & STANDARD SETUP ---
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools Network DBus)
+
+# --- 3. DRITTANBIETER (ZLIB) GLOBAL BEREITSTELLEN ---
+find_package(ZLIB REQUIRED)
+
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON)
 
-qt_add_executable(mkImageViewer WIN32
+qt_add_executable(mkImageViewer
     src/main.cpp
     src/ApplyFilterAVX.h src/ApplyFilterAVX.cpp
     src/BasicProcessing.h src/BasicProcessing.cpp
@@ -97,21 +78,18 @@ qt_add_executable(mkImageViewer WIN32
     src/wrapperWEBP.h src/wrapperWEBP.cpp
     src/XMMImage.h src/XMMImage.cpp
     src/zip/zip.h src/zip/zip.c
-    
+
     src/ImageProcessingTypes.h
     src/LookupTables.h
     src/MaxImageDef.h
     src/ProcessParams.h
     src/resource.h
     src/WTLCompat.h
-    
+
     res/resources.qrc
 )
 
 target_compile_definitions(mkImageViewer PRIVATE
-    WIN32
-    _WINDOWS
-    STRICT
     BIT7Z_AUTO_FORMAT
     $<$<CONFIG:Debug>:_DEBUG>
     $<$<CONFIG:Release>:NDEBUG>
@@ -148,17 +126,18 @@ target_link_libraries(mkImageViewer PRIVATE
     Qt6::Concurrent
     Qt6::DBus
     Qt6::Network
-    
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/lib64/liblcms2.dll.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/lib64/libavif.dll.a
+#static
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libbit7z/lib64/libbit7z64.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/lib64/libheif.dll.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libjpeg-turbo/lib64/libturbojpeg.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_dec.dll.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_threads.dll.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/lib64/libpng.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/lib64/libzs.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebp.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebpdemux.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libsharpyuv.a
+# dynamic (Linux .so)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/lib64/liblcms2.so
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/lib64/libavif.so
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/lib64/libheif.so
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_dec.so
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_threads.so
 )

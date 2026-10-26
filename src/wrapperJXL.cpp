@@ -6,6 +6,7 @@
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 
+#include <bit>
 #include <cstring>
 
 static int CountJxlFrames(const uint8_t* jxl_data, size_t size) {
@@ -244,7 +245,7 @@ void* JxlReader::ReadImage(int& width,
         // RGBA -> BGRA conversion (with little-endian integers)
         uint32_t* data = (uint32_t*)pixels.data();
         for (size_t i = 0; i * sizeof(uint32_t) < size; i++) {
-            ((uint32_t*)pPixelData)[i] = _rotr(_byteswap_ulong(data[i]), 8);
+            ((uint32_t*)pPixelData)[i] = std::rotr(__builtin_bswap32(data[i]), 8);
         }
     }
 
@@ -253,7 +254,7 @@ void* JxlReader::ReadImage(int& width,
         exif_chunk = malloc(cache.exif.size() + 6);
         if (exif_chunk != NULL) {
             memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
-            *((unsigned short*)exif_chunk + 1) = _byteswap_ushort(cache.exif.size() + 4);
+            *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(cache.exif.size() + 4);
             memcpy((uint8_t*)exif_chunk + 10, cache.exif.data() + 4, cache.exif.size() - 4);
         }
     }
