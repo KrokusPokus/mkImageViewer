@@ -65,8 +65,6 @@ namespace {
     const int KEEP_PARAMETERS = 4; // used in GotoImage() method
     const int NO_UPDATE_WINDOW = 8; // used in GotoImage() method
 
-    const CSize HUGE_SIZE = CSize(99999999, 99999999);
-
     // Errors that occur during loading a file
     enum EFileLoadError {
         FileLoad_Ok = 0,
