@@ -1146,7 +1146,7 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
 
     int nCommand = m_pKeyMap->GetCommandIdForKey(vkCode, bAlt, bCtrl, bShift);
     if (nCommand > 0) {
-        if (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN || IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT) {
+        if (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN || nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT) {
             // Prüfung analog zum Original: Wenn eine andere Taste als die Pfeiltaste selbst das Panning triggert
             if ((nCommand == IDM_PAN_UP && vkCode != Qt::Key_Up) ||
                 (nCommand == IDM_PAN_DOWN && vkCode != Qt::Key_Down) ||
@@ -1175,13 +1175,13 @@ void CMainDlg::keyReleaseEvent(QKeyEvent* event) {
 
     if (!event->isAutoRepeat()) {
         if (vkCode == Qt::Key_Up) {
-            m_bPanKeyUp = true;
+            m_bPanKeyUp = false;
         } else if (vkCode == Qt::Key_Down) {
-            m_bPanKeyDown = true;
+            m_bPanKeyDown = false;
         } else if (vkCode == Qt::Key_Left) {
-            m_bPanKeyLeft = true;
+            m_bPanKeyLeft = false;
         } else if (vkCode == Qt::Key_Right) {
-            m_bPanKeyRight = true;
+            m_bPanKeyRight = false;
         }
     }
     QMainWindow::keyReleaseEvent(event);
@@ -1316,10 +1316,8 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
                 PanY = PanYbase;
             }
 
-            // Ausführen des Pans
             if (PerformPan(PanX, PanY, false)) {
-                // Erzwingt ein sofortiges Neuzeichnen ohne den Event-Loop zu blockieren
-                this->repaint();
+                this->repaint(); // Erzwingt ein sofortiges Neuzeichnen ohne den Event-Loop zu blockieren
             }
         }
     }
@@ -2083,7 +2081,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
-                                m_panTimerId = startTimer(10);
+                                m_panTimerId = startTimer(17);
                             }
                         } else {
                             PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
@@ -2107,7 +2105,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
-                                m_panTimerId = startTimer(10);
+                                m_panTimerId = startTimer(17);
                             }
                         } else {
                             PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
@@ -2129,7 +2127,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                                     } else {
                                         if (m_bAllowSmoothPanning) {
                                             m_bPanTimerActive = true;
-                                            m_panTimerId = startTimer(10);
+                                            m_panTimerId = startTimer(17);
                                         } else {
                                             PerformPan(0, ((nCommand == IDM_PAN_UP) || (nCommand == IDM_PAN_LEFT)) ? PAN_STEP : ((nCommand == IDM_PAN_DOWN) || (nCommand == IDM_PAN_RIGHT)) ? -PAN_STEP : 0, false);
                                         }
@@ -3910,4 +3908,9 @@ bool CMainDlg::ShouldAcceptFile(const QString& testFilePath) {
     }
 
     return false;
+}
+
+void CMainDlg::focusOutEvent(QFocusEvent* event) {
+    m_bPanKeyUp = m_bPanKeyDown = m_bPanKeyLeft = m_bPanKeyRight = false;
+    QMainWindow::focusOutEvent(event);
 }

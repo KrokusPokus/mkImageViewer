@@ -258,6 +258,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
     void timerEvent(QTimerEvent* event) override;
+    void focusOutEvent(QFocusEvent* event) override;
 };
 
 #endif // MAINDLG_H
