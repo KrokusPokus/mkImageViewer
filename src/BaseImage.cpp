@@ -1,4 +1,4 @@
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "BasicProcessing.h"
 
 #include "Helpers.h"
@@ -59,14 +59,14 @@ static CBasicProcessing::SIMDArchitecture ToSIMDArchitecture(Helpers::CPUType cp
 
 // Overloaded version without the argument EImageFormat eContainerFormat. It will be set to "IF_Unknown"
 // if (eContainerFormat != IF_Unknown) m_bIsAnimation will be set to "false"
-CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, int64_t nJPEGHash,
+CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, int64_t nJPEGHash,
                        EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs)
-    : CJPEGImage(nWidth, nHeight, pPixels, pEXIFData, nChannels, nJPEGHash,
+    : CBaseImage(nWidth, nHeight, pPixels, pEXIFData, nChannels, nJPEGHash,
         eImageFormat, IF_Unknown, bIsAnimation, nFrameIndex, nNumberOfFrames, nFrameTimeMs)
 {
 }
 
-CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, int64_t nJPEGHash,
+CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels, int64_t nJPEGHash,
                     EImageFormat eImageFormat, EImageFormat eContainerFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs)
     : m_rotationParams{ 0 },
     m_fColorCorrectionFactorsNull{ 0 },
@@ -153,7 +153,7 @@ CJPEGImage::CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     memcpy(m_fColorCorrectionFactors, CSettingsProvider::This().ColorCorrectionAmounts(), sizeof(m_fColorCorrectionFactors));
 }
 
-CJPEGImage::~CJPEGImage(void) {
+CBaseImage::~CBaseImage(void) {
     delete[] m_pOrigPixels;
     m_pOrigPixels = NULL;
     delete[] m_pDIBPixels;
@@ -177,7 +177,7 @@ CJPEGImage::~CJPEGImage(void) {
     m_pCachedProcessedHistogram = NULL;
 }
 
-void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, CSize fullTargetSize, 
+void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, CSize fullTargetSize,
                                  CSize clippingSize, CPoint targetOffset, CRect oldClippingRect,
                                  EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, 
                                  double dRotation, EResizeType eResizeType) {
@@ -304,7 +304,7 @@ void CJPEGImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
     delete[] pDIBPixelsLUTProcessed; pDIBPixelsLUTProcessed = NULL;
 }
 
-void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType) {
+void* CBaseImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType) {
 
     Helpers::CPUType cpu = CSettingsProvider::This().AlgorithmImplementation();
     EFilterType filter = CSettingsProvider::This().DownsamplingFilter();
@@ -335,13 +335,13 @@ void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targ
     }
 }
 
-CPoint CJPEGImage::ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset) {
+CPoint CBaseImage::ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset) {
     int nStartX = (fullTargetSize.cx - clippingSize.cx)/2 - targetOffset.x;
     int nStartY = (fullTargetSize.cy - clippingSize.cy)/2 - targetOffset.y;
     return CPoint(nStartX, nStartY);
 }
 
-bool CJPEGImage::VerifyRotation(const CRotationParams& rotationParams) {
+bool CBaseImage::VerifyRotation(const CRotationParams& rotationParams) {
     int nDiff = ((rotationParams.Rotation - m_rotationParams.Rotation) + 360) % 360;
     if (nDiff != 0) {
         if (!Rotate(nDiff)) return false;
@@ -349,7 +349,7 @@ bool CJPEGImage::VerifyRotation(const CRotationParams& rotationParams) {
     return true;
 }
 
-bool CJPEGImage::Rotate(int nRotation) {
+bool CBaseImage::Rotate(int nRotation) {
     // Rotation can only be done in 32 bpp
     if (!ConvertSrcTo4Channels()) {
         return false;
@@ -370,7 +370,7 @@ bool CJPEGImage::Rotate(int nRotation) {
     return true;
 }
 
-bool CJPEGImage::Mirror(bool bHorizontally) {
+bool CBaseImage::Mirror(bool bHorizontally) {
     // Rotation can only be done in 32 bpp
     if (!ConvertSrcTo4Channels()) {
         return false;
@@ -386,21 +386,21 @@ bool CJPEGImage::Mirror(bool bHorizontally) {
     return true;
 }
 
-void* CJPEGImage::DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded) {
+void* CBaseImage::DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded) {
     if (bGenerateDIBIfNeeded && m_pLastDIB == NULL) {
         m_pLastDIB = GetDIB(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_imageProcParams, m_eProcFlags);
     }
     return m_pLastDIB;
 }
 
-void CJPEGImage::VerifyDIBPixelsCreated() {
+void CBaseImage::VerifyDIBPixelsCreated() {
     if (m_pDIBPixels == NULL) {
         EResizeType eResizeType = GetResizeType(m_FullTargetSize, CSize(m_nOrigWidth, m_nOrigHeight));
         m_pDIBPixels = Resample(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_eProcFlags, eResizeType);
     }
 }
 
-void CJPEGImage::RestoreInitialParameters(const QString& sFileName, const CImageProcessingParams& imageProcParams,
+void CBaseImage::RestoreInitialParameters(const QString& sFileName, const CImageProcessingParams& imageProcParams,
                                           EProcessingFlags & procFlags, int nRotation, double dZoom, 
                                           CPoint offsets, CSize targetSize, CSize monitorSize) {
     // zoom and offsets must be initialized in all cases as they may not bo in param DB even when other parameters are
@@ -413,7 +413,7 @@ void CJPEGImage::RestoreInitialParameters(const QString& sFileName, const CImage
     m_imageProcParamsInitial = imageProcParams;
 }
 
-void CJPEGImage::SetFileDependentProcessParams(const QString& sFileName, CProcessParams* pParams) {
+void CBaseImage::SetFileDependentProcessParams(const QString& sFileName, CProcessParams* pParams) {
     m_bInParamDB = false;
     m_bHasZoomStoredInParamDB = false;
 
@@ -432,7 +432,7 @@ void CJPEGImage::SetFileDependentProcessParams(const QString& sFileName, CProces
 // Private
 ///////////////////////////////////////////////////////////////////////////////////
 
-void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
+void* CBaseImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
                          const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
                          bool &bParametersChanged) {
 
@@ -513,7 +513,7 @@ void* CJPEGImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
     return pDIB;
 }
 
-void* CJPEGImage::ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
+void* CBaseImage::ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
                                            void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset, 
                                            void * pSourceDIB, CSize dibSize,
                                            bool bGeometryChanged, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged) {
@@ -617,7 +617,7 @@ void* CJPEGImage::ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageP
     return pCachedTargetDIB;
 }
 
-bool CJPEGImage::ConvertSrcTo4Channels() {
+bool CBaseImage::ConvertSrcTo4Channels() {
     if (m_nOriginalChannels == 3) {
         void* pNewOriginalPixels = CBasicProcessing::Convert3To4Channels(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels);
         if (pNewOriginalPixels != NULL) {
@@ -630,7 +630,7 @@ bool CJPEGImage::ConvertSrcTo4Channels() {
     return true;
 }
 
-CJPEGImage::EResizeType CJPEGImage::GetResizeType(CSize targetSize, CSize sourceSize) {
+CBaseImage::EResizeType CBaseImage::GetResizeType(CSize targetSize, CSize sourceSize) {
     if (targetSize.cx == sourceSize.cx && targetSize.cy == sourceSize.cy) {
         return NoResize;
     } else if (targetSize.cx <= sourceSize.cx && targetSize.cy <= sourceSize.cy) {
@@ -640,7 +640,7 @@ CJPEGImage::EResizeType CJPEGImage::GetResizeType(CSize targetSize, CSize source
     }
 }
 
-int CJPEGImage::GetRotationFromEXIF(int nOrigRotation) {
+int CBaseImage::GetRotationFromEXIF(int nOrigRotation) {
     if (m_pEXIFReader != NULL && m_pEXIFReader->ImageOrientationPresent() && CSettingsProvider::This().AutoRotateEXIF()) {
 
         // Some tools rotate the pixel data but do not reset the EXIF orientation flag.
@@ -676,12 +676,12 @@ int CJPEGImage::GetRotationFromEXIF(int nOrigRotation) {
     return nOrigRotation;
 }
 
-void CJPEGImage::MarkAsDestructivelyProcessed() {
+void CBaseImage::MarkAsDestructivelyProcessed() {
     m_bIsDestructivelyProcessed = true;
     m_rotationParams.Flags = RFLAG_None;
 }
 
-void CJPEGImage::InvalidateAllCachedPixelData() {
+void CBaseImage::InvalidateAllCachedPixelData() {
     m_pLastDIB = NULL;
     if (m_bLDCOwned) delete m_pLDC; // LDC mask must be recalculated!
     m_pLDC = NULL;

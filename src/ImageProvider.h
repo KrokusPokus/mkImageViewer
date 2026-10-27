@@ -1,5 +1,5 @@
-#ifndef JPEGPROVIDER_H
-#define JPEGPROVIDER_H
+#ifndef IMAGEPROVIDER_H
+#define IMAGEPROVIDER_H
 
 #include <list>
 #include <memory>
@@ -10,12 +10,12 @@
 #include <QWaitCondition>
 #include <QDebug>
 
-class CJPEGImage;
+class CBaseImage;
 class CImageLoadThread;
 class CFileList;
 class CProcessParams;
 
-class CJPEGProvider : public QObject {
+class CImageProvider : public QObject {
     Q_OBJECT
 
 public:
@@ -25,14 +25,14 @@ public:
         BACKWARD
     };
 
-    CJPEGProvider(QObject* pParent, int nNumThreads, int nNumBuffers);
-    ~CJPEGProvider(void);
+    CImageProvider(QObject* pParent, int nNumThreads, int nNumBuffers);
+    ~CImageProvider(void);
 
-    CJPEGImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const QString& sFileName, int nFrameIndex,
+    CBaseImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const QString& sFileName, int nFrameIndex,
                              const CProcessParams & processParams, bool& bOutOfMemory, bool& bExceptionError);
 
-    void NotifyNotUsed(CJPEGImage* pImage);
-    bool ClearRequest(CJPEGImage* pImage, bool releaseLockedFile = false);
+    void NotifyNotUsed(CBaseImage* pImage);
+    bool ClearRequest(CBaseImage* pImage, bool releaseLockedFile = false);
     void ClearAllRequests();
     bool FreeAllPossibleMemory();
 
@@ -40,7 +40,7 @@ private:
     struct CImageRequest {
         QString FileName;
         int FrameIndex;
-        CJPEGImage* Image;
+        CBaseImage* Image;
         std::atomic<bool> Ready; // Thread-sicher über atomare Sequenzierung
         int Handle;
         bool InUse;
@@ -66,8 +66,8 @@ private:
             AccessTimeStamp(-1),
             HandlingThread(nullptr) {}
 
-        // Defined in JPEGProvider.cpp: CJPEGImage is only forward declared here, so a delete in the header
-        // would not run ~CJPEGImage() (undefined behavior, all pixel buffers of the image would leak).
+        // Defined in JPEGProvider.cpp: CBaseImage is only forward declared here, so a delete in the header
+        // would not run ~CBaseImage() (undefined behavior, all pixel buffers of the image would leak).
         ~CImageRequest();
     };
 
@@ -87,8 +87,8 @@ private:
     RequestPtr FindRequest(const QString& sFileName, int nFrameIndex);
     std::list<RequestPtr>::iterator DeleteElementAt(std::list<RequestPtr>::iterator iteratorAt);
     void DeleteElement(RequestPtr pRequest);
-    bool IsDestructivelyProcessed(CJPEGImage* pImage);
+    bool IsDestructivelyProcessed(CBaseImage* pImage);
     void SetAllRequestsInactive();
 };
 
-#endif // JPEGPROVIDER_H
+#endif // IMAGEPROVIDER_H

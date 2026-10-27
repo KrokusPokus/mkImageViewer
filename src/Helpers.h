@@ -9,7 +9,7 @@
 #include <QString>
 #include <QRgb>
 
-class CJPEGImage;
+class CBaseImage;
 class CFileList;
 
 namespace Helpers {
@@ -206,7 +206,7 @@ namespace Helpers {
     QString GetJPEGComment(const void* pJPEGStream, int nStreamLength);
 
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
-    int GetFrameIndex(CJPEGImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage);
+    int GetFrameIndex(CBaseImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage);
 
     uint64_t GetTimeMs();
 

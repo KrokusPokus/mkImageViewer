@@ -4,8 +4,8 @@
 
 #include "MainDlg.h"
 #include "FileList.h"
-#include "JPEGProvider.h"
-#include "JPEGImage.h"
+#include "ImageProvider.h"
+#include "BaseImage.h"
 #include "SettingsProvider.h"
 #include "MultiMonitorSupport.h"
 #include "HistogramCorr.h"
@@ -471,10 +471,10 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     int nReadAheadBuffers = (CSettingsProvider::This().CacheRange() * 2) + 1;    // The +1 is the current image
 
     // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
-    m_pJPEGProvider = new CJPEGProvider(this, NUM_THREADS, nReadAheadBuffers);
+    m_pJPEGProvider = new CImageProvider(this, NUM_THREADS, nReadAheadBuffers);
 
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
-                                                    CJPEGProvider::FORWARD,
+                                                    CImageProvider::FORWARD,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
                                                     CreateProcessParams(!m_bFullScreenMode),
@@ -767,7 +767,7 @@ void CMainDlg::PaintToDC(QPainter& painter) {
 
     QRect qClient(m_clientRect.left, m_clientRect.top, m_clientRect.Width(), m_clientRect.Height());
 
-    CJPEGImage* pCurrentImage = GetCurrentImage();
+    CBaseImage* pCurrentImage = GetCurrentImage();
     if (pCurrentImage == NULL) {
         painter.fillRect(qClient, backColor);
     } else {
@@ -806,7 +806,7 @@ void CMainDlg::PaintToDC(QPainter& painter) {
 }
 */
 
-void CMainDlg::DisplayErrors(CJPEGImage* pCurrentImage, const QRect& clientRect, QPainter& painter)
+void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect, QPainter& painter)
 {
     // Einheitliche Schriftart für Fehlermeldungen setzen (z. B. Arial oder Standard-GUI-Font)
     QFont font = QApplication::font();
@@ -2382,7 +2382,7 @@ void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
     m_pJPEGProvider->ClearAllRequests();
 
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
-                                                    CJPEGProvider::FORWARD,
+                                                    CImageProvider::FORWARD,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
                                                     CreateProcessParams(!m_bFullScreenMode && bAfterStartup),
@@ -2472,7 +2472,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     m_pFileList->SetCheckpoint();
     CFileList* pOldFileList = m_pFileList;
     int nOldFrameIndex = (m_pCurrentImage == NULL) ? 0 : m_pCurrentImage->FrameIndex();
-    CJPEGProvider::EReadAheadDirection eDirection = CJPEGProvider::FORWARD;
+    CImageProvider::EReadAheadDirection eDirection = CImageProvider::FORWARD;
 
     switch (ePos) {
         case POS_First:
@@ -2532,7 +2532,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                 }
                 
                 m_pFileList = m_pFileList->Prev();
-                eDirection = CJPEGProvider::BACKWARD;
+                eDirection = CImageProvider::BACKWARD;
 
                 const QString sFileName = m_pFileList->Current();
                 if ((!sFileName.isEmpty()) && IsBookModeFile(sFileName)) {
@@ -2555,7 +2555,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                 bool bGotoPrevImage;
                 nFrameIndex = Helpers::GetFrameIndex(m_pCurrentImage, -1, false, bGotoPrevImage);
                 if (bGotoPrevImage) m_pFileList = m_pFileList->Prev();
-                eDirection = CJPEGProvider::BACKWARD;
+                eDirection = CImageProvider::BACKWARD;
                 bNoWrapAroundEdgeFrame = false; // previous image at edge is not a wraparound
                 break;
             }
@@ -2614,7 +2614,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 /* Debugging */ qDebug() << "GotoImage()->RequestImage()  nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
     m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
-                                                    (ePos == POS_AwayFromCurrent) ? CJPEGProvider::NONE : eDirection,
+                                                    (ePos == POS_AwayFromCurrent) ? CImageProvider::NONE : eDirection,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
                                                     procParams,
@@ -3197,7 +3197,7 @@ void CMainDlg::PrefetchDIB(const QRect& clientRect) {
     m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, *m_pImageProcParams, CreateDefaultProcessingFlags());
 }
 
-double CMainDlg::GetZoomMultiplier(CJPEGImage* pImage, const QRect& clientRect) {
+double CMainDlg::GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect) {
     double dZoomToFit;
 
     Helpers::GetImageRect(pImage->OrigWidth(),
@@ -3690,7 +3690,7 @@ void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
 }
 
 // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
-QString CMainDlg::GetMultiframeIndex(CJPEGImage* pImage) {
+QString CMainDlg::GetMultiframeIndex(CBaseImage* pImage) {
     const bool isMultiFrame = (pImage != nullptr) && (pImage->NumberOfFrames() > 1);
     
     if (isMultiFrame && !pImage->IsAnimation()) {

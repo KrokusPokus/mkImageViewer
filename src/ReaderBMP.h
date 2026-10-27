@@ -3,7 +3,7 @@
 
 #include "ImageProcessingTypes.h"
 
-class CJPEGImage;
+class CBaseImage;
 
 // Simple reader for windows bitmap files (.bmp)
 class CReaderBMP

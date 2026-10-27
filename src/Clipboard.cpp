@@ -1,5 +1,5 @@
 #include "Clipboard.h"
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "Helpers.h"
 
 #include <QGuiApplication>
@@ -11,7 +11,7 @@
 #include <QString>
 #include <algorithm>
 
-void CClipboard::CopyImageToClipboard(CJPEGImage* pImage, const QString& fileName) {
+void CClipboard::CopyImageToClipboard(CBaseImage* pImage, const QString& fileName) {
     if (pImage == nullptr || pImage->DIBPixelsLastProcessed(true) == nullptr) {
         return;
     }
@@ -19,11 +19,11 @@ void CClipboard::CopyImageToClipboard(CJPEGImage* pImage, const QString& fileNam
     DoCopy(pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), fileName);
 }
 
-void CClipboard::CopyFullImageToClipboard(CJPEGImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, const QString& fileName) {
+void CClipboard::CopyFullImageToClipboard(CBaseImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, const QString& fileName) {
     CopyFullImageToClipboard(pImage, procParams, eFlags, CRect(0, 0, pImage->OrigWidth(), pImage->OrigHeight()), fileName);
 }
 
-void CClipboard::CopyFullImageToClipboard(CJPEGImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, CRect clipRect, const QString& fileName) {
+void CClipboard::CopyFullImageToClipboard(CBaseImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, CRect clipRect, const QString& fileName) {
     if (pImage == nullptr) {
         return;
     }
@@ -37,7 +37,7 @@ void CClipboard::CopyFullImageToClipboard(CJPEGImage* pImage, const CImageProces
     DoCopy(clipRect.Width(), clipRect.Height(), pDIB, fileName);
 }
 
-void CClipboard::CopyPathToClipboard(CJPEGImage* pImage, const QString& fileName) {
+void CClipboard::CopyPathToClipboard(CBaseImage* pImage, const QString& fileName) {
     if (pImage == nullptr || pImage->DIBPixelsLastProcessed(true) == nullptr) {
         return;
     }

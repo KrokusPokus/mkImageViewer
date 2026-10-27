@@ -3,7 +3,7 @@
 
 #include "ImageProcessingTypes.h"
 
-class CJPEGImage;
+class CBaseImage;
 class CHistogram;
 
 // Local density correction for an image, lighting shadows and darkening highlights
@@ -11,7 +11,7 @@ class CLocalDensityCorr
 {
 public:
     // Note: Partially constructed LDC object allows getting the histogram and the pixel hash but not much more
-    CLocalDensityCorr(const CJPEGImage & image, bool bFullConstruct);
+    CLocalDensityCorr(const CBaseImage & image, bool bFullConstruct);
     ~CLocalDensityCorr(void);
 
     // Gets the histogram.

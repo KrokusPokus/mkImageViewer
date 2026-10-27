@@ -1,5 +1,5 @@
 #include "Helpers.h"
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "SettingsProvider.h"
 
 #include <algorithm>
@@ -239,7 +239,7 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
 }
 
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
-    int GetFrameIndex(CJPEGImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage) {
+    int GetFrameIndex(CBaseImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage) {
         bool isMultiFrame = pImage != NULL && pImage->NumberOfFrames() > 1;
         bool isAnimation = pImage != NULL && pImage->IsAnimation();
         bool isContainer = pImage != NULL && pImage->IsContainer();

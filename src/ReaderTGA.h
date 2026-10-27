@@ -3,7 +3,7 @@
 
 #include "Helpers.h"
 
-class CJPEGImage;
+class CBaseImage;
 
 // Simple reader for .tga files
 class CReaderTGA

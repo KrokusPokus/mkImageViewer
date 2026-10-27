@@ -14,8 +14,8 @@
 #include <QString>
 
 class CFileList;
-class CJPEGProvider;
-class CJPEGImage;
+class CImageProvider;
+class CBaseImage;
 class CKeyMap;
 class CDirectoryWatcher;
 
@@ -60,15 +60,15 @@ public:
     bool IsMaximizedMode() { return isMaximized(); }
     bool IsKeepParams() { return m_bKeepParams; }
     int GetRotation() { return m_nRotation; }
-    CJPEGImage* GetCurrentImage() { return m_pCurrentImage; }
+    CBaseImage* GetCurrentImage() { return m_pCurrentImage; }
     QString CurrentFileName(bool bFileNameOnly);
     const QRect& WindowRectOnClose() { return m_windowRectOnClose; } // only valid after having closed the window
-    double GetZoomMultiplier(CJPEGImage* pImage, const QRect& clientRect);
+    double GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect);
     Helpers::EAutoZoomMode GetAutoZoomMode() { return m_bFullScreenMode ? m_eAutoZoomModeFullscreen : m_eAutoZoomModeWindowed; }
     CPoint GetOffsets() { return m_offsets; }
     CImageProcessingParams* GetImageProcessingParams() { return m_pImageProcParams; }
     EProcessingFlags CreateDefaultProcessingFlags(bool bKeepParams = false);
-    void DisplayErrors(CJPEGImage* pCurrentImage, const QRect& clientRect, QPainter& painter);
+    void DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect, QPainter& painter);
 
     void UpdateWindowTitle(bool bForce = false);
     void MouseOff();
@@ -93,8 +93,8 @@ private:
     Helpers::ESorting m_eForcedSorting; // forced sorting mode on command line
     CFileList* m_pFileList; // used for navigation
     CDirectoryWatcher* m_pDirectoryWatcher = NULL; // notifies the main window when the current file changed or a file in the current directory was added or deleted
-    CJPEGProvider * m_pJPEGProvider; // reads image (of any format, not only JPEGs) files, using read ahead
-    CJPEGImage * m_pCurrentImage; // currently displayed image
+    CImageProvider * m_pJPEGProvider; // reads image (of any format, not only JPEGs) files, using read ahead
+    CBaseImage * m_pCurrentImage; // currently displayed image
     bool m_bOutOfMemoryLastImage; // true if the last image could not be requested because not enough memory
     bool m_bExceptionErrorLastImage; // true if the last image could not be requested because of an unhandled exception
     int m_nLastLoadError; // one of EFileLoadError
@@ -218,7 +218,7 @@ private:
     void SaveBookmark();
     bool IsBookModeFile(const QString& filePath);
     float MaxRatio(float valA, float valB);
-    QString GetMultiframeIndex(CJPEGImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
+    QString GetMultiframeIndex(CBaseImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
     QString formatOutputZoomFactor(double m_dZoom);
     void onShowContextMenu(const QPoint &pos);
 

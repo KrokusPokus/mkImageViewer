@@ -1,6 +1,6 @@
 #include "LocalDensityCorr.h"
 #include "HistogramCorr.h"
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "Helpers.h"
 
 #include <cmath>
@@ -24,7 +24,7 @@ namespace {
 // Public
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-CLocalDensityCorr::CLocalDensityCorr(const CJPEGImage & image, bool bFullConstruct) {
+CLocalDensityCorr::CLocalDensityCorr(const CBaseImage & image, bool bFullConstruct) {
 
     // Caution: If something is changed in this code, this breaks all existing image DBs
 

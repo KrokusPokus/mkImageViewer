@@ -1,5 +1,5 @@
 #include "HistogramCorr.h"
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "Helpers.h"
 
 #include <math.h>
@@ -21,7 +21,7 @@ static int64_t CalculateSum(const int* pHistogram) {
 // CHistogram class
 ///////////////////////////////////////////////////////////////////////////////////
 
-CHistogram::CHistogram(const CJPEGImage & image, bool bUseOrigPixels)
+CHistogram::CHistogram(const CBaseImage & image, bool bUseOrigPixels)
     : m_ChannelR{ 0 },
     m_ChannelG{ 0 },
     m_ChannelB{ 0 },

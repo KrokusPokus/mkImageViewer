@@ -1,5 +1,5 @@
 #include "ReaderTGA.h"
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "BasicProcessing.h"
 #include "MaxImageDef.h"
 #include <cstdint>

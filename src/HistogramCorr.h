@@ -4,14 +4,14 @@
 #include "ImageProcessingTypes.h"
 #include "WTLCompat.h"
 
-class CJPEGImage;
+class CBaseImage;
 
 // Histogram (R,G,B,Grey) of an image
 class CHistogram {
 public:
     // If bUseOrigPixels is set to true, the original pixels (uncropped and not resized) are used.
     // If bUseOrigPixels is set to false, the cropped and resized subrectangle is used.
-    CHistogram(const CJPEGImage & image, bool bUseOrigPixels);
+    CHistogram(const CBaseImage & image, bool bUseOrigPixels);
     // Create histogram of 32 bpp DIB
     CHistogram(const void* pPixels, const CSize& size);
     // Creating histogram with already known channel histograms. The histogram channels are copied and must

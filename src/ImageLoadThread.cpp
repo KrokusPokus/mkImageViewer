@@ -1,6 +1,6 @@
 #include "ImageLoadThread.h"
 #include "Helpers.h"
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "MaxImageDef.h"
 #include "MainDlg.h"
 #include "ReaderBMP.h"
@@ -47,7 +47,7 @@ using namespace bit7z;
 // static initializers
 std::atomic<int> CImageLoadThread::m_curHandle(0);
 
-// The DIBs handed to CJPEGImage are BGRA. QImage::Format_ARGB32 / Format_RGB32 have exactly this layout on little endian.
+// The DIBs handed to CBaseImage are BGRA. QImage::Format_ARGB32 / Format_RGB32 have exactly this layout on little endian.
 static_assert(Q_BYTE_ORDER == Q_LITTLE_ENDIAN, "The 32bpp DIB layout (B,G,R,A) assumes a little endian platform");
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -283,7 +283,7 @@ std::string ToNativeNarrowPath(const QString& sFileName) {
 // Qt image decoding (QImageReader / QImage / QColorSpace)
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-// Format and frame information that is handed over to the CJPEGImage constructor
+// Format and frame information that is handed over to the CBaseImage constructor
 struct CImageFrameInfo {
     EImageFormat eFormat = IF_Unknown;
     bool bIsAnimation = false;
@@ -293,7 +293,7 @@ struct CImageFrameInfo {
     EImageFormat eContainerFormat = IF_Unknown; // IF_ZIP for an entry of an archive
 };
 
-// Maps the format name reported by QImageReader::format() to the image format used by CJPEGImage.
+// Maps the format name reported by QImageReader::format() to the image format used by CBaseImage.
 EImageFormat MapQtImageFormat(const QByteArray& sFormat) {
     if (sFormat == "avif") {
         return IF_AVIF;
@@ -341,7 +341,7 @@ const QColorSpace& SrgbColorSpace() {
 }
 
 // bApplyEXIFOrientation: let Qt rotate/mirror the image according to its EXIF orientation (if enabled in the settings).
-// Pass false if the caller hands the EXIF data to the CJPEGImage, which then does the rotation itself (otherwise it would be done twice).
+// Pass false if the caller hands the EXIF data to the CBaseImage, which then does the rotation itself (otherwise it would be done twice).
 std::unique_ptr<QImageReader> CreateQtImageReader(QIODevice* pDevice, bool bApplyEXIFOrientation) {
     auto pReader = std::make_unique<QImageReader>(pDevice);
     pReader->setDecideFormatFromContent(true); // do not trust the file extension
@@ -365,12 +365,12 @@ bool IsImageSizeAcceptable(const QSize& size, bool& bOutOfMemory) {
     return true;
 }
 
-// Converts a decoded QImage into a CJPEGImage (32bpp BGRA DIB).
+// Converts a decoded QImage into a CBaseImage (32bpp BGRA DIB).
 // - If enabled in the settings, the embedded ICC profile is applied (conversion to sRGB). Images without a profile,
 //   or with a profile Qt cannot use, have an invalid colorSpace() and are left untouched.
 // - Images with an alpha channel are blended onto the background according to nTransparencyMode.
-// pEXIFData is copied by CJPEGImage, the caller keeps ownership.
-CJPEGImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImageFrameInfo& frame,
+// pEXIFData is copied by CBaseImage, the caller keeps ownership.
+CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImageFrameInfo& frame,
                                      bool& isOutOfMemory, Helpers::ETransparencyMode nTransparencyMode) {
     isOutOfMemory = false;
     if (image.isNull()) {
@@ -407,14 +407,14 @@ CJPEGImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     for (int y = 0; y < nHeight; ++y) {
         std::memcpy(pDIB.get() + static_cast<size_t>(y) * nRowBytes, image.constScanLine(y), nRowBytes);
     }
-    image = QImage(); // release the decoded image before the CJPEGImage is created
+    image = QImage(); // release the decoded image before the CBaseImage is created
 
     if (bHasAlphaChannel) {
         Helpers::BlendAlpha(reinterpret_cast<uint32*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
     }
-    CJPEGImage* pJPEGImage = new CJPEGImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat, frame.eContainerFormat,
+    CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat, frame.eContainerFormat,
                                             frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs);
-    pDIB.release(); // owned by the CJPEGImage now
+    pDIB.release(); // owned by the CBaseImage now
     return pJPEGImage;
 }
 
@@ -422,7 +422,7 @@ CJPEGImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
 // This is what QImage::fromData() does internally; a QImageReader is used directly because it reports the image
 // size before the pixels are decoded, which keeps the MAX_IMAGE_DIMENSION / MAX_IMAGE_PIXELS limits effective.
 // pData must stay valid for the duration of the call (it is not copied).
-CJPEGImage* DecodeBufferWithQt(const void* pData, int nSize, void* pEXIFData, const CImageFrameInfo& frame,
+CBaseImage* DecodeBufferWithQt(const void* pData, int nSize, void* pEXIFData, const CImageFrameInfo& frame,
                                bool& isOutOfMemory, Helpers::ETransparencyMode nTransparencyMode) {
     isOutOfMemory = false;
     try {
@@ -525,7 +525,7 @@ struct CFreeDeleter {
 };
 using ExifPtr = std::unique_ptr<void, CFreeDeleter>;
 
-// Pixel data is always allocated with new[]: CJPEGImage releases it with delete[]
+// Pixel data is always allocated with new[]: CBaseImage releases it with delete[]
 using PixelPtr = std::unique_ptr<uint8_t[]>;
 
 // The encoded data handed to a decoder
@@ -679,14 +679,14 @@ CImageFrameInfo MakeFrameInfo(EImageFormat eFormat, const CDecodeTarget& target)
     return info;
 }
 
-// Builds the CJPEGImage from decoded pixels. The ownership of the pixels goes to the image.
-std::unique_ptr<CJPEGImage> CreateImage(CDecoded& d, EImageFormat eFormat, const CEncodedData& in,
+// Builds the CBaseImage from decoded pixels. The ownership of the pixels goes to the image.
+std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const CEncodedData& in,
                                         const CDecodeTarget& target, Helpers::ETransparencyMode eTransparency) {
     if (d.bBlendAlpha) {
         Helpers::BlendAlpha(reinterpret_cast<uint32*>(d.pixels.get()), d.nWidth, d.nHeight, eTransparency);
     }
 
-    // JPEG: the EXIF block is part of the file data (CJPEGImage copies it) and the hash identifies the file
+    // JPEG: the EXIF block is part of the file data (CBaseImage copies it) and the hash identifies the file
     void* pEXIF = d.pExif;
     int64_t nHash = 0;
     if (eFormat == IF_JPEG) {
@@ -694,16 +694,16 @@ std::unique_ptr<CJPEGImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
         nHash = Helpers::CalculateJPEGFileHash(in.pData, static_cast<int>(in.nSize));
     }
 
-    std::unique_ptr<CJPEGImage> pImage;
+    std::unique_ptr<CBaseImage> pImage;
     if (target.bInArchive) {
         // For an entry of an archive "the frame" is the entry
-        pImage.reset(new CJPEGImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat, IF_ZIP,
+        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat, IF_ZIP,
                                     target.bMultipleFiles, target.nEntryIndex, target.nArchiveCount, kMangaFrameTimeMs));
     } else {
-        pImage.reset(new CJPEGImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
+        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
                                     d.bHasAnimation, d.nFrameIndex, d.nFrameCount, d.nFrameTimeMs));
     }
-    d.pixels.release(); // owned by the CJPEGImage now
+    d.pixels.release(); // owned by the CBaseImage now
 
     if (eFormat == IF_JPEG) {
         pImage->SetJPEGComment(Helpers::GetJPEGComment(in.pData, static_cast<int>(in.nSize)));
@@ -851,7 +851,7 @@ void CImageLoadThread::AfterFinishProcess(CRequestBase& request) {
     }
 
     CRequest& rq = static_cast<CRequest&>(request);
-    // Invokes the completion callback that was passed in by CJPEGProvider
+    // Invokes the completion callback that was passed in by CImageProvider
     if (rq.CompletedCallback) {
         rq.CompletedCallback(rq.RequestHandle);
     }
@@ -951,7 +951,7 @@ void CImageLoadThread::ProcessReadFileRequest(CRequest* request, EImageFormat eF
 }
 
 // Decodes the encoded image in pBuffer and stores the result in request->Image. This is the only place that knows
-// how to turn the data of a format into a CJPEGImage, for single files and for entries of an archive alike.
+// how to turn the data of a format into a CBaseImage, for single files and for entries of an archive alike.
 // On failure request->OutOfMemory / request->ExceptionError are set accordingly.
 //
 // Buffer ownership (pBuffer is empty if a cached animation is continued):
@@ -963,7 +963,7 @@ void CImageLoadThread::ProcessReadFileRequest(CRequest* request, EImageFormat eF
 //
 // Differences between a file and an archive entry (CDecodeTarget::bInArchive):
 //  - Archive: only the first frame is shown, no decoder is kept (the caller drops them before the buffer is released),
-//    AVIF/HEIF always read frame 0, and the CJPEGImage is created as an entry of the container IF_ZIP.
+//    AVIF/HEIF always read frame 0, and the CBaseImage is created as an entry of the container IF_ZIP.
 EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat eFormat, std::unique_ptr<char[]>& pBuffer,
                                                  size_t nSize, const CDecodeTarget& target) {
     CErrorModeGuard errorModeGuard;
@@ -972,7 +972,7 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
     const bool bHaveData = (in.pData != nullptr);
 
     try {
-        // Qt decodes the (first frame of the) buffer. pEXIFData is only used for the rotation done by the CJPEGImage.
+        // Qt decodes the (first frame of the) buffer. pEXIFData is only used for the rotation done by the CBaseImage.
         auto decodeWithQt = [&](void* pEXIFData) {
             bool bQtOutOfMemory = false;
             request->Image = DecodeBufferWithQt(in.pData, static_cast<int>(in.nSize), pEXIFData, MakeFrameInfo(eFormat, target),
@@ -1049,7 +1049,7 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
                 break;
             case IF_PNG:
             {
-                // libpng failed: Qt gets a chance. The EXIF data is taken from the PNG, the CJPEGImage does the rotation.
+                // libpng failed: Qt gets a chance. The EXIF data is taken from the PNG, the CBaseImage does the rotation.
                 const ExifPtr pQtEXIF(PngReader::GetEXIFBlock(in.pData, in.nSize));
                 status = decodeWithQt(pQtEXIF.get());
             }
@@ -1223,7 +1223,7 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
 
     LimitOffsets(request->ProcessParams.Offsets, QSize(request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight), newSize);
 
-    // this will process the image and cache the processed DIB in the CJPEGImage instance
+    // this will process the image and cache the processed DIB in the CBaseImage instance
     const CPoint offsetInImage = request->Image->ConvertOffset(newSize, clippedSize, request->ProcessParams.Offsets);
     return nullptr != request->Image->GetDIB(newSize, clippedSize, offsetInImage,
                                              request->ProcessParams.ImageProcParams, request->ProcessParams.ProcFlags);

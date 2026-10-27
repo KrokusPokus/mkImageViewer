@@ -1,5 +1,5 @@
 #include "ReaderBMP.h"
-#include "JPEGImage.h"
+#include "BaseImage.h"
 #include "Helpers.h"
 #include "BasicProcessing.h"
 #include "MaxImageDef.h"

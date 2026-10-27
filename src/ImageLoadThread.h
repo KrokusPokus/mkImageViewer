@@ -23,7 +23,7 @@ struct CDecodeTarget {
     int  nEntryIndex = 0;
 };
 
-class CJPEGImage;
+class CBaseImage;
 
 class ZipEntry
 {
@@ -40,11 +40,11 @@ public:
 class CImageData
 {
 public:
-    CJPEGImage* Image;
+    CBaseImage* Image;
     bool IsRequestFailedOutOfMemory;
     bool IsRequestFailedException;
 
-    CImageData(CJPEGImage* pImage, bool isRequestFailedOutOfMemory, bool isRequestFailedException) {
+    CImageData(CBaseImage* pImage, bool isRequestFailedOutOfMemory, bool isRequestFailedException) {
         Image = pImage;
         IsRequestFailedOutOfMemory = isRequestFailedOutOfMemory;
         IsRequestFailedException = isRequestFailedException;
@@ -91,7 +91,7 @@ private:
         int FrameIndex;
         std::function<void(int)> CompletedCallback;
         int RequestHandle;
-        CJPEGImage* Image;
+        CBaseImage* Image;
         CProcessParams ProcessParams;
         bool OutOfMemory;
         bool ExceptionError;

@@ -1,5 +1,5 @@
-#include "JPEGProvider.h"
-#include "JPEGImage.h"
+#include "ImageProvider.h"
+#include "BaseImage.h"
 #include "ImageLoadThread.h"
 #include "FileList.h"
 #include "ProcessParams.h"
@@ -10,7 +10,7 @@
 
 namespace {
 
-bool CanReadAhead(CJPEGImage* pImage) {
+bool CanReadAhead(CBaseImage* pImage) {
     bool isMultiFrame = pImage != nullptr && pImage->NumberOfFrames() > 1;
     bool isAnimation = pImage != nullptr && pImage->IsAnimation();
     bool isContainer = pImage != nullptr && pImage->IsContainer();
@@ -28,11 +28,11 @@ bool CanReadAhead(CJPEGImage* pImage) {
 
 } // namespace
 
-CJPEGProvider::CImageRequest::~CImageRequest() {
-    delete Image; // CJPEGImage is a complete type here (JPEGImage.h)
+CImageProvider::CImageRequest::~CImageRequest() {
+    delete Image; // CBaseImage is a complete type here (JPEGImage.h)
 }
 
-CJPEGProvider::CJPEGProvider(QObject* pParent, int nNumThreads, int nNumBuffers)
+CImageProvider::CImageProvider(QObject* pParent, int nNumThreads, int nNumBuffers)
     : QObject(pParent),
     m_nNumThread(std::max(1, nNumThreads)),
     m_nNumBuffers(std::max(0, nNumBuffers)),
@@ -43,14 +43,14 @@ CJPEGProvider::CJPEGProvider(QObject* pParent, int nNumThreads, int nNumBuffers)
     }
 }
 
-CJPEGProvider::~CJPEGProvider(void) {
+CImageProvider::~CImageProvider(void) {
     for (int i = 0; i < m_nNumThread; i++) {
         delete m_pWorkThreads[i];
     }
     delete[] m_pWorkThreads;
 }
 
-CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirection eDirection,
+CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirection eDirection,
                                         const QString& sFileName, int nFrameIndex, const CProcessParams & processParams,
                                         bool& bOutOfMemory, bool& bExceptionError) {
     if (sFileName.isEmpty()) {
@@ -62,28 +62,28 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
     RequestPtr pRequest = FindRequest(sFileName, nFrameIndex);
     bool bWasOutOfMemory = false;
     if (pRequest == nullptr) {
-        qDebug() << "CJPEGProvider::RequestImage() -> StartNewRequest() Frame" << nFrameIndex << "of" << sFileName;
+        qDebug() << "CImageProvider::RequestImage() -> StartNewRequest() Frame" << nFrameIndex << "of" << sFileName;
         pRequest = StartNewRequest(sFileName, nFrameIndex, processParams);
     } else {
-        qDebug() << "CJPEGProvider::RequestImage() Retrieving existing request: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
+        qDebug() << "CImageProvider::RequestImage() Retrieving existing request: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
     }
 
     // Warten auf das Laden des Bildes via QWaitCondition
     if (!pRequest->Ready) {
-        qDebug() << "CJPEGProvider::RequestImage() waiting for image to finish loading from disk: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
+        qDebug() << "CImageProvider::RequestImage() waiting for image to finish loading from disk: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
         QMutexLocker locker(&pRequest->Mutex);
         while (!pRequest->Ready) {
             pRequest->WaitCondition.wait(&pRequest->Mutex);
         }
     } else {
-        CJPEGImage* pImage = pRequest->Image;
+        CBaseImage* pImage = pRequest->Image;
         if (pImage != nullptr) {
             EProcessingFlags procFlags = processParams.ProcFlags;
             pImage->RestoreInitialParameters(sFileName, processParams.ImageProcParams, procFlags,
                                              processParams.RotationParams.Rotation, processParams.Zoom, processParams.Offsets,
                                              CSize(processParams.TargetWidth, processParams.TargetHeight), processParams.MonitorSize);
         }
-        qDebug() << "CJPEGProvider::RequestImage() found in cache: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
+        qDebug() << "CImageProvider::RequestImage() found in cache: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
     }
 
     pRequest->InUse = true;
@@ -109,14 +109,14 @@ CJPEGImage* CJPEGProvider::RequestImage(CFileList* pFileList, EReadAheadDirectio
         RemoveUnusedImages(true);
     }
 
-    qDebug() << "CJPEGProvider::RequestImage() m_requestList.size:" << m_requestList.size();
+    qDebug() << "CImageProvider::RequestImage() m_requestList.size:" << m_requestList.size();
 
     bOutOfMemory = pRequest->OutOfMemory;
     bExceptionError = pRequest->ExceptionError;
     return pRequest->Image;
 }
 
-void CJPEGProvider::NotifyNotUsed(CJPEGImage* pImage) {
+void CImageProvider::NotifyNotUsed(CBaseImage* pImage) {
     if (!pImage) return;
 
     for (const auto& request : m_requestList) {
@@ -130,7 +130,7 @@ void CJPEGProvider::NotifyNotUsed(CJPEGImage* pImage) {
     delete pImage;
 }
 
-void CJPEGProvider::ClearAllRequests() {
+void CImageProvider::ClearAllRequests() {
     for (auto iter = m_requestList.begin(); iter != m_requestList.end(); ) {
         const auto& pRequest = *iter;
         if (pRequest->InUse) {
@@ -141,7 +141,7 @@ void CJPEGProvider::ClearAllRequests() {
     }
 }
 
-bool CJPEGProvider::FreeAllPossibleMemory() {
+bool CImageProvider::FreeAllPossibleMemory() {
     bool bCouldFreeMemory = false;
     for (auto iter = m_requestList.begin(); iter != m_requestList.end(); ) {
         const auto& pRequest = *iter;
@@ -155,7 +155,7 @@ bool CJPEGProvider::FreeAllPossibleMemory() {
     return bCouldFreeMemory;
 }
 
-bool CJPEGProvider::ClearRequest(CJPEGImage* pImage, bool releaseLockedFile) {
+bool CImageProvider::ClearRequest(CBaseImage* pImage, bool releaseLockedFile) {
     if (pImage == nullptr) {
         return false;
     }
@@ -174,7 +174,7 @@ bool CJPEGProvider::ClearRequest(CJPEGImage* pImage, bool releaseLockedFile) {
     return bErased;
 }
 
-CJPEGProvider::RequestPtr CJPEGProvider::FindRequest(const QString& sFileName, int nFrameIndex) {
+CImageProvider::RequestPtr CImageProvider::FindRequest(const QString& sFileName, int nFrameIndex) {
     if (sFileName.isEmpty()) {
         return nullptr;
     }
@@ -192,7 +192,7 @@ CJPEGProvider::RequestPtr CJPEGProvider::FindRequest(const QString& sFileName, i
     return nullptr;
 }
 
-CJPEGProvider::RequestPtr CJPEGProvider::StartRequestAndWaitUntilReady(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
+CImageProvider::RequestPtr CImageProvider::StartRequestAndWaitUntilReady(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
     RequestPtr pRequest = StartNewRequest(sFileName, nFrameIndex, processParams);
 
     QMutexLocker locker(&pRequest->Mutex);
@@ -202,7 +202,7 @@ CJPEGProvider::RequestPtr CJPEGProvider::StartRequestAndWaitUntilReady(const QSt
     return pRequest;
 }
 
-void CJPEGProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirection eDirection,
+void CImageProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirection eDirection,
                                           const CProcessParams & processParams, int nNumRequests, RequestPtr pLastReadyRequest) {
     if (nNumRequests < 1 || pFileList == nullptr || pLastReadyRequest == nullptr) {
         return;
@@ -258,7 +258,7 @@ void CJPEGProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirect
     }
 }
 
-CJPEGProvider::RequestPtr CJPEGProvider::StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
+CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
     qDebug() << "StartNewRequest() sFileName:" << sFileName << "nFrameIndex:" << nFrameIndex;
     auto pRequest = std::make_shared<CImageRequest>(sFileName, nFrameIndex);
     m_requestList.push_back(pRequest);
@@ -283,7 +283,7 @@ CJPEGProvider::RequestPtr CJPEGProvider::StartNewRequest(const QString& sFileNam
     return pRequest;
 }
 
-CImageLoadThread* CJPEGProvider::SearchThreadForNewRequest(void) {
+CImageLoadThread* CImageProvider::SearchThreadForNewRequest(void) {
     for (int i = 0; i < m_nNumThread; i++) {
         bool bFree = true;
         CImageLoadThread* pThisThread = m_pWorkThreads[i];
@@ -312,7 +312,7 @@ CImageLoadThread* CJPEGProvider::SearchThreadForNewRequest(void) {
     return (pOldestThread == nullptr) ? m_pWorkThreads[0] : pOldestThread;
 }
 
-void CJPEGProvider::RemoveUnusedImages(bool bRemoveAlsoActiveRequests) {
+void CImageProvider::RemoveUnusedImages(bool bRemoveAlsoActiveRequests) {
     bool bRemoved = false;
     int nTimeStampToRemove = -2;
     do {
@@ -343,20 +343,20 @@ void CJPEGProvider::RemoveUnusedImages(bool bRemoveAlsoActiveRequests) {
     } while (bRemoved);
 }
 
-void CJPEGProvider::SetAllRequestsInactive() {
+void CImageProvider::SetAllRequestsInactive() {
     for (const auto& request : m_requestList) {
         request->IsActive = false;
     }
 }
 
-std::list<CJPEGProvider::RequestPtr>::iterator CJPEGProvider::DeleteElementAt(std::list<RequestPtr>::iterator iteratorAt) {
+std::list<CImageProvider::RequestPtr>::iterator CImageProvider::DeleteElementAt(std::list<RequestPtr>::iterator iteratorAt) {
     return m_requestList.erase(iteratorAt);
 }
 
-void CJPEGProvider::DeleteElement(RequestPtr pRequest) {
+void CImageProvider::DeleteElement(RequestPtr pRequest) {
     m_requestList.remove(pRequest);
 }
 
-bool CJPEGProvider::IsDestructivelyProcessed(CJPEGImage* pImage) {
+bool CImageProvider::IsDestructivelyProcessed(CBaseImage* pImage) {
     return pImage != nullptr && pImage->IsDestructivelyProcessed();
 }

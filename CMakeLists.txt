@@ -57,8 +57,8 @@ qt_add_executable(mkImageViewer
     src/HistogramCorr.h src/HistogramCorr.cpp
     src/ICCProfileTransform.h src/ICCProfileTransform.cpp
     src/ImageLoadThread.h src/ImageLoadThread.cpp
-    src/JPEGImage.h src/JPEGImage.cpp
-    src/JPEGProvider.h src/JPEGProvider.cpp
+    src/BaseImage.h src/BaseImage.cpp
+    src/ImageProvider.h src/ImageProvider.cpp
     src/KeyMap.h src/KeyMap.cpp
     src/LocalDensityCorr.h src/LocalDensityCorr.cpp
     src/MainDlg.h src/MainDlg.cpp

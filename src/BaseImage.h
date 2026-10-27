@@ -1,5 +1,5 @@
-#ifndef JPEGIMAGE_H
-#define JPEGIMAGE_H
+#ifndef BASEIMAGE_H
+#define BASEIMAGE_H
 
 #include "ProcessParams.h"
 #include "libjpeg-turbo/include/turbojpeg.h" // for enum TJSAMP
@@ -19,7 +19,7 @@ struct CDimRect {
 };
 
 // Class holding a decoded image (not just JPEG - any supported format) and its meta data (if available).
-class CJPEGImage {
+class CBaseImage {
 public:
     // Ownership of memory in pPixels goes to class, accessing this pointer after the constructor has been called
     // may causes access violations (use OriginalPixels() instead).
@@ -35,13 +35,13 @@ public:
     // its value must be NULL.
     // If RAW metadata is specified, ownership of this memory is transferred to this class.
 
-    CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
+    CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
         int64_t nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs);
 
-    CJPEGImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
+    CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
         int64_t nJPEGHash, EImageFormat eImageFormat, EImageFormat eContainerFormat = IF_Unknown, bool bIsAnimation = false, int nFrameIndex = 9, int nNumberOfFrames = 1, int nFrameTimeMs = 0);
 
-    ~CJPEGImage(void);
+    ~CBaseImage(void);
 
     // Gets resampled and processed 32 bpp DIB image (up or downsampled).
     // Parameters:
@@ -52,7 +52,7 @@ public:
     // eProcFlags: Processing flags, e.g. apply LDC
     // Return value:
     // The returned DIB is a 32 bpp DIB (BGRA). Note that the returned pointer must not
-    // be deleted by the caller and is only valid until another call to GetDIB() is done, the CJPEGImage
+    // be deleted by the caller and is only valid until another call to GetDIB() is done, the CBaseImage
     // object is disposed or the Rotate() or any other method affecting original pixels is called!
     // Note: The method tries to satisfy consecutive requests as efficient as possible. Calling the GetDIB()
     // method multiple times with the same set of parameters will return the same image starting from the second
@@ -81,7 +81,7 @@ public:
     int OrigHeight() const { return m_nOrigHeight; }
     CSize OrigSize() const { return CSize(m_nOrigWidth, m_nOrigHeight); }
 
-    // Original image size at the time the CJPEGImage was constructed.
+    // Original image size at the time the CBaseImage was constructed.
     // Operations on the original pixels will not change this size!
     int InitOrigWidth() const { return m_nInitOrigWidth; }
     int InitOrigHeight() const { return m_nInitOrigHeight; }
@@ -346,4 +346,4 @@ private:
 };
 
 
-#endif // JPEGIMAGE_H
+#endif // BASEIMAGE_H
