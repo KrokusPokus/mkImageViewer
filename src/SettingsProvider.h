@@ -44,7 +44,6 @@ private:
     class QCheckBox* m_checkShowFullScreen;
     class QCheckBox* m_checkBookModeLaunchFullscreen;
     class QCheckBox* m_checkSingleFullScreenInstance;
-    class QComboBox* m_comboDefaultWindowRect;
     class QSpinBox*  m_spinMinWidth;
     class QSpinBox*  m_spinMinHeight;
     class QCheckBox* m_checkShowFilePathInTitle;
@@ -139,7 +138,6 @@ public:
     // Ursprüngliche Rückgabetypen für vollständige Drop-in Compatibility
     QColor ColorBackground() const { return m_colorBackground; }
     QColor ColorTransparency() const { return m_colorTransparency; }
-    QRect DefaultWindowRect() const { return m_defaultWindowRect; }
     QRect StickyWindowRect() const { return m_stickyWindowRect; }
     QSize MinimalWindowSize() const { return m_minimalWindowSize; }
 
@@ -225,11 +223,10 @@ private:
     bool m_bWrapAroundFolder{true};
     Helpers::EDeleteConfirmation m_eDeleteConfirmation;
     bool m_bAutoRotateEXIF{true};
-    bool m_bUseEmbeddedColorProfiles{false};
-    QRect m_defaultWindowRect;
+    bool m_bUseEmbeddedColorProfiles{true};
     QRect m_stickyWindowRect;
     bool m_bDefaultMaximized{false};
-    bool m_bStickyWindowSize{false};
+    bool m_bStickyWindowSize{true};
     bool m_bExplicitWindowRect{false};
     bool m_bForceQImageReader{false};
     QColor m_colorBackground;

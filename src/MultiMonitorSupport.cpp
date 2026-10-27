@@ -113,13 +113,12 @@ QRect CMultiMonitorSupport::GetWorkingRect(const QWidget* pWidget) {
     return QRect(0, 0, 1920, 1080);
 }
 
-// Gets the default window rectangle for windowed mode
+// Gets the default client rectangle for windowed mode
 QRect CMultiMonitorSupport::GetDefaultWindowRect() {
     CSettingsProvider& settings = CSettingsProvider::This();
-    
     // Ermitteln, welches Basis-Rechteck geladen werden soll
-    QRect windowRect = !defaultWindowRect.isEmpty() ? defaultWindowRect : (settings.StickyWindowSize() ? settings.StickyWindowRect() : settings.DefaultWindowRect());
-    
+    QRect windowRect = !defaultWindowRect.isEmpty() ? defaultWindowRect : (settings.StickyWindowSize() ? settings.StickyWindowRect() : QRect(0, 0, 0, 0));
+
     QRect rectAllScreens = CMultiMonitorSupport::GetVirtualDesktop();
     
     // If we still have no valid windowRect OR if the windowRect we have is outside the screen rect, reset to a calculated default
@@ -138,10 +137,6 @@ QRect CMultiMonitorSupport::GetDefaultWindowRect() {
         int nDesiredWidth = monitorRect.width() * 2 / 3;
         int nDesiredHeight = nDesiredWidth * 3 / 4;
         
-        QSize borderSize = GetTotalBorderSize();
-        nDesiredWidth += borderSize.width();
-        nDesiredHeight += borderSize.height();
-        
         windowRect = QRect(
             QPoint(monitorRect.left() + (monitorRect.width() - nDesiredWidth) / 2, 
                    monitorRect.top() + (monitorRect.height() - nDesiredHeight) / 2), 
@@ -149,45 +144,11 @@ QRect CMultiMonitorSupport::GetDefaultWindowRect() {
         );
     }
     
+    qDebug() << "GetDefaultWindowRect() StickyWindowRect:" << settings.StickyWindowRect() << "windowRect:" << windowRect;
     return windowRect;
 }
 
 // Sets the default window rectangle for windowed mode
 void CMultiMonitorSupport::SetDefaultWindowRect(QRect rect) {
     defaultWindowRect = rect;
-}
-
-// Gets the default client rectangle for windowed mode
-QRect CMultiMonitorSupport::GetDefaultClientRectInWindowMode() {
-    QRect wndRect = CMultiMonitorSupport::GetDefaultWindowRect();
-    QSize borderSize = GetTotalBorderSize();
-    
-    return QRect(
-        0, 0, 
-        wndRect.width() - borderSize.width(), 
-        wndRect.height() - borderSize.height()
-    );
-}
-
-QSize CMultiMonitorSupport::GetTotalBorderSize() {
-    QStyle* style = QApplication::style();
-    
-    // Standard-Rahmenbreite (entspricht in etwa SM_CXSIZEFRAME)
-    int frameWidth = style->pixelMetric(QStyle::PM_DefaultFrameWidth);
-    
-    // Titelleistenhöhe (entspricht SM_CYCAPTION)
-    int titleBarHeight = style->pixelMetric(QStyle::PM_TitleBarHeight);
-    
-    // Falls PM_TitleBarHeight auf manchen Plattformen/Styles 0 liefert, 
-    // setzen wir einen sinnvollen Fallback (z.B. Font-Metriken oder Standardwert)
-    if (titleBarHeight <= 0) {
-        titleBarHeight = 25; // Typischer Standardwert
-    }
-
-    // Da der Rahmen links und rechts bzw. oben und unten existiert, * 2 für die Breite
-    int nBorderWidth = frameWidth * 2;
-    // Gesamthöhe setzt sich aus Titelleiste + oberem/unteren Rahmen zusammen
-    int nBorderHeight = titleBarHeight + (frameWidth * 2);
-
-    return QSize(nBorderWidth, nBorderHeight);
 }

@@ -242,7 +242,7 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
     int GetFrameIndex(CBaseImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage) {
         bool isMultiFrame = pImage != NULL && pImage->NumberOfFrames() > 1;
         bool isAnimation = pImage != NULL && pImage->IsAnimation();
-        bool isContainer = pImage != NULL && pImage->IsContainer();
+        bool bInArchive = pImage != NULL && pImage->InArchive();
         int nFrameIndex = 0;
         switchImage = true;
         if (isMultiFrame) {
@@ -259,7 +259,7 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
                     switchImage = true;
                     nFrameIndex = 0;
                 }
-            } else if (isContainer) {
+            } else if (bInArchive) {
                 if (nFrameIndex < 0) {
                     nFrameIndex = nFrameIndex + pImage->NumberOfFrames();
                 } else if (nFrameIndex > pImage->NumberOfFrames() - 1) {

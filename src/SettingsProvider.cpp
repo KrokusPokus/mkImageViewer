@@ -274,11 +274,6 @@ QWidget* SettingsDialog::createGuiTab() {
     m_checkSingleFullScreenInstance = new QCheckBox(tr("Nur eine Vollbild-Instanz erlauben"));
     layout->addRow(m_checkSingleFullScreenInstance);
 
-    m_comboDefaultWindowRect = new QComboBox();
-    m_comboDefaultWindowRect->addItems({"sticky", "auto", "max"});
-    m_comboDefaultWindowRect->setToolTip(tr("Standardposition und -größe im Fenster-Modus."));
-    layout->addRow(tr("Fenstergröße beim Start:"), m_comboDefaultWindowRect);
-
     QHBoxLayout* minSizeLayout = new QHBoxLayout();
     m_spinMinWidth = new QSpinBox();
     m_spinMinWidth->setRange(100, 3840);
@@ -591,7 +586,6 @@ void SettingsDialog::saveToSettings() {
     settings.WriteString("BackgroundColor", QString("%1 %2 %3").arg(m_colorBg.red()).arg(m_colorBg.green()).arg(m_colorBg.blue()));
     settings.WriteString("CPUType", m_comboCpuType->currentText());
     settings.WriteString("ColorCorrection", m_editColorCorrection->text());
-    settings.WriteString("DefaultWindowRect", m_comboDefaultWindowRect->currentText());
     settings.WriteString("DeleteConfirmation", m_comboDeleteConfirmation->currentText());
     settings.WriteString("DownSamplingFilter", m_comboDownSamplingFilter->currentText());
     settings.WriteString("FileDisplayOrder", m_comboFileDisplayOrder->currentText());
@@ -631,6 +625,8 @@ void CSettingsProvider::ReadStickyWindowRect() {
             m_stickyWindowRect = QRect(QPoint(left, top), QPoint(right, bottom)).normalized();
         }
     }
+
+    m_bExplicitWindowRect = !m_stickyWindowRect.isEmpty();
 }
 
 CSettingsProvider::CSettingsProvider() {
@@ -756,22 +752,8 @@ CSettingsProvider::CSettingsProvider() {
     m_dAutoContrastAmount = GetDouble("AutoContrastCorrectionAmount", 0.5, 0.0, 1.0);
     m_dAutoBrightnessAmount = GetDouble("AutoBrightnessCorrectionAmount", 0.2, 0.0, 1.0);
 
-    m_defaultWindowRect = GetRect("DefaultWindowRect", QRect(0, 0, 0, 0));
     m_bDefaultMaximized = false;
-    m_bStickyWindowSize = false;
-    m_bExplicitWindowRect = false;
-
-    if (m_defaultWindowRect.isEmpty()) {
-        QString sAuto = GetString("DefaultWindowRect", "");
-        if (sAuto.compare("max", Qt::CaseInsensitive) == 0) {
-            m_bDefaultMaximized = true;
-        } else if (sAuto.compare("sticky", Qt::CaseInsensitive) == 0) {
-            m_bStickyWindowSize = true;
-            m_bExplicitWindowRect = !m_stickyWindowRect.isEmpty();
-        }
-    } else {
-        m_bExplicitWindowRect = true;
-    }
+    m_bStickyWindowSize = true;
 
     m_colorBackground = GetColor("BackgroundColor", QColor(0, 0, 0));
     m_colorTransparency = GetColor("TransparencyColor", QColor(255, 0, 255));

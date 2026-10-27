@@ -13,11 +13,11 @@ namespace {
 bool CanReadAhead(CBaseImage* pImage) {
     bool isMultiFrame = pImage != nullptr && pImage->NumberOfFrames() > 1;
     bool isAnimation = pImage != nullptr && pImage->IsAnimation();
-    bool isContainer = pImage != nullptr && pImage->IsContainer();
+    bool bInArchive = pImage != nullptr && pImage->InArchive();
     if (isMultiFrame) {
         if (isAnimation) {
             return false;
-        } else if (isContainer) {
+        } else if (bInArchive) {
             return true;
         } else {
             return false;
@@ -62,19 +62,20 @@ CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirecti
     RequestPtr pRequest = FindRequest(sFileName, nFrameIndex);
     bool bWasOutOfMemory = false;
     if (pRequest == nullptr) {
-        qDebug() << "CImageProvider::RequestImage() -> StartNewRequest() Frame" << nFrameIndex << "of" << sFileName;
+        //qDebug() << "CImageProvider::RequestImage() -> StartNewRequest() Frame" << nFrameIndex << "of" << sFileName;
         pRequest = StartNewRequest(sFileName, nFrameIndex, processParams);
     } else {
-        qDebug() << "CImageProvider::RequestImage() Retrieving existing request: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
+        //qDebug() << "CImageProvider::RequestImage() Retrieving existing request: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
     }
 
     // Warten auf das Laden des Bildes via QWaitCondition
     if (!pRequest->Ready) {
-        qDebug() << "CImageProvider::RequestImage() waiting for image to finish loading from disk: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
+        qDebug() << "CImageProvider::RequestImage() Start waiting for request completion: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
         QMutexLocker locker(&pRequest->Mutex);
         while (!pRequest->Ready) {
             pRequest->WaitCondition.wait(&pRequest->Mutex);
         }
+        qDebug() << "CImageProvider::RequestImage() Finished waiting for request completion: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
     } else {
         CBaseImage* pImage = pRequest->Image;
         if (pImage != nullptr) {
@@ -83,7 +84,7 @@ CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirecti
                                              processParams.RotationParams.Rotation, processParams.Zoom, processParams.Offsets,
                                              CSize(processParams.TargetWidth, processParams.TargetHeight), processParams.MonitorSize);
         }
-        qDebug() << "CImageProvider::RequestImage() found in cache: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
+        //qDebug() << "CImageProvider::RequestImage() found in cache: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
     }
 
     pRequest->InUse = true;
@@ -109,7 +110,7 @@ CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirecti
         RemoveUnusedImages(true);
     }
 
-    qDebug() << "CImageProvider::RequestImage() m_requestList.size:" << m_requestList.size();
+    //qDebug() << "CImageProvider::RequestImage() m_requestList.size:" << m_requestList.size();
 
     bOutOfMemory = pRequest->OutOfMemory;
     bExceptionError = pRequest->ExceptionError;
@@ -259,7 +260,7 @@ void CImageProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirec
 }
 
 CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
-    qDebug() << "StartNewRequest() sFileName:" << sFileName << "nFrameIndex:" << nFrameIndex;
+    //qDebug() << "StartNewRequest() sFileName:" << sFileName << "nFrameIndex:" << nFrameIndex;
     auto pRequest = std::make_shared<CImageRequest>(sFileName, nFrameIndex);
     m_requestList.push_back(pRequest);
     pRequest->HandlingThread = SearchThreadForNewRequest();

@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
     bool instanceAccepted = false;
     if (!sStartupFile.isEmpty()) {
         const QList<qint64> activePids = GetActivePids(shm, sem);
-        qDebug() << "As Client: I can see activePids:" << activePids;
+        //qDebug() << "As Client: I can see activePids:" << activePids;
         for (qint64 pid : activePids) {
             if (pid == myPid) continue;
 
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
     // Wenn eine andere Instanz die Datei übernommen hat, beenden wir uns
     if (instanceAccepted) {
-        qDebug() << "As Client: Server has accepted the file. Client will exit.";
+        //qDebug() << "As Client: Server has accepted the file. Client will exit.";
         return 0;
     }
 
@@ -159,12 +159,12 @@ int main(int argc, char *argv[])
 
             clientSocket->waitForReadyRead(kIpcTimeoutMs);
             QString sCopyDataFile = QString::fromUtf8(clientSocket->readAll());
-            qDebug() << "As Server: Client sent path to evaluate:" << sCopyDataFile;
+            //qDebug() << "As Server: Client sent path to evaluate:" << sCopyDataFile;
             if (dlgMain.ShouldAcceptFile(sCopyDataFile)) {
-                qDebug() << "As Server: I accept that file. The client should exit.";
+                //qDebug() << "As Server: I accept that file. The client should exit.";
                 clientSocket->write("ACK");
             } else {
-                qDebug() << "As Server: I won't accept that file. The client may open it.";
+                //qDebug() << "As Server: I won't accept that file. The client may open it.";
                 clientSocket->write("NACK");
             }
             clientSocket->waitForBytesWritten(kIpcTimeoutMs);

@@ -290,7 +290,7 @@ struct CImageFrameInfo {
     int nFrameIndex = 0;
     int nFrameCount = 1;
     int nFrameTimeMs = 100;
-    EImageFormat eContainerFormat = IF_Unknown; // IF_ZIP for an entry of an archive
+    bool bInArchive = false;
 };
 
 // Maps the format name reported by QImageReader::format() to the image format used by CBaseImage.
@@ -412,8 +412,8 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     if (bHasAlphaChannel) {
         Helpers::BlendAlpha(reinterpret_cast<uint32*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
     }
-    CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat, frame.eContainerFormat,
-                                            frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs);
+    CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat,
+                                            frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs, frame.bInArchive);
     pDIB.release(); // owned by the CBaseImage now
     return pJPEGImage;
 }
@@ -670,11 +670,11 @@ CImageFrameInfo MakeFrameInfo(EImageFormat eFormat, const CDecodeTarget& target)
     CImageFrameInfo info;
     info.eFormat = eFormat;
     if (target.bInArchive) {
+        info.bInArchive = true;
         info.bIsAnimation = target.bMultipleFiles;
         info.nFrameIndex = target.nEntryIndex;
         info.nFrameCount = target.nArchiveCount;
         info.nFrameTimeMs = kMangaFrameTimeMs;
-        info.eContainerFormat = IF_ZIP;
     }
     return info;
 }
@@ -697,17 +697,16 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
     std::unique_ptr<CBaseImage> pImage;
     if (target.bInArchive) {
         // For an entry of an archive "the frame" is the entry
-        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat, IF_ZIP,
-                                    target.bMultipleFiles, target.nEntryIndex, target.nArchiveCount, kMangaFrameTimeMs));
+        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
+                                    target.bMultipleFiles, target.nEntryIndex, target.nArchiveCount, kMangaFrameTimeMs, target.bInArchive));
     } else {
         pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
-                                    d.bHasAnimation, d.nFrameIndex, d.nFrameCount, d.nFrameTimeMs));
+                                    d.bHasAnimation, d.nFrameIndex, d.nFrameCount, d.nFrameTimeMs, target.bInArchive));
     }
     d.pixels.release(); // owned by the CBaseImage now
 
     if (eFormat == IF_JPEG) {
         pImage->SetJPEGComment(Helpers::GetJPEGComment(in.pData, static_cast<int>(in.nSize)));
-        pImage->SetJPEGChromoSampling(d.eChromoSubSampling);
     }
     return pImage;
 }
@@ -723,6 +722,7 @@ CImageLoadThread::CImageLoadThread(void) : CWorkThread(true) {
 }
 
 CImageLoadThread::~CImageLoadThread(void) {
+    Terminate(); // *must* happen first
     DeleteCachedQtImageReader();
     DeleteCachedWebpDecoder();
     DeleteCachedPngDecoder();
@@ -833,6 +833,7 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
         ProcessReadQtImageRequest(&rq);
         break;
     }
+
     // then process the image if read was successful
     if (rq.Image != nullptr) {
         rq.Image->SetFileLoadDelayMs(Helpers::GetTimeMs() - startTimeMs);
@@ -1185,6 +1186,8 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
 }
 
 bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
+    qDebug() << "CImageLoadThread::ProcessImageAfterLoad() request->FileName:" << request->FileName << "request->FrameIndex:" << request->FrameIndex;
+
     // set process parameters depending on filename
     request->Image->SetFileDependentProcessParams(request->FileName, &(request->ProcessParams));
 
@@ -1202,6 +1205,9 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
     const int nHeight = request->Image->OrigHeight();
 
     double dZoom = request->ProcessParams.Zoom;
+
+    qDebug() << "CImageLoadThread::ProcessImageAfterLoad() OrigWidth:" << nWidth << "OrigHeight:" << nHeight << "dZoom:" << dZoom << "TargetWidth:" << request->ProcessParams.TargetWidth << "TargetHeight:" << request->ProcessParams.TargetHeight;
+
     QSize newSize;
     if (dZoom < 0.0) {
         newSize = Helpers::GetImageRect(nWidth,

@@ -2,7 +2,6 @@
 #define BASEIMAGE_H
 
 #include "ProcessParams.h"
-#include "libjpeg-turbo/include/turbojpeg.h" // for enum TJSAMP
 
 #include <QString>
 
@@ -36,10 +35,7 @@ public:
     // If RAW metadata is specified, ownership of this memory is transferred to this class.
 
     CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
-        int64_t nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs);
-
-    CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
-        int64_t nJPEGHash, EImageFormat eImageFormat, EImageFormat eContainerFormat = IF_Unknown, bool bIsAnimation = false, int nFrameIndex = 9, int nNumberOfFrames = 1, int nFrameTimeMs = 0);
+        int64_t nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs, bool bInArchive);
 
     ~CBaseImage(void);
 
@@ -92,10 +88,6 @@ public:
 
     // Gets the rotation applied to the pixels
     const CRotationParams& GetRotationParams() {return m_rotationParams; }
-
-    // Gets or sets the JPEG chromo sampling. See turbojpeg.h for the TJSAMP enumeration.
-    TJSAMP GetJPEGChromoSampling() { return m_eJPEGChromoSampling; }
-    void SetJPEGChromoSampling(TJSAMP eSampling) { m_eJPEGChromoSampling = eSampling; }
 
     // Declare the cached DIB as invalid - forcing it to be regenerated on next GetDIB() call
     void SetDIBInvalid() { m_ClippingSize = CSize(0, 0); }
@@ -185,10 +177,8 @@ public:
     // Gets the image format this image has originally
     EImageFormat GetImageFormat() const { return m_eImageFormat; }
 
-    // Gets the container format of this image; IF_Unknown is not
-    EImageFormat GetContainerFormat() const { return m_eContainerFormat; }
-    bool IsContainer() const { return m_eContainerFormat != IF_Unknown; }
-    bool ContainerHasMultipleImages() const { return (m_eContainerFormat != IF_Unknown) && (m_nNumberOfFrames > 1); }
+    bool InArchive() const { return m_bInArchive; }
+    bool ContainerHasMultipleImages() const { return m_bInArchive && (m_nNumberOfFrames > 1); }
 
     // Gets if this image is part of an animation (animated GIF)
     bool IsAnimation() const { return m_bIsAnimation; }
@@ -240,10 +230,10 @@ private:
     int m_nInitOrigWidth, m_nInitOrigHeight; // original width of image when constructed (before any rotation and crop)
     int m_nOriginalChannels;
     int64_t m_nPixelHash;
-    EImageFormat m_eImageFormat, m_eContainerFormat;
-    TJSAMP m_eJPEGChromoSampling;
+    EImageFormat m_eImageFormat;
 
     // multiframe and GIF animation related data
+    bool m_bInArchive;
     bool m_bIsAnimation;
     int m_nFrameIndex;
     int m_nNumberOfFrames;
@@ -318,15 +308,15 @@ private:
     // can be used (return != NULL) or not (return == NULL)
     // The out parameter bParametersChanged returns if one of the parameters relevant for image processing has been changed since the last call
     void* ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-        void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset, 
-        void * pSourceDIB, CSize dibSize, bool bGeometryChanged, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged);
+        void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset,
+        void * pSourceDIB, CSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged);
 
     void* ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
         void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset, 
-        void * pSourceDIB, CSize dibSize, bool bGeometryChanged, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB) {
+        void * pSourceDIB, CSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB) {
         bool bNotUsed;
         return ApplyCorrectionLUTandLDC(imageProcParams, eProcFlags, pCachedTargetDIB, fullTargetSize, targetOffset, 
-            pSourceDIB, dibSize, bGeometryChanged, bOnlyCheck, bCanTakeOwnershipOfSourceDIB, bNotUsed);
+            pSourceDIB, dibSize, bOnlyCheck, bCanTakeOwnershipOfSourceDIB, bNotUsed);
     }
 
     // makes sure that the input image (m_pOrigPixels) is a 4 channel BGRA image (converts if necessary)

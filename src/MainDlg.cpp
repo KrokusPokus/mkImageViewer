@@ -442,7 +442,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
         }
     }
 
-    m_clientRect = m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultClientRectInWindowMode();
+    m_clientRect = m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultWindowRect();
 
     this->setWindowIcon(QIcon(":/icons/mainframes.ico"));
 
@@ -2845,6 +2845,8 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
         nClientHeight = rect.height();
     }
     
+    qDebug() << "CMainDlg::CreateProcessParams() nClientWidth:" << nClientWidth << "nClientHeight:" << nClientHeight;
+
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
     
     if (m_bKeepParams) {
@@ -3382,7 +3384,7 @@ void CMainDlg::AnimateTransition() {
 }
 */
 void CMainDlg::CleanupAndTerminate() {
-    // geometry() liefert die echten Fensterkoordinaten (ohne Window-Manager-Rahmen),
+    // geometry() liefert die ClientRect Fensterkoordinaten (ohne Window-Manager-Rahmen),
     // die setGeometry() beim Start auch fehlerfrei wiederherstellen kann.
     m_windowRectOnClose = geometry();
 
