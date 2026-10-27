@@ -122,10 +122,6 @@ private:
     bool m_bAutoContrast;
     bool m_bKeepParams;
 
-    // used to enable switch between two sets of parameters with CTRL-A
-    CImageProcessingParams* m_pImageProcParams2;
-    EProcessingFlags m_eProcessingFlags2;
-
     // set of parameters used when m_bKeepParams is true
     CImageProcessingParams* m_pImageProcParamsKept;
     EProcessingFlags m_eProcessingFlagsKept;
@@ -183,7 +179,6 @@ private:
     void StopMovieMode();
     void StartLowQTimer(int nTimeout);
     void InitParametersForNewImage();
-    void ExchangeProcessingParams();
     void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
     void onLoadFileAsynch(); // WM_COPYDATAhandler and OnAnotherInstanceStarted() call this via invokeMethod()
 
@@ -217,7 +212,7 @@ private:
     QString LoadBookmark(const QString& sFilePath);
     void SaveBookmark();
     bool IsBookModeFile(const QString& filePath);
-    float MaxRatio(float valA, float valB);
+    double MaxRatio(double valA, double valB);
     QString GetMultiframeIndex(CBaseImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
     QString formatOutputZoomFactor(double m_dZoom);
     void onShowContextMenu(const QPoint &pos);
@@ -228,6 +223,7 @@ private:
     void ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting);
     
     int m_customAnimationFrameTime;
+    bool m_bTerminated{false};
 
     QFileIconProvider m_iconProvider;
 
@@ -243,6 +239,8 @@ private:
     bool m_bPanKeyDown = false;
     bool m_bPanKeyLeft = false;
     bool m_bPanKeyRight = false;
+    bool m_bDropInput = false;
+    void DiscardPendingInput();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -259,6 +257,7 @@ protected:
     void dropEvent(QDropEvent* event) override;
     void timerEvent(QTimerEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
+    bool event(QEvent*) override;
 };
 
 #endif // MAINDLG_H

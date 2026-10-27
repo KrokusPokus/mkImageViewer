@@ -294,10 +294,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_pImageProcParams = new CImageProcessingParams(GetDefaultProcessingParams());
     InitFromProcessingFlags(GetDefaultProcessingFlags(), m_bHQResampling, m_bAutoContrast);
 
-    // Initialize second parameter set using hard coded values, turning off all corrections
-    m_pImageProcParams2 = new CImageProcessingParams(GetNoProcessingParams()); 
-    m_eProcessingFlags2 = PFLAG_HighQualityResampling;
-
     m_pImageProcParamsKept = new CImageProcessingParams();
     m_eProcessingFlagsKept = PFLAG_HighQualityResampling;
     m_dZoomKept = -1;
@@ -322,7 +318,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_bExceptionErrorLastImage = false;
     m_nLastLoadError = FileLoad_Ok;
 
-    m_bAutoExit = false;
     m_nLastSlideShowImageTickCount = 0;
     m_dMovieFPS = 1.0;
     m_nAutoStartSlideShow = false;
@@ -512,7 +507,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     this->update();
 
     this->setAcceptDrops(true);
-    //this->setMouseTracking(true); // Aktiviert permanente Mouse-Move-Events
+    this->setMouseTracking(true); // Aktiviert permanente Mouse-Move-Events
 
     connect(m_pDirectoryWatcher, &CDirectoryWatcher::DirectoryFileListChanged, this, &CMainDlg::onActiveDirectoryFilelistChanged);
     connect(m_pDirectoryWatcher, &CDirectoryWatcher::DisplayedFileChangedOnDisk, this, &CMainDlg::onDisplayedFileChangedOnDisk);
@@ -520,8 +515,8 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
 }
 
 CMainDlg::~CMainDlg() {
-    delete m_pDirectoryWatcher;
     delete m_pFileList;
+    delete m_pDirectoryWatcher;
     if (m_pJPEGProvider != NULL) delete m_pJPEGProvider;
     delete m_pImageProcParams;
     delete m_pImageProcParamsKept;
@@ -537,7 +532,6 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     QPainter painter(this);
     m_dRealizedZoom = 1.0;
 
-    QRect m_clientRect = rect();
     m_clientRect = rect();
 
     QColor backColor = CSettingsProvider::This().ColorBackground();
@@ -609,8 +603,9 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             else if (filter == Filter_Downsampling_Mitchell) sFilter = "Mitchell";
             else if (filter == Filter_Downsampling_Lanczos2) sFilter = "Lanczos2";
 
-            unsigned int iRealWidth = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigWidth()));
-            unsigned int iRealHeight = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigHeight()));
+            double dZoom = m_dZoom > 0 ? m_dZoom : 1.0;
+            unsigned int iRealWidth = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigWidth()));
+            unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
             QString infoText;
             QString sFullPath = CurrentFileName(false);
@@ -1030,7 +1025,8 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                             this->update();
                         }
                     } else {
-                        unsigned int iRealHeight = static_cast<unsigned int>(m_dZoom * (m_pCurrentImage->OrigHeight()));
+                        double dZoom = m_dZoom > 0 ? m_dZoom : 1.0;
+                        unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
                         if (iRealHeight > m_clientRect.height()) {
                             if (PerformPan(0, -PAN_STEP, false) == true) {
@@ -1230,8 +1226,8 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
         if (m_nCurrentTimeout > 250 && timerId == m_slideshowTimerId) {
             if (m_nCurrentTimeout - nRealDisplayTimeMs > 100) {
                 killTimer(m_slideshowTimerId);
-                QThread::msleep(m_nCurrentTimeout - nRealDisplayTimeMs);
-                m_slideshowTimerId = startTimer(m_nCurrentTimeout);
+                m_slideshowTimerId = startTimer(m_nCurrentTimeout - nRealDisplayTimeMs);
+                return;
             }
         }
 
@@ -1250,10 +1246,13 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
         m_zoomTimerId = 0;
 
         if (m_bTemporaryLowQ || m_bInZooming) {
+            if (m_zoomTextTimerId != 0) killTimer(m_zoomTextTimerId);
             m_zoomTextTimerId = startTimer(ZOOM_TEXT_TIMEOUT);
+
             if (m_bInZooming) {
                 m_bShowZoomFactor = true;
             }
+
             m_bTemporaryLowQ = false;
             m_bInZooming = false;
             if (m_bHQResampling && m_pCurrentImage != nullptr) {
@@ -1317,8 +1316,13 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
             }
 
             if (PerformPan(PanX, PanY, false)) {
-                this->repaint(); // Erzwingt ein sofortiges Neuzeichnen ohne den Event-Loop zu blockieren
+                this->update(); // Alternative: this->repaint() = Erzwingt ein sofortiges Neuzeichnen ohne den Event-Loop zu blockieren
             }
+        } else {
+            killTimer(m_panTimerId);
+            m_panTimerId = 0;
+            m_bPanTimerActive = false;
+            return;
         }
     }
 }
@@ -1461,7 +1465,7 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     actCopyPath->setEnabled(m_pCurrentImage != nullptr);
 
     menu.addAction(tr("Cut file to clipboard"))->setData(IDM_CUT_FILE);
-    menu.addAction(tr("Open containing folder in Explorer"))->setData(IDM_EXPLORE);
+    menu.addAction(tr("Show in folder"))->setData(IDM_EXPLORE);
 
     menu.addSeparator();
 
@@ -1620,33 +1624,27 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                     break;
                 }
 
-                bool allowDelete = false;
-
                 Helpers::EDeleteConfirmation confirmationPolicy = CSettingsProvider::This().DeleteConfirmation();
-                if (confirmationPolicy == Helpers::DC_Never) {
-                    allowDelete = true;
-                } else {
+                if (confirmationPolicy != Helpers::DC_Never) {
                     bool bRecycleOnly = false;
                     if (!showDeleteConfirmationDialog({currentFileName}, bRecycleOnly)) {
                         break;
                     }
                 }
 
-                if (allowDelete) {
-                    CFileList* fileListOfDeletedImage = m_pFileList;
-                    GotoImage(POS_AwayFromCurrent, NO_REQUEST);
-                    if (QFile::remove(currentFileName)) {
-                        fileListOfDeletedImage->Reload(NULL, false);
-                        m_pFileList->DeleteHistory(true);
-                        update();
-                        GotoImage(POS_Current);
+                CFileList* fileListOfDeletedImage = m_pFileList;
+                GotoImage(POS_AwayFromCurrent, NO_REQUEST);
+                if (QFile::remove(currentFileName)) {
+                    fileListOfDeletedImage->Reload(NULL, false);
+                    m_pFileList->DeleteHistory(true);
+                    update();
+                    GotoImage(POS_Current);
+                } else {
+                    update();
+                    if (m_pFileList->Current().isEmpty()) {
+                        GotoImage(POS_First);
                     } else {
-                        update();
-                        if (m_pFileList->Current().isEmpty()) {
-                            GotoImage(POS_First);
-                        } else {
-                            GotoImage(POS_Previous);
-                        }
+                        GotoImage(POS_Previous);
                     }
                 }
             }
@@ -1750,7 +1748,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
         case IDM_SLIDESHOW_20:
             {
             int nValue = nCommand - IDM_SLIDESHOW_START;
-            SetToast(QStringLiteral("Starting Slideshow (Timer %d s)").arg(nValue));
+            SetToast(QStringLiteral("Starting Slideshow (Timer %1 s)").arg(nValue));
             StartMovieMode(1.0/nValue);
             }
             break;
@@ -1795,8 +1793,12 @@ void CMainDlg::ExecuteCommand(int nCommand) {
 
                     if (m_customAnimationFrameTime == targetFrameTime) {
                         m_customAnimationFrameTime = 1000;
-                        const int defaultFps = 1000 / m_pCurrentImage->FrameTimeMs();
-                        toastText = QStringLiteral("Default Playback Speed: %1 fps").arg(defaultFps);
+                        if (m_pCurrentImage->FrameTimeMs() != 0) {
+                            const int defaultFps = 1000 / m_pCurrentImage->FrameTimeMs();
+                            toastText = QStringLiteral("Default Playback Speed: %1 fps").arg(defaultFps);
+                        } else {
+                            toastText = QStringLiteral("Default Playback Speed");
+                        }
                     } else {
                         m_customAnimationFrameTime = targetFrameTime;
                         toastText = QStringLiteral("Custom Playback Speed: %1 fps").arg(nValue);
@@ -1925,13 +1927,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             else {
                 // Vollbild verlassen und normales Fenster wiederherstellen
                 this->showNormal();
-/*
-// Disabled since this caused gaphical glitches in KDE Plasma.
-                if (sp.ExplicitWindowRect()) {
-                    QRect defaultWindowRect = CMultiMonitorSupport::GetDefaultWindowRect();
-                    this->setGeometry(defaultWindowRect.left(), defaultWindowRect.top(), defaultWindowRect.width(), defaultWindowRect.height());
-                }
-*/
                 UpdateWindowTitle(true); // Aktualisiert den Titel / das Icon der Titelleiste
                 this->MouseOn();
             }
@@ -1986,20 +1981,11 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             break;
         case IDM_DEFAULT_ESC:
             if (m_bMovieMode) {
-                if (m_bAutoExit) {
-                    CleanupAndTerminate();
-                } else {
-                    SetToast(QStringLiteral("Slideshow Paused"));
-
-                    StopMovieMode(); // stop any running movie/slideshow
-                }
+                SetToast(QStringLiteral("Slideshow Paused"));
+                StopMovieMode(); // stop any running movie/slideshow
             } else if (m_bIsAnimationPlaying) {
-                if (m_bAutoExit) {
-                    CleanupAndTerminate();
-                } else {
-                    SetToast(QStringLiteral("Animation Paused"));
-                    StopAnimation(); // stop any running animation
-                }
+                SetToast(QStringLiteral("Animation Paused"));
+                StopAnimation(); // stop any running animation
             } else if (m_bShowInfo == true) {
                 m_bShowInfo = false;
                 this->update();
@@ -2064,9 +2050,6 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             SetToast(m_bHQResampling? QStringLiteral("Resampling: enabled"): QStringLiteral("Resampling: disabled"));
             this->update();
             break;
-        case IDM_EXCHANGE_PROC_PARAMS:
-            ExchangeProcessingParams();
-            break;
         case IDM_PAN_UP:
         case IDM_PAN_DOWN:
         case IDM_PAN_RIGHT:
@@ -2081,6 +2064,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
+                                if (m_panTimerId != 0) killTimer(m_panTimerId);
                                 m_panTimerId = startTimer(17);
                             }
                         } else {
@@ -2105,6 +2089,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
+                                if (m_panTimerId != 0) killTimer(m_panTimerId);
                                 m_panTimerId = startTimer(17);
                             }
                         } else {
@@ -2127,6 +2112,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                                     } else {
                                         if (m_bAllowSmoothPanning) {
                                             m_bPanTimerActive = true;
+                                            if (m_panTimerId != 0) killTimer(m_panTimerId);
                                             m_panTimerId = startTimer(17);
                                         } else {
                                             PerformPan(0, ((nCommand == IDM_PAN_UP) || (nCommand == IDM_PAN_LEFT)) ? PAN_STEP : ((nCommand == IDM_PAN_DOWN) || (nCommand == IDM_PAN_RIGHT)) ? -PAN_STEP : 0, false);
@@ -2571,12 +2557,9 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos4 m_offsets.x:" <<  m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex;
 
     if (bCheckIfSameImage && (m_pFileList == pOldFileList && (nOldFrameIndex == nFrameIndex || bNoWrapAroundEdgeFrame) && !m_pFileList->ChangedSinceCheckpoint())) {
-        if (m_bMovieMode && m_bAutoExit) {
-            CleanupAndTerminate();
-        } else {
 /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos4b  bCheckIfSameImage:" << bCheckIfSameImage << "bNoWrapAroundEdgeFrame:" << bNoWrapAroundEdgeFrame << "m_pFileList->ChangedSinceCheckpoint():" << m_pFileList->ChangedSinceCheckpoint();
-            return; // not placed on a new image, don't do anything
-        }
+        return; // not placed on a new image, don't do anything
+
     }
 
     if (ePos != POS_Current && ePos != POS_NextFrame && ePos != POS_AwayFromCurrent) {
@@ -2642,8 +2625,11 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
     if (((nFlags & NO_UPDATE_WINDOW) == 0) && !(ePos == POS_NextSlideShow && UseSlideShowTransitionEffect())) {
         this->update();
-        // this will force to wait until really redrawn, preventing to process images but do not show them
-        this->repaint();
+        this->repaint(); // this will force to wait until really redrawn, preventing images to be processed but not shown
+    }
+
+    if (!(nFlags & NO_REMOVE_KEY_MSG)) {
+        DiscardPendingInput();
     }
 
 /* Debugging */ qDebug() << "GotoImage() Pos9 after repaint() nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
@@ -2892,6 +2878,7 @@ void CMainDlg::ResetParamsToDefault() {
 }
 
 void CMainDlg::StartSlideShowTimer(int nMilliSeconds) {
+    if (m_slideshowTimerId != 0) killTimer(m_slideshowTimerId);
     m_nCurrentTimeout = nMilliSeconds;
     m_slideshowTimerId = startTimer(nMilliSeconds);
     m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
@@ -2961,13 +2948,7 @@ void CMainDlg::StopMovieMode() {
 void CMainDlg::StartLowQTimer(int nTimeout) {
     m_bTemporaryLowQ = true;
 
-    // Alten Zoom-Timer stoppen, falls er bereits läuft
-    if (m_zoomTimerId != 0) {
-        killTimer(m_zoomTimerId);
-        m_zoomTimerId = 0;
-    }
-
-    // Neuen Timer starten und die ID in unserer Member-Variable speichern
+    if (m_zoomTimerId != 0) killTimer(m_zoomTimerId);
     m_zoomTimerId = startTimer(nTimeout);
 }
 
@@ -3004,22 +2985,9 @@ void CMainDlg::InitParametersForNewImage() {
         m_dZoom = -1;
     }
 
-    *m_pImageProcParams2 = GetNoProcessingParams();
-    m_eProcessingFlags2 = PFLAG_HighQualityResampling;
-
     if (!m_bIsAnimationPlaying) {
         m_bInZooming = m_bTemporaryLowQ = m_bShowZoomFactor = false;
     }
-}
-
-void CMainDlg::ExchangeProcessingParams() {
-    CImageProcessingParams tempParams = *m_pImageProcParams;
-    EProcessingFlags tempFlags = CreateDefaultProcessingFlags();
-    *m_pImageProcParams = *m_pImageProcParams2;
-    InitFromProcessingFlags(m_eProcessingFlags2, m_bHQResampling, m_bAutoContrast);
-    *m_pImageProcParams2 = tempParams;
-    m_eProcessingFlags2 = tempFlags;
-    this->update();
 }
 
 void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack) {
@@ -3382,6 +3350,12 @@ void CMainDlg::AnimateTransition() {
 }
 */
 void CMainDlg::CleanupAndTerminate() {
+    if (m_bTerminated == true) {
+        return;
+    }
+
+    m_bTerminated = true;
+
     // geometry() liefert die ClientRect Fensterkoordinaten (ohne Window-Manager-Rahmen),
     // die setGeometry() beim Start auch fehlerfrei wiederherstellen kann.
     m_windowRectOnClose = geometry();
@@ -3407,7 +3381,9 @@ void CMainDlg::CleanupAndTerminate() {
     StopAnimation();
 
     delete m_pJPEGProvider; // delete this early to properly shut down the loading threads
-    m_pJPEGProvider = NULL;
+    m_pJPEGProvider = nullptr;
+    m_pCurrentImage = nullptr;
+
     close();
 }
     
@@ -3438,6 +3414,7 @@ void CMainDlg::StartAnimation() {
     
     int nTimerDelay = std::max(10, m_pCurrentImage->FrameTimeMs());
     m_nExpectedNextAnimationTickCount = QDateTime::currentMSecsSinceEpoch() + nTimerDelay;
+    if (m_animationTimerId != 0) killTimer(m_animationTimerId);
     m_animationTimerId = startTimer(nTimerDelay);
 }
 
@@ -3518,10 +3495,7 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
                                 : fileInfo.dir().dirName();
 
     // 1. Universelles Entfernen von Sprach-Tags ([en], [de], [ch], [ko], etc.) am Ende
-    static const QRegularExpression langTagRx(
-        QStringLiteral(R"(\s+\[(en|de|ch|ko)\]$)"),
-        QRegularExpression::CaseInsensitiveOption
-    );
+    static const QRegularExpression langTagRx(QStringLiteral(R"(\s+\[(en|de|ch|ko)\]$)"), QRegularExpression::CaseInsensitiveOption);
     keyName.remove(langTagRx);
 
     // 2. Sonderzeichen anpassen
@@ -3577,9 +3551,13 @@ void CMainDlg::SaveBookmark() {
         keyName = fileInfo.dir().dirName();
     }
 
-    // Sprach-Tag entfernen und Sonderzeichen ersetzen ([ -> <, ] -> >)
     QString keyNameCleaned = keyName;
-    keyNameCleaned.remove(QStringLiteral(" [en]"), Qt::CaseInsensitive);
+
+    // 1. Universelles Entfernen von Sprach-Tags ([en], [de], [ch], [ko], etc.) am Ende
+    static const QRegularExpression langTagRx(QStringLiteral(R"(\s+\[(en|de|ch|ko)\]$)"), QRegularExpression::CaseInsensitiveOption);
+    keyNameCleaned.remove(langTagRx);
+
+    // 2. Sonderzeichen anpassen
     keyNameCleaned.replace(QLatin1Char('['), QLatin1Char('<'));
     keyNameCleaned.replace(QLatin1Char(']'), QLatin1Char('>'));
 
@@ -3650,7 +3628,7 @@ bool CMainDlg::IsBookModeFile(const QString& filePath) {
            filePath.contains(QStringLiteral("\\comics\\"), Qt::CaseInsensitive);
 }
 
-float CMainDlg::MaxRatio(float valA, float valB) {
+double CMainDlg::MaxRatio(double valA, double valB) {
     double dRatio = (valA / valB);
     if (dRatio < 1.0)
         dRatio = 1 / dRatio;
@@ -3659,13 +3637,7 @@ float CMainDlg::MaxRatio(float valA, float valB) {
 
 void CMainDlg::SetToast(const QString& strToast, int nDurationMs)
 {
-    // Alten Toast-Timer stoppen, falls er noch läuft
-    if (m_toastTimerId != 0) {
-        killTimer(m_toastTimerId);
-        m_toastTimerId = 0;
-    }
-
-    // Neuen Timer starten und ID speichern
+    if (m_toastTimerId != 0) killTimer(m_toastTimerId);
     m_toastTimerId = startTimer(nDurationMs);
 
     m_strToast = strToast;
@@ -3855,7 +3827,7 @@ void CMainDlg::onActiveDirectoryFilelistChanged() {
         }
 
         if (m_pCurrentImage != NULL) {
-            GotoImage(POS_Current);
+            GotoImage(POS_Current, KEEP_PARAMETERS);
         }
     }
 }
@@ -3877,9 +3849,13 @@ bool CMainDlg::ShouldAcceptFile(const QString& testFilePath) {
     if (!sCurrentFile.isEmpty()) {
         if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
             if (testFilePath.compare(sCurrentFile, Qt::CaseInsensitive) == 0) {
-                showNormal();
-                raise();
-                activateWindow();
+                if (m_bFullScreenMode) {
+                    m_bFullScreenMode = false;
+                    UpdateWindowTitle(true); // Aktualisiert den Titel / das Icon der Titelleiste
+                    this->MouseOn();
+                    m_dZoom = -1;
+                    StartLowQTimer(ZOOM_TIMEOUT);
+                }
                 return true; // We tell the client that we handle it, client should exit.
             } else {
                 return false; // We tell the client that it should open the file.
@@ -3897,13 +3873,14 @@ bool CMainDlg::ShouldAcceptFile(const QString& testFilePath) {
     const bool bSingleInstancePerFolder = (CSettingsProvider::This().SingleInstanceMode() == Helpers::SI_PerFolder) && bSameImageFolder;
 
     if (bNoCurrentFile || bSingleFullScreen || bSingleInstanceAlways || bSingleInstancePerFolder) {
+        if (m_bFullScreenMode) {
+            m_bFullScreenMode = false;
+            UpdateWindowTitle(true); // Aktualisiert den Titel / das Icon der Titelleiste
+            this->MouseOn();
+        }
+
         m_sStartupFile = testFilePath;
-
         QMetaObject::invokeMethod(this, &CMainDlg::onLoadFileAsynch, Qt::QueuedConnection);
-
-        showNormal();
-        raise();
-        activateWindow();
         return true; // We tell the client that we handle it, client should exit.
     }
 
@@ -3913,4 +3890,26 @@ bool CMainDlg::ShouldAcceptFile(const QString& testFilePath) {
 void CMainDlg::focusOutEvent(QFocusEvent* event) {
     m_bPanKeyUp = m_bPanKeyDown = m_bPanKeyLeft = m_bPanKeyRight = false;
     QMainWindow::focusOutEvent(event);
+}
+
+bool CMainDlg::event(QEvent* e) {
+    if (m_bDropInput) {
+        switch (e->type()) {
+        case QEvent::KeyPress:
+        case QEvent::MouseButtonPress:
+        case QEvent::MouseButtonDblClick:
+        case QEvent::Wheel:
+            e->accept();
+            return true;            // verworfen
+        default:
+            break;                  // Release/Move durchlassen
+        }
+    }
+    return QMainWindow::event(e);
+}
+
+void CMainDlg::DiscardPendingInput() {
+    m_bDropInput = true;
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+    m_bDropInput = false;
 }
