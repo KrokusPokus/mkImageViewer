@@ -865,9 +865,7 @@ void CMainDlg::resizeEvent(QResizeEvent* event) {
 }
 
 void CMainDlg::closeEvent(QCloseEvent* event) {
-    // geometry() liefert die echten Fensterkoordinaten (ohne Window-Manager-Rahmen),
-    // die setGeometry() beim Start auch fehlerfrei wiederherstellen kann.
-    m_windowRectOnClose = geometry();
+    CleanupAndTerminate();
     event->accept(); // Erlaubt das Schließen des Fensters (entspricht bHandled = FALSE)
 }
 
@@ -2775,7 +2773,7 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
                     m_nBookModePageHeight = (int)((nImageH * m_dZoom * 100) / nWinH);
                 }
 
-                CSettingsProvider::This().SetBookModePageHeight(m_nBookModePageHeight);
+                CSettingsProvider::This().SetBookModePageHeight(m_nBookModePageHeight); // Will be written to disk during SaveCustomSettings()
             }
         }
     }
@@ -3384,6 +3382,10 @@ void CMainDlg::AnimateTransition() {
 }
 */
 void CMainDlg::CleanupAndTerminate() {
+    // geometry() liefert die echten Fensterkoordinaten (ohne Window-Manager-Rahmen),
+    // die setGeometry() beim Start auch fehlerfrei wiederherstellen kann.
+    m_windowRectOnClose = geometry();
+
     /*
     if (!m_bMovieMode) {
         EProcessingFlags eFlags = CreateDefaultProcessingFlags(m_bKeepParams);
@@ -3400,8 +3402,10 @@ void CMainDlg::CleanupAndTerminate() {
 
     SaveBookmark();
     CSettingsProvider::This().SaveCustomSettings();
+
     StopMovieMode();
     StopAnimation();
+
     delete m_pJPEGProvider; // delete this early to properly shut down the loading threads
     m_pJPEGProvider = NULL;
     close();
@@ -3526,7 +3530,7 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
 
     // Auslesen der INI-Datei
     QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
-    iniSettings.beginGroup(QStringLiteral("mkImageViewer"));
+    iniSettings.beginGroup(QStringLiteral("Bookmarks"));
 
     QString value = iniSettings.value(keyName, QString()).toString();
     iniSettings.endGroup();
@@ -3554,7 +3558,7 @@ void CMainDlg::SaveBookmark() {
         }
     }
 
-    const QString bookmarkFilePath = bookmarkDir.filePath(QStringLiteral("Bookmarks.ini"));
+    const QString bookmarkFilePath = bookmarkDir.filePath(QStringLiteral("bookmarks.ini"));
 
     // 2. Pfadanalyse mit QFileInfo & QString-Methoden
     const QFileInfo fileInfo(filePath);
@@ -3607,7 +3611,6 @@ void CMainDlg::SaveBookmark() {
     iniSettings.beginGroup(QStringLiteral("Bookmarks"));
 
     const QString oldValueStr = iniSettings.value(keyNameCleaned, QString()).toString();
-
     // Nur schreiben/löschen, wenn sich der Wert geändert hat
     if (oldValueStr != newValueStr) {
         if (bIsEndpoint) {

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <new>
@@ -66,7 +67,7 @@ constexpr const char* k7zLibraryName = "7z.so";
 const uint64_t kMaxZipEntrySize = std::min<uint64_t>(
     std::max({ static_cast<uint64_t>(MAX_JPEG_FILE_SIZE), static_cast<uint64_t>(MAX_WEBP_FILE_SIZE),
               static_cast<uint64_t>(MAX_PNG_FILE_SIZE), static_cast<uint64_t>(MAX_JXL_FILE_SIZE),
-              static_cast<uint64_t>(MAX_HEIF_FILE_SIZE) }),
+              static_cast<uint64_t>(MAX_HEIF_FILE_SIZE), static_cast<uint64_t>(MAX_BMP_FILE_SIZE) }),
     static_cast<uint64_t>(INT_MAX));
 
 // Flags for the decoder caches that must survive when switching to another format
@@ -79,6 +80,17 @@ enum CacheKeep : unsigned {
     Keep_Avif = 1u << 4,
     Keep_Zip  = 1u << 5
 };
+
+// The decoder cache that must survive while a file of this format is read (an animation is continued with it)
+unsigned CacheKeepFor(EImageFormat eFormat) {
+    switch (eFormat) {
+    case IF_WEBP: return Keep_Webp;
+    case IF_PNG:  return Keep_Png;
+    case IF_JXL:  return Keep_Jxl;
+    case IF_AVIF: return Keep_Avif;
+    default:      return Keep_None;
+    }
+}
 
 // Runs a callable when the scope is left (normally or by exception)
 template <class F>
@@ -134,26 +146,26 @@ std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, qint64 nMaxSize,
 
 EImageFormat GetImageFormatFromName(const QString& sFileName) {
     static const QHash<QString, EImageFormat> kFormatBySuffix = {
-                                                                  { QStringLiteral("jpg"),  IF_JPEG },
-                                                                  { QStringLiteral("jpeg"), IF_JPEG },
-                                                                  { QStringLiteral("jfif"), IF_JPEG },
-                                                                  { QStringLiteral("bmp"),  IF_WindowsBMP },
-                                                                  { QStringLiteral("png"),  IF_PNG },
-                                                                  { QStringLiteral("tif"),  IF_TIFF },
-                                                                  { QStringLiteral("tiff"), IF_TIFF },
-                                                                  { QStringLiteral("webp"), IF_WEBP },
-                                                                  { QStringLiteral("jxl"),  IF_JXL },
-                                                                  { QStringLiteral("avif"), IF_AVIF },
-                                                                  { QStringLiteral("heif"), IF_HEIF },
-                                                                  { QStringLiteral("heic"), IF_HEIF },
-                                                                  { QStringLiteral("hif"),  IF_HEIF },
-                                                                  { QStringLiteral("tga"),  IF_TGA },
-                                                                  { QStringLiteral("zip"),  IF_ZIP },
-                                                                  { QStringLiteral("cbz"),  IF_ZIP },
-                                                                  { QStringLiteral("7z"),   IF_ZIP },
-                                                                  { QStringLiteral("cb7"),  IF_ZIP },
-                                                                  { QStringLiteral("qoi"),  IF_QOI }
-                                                                  };
+        { QStringLiteral("jpg"),  IF_JPEG },
+        { QStringLiteral("jpeg"), IF_JPEG },
+        { QStringLiteral("jfif"), IF_JPEG },
+        { QStringLiteral("bmp"),  IF_WindowsBMP },
+        { QStringLiteral("png"),  IF_PNG },
+        { QStringLiteral("tif"),  IF_TIFF },
+        { QStringLiteral("tiff"), IF_TIFF },
+        { QStringLiteral("webp"), IF_WEBP },
+        { QStringLiteral("jxl"),  IF_JXL },
+        { QStringLiteral("avif"), IF_AVIF },
+        { QStringLiteral("heif"), IF_HEIF },
+        { QStringLiteral("heic"), IF_HEIF },
+        { QStringLiteral("hif"),  IF_HEIF },
+        { QStringLiteral("tga"),  IF_TGA },
+        { QStringLiteral("zip"),  IF_ZIP },
+        { QStringLiteral("cbz"),  IF_ZIP },
+        { QStringLiteral("7z"),   IF_ZIP },
+        { QStringLiteral("cb7"),  IF_ZIP },
+        { QStringLiteral("qoi"),  IF_QOI }
+    };
     return kFormatBySuffix.value(QFileInfo(sFileName).suffix().toLower(), IF_Unknown);
 }
 
@@ -250,6 +262,8 @@ EImageFormat GetImageFormat(const QString& sFileName) {
 // Maximum accepted size of a (decompressed) archive entry for the given format
 uint64_t MaxFileSizeForFormat(EImageFormat eFormat) {
     switch (eFormat) {
+    case IF_WindowsBMP:
+    case IF_TGA:  return MAX_BMP_FILE_SIZE;
     case IF_JPEG: return MAX_JPEG_FILE_SIZE;
     case IF_WEBP: return MAX_WEBP_FILE_SIZE;
     case IF_PNG:  return MAX_PNG_FILE_SIZE;
@@ -276,6 +290,7 @@ struct CImageFrameInfo {
     int nFrameIndex = 0;
     int nFrameCount = 1;
     int nFrameTimeMs = 100;
+    EImageFormat eContainerFormat = IF_Unknown; // IF_ZIP for an entry of an archive
 };
 
 // Maps the format name reported by QImageReader::format() to the image format used by CJPEGImage.
@@ -397,7 +412,7 @@ CJPEGImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     if (bHasAlphaChannel) {
         Helpers::BlendAlpha(reinterpret_cast<uint32*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
     }
-    CJPEGImage* pJPEGImage = new CJPEGImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat,
+    CJPEGImage* pJPEGImage = new CJPEGImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat, frame.eContainerFormat,
                                             frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs);
     pDIB.release(); // owned by the CJPEGImage now
     return pJPEGImage;
@@ -494,6 +509,207 @@ EEntryRead ReadZipEntry(const ZipEntry& z, bool use7z, const std::string& sArchi
         pBuffer.reset();
     }
     return result;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Decoding from a buffer (one code path for single files and for entries of an archive)
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+// default frame interval in ms for images in CB* archives: 1hr
+constexpr int kMangaFrameTimeMs = 360000;
+
+// Frees memory that the wrappers allocated with malloc() (the EXIF segments)
+struct CFreeDeleter {
+    void operator()(void* p) const noexcept { std::free(p); }
+};
+using ExifPtr = std::unique_ptr<void, CFreeDeleter>;
+
+// Pixel data is always allocated with new[]: CJPEGImage releases it with delete[]
+using PixelPtr = std::unique_ptr<uint8_t[]>;
+
+// The encoded data handed to a decoder
+struct CEncodedData {
+    char* pData = nullptr; // nullptr: the decoder continues an animation it has cached
+    size_t nSize = 0;
+};
+
+// Result of a decoder run, the same for all formats
+struct CDecoded {
+    CDecoded() = default;
+    CDecoded(const CDecoded&) = delete;
+    CDecoded& operator=(const CDecoded&) = delete;
+    ~CDecoded() { std::free(pExif); }
+
+    PixelPtr pixels;
+    void* pExif = nullptr;                   // EXIF segment, allocated by the wrapper with malloc(), released here
+    int nWidth = 0;
+    int nHeight = 0;
+    int nChannels = 0;
+    int nFrameIndex = 0;                     // frame that was decoded (formats with several frames)
+    int nFrameCount = 1;
+    int nFrameTimeMs = 0;
+    bool bHasAnimation = false;
+    bool bBlendAlpha = false;                // the pixels have an alpha channel that must be blended onto the background
+    bool bOutOfMemory = false;
+    TJSAMP eChromoSubSampling = TJSAMP_420;  // JPEG only
+};
+
+// Reads one image from 'in'. Returns false if that did not work; bOutOfMemory is set if the reason is the image size.
+// nFrameIndex is only used by the formats that can return a specific frame (AVIF, HEIF).
+using DecoderFn = bool (*)(const CEncodedData& in, int nFrameIndex, CDecoded& out);
+
+bool DecodeJpeg(const CEncodedData& in, int, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(TurboJpeg::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.eChromoSubSampling,
+                                                                 out.bOutOfMemory, in.pData, static_cast<int>(in.nSize))));
+    if (out.nChannels != 3 && out.nChannels != 1) { // color and b/w JPEG is supported
+        out.pixels.reset();
+    }
+    return out.pixels != nullptr;
+}
+
+bool DecodeBmp(const CEncodedData& in, int, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(CReaderBMP::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bOutOfMemory,
+                                                                  in.pData, in.nSize)));
+    return out.pixels != nullptr;
+}
+
+bool DecodeTga(const CEncodedData& in, int, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(CReaderTGA::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bOutOfMemory,
+                                                                  in.pData, in.nSize)));
+    if (out.pixels && out.nChannels == 4) {
+        uint32_t* pImage32 = reinterpret_cast<uint32_t*>(out.pixels.get());
+        if (CReaderTGA::IsAlphaChannelValid(out.nWidth, out.nHeight, pImage32)) {
+            out.bBlendAlpha = true;
+        } else {
+            // no valid alpha channel - set all A to 255
+            const size_t nPixels = static_cast<size_t>(out.nWidth) * static_cast<size_t>(out.nHeight);
+            for (size_t i = 0; i < nPixels; ++i) {
+                pImage32[i] |= 0xFF000000u;
+            }
+        }
+    }
+    return out.pixels != nullptr;
+}
+
+bool DecodeWebp(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
+    // Without data the reader continues the cached animation and leaves has_animation untouched
+    out.bHasAnimation = (in.pData == nullptr);
+    out.pixels.reset(static_cast<uint8_t*>(WebpReaderWriter::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bHasAnimation,
+                                                                        out.nFrameCount, out.nFrameTimeMs, out.pExif, out.bOutOfMemory,
+                                                                        in.pData, static_cast<int>(in.nSize))));
+    if (out.nChannels != 4) {
+        out.pixels.reset();
+    }
+    out.nFrameIndex = nFrameIndex;
+    out.bBlendAlpha = true;
+    return out.pixels != nullptr;
+}
+
+bool DecodePng(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(PngReader::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bHasAnimation,
+                                                                 out.nFrameCount, out.nFrameTimeMs, out.pExif, out.bOutOfMemory,
+                                                                 in.pData, in.nSize)));
+    out.nFrameIndex = nFrameIndex;
+    out.bBlendAlpha = true;
+    return out.pixels != nullptr;
+}
+
+bool DecodeJxl(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(JxlReader::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bHasAnimation,
+                                                                 out.nFrameCount, out.nFrameTimeMs, out.pExif, out.bOutOfMemory,
+                                                                 in.pData, static_cast<int>(in.nSize))));
+    out.nFrameIndex = nFrameIndex;
+    out.bBlendAlpha = true;
+    return out.pixels != nullptr;
+}
+
+bool DecodeAvif(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(AvifReader::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bHasAnimation,
+                                                                  nFrameIndex, out.nFrameCount, out.nFrameTimeMs, out.pExif,
+                                                                  out.bOutOfMemory, in.pData, in.nSize)));
+    out.nFrameIndex = nFrameIndex;
+    out.bBlendAlpha = true;
+    return out.pixels != nullptr;
+}
+
+bool DecodeHeif(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(HeifReader::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.nFrameCount,
+                                                                  out.pExif, out.bOutOfMemory, nFrameIndex,
+                                                                  in.pData, static_cast<int>(in.nSize))));
+    out.nFrameIndex = nFrameIndex;
+    out.bBlendAlpha = true;
+    return out.pixels != nullptr;
+}
+
+bool DecodeQoi(const CEncodedData& in, int, CDecoded& out) {
+    out.pixels.reset(static_cast<uint8_t*>(QoiReaderWriter::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bOutOfMemory,
+                                                                       in.pData, static_cast<int>(in.nSize))));
+    out.bBlendAlpha = (out.nChannels == 4);
+    return out.pixels != nullptr;
+}
+
+// nullptr: no dedicated wrapper (GIF, TIFF, ICO and the like are read by Qt)
+DecoderFn DecoderFor(EImageFormat eFormat) {
+    switch (eFormat) {
+    case IF_JPEG:       return DecodeJpeg;
+    case IF_WindowsBMP: return DecodeBmp;
+    case IF_TGA:        return DecodeTga;
+    case IF_WEBP:       return DecodeWebp;
+    case IF_PNG:        return DecodePng;
+    case IF_JXL:        return DecodeJxl;
+    case IF_AVIF:       return DecodeAvif;
+    case IF_HEIF:       return DecodeHeif;
+    case IF_QOI:        return DecodeQoi;
+    default:            return nullptr;
+    }
+}
+
+// Frame information for an image that Qt decodes from a buffer
+CImageFrameInfo MakeFrameInfo(EImageFormat eFormat, const CDecodeTarget& target) {
+    CImageFrameInfo info;
+    info.eFormat = eFormat;
+    if (target.bInArchive) {
+        info.bIsAnimation = target.bMultipleFiles;
+        info.nFrameIndex = target.nEntryIndex;
+        info.nFrameCount = target.nArchiveCount;
+        info.nFrameTimeMs = kMangaFrameTimeMs;
+        info.eContainerFormat = IF_ZIP;
+    }
+    return info;
+}
+
+// Builds the CJPEGImage from decoded pixels. The ownership of the pixels goes to the image.
+std::unique_ptr<CJPEGImage> CreateImage(CDecoded& d, EImageFormat eFormat, const CEncodedData& in,
+                                        const CDecodeTarget& target, Helpers::ETransparencyMode eTransparency) {
+    if (d.bBlendAlpha) {
+        Helpers::BlendAlpha(reinterpret_cast<uint32*>(d.pixels.get()), d.nWidth, d.nHeight, eTransparency);
+    }
+
+    // JPEG: the EXIF block is part of the file data (CJPEGImage copies it) and the hash identifies the file
+    void* pEXIF = d.pExif;
+    int64_t nHash = 0;
+    if (eFormat == IF_JPEG) {
+        pEXIF = Helpers::FindEXIFBlock(in.pData, static_cast<int>(in.nSize));
+        nHash = Helpers::CalculateJPEGFileHash(in.pData, static_cast<int>(in.nSize));
+    }
+
+    std::unique_ptr<CJPEGImage> pImage;
+    if (target.bInArchive) {
+        // For an entry of an archive "the frame" is the entry
+        pImage.reset(new CJPEGImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat, IF_ZIP,
+                                    target.bMultipleFiles, target.nEntryIndex, target.nArchiveCount, kMangaFrameTimeMs));
+    } else {
+        pImage.reset(new CJPEGImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
+                                    d.bHasAnimation, d.nFrameIndex, d.nFrameCount, d.nFrameTimeMs));
+    }
+    d.pixels.release(); // owned by the CJPEGImage now
+
+    if (eFormat == IF_JPEG) {
+        pImage->SetJPEGComment(Helpers::GetJPEGComment(in.pData, static_cast<int>(in.nSize)));
+        pImage->SetJPEGChromoSampling(d.eChromoSubSampling);
+    }
+    return pImage;
 }
 
 } // namespace
@@ -594,40 +810,17 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
     // Get image format and read the image
     switch (eFormat) {
     case IF_JPEG:
-        dropCaches(Keep_None);
-        ProcessReadJPEGRequest(&rq);
-        break;
     case IF_WindowsBMP:
-        dropCaches(Keep_None);
-        ProcessReadBMPRequest(&rq);
-        break;
     case IF_TGA:
-        dropCaches(Keep_None);
-        ProcessReadTGARequest(&rq);
-        break;
     case IF_WEBP:
-        dropCaches(Keep_Webp);
-        ProcessReadWEBPRequest(&rq);
-        break;
     case IF_PNG:
-        dropCaches(Keep_Png);
-        ProcessReadPNGRequest(&rq);
-        break;
     case IF_JXL:
-        dropCaches(Keep_Jxl);
-        ProcessReadJXLRequest(&rq);
-        break;
     case IF_AVIF:
-        dropCaches(Keep_Avif);
-        ProcessReadAVIFRequest(&rq);
-        break;
     case IF_HEIF:
-        dropCaches(Keep_None);
-        ProcessReadHEIFRequest(&rq);
-        break;
     case IF_QOI:
-        dropCaches(Keep_None);
-        ProcessReadQOIRequest(&rq);
+        // only the cached decoder of the format that is read survives: an animation is continued with it
+        dropCaches(CacheKeepFor(eFormat));
+        ProcessReadFileRequest(&rq, eFormat);
         break;
     case IF_ZIP:
         // ProcessReadZipRequest decides internally which cached decoders to drop.
@@ -714,389 +907,170 @@ void CImageLoadThread::DeleteCachedAvifDecoder() {
     m_sLastAvifFileName.clear();
 }
 
-void CImageLoadThread::ProcessReadJPEGRequest(CRequest * request) {
-    bool bOutOfMemory = false;
-    qint64 nFileSize = 0;
-    std::unique_ptr<char[]> pBuffer = ReadWholeFile(request->FileName, MAX_JPEG_FILE_SIZE, nFileSize, bOutOfMemory);
-    if (!pBuffer) {
-        request->OutOfMemory = bOutOfMemory;
-        return;
-    }
-    const int nSize = static_cast<int>(nFileSize);
-
-    try {
-        int nWidth = 0, nHeight = 0, nBPP = 0;
-        TJSAMP eChromoSubSampling = TJSAMP_420;
-        bool bDecodeOutOfMemory = false;
-
-        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-            TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bDecodeOutOfMemory, pBuffer.get(), nSize)));
-
-        if (pPixelData && (nBPP == 3 || nBPP == 1)) {
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(),
-                                            Helpers::FindEXIFBlock(pBuffer.get(), nSize), nBPP,
-                                            Helpers::CalculateJPEGFileHash(pBuffer.get(), nSize), IF_JPEG, false, 0, 1, 0);
-            pPixelData.release(); // owned by the CJPEGImage now
-            request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer.get(), nSize));
-            request->Image->SetJPEGChromoSampling(eChromoSubSampling);
-        } else if (bDecodeOutOfMemory) {
-            request->OutOfMemory = true;
-        } else {
-            pPixelData.reset();
-            ProcessReadQtImageRequest(request);
-        }
-    } catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
-        request->ExceptionError = true;
+QString* CImageLoadThread::CachedFileNameFor(EImageFormat eFormat) {
+    switch (eFormat) {
+    case IF_WEBP: return &m_sLastWebpFileName;
+    case IF_PNG:  return &m_sLastPngFileName;
+    case IF_JXL:  return &m_sLastJxlFileName;
+    case IF_AVIF: return &m_sLastAvifFileName;
+    default:      return nullptr;
     }
 }
 
-void CImageLoadThread::ProcessReadBMPRequest(CRequest * request) {
-    bool bOutOfMemory = false;
-    qint64 nFileSize = 0;
-    std::unique_ptr<char[]> pBuffer = ReadWholeFile(request->FileName, MAX_BMP_FILE_SIZE, nFileSize, bOutOfMemory);
-    if (!pBuffer) {
-        request->OutOfMemory = bOutOfMemory;
-        return;
-    }
-    const std::size_t nSize = static_cast<std::size_t>(nFileSize);
-
-    try {
-        int nWidth = 0, nHeight = 0, nBPP = 0;
-        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-            CReaderBMP::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer.get(), nSize)));
-        if (pPixelData) {
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_WindowsBMP, false, 0, 1, 0);
-            pPixelData.release();
-        } else {
-            pPixelData.reset();
-            ProcessReadQtImageRequest(request);
-        }
-    } catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
-        request->ExceptionError = true;
+void CImageLoadThread::DeleteCachedDecoder(EImageFormat eFormat) {
+    switch (eFormat) {
+    case IF_WEBP: DeleteCachedWebpDecoder(); break;
+    case IF_PNG:  DeleteCachedPngDecoder();  break;
+    case IF_JXL:  DeleteCachedJxlDecoder();  break;
+    case IF_AVIF: DeleteCachedAvifDecoder(); break;
+    default:      break;
     }
 }
 
-void CImageLoadThread::ProcessReadTGARequest(CRequest * request) {
-    bool bOutOfMemory = false;
-    qint64 nFileSize = 0;
-    std::unique_ptr<char[]> pBuffer = ReadWholeFile(request->FileName, MAX_BMP_FILE_SIZE, nFileSize, bOutOfMemory);
-    if (!pBuffer) {
-        request->OutOfMemory = bOutOfMemory;
-        return;
-    }
-    const std::size_t nSize = static_cast<std::size_t>(nFileSize);
-
-    try {
-        bool bOutOfMemory = false;
-        int nWidth = 0, nHeight = 0, nBPP = 0;
-        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-            CReaderTGA::ReadImage(nWidth, nHeight, nBPP, bOutOfMemory, pBuffer.get(), nSize)));
-        if (pPixelData) {
-            if (nBPP == 4) {
-                uint32* pImage32 = (uint32*)pPixelData.get();
-                Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                if (CReaderTGA::IsAlphaChannelValid(nWidth, nHeight, (uint32*)pImage32)) {
-                    Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                }
-                else { // no valid alpha channel - set all A to 255
-                    for (int i = 0; i < nWidth*nHeight; i++) {
-                        *pImage32 = *pImage32 | 0xFF000000; // Mask out the alpha channel from the 32 bit RGBA pixel;
-                        pImage32++;
-                    }
-                }
-            }
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_TGA, false, 0, 1, 0);
-            pPixelData.release();
-        } else if (bOutOfMemory) {
-            request->OutOfMemory = true;
-        } else {
-            pPixelData.reset();
-            ProcessReadQtImageRequest(request);
-        }
-    } catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
-        request->ExceptionError = true;
-    }
-}
-
-// Buffer ownership: WebpReaderWriter copies the data it needs for animations into its own cache,
-// the file buffer can always be released right after the call.
-void CImageLoadThread::ProcessReadWEBPRequest(CRequest * request) {
-    const bool bUseCachedDecoder = (request->FileName == m_sLastWebpFileName);
+// Reads a file that has a dedicated decoder (everything except GIF, TIFF, ICO and the like, which Qt reads from the file).
+// WebP, PNG, JXL and AVIF can be animated: the decoder stays cached (m_sLast*FileName) and delivers the next frame
+// when the same file is requested again. In that case the file is not read again and DecodeFromBuffer() gets no data.
+void CImageLoadThread::ProcessReadFileRequest(CRequest* request, EImageFormat eFormat) {
+    const QString* pCachedName = CachedFileNameFor(eFormat);
+    const bool bUseCachedDecoder = (pCachedName != nullptr && *pCachedName == request->FileName);
     if (!bUseCachedDecoder) {
-        DeleteCachedWebpDecoder();
+        DeleteCachedDecoder(eFormat);
     }
 
     std::unique_ptr<char[]> pBuffer;
     qint64 nFileSize = 0;
     if (!bUseCachedDecoder) {
         bool bOutOfMemory = false;
-        pBuffer = ReadWholeFile(request->FileName, MAX_WEBP_FILE_SIZE, nFileSize, bOutOfMemory);
+        pBuffer = ReadWholeFile(request->FileName, static_cast<qint64>(MaxFileSizeForFormat(eFormat)), nFileSize, bOutOfMemory);
         if (!pBuffer) {
             request->OutOfMemory = bOutOfMemory;
             return;
         }
     }
-
-    try {
-        int nWidth = 0, nHeight = 0, nBPP = 0;
-        bool bHasAnimation = bUseCachedDecoder;
-        int nFrameCount = 1;
-        int nFrameTimeMs = 0;
-        void* pEXIFData = nullptr;
-        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-            WebpReaderWriter::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData,
-                                        request->OutOfMemory, pBuffer.get(), static_cast<int>(nFileSize))));
-        if (pPixelData && nBPP == 4) {
-            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-            if (bHasAnimation) {
-                m_sLastWebpFileName = request->FileName;
-            }
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, nBPP, 0, IF_WEBP, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-            pPixelData.release();
-        } else {
-            pPixelData.reset();
-            DeleteCachedWebpDecoder();
-        }
-        free(pEXIFData);
-    } catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
-        request->ExceptionError = true;
-        DeleteCachedWebpDecoder();
-    }
+    DecodeFromBuffer(request, eFormat, pBuffer, static_cast<size_t>(nFileSize), CDecodeTarget{});
 }
 
-// Buffer ownership: PngReader copies the file into its own cache (without the 8 byte signature),
-// the file buffer can always be released right after the call.
-void CImageLoadThread::ProcessReadPNGRequest(CRequest* request) {
-    const bool bUseCachedDecoder = (request->FileName == m_sLastPngFileName);
-    if (!bUseCachedDecoder) {
-        DeleteCachedPngDecoder();
-    }
-
-    std::unique_ptr<char[]> pBuffer;
-    qint64 nFileSize = 0;
-    if (!bUseCachedDecoder) {
-        bool bOutOfMemory = false;
-        pBuffer = ReadWholeFile(request->FileName, MAX_PNG_FILE_SIZE, nFileSize, bOutOfMemory);
-        if (!pBuffer) {
-            request->OutOfMemory = bOutOfMemory;
-            return;
-        }
-    }
-
-    try {
-        int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-        bool bHasAnimation = false;
-        void* pEXIFData = nullptr;
-
-        uint8* pPixelData = static_cast<uint8*>(PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation,
-                                                                      nFrameCount, nFrameTimeMs, pEXIFData,
-                                                                      request->OutOfMemory,
-                                                                      pBuffer.get(),
-                                                                      static_cast<size_t>(nFileSize)));
-        if (pPixelData != nullptr) {
-            if (bHasAnimation) {
-                m_sLastPngFileName = request->FileName;
-            }
-            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-            free(pEXIFData);
-        } else {
-            free(pEXIFData);
-            DeleteCachedPngDecoder();
-
-            if (!request->OutOfMemory && pBuffer) {
-                // libpng could not decode the file: give Qt a chance, the file is already in memory
-                void* pQtEXIFData = PngReader::GetEXIFBlock(pBuffer.get(), static_cast<size_t>(nFileSize));
-                bool bQtOutOfMemory = false;
-                request->Image = DecodeBufferWithQt(pBuffer.get(), static_cast<int>(nFileSize), pQtEXIFData,
-                                                    CImageFrameInfo{ .eFormat = IF_PNG }, bQtOutOfMemory,
-                                                    request->ProcessParams.TransparencyMode);
-                free(pQtEXIFData);
-                request->OutOfMemory = request->Image == nullptr && bQtOutOfMemory;
-            }
-        }
-    }
-    catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
-        request->ExceptionError = true;
-        DeleteCachedPngDecoder();
-    }
-}
-
-// Buffer ownership: unlike all other wrappers, JxlReader does NOT copy the input data. Its decoder keeps
-// reading from the buffer for as long as an animation is cached. In that case the buffer is moved into
-// m_pJxlBuffer and released in DeleteCachedJxlDecoder() - strictly after JxlReader::DeleteCache().
-void CImageLoadThread::ProcessReadJXLRequest(CRequest* request) {
-    const bool bUseCachedDecoder = (request->FileName == m_sLastJxlFileName);
-    if (!bUseCachedDecoder) {
-        DeleteCachedJxlDecoder();
-    }
-
-    std::unique_ptr<char[]> pBuffer;
-    qint64 nFileSize = 0;
-    if (!bUseCachedDecoder) {
-        bool bOutOfMemory = false;
-        pBuffer = ReadWholeFile(request->FileName, MAX_JXL_FILE_SIZE, nFileSize, bOutOfMemory);
-        if (!pBuffer) {
-            request->OutOfMemory = bOutOfMemory;
-            return;
-        }
-    }
-
+// Decodes the encoded image in pBuffer and stores the result in request->Image. This is the only place that knows
+// how to turn the data of a format into a CJPEGImage, for single files and for entries of an archive alike.
+// On failure request->OutOfMemory / request->ExceptionError are set accordingly.
+//
+// Buffer ownership (pBuffer is empty if a cached animation is continued):
+//  - WebpReaderWriter, PngReader and AvifReader copy what they need for an animation into their own cache,
+//    HeifReader and the other readers only read during the call. The buffer can be released after the call.
+//  - JxlReader does NOT copy its input: the decoder keeps reading from the buffer for as long as an animation is
+//    cached. In that case the buffer is moved into m_pJxlBuffer and released in DeleteCachedJxlDecoder(),
+//    strictly after JxlReader::DeleteCache().
+//
+// Differences between a file and an archive entry (CDecodeTarget::bInArchive):
+//  - Archive: only the first frame is shown, no decoder is kept (the caller drops them before the buffer is released),
+//    AVIF/HEIF always read frame 0, and the CJPEGImage is created as an entry of the container IF_ZIP.
+EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat eFormat, std::unique_ptr<char[]>& pBuffer,
+                                                 size_t nSize, const CDecodeTarget& target) {
     CErrorModeGuard errorModeGuard;
+    const Helpers::ETransparencyMode eTransparency = request->ProcessParams.TransparencyMode;
+    const CEncodedData in{ pBuffer.get(), nSize };
+    const bool bHaveData = (in.pData != nullptr);
+
     try {
-        int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-        bool bHasAnimation = false;
-        void* pEXIFData = nullptr;
-        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-            JxlReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData,
-                                 request->OutOfMemory, pBuffer.get(), static_cast<int>(nFileSize))));
-        if (pPixelData) {
-            if (bHasAnimation) {
-                // The decoder still points into this buffer. Only the first call has one: with a cached decoder pBuffer
-                // is empty, and moving it would release the buffer the decoder is reading from (use after free).
-                if (pBuffer) {
+        // Qt decodes the (first frame of the) buffer. pEXIFData is only used for the rotation done by the CJPEGImage.
+        auto decodeWithQt = [&](void* pEXIFData) {
+            bool bQtOutOfMemory = false;
+            request->Image = DecodeBufferWithQt(in.pData, static_cast<int>(in.nSize), pEXIFData, MakeFrameInfo(eFormat, target),
+                                                bQtOutOfMemory, eTransparency);
+            if (request->Image != nullptr) {
+                return EDecodeStatus::Ok;
+            }
+            if (bQtOutOfMemory) {
+                request->OutOfMemory = true;
+                return EDecodeStatus::OutOfMemory;
+            }
+            return EDecodeStatus::NotDecodable;
+        };
+
+        const DecoderFn decode = DecoderFor(eFormat);
+        if (decode == nullptr) {
+            // No dedicated wrapper (GIF, TIFF, ICO in an archive)
+            const bool bQtFormat = (eFormat == IF_GIF || eFormat == IF_TIFF || eFormat == IF_ICO);
+            return (bHaveData && bQtFormat) ? decodeWithQt(nullptr) : EDecodeStatus::NotDecodable;
+        }
+
+        CDecoded d;
+        bool bDecoded = false;
+        bool bException = false;
+        try {
+            bDecoded = decode(in, target.bInArchive ? 0 : request->FrameIndex, d);
+        } catch (const heif::Error&) {
+            // libheif could not read the data: the same as undecodable data, not an error of the program
+        } catch (const std::bad_alloc&) {
+            d.bOutOfMemory = true;
+        } catch (...) {
+            bException = true;
+        }
+
+        if (bDecoded) {
+            if (!target.bInArchive && d.bHasAnimation) {
+                // The decoder stays cached to deliver the next frame
+                if (QString* pCachedName = CachedFileNameFor(eFormat)) {
+                    *pCachedName = request->FileName;
+                }
+                if (eFormat == IF_JXL && pBuffer) {
+                    // Only the first call has a buffer: with a cached decoder pBuffer is empty, and releasing
+                    // the buffer the decoder is reading from would be a use after free.
                     m_pJxlBuffer = std::move(pBuffer);
                 }
-                m_sLastJxlFileName = request->FileName;
             }
-            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, 4, 0, IF_JXL, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-            pPixelData.release();
-        } else {
-            DeleteCachedJxlDecoder();
+            request->Image = CreateImage(d, eFormat, in, target, eTransparency).release();
+            return EDecodeStatus::Ok;
         }
-        free(pEXIFData);
-    }
-    catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
-        request->ExceptionError = true;
-        DeleteCachedJxlDecoder();
-    }
-}
 
-// Buffer ownership: AvifReader copies the data into its own cache (malloc), the file buffer can be released right away.
-void CImageLoadThread::ProcessReadAVIFRequest(CRequest* request) {
-    const bool bUseCachedDecoder = (request->FileName == m_sLastAvifFileName);
-    if (!bUseCachedDecoder) {
-        DeleteCachedAvifDecoder();
-    }
-
-    std::unique_ptr<char[]> pBuffer;
-    qint64 nFileSize = 0;
-    if (!bUseCachedDecoder) {
-        bool bOutOfMemory = false;
-        pBuffer = ReadWholeFile(request->FileName, MAX_HEIF_FILE_SIZE, nFileSize, bOutOfMemory);
-        if (!pBuffer) {
-            request->OutOfMemory = bOutOfMemory;
-            return;
+        // The state of a decoder is unknown after a failure
+        DeleteCachedDecoder(eFormat);
+        if (d.bOutOfMemory) {
+            request->OutOfMemory = true;
+            return EDecodeStatus::OutOfMemory;
         }
-    }
-
-    bool bSuccess = false;
-    {
-        CErrorModeGuard errorModeGuard;
-        try {
-            int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-            bool bHasAnimation = false;
-            void* pEXIFData = nullptr;
-            std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                AvifReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, request->FrameIndex,
-                                      nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer.get(), static_cast<int>(nFileSize))));
-            if (pPixelData) {
-                if (bHasAnimation) {
-                    m_sLastAvifFileName = request->FileName;
-                }
-                Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, 4, 0, IF_AVIF, bHasAnimation, request->FrameIndex, nFrameCount, nFrameTimeMs);
-                pPixelData.release();
-                bSuccess = true;
-            } else {
-                DeleteCachedAvifDecoder();
-            }
-            free(pEXIFData);
-        }
-        catch (...) {
-            delete request->Image;
-            request->Image = nullptr;
+        if (bException && eFormat != IF_AVIF) {
             request->ExceptionError = true;
-            DeleteCachedAvifDecoder();
+            return EDecodeStatus::Exception;
         }
-    }
-    if (!bSuccess && !request->OutOfMemory) {
-        ProcessReadHEIFRequest(request);
-    }
-}
 
-// Buffer ownership: HeifReader reads from the buffer only during the call (no copy kept).
-void CImageLoadThread::ProcessReadHEIFRequest(CRequest* request) {
-    bool bOutOfMemory = false;
-    qint64 nFileSize = 0;
-    std::unique_ptr<char[]> pBuffer = ReadWholeFile(request->FileName, MAX_HEIF_FILE_SIZE, nFileSize, bOutOfMemory);
-    if (!pBuffer) {
-        request->OutOfMemory = bOutOfMemory;
-        return;
-    }
-
-    CErrorModeGuard errorModeGuard;
-    try {
-        int nWidth = 0, nHeight = 0, nBPP = 0;
-        int nFrameCount = 1;
-        const int nFrameTimeMs = 0;
-        void* pEXIFData = nullptr;
-        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-            HeifReader::ReadImage(nWidth, nHeight, nBPP, nFrameCount, pEXIFData, request->OutOfMemory, request->FrameIndex,
-                                  pBuffer.get(), static_cast<int>(nFileSize))));
-        if (pPixelData) {
-            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, nBPP, 0, IF_HEIF, false, request->FrameIndex, nFrameCount, nFrameTimeMs);
-            pPixelData.release();
-        }
-        free(pEXIFData);
-    } catch (const heif::Error&) {
-        delete request->Image;
-        request->Image = nullptr;
-    } catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
-        request->ExceptionError = true;
-    }
-}
-
-void CImageLoadThread::ProcessReadQOIRequest(CRequest* request) {
-    bool bOutOfMemory = false;
-    qint64 nFileSize = 0;
-    std::unique_ptr<char[]> pBuffer = ReadWholeFile(request->FileName, MAX_PNG_FILE_SIZE, nFileSize, bOutOfMemory);
-    if (!pBuffer) {
-        request->OutOfMemory = bOutOfMemory;
-        return;
-    }
-
-    try {
-        int nWidth = 0, nHeight = 0, nBPP = 0;
-        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-            QoiReaderWriter::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer.get(), static_cast<int>(nFileSize))));
-        if (pPixelData) {
-            if (nBPP == 4) {
-                Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
+        // Fallbacks (only possible if the data is at hand)
+        EDecodeStatus status = EDecodeStatus::NotDecodable;
+        if (bHaveData) {
+            switch (eFormat) {
+            case IF_AVIF:
+                // libavif failed or is not available (also by exception): libheif reads AVIF as well, the buffer is reused
+                status = DecodeFromBuffer(request, IF_HEIF, pBuffer, nSize, target);
+                break;
+            case IF_JPEG:
+            case IF_WindowsBMP:
+            case IF_TGA:
+                status = decodeWithQt(nullptr);
+                break;
+            case IF_PNG:
+            {
+                // libpng failed: Qt gets a chance. The EXIF data is taken from the PNG, the CJPEGImage does the rotation.
+                const ExifPtr pQtEXIF(PngReader::GetEXIFBlock(in.pData, in.nSize));
+                status = decodeWithQt(pQtEXIF.get());
             }
-            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_QOI, false, 0, 1, 0);
-            pPixelData.release();
+            break;
+            default:
+                break; // WebP, JXL, QOI, HEIF: no fallback
+            }
         }
+        if (bException && status == EDecodeStatus::NotDecodable) {
+            request->ExceptionError = true;
+            return EDecodeStatus::Exception;
+        }
+        return status;
+    } catch (const std::bad_alloc&) {
+        request->OutOfMemory = true;
+        DeleteCachedDecoder(eFormat);
+        return EDecodeStatus::OutOfMemory;
     } catch (...) {
-        delete request->Image;
-        request->Image = nullptr;
         request->ExceptionError = true;
+        DeleteCachedDecoder(eFormat);
+        return EDecodeStatus::Exception;
     }
 }
 
@@ -1276,10 +1250,6 @@ ZipEntry::ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned 
 {
 }
 
-//default frame interval in ms for images in CB* archives: 1hr
-#define DEF_MANGA_FRAME_TIME_MS 360000
-#define EXTRA_MANGA_PARAMS IF_ZIP, bMultipleFiles, request->FrameIndex, m_nZipCount, DEF_MANGA_FRAME_TIME_MS
-
 /*
  * Notes on archive mode:
  *
@@ -1288,7 +1258,7 @@ ZipEntry::ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned 
  * - These readers take FrameIndex as an argument and are able to return specific frames without stepping through them one by one:
  *        AvifReader::ReadImage()
  *        HeifReader::ReadImage()
- *   In archive mode they get "nFrameIndexFixed = 0", so no animations are available within archives.
+ *   In archive mode DecodeFromBuffer() passes frame index 0 to them, so no animations are available within archives.
  *
  * - These readers deliver consecutive frames of an animation when called repeatedly for the same image:
  *        PngReader::ReadImage()
@@ -1304,7 +1274,6 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
     bool bIsSameArchive = false;
     bool bMultipleFiles = false;
     int nArchiveItemIndex = request->FrameIndex;
-    constexpr int nFrameIndexFixed = 0;
 
     if (request->FileName == m_sLastZipFileName) {
         if (m_nZipCount <= 0) {
@@ -1402,168 +1371,16 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                 unsigned char header[16] = { 0 };
                 memcpy(header, pBuffer.get(), static_cast<size_t>(std::min<uint64_t>(sizeof(header), z.size)));
                 const EImageFormat eFormat = GetImageFormatInMemory(header, z.name);
-                const int nSize = static_cast<int>(z.size); // z.size <= kMaxZipEntrySize <= INT_MAX
-
                 if (z.size > MaxFileSizeForFormat(eFormat)) {
                     request->OutOfMemory = true;
                     bAbort = true;
                 } else {
-                    switch (eFormat) {
-                    case IF_JXL:
-                    {
-                        int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-                        bool bHasAnimation = false;
-                        void* pEXIFData = nullptr;
-                        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                            JxlReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer.get(), nSize)));
-                        if (pPixelData) {
-                            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, 4, 0, IF_JXL, EXTRA_MANGA_PARAMS);
-                            pPixelData.release();
-                            bSuccess = true;
-                        }
-                        free(pEXIFData);
-                    }
-                    break;
-                    case IF_JPEG:
-                    {
-                        int nWidth = 0, nHeight = 0, nBPP = 0;
-                        TJSAMP eChromoSubSampling = TJSAMP_420;
-                        bool bDecodeOutOfMemory = false;
-                        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                            TurboJpeg::ReadImage(nWidth, nHeight, nBPP, eChromoSubSampling, bDecodeOutOfMemory, pBuffer.get(), nSize)));
-                        // Color and b/w JPEG is supported
-                        if (pPixelData && (nBPP == 3 || nBPP == 1)) {
-                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(),
-                                                            Helpers::FindEXIFBlock(pBuffer.get(), nSize), nBPP,
-                                                            Helpers::CalculateJPEGFileHash(pBuffer.get(), nSize), IF_JPEG, EXTRA_MANGA_PARAMS);
-                            pPixelData.release();
-                            request->Image->SetJPEGComment(Helpers::GetJPEGComment(pBuffer.get(), nSize));
-                            request->Image->SetJPEGChromoSampling(eChromoSubSampling);
-                            bSuccess = true;
-                        } else if (bDecodeOutOfMemory) {
-                            request->OutOfMemory = true;
-                        }
-                    }
-                    break;
-                    case IF_PNG:
-                    {
-                        int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-                        bool bHasAnimation = false;
-                        void* pEXIFData = nullptr;
-                        uint8* pPixelData = static_cast<uint8*>(PngReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation,
-                                                                                      nFrameCount, nFrameTimeMs, pEXIFData,
-                                                                                      request->OutOfMemory,
-                                                                                      pBuffer.get(),
-                                                                                      static_cast<size_t>(z.size)));
-                        if (pPixelData != nullptr) {
-                            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData, pEXIFData, 4, 0, IF_PNG, EXTRA_MANGA_PARAMS);
-                            bSuccess = true;
-                        }
-                        free(pEXIFData);
-                    }
-                    break;
-                    case IF_WEBP:
-                    {
-                        int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-                        bool bHasAnimation = false;
-                        void* pEXIFData = nullptr;
-                        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                            WebpReaderWriter::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer.get(), nSize)));
-                        if (pPixelData && nBPP == 4) {
-                            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, nBPP, 0, IF_WEBP, EXTRA_MANGA_PARAMS);
-                            pPixelData.release();
-                            bSuccess = true;
-                        }
-                        free(pEXIFData);
-                    }
-                    break;
-                    case IF_QOI:
-                    {
-                        int nWidth = 0, nHeight = 0, nBPP = 0;
-                        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                            QoiReaderWriter::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer.get(), nSize)));
-                        if (pPixelData) {
-                            if (nBPP == 4) {
-                                Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                            }
-                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_QOI, EXTRA_MANGA_PARAMS);
-                            pPixelData.release();
-                            bSuccess = true;
-                        }
-                    }
-                    break;
-                    case IF_WindowsBMP:
-                    {
-                        int nWidth = 0, nHeight = 0, nBPP = 0;
-                        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                            CReaderBMP::ReadImage(nWidth, nHeight, nBPP, request->OutOfMemory, pBuffer.get(), nSize)));
-                        if (pPixelData) {
-                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), nullptr, nBPP, 0, IF_WindowsBMP, EXTRA_MANGA_PARAMS);
-                            pPixelData.release();
-                            bSuccess = true;
-                        }
-                    }
-                    break;
-                    case IF_AVIF:
-                    {
-                        int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-                        bool bHasAnimation = false;
-                        void* pEXIFData = nullptr;
-                        std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                            AvifReader::ReadImage(nWidth, nHeight, nBPP, bHasAnimation, nFrameIndexFixed, nFrameCount, nFrameTimeMs, pEXIFData, request->OutOfMemory, pBuffer.get(), nSize)));
-                        if (pPixelData) {
-                            Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                            request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, 4, 0, IF_AVIF, EXTRA_MANGA_PARAMS);
-                            pPixelData.release();
-                            bSuccess = true;
-                        }
-                        free(pEXIFData);
-                    }
-                    break;
-                    case IF_HEIF:
-                    {
-                        try {
-                            int nWidth = 0, nHeight = 0, nBPP = 0, nFrameCount = 1, nFrameTimeMs = 0;
-                            void* pEXIFData = nullptr;
-                            std::unique_ptr<uint8_t[]> pPixelData(static_cast<uint8_t*>(
-                                HeifReader::ReadImage(nWidth, nHeight, nBPP, nFrameCount, pEXIFData, request->OutOfMemory, nFrameIndexFixed, pBuffer.get(), nSize)));
-                            if (pPixelData) {
-                                Helpers::BlendAlpha(reinterpret_cast<uint32*>(pPixelData.get()), nWidth, nHeight, request->ProcessParams.TransparencyMode);
-                                request->Image = new CJPEGImage(nWidth, nHeight, pPixelData.get(), pEXIFData, nBPP, 0, IF_HEIF, EXTRA_MANGA_PARAMS);
-                                pPixelData.release();
-                                bSuccess = true;
-                            }
-                            free(pEXIFData);
-                        }
-                        catch (const heif::Error&) {
-                            delete request->Image;
-                            request->Image = nullptr;
-                        }
-                    }
-                    break;
-                    case IF_GIF:
-                    case IF_TIFF:
-                    case IF_ICO:
-                    {
-                        // No dedicated wrapper: Qt decodes the entry straight from the buffer (first frame only)
-                        bool bQtOutOfMemory = false;
-                        request->Image = DecodeBufferWithQt(pBuffer.get(), nSize, nullptr, CImageFrameInfo{ EXTRA_MANGA_PARAMS },
-                                                            bQtOutOfMemory, request->ProcessParams.TransparencyMode);
-                        if (request->Image != nullptr) {
-                            bSuccess = true;
-                        }
-                        if (bQtOutOfMemory) {
-                            request->OutOfMemory = true;
-                        }
-                    }
-                    break;
-                    default:
-                        // not an image format that can be decoded from a buffer
-                        break;
-                    }
+                    const CDecodeTarget target{ .bInArchive = true, .bMultipleFiles = bMultipleFiles,
+                                               .nArchiveCount = m_nZipCount, .nEntryIndex = nArchiveItemIndex };
+                    const EDecodeStatus eStatus = DecodeFromBuffer(request, eFormat, pBuffer, static_cast<size_t>(z.size), target);
+                    bSuccess = (eStatus == EDecodeStatus::Ok);
+                    // OutOfMemory / Exception: the request carries the flag, stop here. Anything else skips the entry.
+                    bAbort = (eStatus == EDecodeStatus::OutOfMemory || eStatus == EDecodeStatus::Exception);
                 }
             }
             // eRead == Empty or Failed: falls through, the entry is skipped like a non-image

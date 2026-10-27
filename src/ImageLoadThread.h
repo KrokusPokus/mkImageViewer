@@ -14,7 +14,17 @@
 #include <QImageReader>
 #include <QString>
 
+enum class EDecodeStatus { Ok, NotDecodable, OutOfMemory, Exception };
+
+struct CDecodeTarget {
+    bool bInArchive = false;
+    bool bMultipleFiles = false;
+    int  nArchiveCount = 1;
+    int  nEntryIndex = 0;
+};
+
 class CJPEGImage;
+
 class ZipEntry
 {
 public:
@@ -117,6 +127,12 @@ private:
     void DeleteCachedAvifDecoder();
     void DeleteCachedZip();
 
+    // in CImageLoadThread: die neun ProcessRead*Request-Deklarationen entfernen, dafür
+    void ProcessReadFileRequest(CRequest*, EImageFormat);
+    EDecodeStatus DecodeFromBuffer(CRequest*, EImageFormat, std::unique_ptr<char[]>&, size_t, const CDecodeTarget&);
+    QString* CachedFileNameFor(EImageFormat);
+    void DeleteCachedDecoder(EImageFormat);
+/*
     void ProcessReadAVIFRequest(CRequest* request);
     void ProcessReadBMPRequest(CRequest * request);
     void ProcessReadHEIFRequest(CRequest * request);
@@ -127,6 +143,7 @@ private:
     void ProcessReadQOIRequest(CRequest * request);
     void ProcessReadTGARequest(CRequest * request);
     void ProcessReadWEBPRequest(CRequest * request);
+*/
     void ProcessReadZipRequest(CRequest* request);
     bool ValidateZipFrameIndex(int nInitialIndex, int &nFrameIndex);
 
