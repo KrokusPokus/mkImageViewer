@@ -3,7 +3,6 @@
 
 #define KEY_MAGIC 2978465
 
-#include "resource.h"
 #include "ProcessParams.h"
 #include "Helpers.h"
 #include "Commands.h"
@@ -94,7 +93,7 @@ private:
     Helpers::ESorting m_eForcedSorting; // forced sorting mode on command line
     CFileList* m_pFileList; // used for navigation
     CDirectoryWatcher* m_pDirectoryWatcher = NULL; // notifies the main window when the current file changed or a file in the current directory was added or deleted
-    CImageProvider * m_pJPEGProvider; // reads image (of any format, not only JPEGs) files, using read ahead
+    CImageProvider * m_pImageProvider; // reads image (of any format, not only JPEGs) files, using read ahead
     CBaseImage * m_pCurrentImage; // currently displayed image
     bool m_bOutOfMemoryLastImage; // true if the last image could not be requested because not enough memory
     bool m_bExceptionErrorLastImage; // true if the last image could not be requested because of an unhandled exception
@@ -182,6 +181,7 @@ private:
     void InitParametersForNewImage();
     void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
     void onLoadFileAsynch(); // WM_COPYDATAhandler and OnAnotherInstanceStarted() call this via invokeMethod()
+    void OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath);
 
     QRect GetZoomTextRect();
     QRect GetToastTextRect();

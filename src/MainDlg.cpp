@@ -321,7 +321,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
 
 
     m_pFileList = NULL;
-    m_pJPEGProvider = NULL;
+    m_pImageProvider = NULL;
     m_pCurrentImage = NULL;
     m_bOutOfMemoryLastImage = false;
     m_bExceptionErrorLastImage = false;
@@ -475,9 +475,9 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     int nReadAheadBuffers = (CSettingsProvider::This().CacheRange() * 2) + 1;    // The +1 is the current image
 
     // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
-    m_pJPEGProvider = new CImageProvider(this, NUM_THREADS, nReadAheadBuffers);
+    m_pImageProvider = new CImageProvider(this, NUM_THREADS, nReadAheadBuffers);
 
-    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+    m_pCurrentImage = m_pImageProvider->RequestImage(m_pFileList,
                                                     CImageProvider::FORWARD,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
@@ -526,7 +526,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
 CMainDlg::~CMainDlg() {
     delete m_pFileList;
     delete m_pDirectoryWatcher;
-    if (m_pJPEGProvider != NULL) delete m_pJPEGProvider;
+    if (m_pImageProvider != NULL) delete m_pImageProvider;
     delete m_pImageProcParams;
     delete m_pImageProcParamsKept;
     delete m_pKeyMap;
@@ -2029,8 +2029,8 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                 m_eTransparencyMode = Helpers::TP_BLEND;
                 SetToast(QStringLiteral("Transparency: Blend"));
             }
-            m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
-            m_pJPEGProvider->ClearAllRequests();
+            m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
+            m_pImageProvider->ClearAllRequests();
             m_pCurrentImage = NULL;
             ReloadImage(true);
             break;
@@ -2042,8 +2042,8 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             } else {
                 SetToast(QStringLiteral("Embedded Color Profiles: used"));
             }
-            m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
-            m_pJPEGProvider->ClearAllRequests();
+            m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
+            m_pImageProvider->ClearAllRequests();
             m_pCurrentImage = NULL;
             ReloadImage(true);
             break;
@@ -2184,13 +2184,17 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             OpenDefaultEditor();
             break;
         case Command::RenameFile:
-                {
-                QString currentPath = CurrentFileName(false);
+            {
+                const QString currentPath = CurrentFileName(false);
+                if (currentPath.isEmpty()) {
+                    break;   // nothing displayed, nothing to rename
+                }
 
                 RenameDialog dlg(currentPath, this);
                 if (dlg.exec() == QDialog::Accepted) {
-                    QString newPath = dlg.newFilePath();
-                    OpenFile(newPath, false);
+                    // No OpenFile(): the image on screen stays valid. The file list, the image cache,
+                    // bookmarks, window title and directory watcher are told the new name instead.
+                    OnCurrentFileRenamed(currentPath, dlg.newFilePath());
                 }
             }
             break;
@@ -2322,11 +2326,38 @@ void CMainDlg::ExploreFile() {
         return;
     }
 
-    if (QFileInfo::exists(sCurrentFileName)) {
-        QStringList args;
-        args << QStringLiteral("--select") << sCurrentFileName;
-        QProcess::startDetached(QStringLiteral("dolphin"), args);
+    QFileInfo fileInfo(sCurrentFileName);
+
+    QString targetPath = sCurrentFileName;
+    QString targetFile = "";
+    if (fileInfo.isFile()) {
+        targetPath = fileInfo.absoluteDir().path();
+        targetFile = sCurrentFileName;
     }
+
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString mkFolderWidgetPath = appDir.filePath("mkFolderWidget");
+    QString fileManager;
+
+    if (QFile::exists(mkFolderWidgetPath) && (fileManager.isEmpty() || fileManager == "mkFolderWidget")) {
+        QStringList args;
+        args << QDir::toNativeSeparators(targetPath);
+        if (!targetFile.isEmpty()) {
+            args << "-f" << QDir::toNativeSeparators(targetFile);
+        }
+        QProcess::startDetached(mkFolderWidgetPath, args);
+        return;
+    }
+
+    QProcess::startDetached("dbus-send", {
+                                             "--session",
+                                             "--print-reply",
+                                             "--dest=org.freedesktop.FileManager1",
+                                             "/org/freedesktop/FileManager1",
+                                             "org.freedesktop.FileManager1.ShowItems",
+                                             "array:string:" + QUrl::fromLocalFile(sCurrentFileName).toString(),
+                                             "string:\"\""
+                                         });
 }
 
 void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
@@ -2384,10 +2415,10 @@ void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
 
     // free current image and all read ahead images
     InitParametersForNewImage();
-    m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
-    m_pJPEGProvider->ClearAllRequests();
+    m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
+    m_pImageProvider->ClearAllRequests();
 
-    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+    m_pCurrentImage = m_pImageProvider->RequestImage(m_pFileList,
                                                     CImageProvider::FORWARD,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
@@ -2596,11 +2627,11 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         InitParametersForNewImage();
     }
 
-    m_pJPEGProvider->NotifyNotUsed(m_pCurrentImage);
+    m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
     // Clear from cache only for POS_Current POS_AwayFromCurrent, which are involved in reloading on file/directory changes and deletion.
     if (ePos == POS_Current || ePos == POS_AwayFromCurrent) {
         // When (ePos == POS_AwayFromCurrent), it will additionally releaseLockedFile in m_pWorkThreads
-        m_pJPEGProvider->ClearRequest(m_pCurrentImage, ePos == POS_AwayFromCurrent);
+        m_pImageProvider->ClearRequest(m_pCurrentImage, ePos == POS_AwayFromCurrent);
     }
     m_pCurrentImage = NULL;
 
@@ -2616,7 +2647,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
 /* Debugging */ qDebug() << "GotoImage()->RequestImage()  nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
-    m_pCurrentImage = m_pJPEGProvider->RequestImage(m_pFileList,
+    m_pCurrentImage = m_pImageProvider->RequestImage(m_pFileList,
                                                     (ePos == POS_AwayFromCurrent) ? CImageProvider::NONE : eDirection,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
@@ -3403,8 +3434,8 @@ void CMainDlg::CleanupAndTerminate() {
     StopMovieMode();
     StopAnimation();
 
-    delete m_pJPEGProvider; // delete this early to properly shut down the loading threads
-    m_pJPEGProvider = nullptr;
+    delete m_pImageProvider; // delete this early to properly shut down the loading threads
+    m_pImageProvider = nullptr;
     m_pCurrentImage = nullptr;
 
     close();
@@ -3496,6 +3527,78 @@ void CMainDlg::StopAnimation() {
     m_bIsAnimationPlaying = false;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Bookmark helpers
+//
+// LoadBookmark(), SaveBookmark() and MigrateBookmarkOnRename() MUST derive the key in bookmarks.ini the
+// same way, otherwise a bookmark written by one is not found by the others. Therefore the rules live
+// here once (they used to be duplicated in LoadBookmark() and SaveBookmark()).
+// ---------------------------------------------------------------------------------------------
+
+static bool IsBookmarkArchive(const QFileInfo& fileInfo) {
+    const QString fileExt = fileInfo.suffix().toLower();
+    return fileExt == QStringLiteral("cbz") || fileExt == QStringLiteral("cbr") || fileExt == QStringLiteral("cb7");
+}
+
+// '[' and ']' are replaced because they are special characters in INI files.
+static QString BookmarkEscape(QString sText) {
+    sText.replace(QLatin1Char('['), QLatin1Char('<'));
+    sText.replace(QLatin1Char(']'), QLatin1Char('>'));
+    return sText;
+}
+
+// Key in bookmarks.ini: archive file name without extension, otherwise the name of the parent folder.
+static QString BookmarkKeyName(const QFileInfo& fileInfo) {
+    QString keyName = IsBookmarkArchive(fileInfo) ? fileInfo.completeBaseName()
+                                                  : fileInfo.dir().dirName();
+
+    // Remove language tags ([en], [de], [ch], [ko]) at the end, so all language versions share a bookmark
+    static const QRegularExpression langTagRx(QStringLiteral(R"(\s+\[(en|de|ch|ko)\]$)"), QRegularExpression::CaseInsensitiveOption);
+    keyName.remove(langTagRx);
+
+    return BookmarkEscape(keyName);
+}
+
+// Moves the bookmark of a renamed file to its new name. Call after the file has been renamed, and
+// before SaveBookmark() can run for the new name.
+//
+//  - Archives (.cbz, ...): the key is the archive name, so a rename changes the key. The entry is moved
+//    to the new key, otherwise the reading position is lost and the old entry stays in the file forever.
+//    If the new key already exists (another book with the same name) nothing is touched: moving would
+//    destroy that bookmark, and keeping the old entry loses nothing.
+//  - Folders (/manga/, /comics/): the key is the folder (unchanged by a rename), the VALUE is the file
+//    name of the last viewed image. If it is the renamed file, the value is updated, otherwise
+//    LoadBookmark() would later point to a file that no longer exists.
+static void MigrateBookmarkOnRename(const QString& sOldPath, const QString& sNewPath) {
+    const QString bookmarkFilePath = QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))
+                                         .filePath(QStringLiteral("bookmarks.ini"));
+    if (!QFileInfo::exists(bookmarkFilePath)) {
+        return;   // no bookmarks yet: nothing to migrate (and no file created just for this)
+    }
+
+    const QFileInfo oldInfo(sOldPath);
+    const QFileInfo newInfo(sNewPath);
+    const QString oldKey = BookmarkKeyName(oldInfo);
+    const QString newKey = BookmarkKeyName(newInfo);
+
+    QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
+    iniSettings.beginGroup(QStringLiteral("Bookmarks"));
+
+    if (IsBookmarkArchive(oldInfo)) {
+        if (oldKey != newKey && iniSettings.contains(oldKey) && !iniSettings.contains(newKey)) {
+            iniSettings.setValue(newKey, iniSettings.value(oldKey));
+            iniSettings.remove(oldKey);
+        }
+    } else {
+        // same folder, so oldKey == newKey
+        if (iniSettings.value(oldKey).toString() == BookmarkEscape(oldInfo.fileName())) {
+            iniSettings.setValue(oldKey, BookmarkEscape(newInfo.fileName()));
+        }
+    }
+
+    iniSettings.endGroup();
+}
+
 QString CMainDlg::LoadBookmark(const QString& filePath) {
     if (filePath.isEmpty()) {
         return QString();
@@ -3508,22 +3611,7 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
         return QString();
     }
 
-    const QFileInfo fileInfo(filePath);
-    const QString fileExt = fileInfo.suffix().toLower();
-    const bool isArchive = (fileExt == QStringLiteral("cbz") ||
-                            fileExt == QStringLiteral("cbr") ||
-                            fileExt == QStringLiteral("cb7"));
-
-    QString keyName = isArchive ? fileInfo.completeBaseName()
-                                : fileInfo.dir().dirName();
-
-    // 1. Universelles Entfernen von Sprach-Tags ([en], [de], [ch], [ko], etc.) am Ende
-    static const QRegularExpression langTagRx(QStringLiteral(R"(\s+\[(en|de|ch|ko)\]$)"), QRegularExpression::CaseInsensitiveOption);
-    keyName.remove(langTagRx);
-
-    // 2. Sonderzeichen anpassen
-    keyName.replace(QLatin1Char('['), QLatin1Char('<'));
-    keyName.replace(QLatin1Char(']'), QLatin1Char('>'));
+    const QString keyName = BookmarkKeyName(QFileInfo(filePath));
 
     // Auslesen der INI-Datei
     QSettings iniSettings(bookmarkFilePath, QSettings::IniFormat);
@@ -3559,30 +3647,8 @@ void CMainDlg::SaveBookmark() {
 
     // 2. Pfadanalyse mit QFileInfo & QString-Methoden
     const QFileInfo fileInfo(filePath);
-    const QString fileExt = fileInfo.suffix().toLower(); // z.B. "cbz"
-    const bool isArchive = (fileExt == QStringLiteral("cbz") ||
-                            fileExt == QStringLiteral("cbr") ||
-                            fileExt == QStringLiteral("cb7"));
-
-    QString keyName;
-
-    if (isArchive) {
-        // Bei Archivdateien: Name der Archivdatei ohne Endung
-        keyName = fileInfo.completeBaseName();
-    } else {
-        // Bei normalen Dateien: Name des übergeordneten Ordners
-        keyName = fileInfo.dir().dirName();
-    }
-
-    QString keyNameCleaned = keyName;
-
-    // 1. Universelles Entfernen von Sprach-Tags ([en], [de], [ch], [ko], etc.) am Ende
-    static const QRegularExpression langTagRx(QStringLiteral(R"(\s+\[(en|de|ch|ko)\]$)"), QRegularExpression::CaseInsensitiveOption);
-    keyNameCleaned.remove(langTagRx);
-
-    // 2. Sonderzeichen anpassen
-    keyNameCleaned.replace(QLatin1Char('['), QLatin1Char('<'));
-    keyNameCleaned.replace(QLatin1Char(']'), QLatin1Char('>'));
+    const bool isArchive = IsBookmarkArchive(fileInfo);
+    const QString keyNameCleaned = BookmarkKeyName(fileInfo);   // same rules as LoadBookmark()
 
     // 3. Neuen Wert für das Lesezeichen bestimmen
     QString newValueStr;
@@ -3624,6 +3690,32 @@ void CMainDlg::SaveBookmark() {
     }
 
     iniSettings.endGroup();
+}
+
+// Brings all state that depends on the file name up to date after the DISPLAYED file has been renamed
+// on disk (by RenameDialog). The image itself is not touched or reloaded, so it stays in the cache.
+void CMainDlg::OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath) {
+    if (sNewPath.isEmpty() || m_pFileList == nullptr) {
+        return;
+    }
+
+    m_pFileList->FileHasRenamed(sOldPath, sNewPath);
+    if (m_pImageProvider != nullptr) {
+        m_pImageProvider->FileHasRenamed(sOldPath, sNewPath);
+    }
+
+    // Only for books: archives are stored under their name, folders under the file name of the last image.
+    if (IsBookModeFile(sNewPath)) {
+        MigrateBookmarkOnRename(sOldPath, sNewPath);
+    }
+
+    if (QDir::cleanPath(m_sStartupFile) == QDir::cleanPath(sOldPath)) {
+        m_sStartupFile = sNewPath;
+    }
+
+    UpdateWindowTitle();
+    m_pDirectoryWatcher->SetCurrentFile(sNewPath);
+    update();
 }
 
 bool CMainDlg::IsBookModeFile(const QString& filePath) {
@@ -3936,3 +4028,4 @@ void CMainDlg::DiscardPendingInput() {
     QCoreApplication::processEvents(QEventLoop::AllEvents);
     m_bDropInput = false;
 }
+

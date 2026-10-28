@@ -16,6 +16,8 @@
 
 enum class EDecodeStatus { Ok, NotDecodable, OutOfMemory, Exception };
 
+namespace bit7z { class Bit7zLibrary; }
+
 struct CDecodeTarget {
     bool bInArchive = false;
     bool bMultipleFiles = false;
@@ -166,6 +168,10 @@ private:
     bool m_bLastQtAnimation = false;
     void DeleteCachedQtImageReader();
     void ProcessReadQtImageRequest(CRequest* request);
+
+    // 7z.so is loaded on first use and kept until the thread object is destroyed
+    std::unique_ptr<bit7z::Bit7zLibrary> m_p7zLibrary;
+    bit7z::Bit7zLibrary& SevenZipLibrary();
 };
 
 #endif // IMAGELOADTHREAD_H

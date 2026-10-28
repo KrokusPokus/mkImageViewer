@@ -58,9 +58,6 @@ namespace {
 
 using namespace std::string_view_literals;
 
-constexpr const char* k7zLibraryName = "7z.so";
-
-
 // Upper bound for a single archive entry we are willing to inflate into memory.
 // The size stored in an archive is attacker controlled, so it must be checked before allocating.
 // The wrappers take 'int' sizes, hence the INT_MAX cap.
@@ -279,6 +276,20 @@ std::string ToNativeNarrowPath(const QString& sFileName) {
     return QFile::encodeName(sFileName).toStdString();
 }
 
+// Location of 7z.so differs between distributions / packages (7zip, p7zip)
+const std::string& SevenZipLibraryPath() {
+    static const std::string kPath = [] {
+        for (const char* p : { "/usr/lib/7zip/7z.so", "/usr/lib/p7zip/7z.so",
+                              "/usr/libexec/p7zip/7z.so", "/usr/lib64/p7zip/7z.so" }) {
+            if (QFile::exists(QString::fromUtf8(p))) {
+                return std::string(p);
+            }
+        }
+        return std::string("7z.so"); // let dlopen() search
+    }();
+    return kPath;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Qt image decoding (QImageReader / QImage / QColorSpace)
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -458,7 +469,8 @@ using ZipPtr = std::unique_ptr<struct zip_t, ZipCloser>;
 
 // Reads one archive entry into pBuffer (pBuffer is released again on every failure).
 // 'zip' is the (optionally already opened) handle for zip/cbz archives; it is closed again when done.
-EEntryRead ReadZipEntry(const ZipEntry& z, bool use7z, const std::string& sArchivePath, ZipPtr& zip, std::unique_ptr<char[]>& pBuffer) {
+// p7zLibrary: nullptr for zip/cbz archives (read with the zip library), otherwise the loaded 7z.so
+EEntryRead ReadZipEntry(const ZipEntry& z, Bit7zLibrary* p7zLibrary, const std::string& sArchivePath, ZipPtr& zip, std::unique_ptr<char[]>& pBuffer) {
     pBuffer.reset();
     if (z.size == 0) {
         return EEntryRead::Empty;
@@ -471,19 +483,20 @@ EEntryRead ReadZipEntry(const ZipEntry& z, bool use7z, const std::string& sArchi
         return EEntryRead::OutOfMemory;
     }
 
-    if (use7z) {
+    if (p7zLibrary != nullptr) {
         try {
-            // The archive has to be reopened for every extraction, otherwise extract fails
-            Bit7zLibrary lib{ k7zLibraryName };
-            BitArchiveReader reader(lib, sArchivePath, BitFormat::Auto);
+            // The library stays loaded, but the archive has to be reopened for every extraction, otherwise extract fails
+            BitArchiveReader reader(*p7zLibrary, sArchivePath, BitFormat::Auto);
             try {
                 reader.extractTo(reinterpret_cast<byte_t*>(pBuffer.get()), static_cast<size_t>(z.size), z.index);
                 return EEntryRead::Ok;
-            } catch (const BitException&) {
+            } catch (const BitException& ex) {
+                qDebug() << "bit7z:" << ex.what();
                 pBuffer.reset();
                 return EEntryRead::Failed; // only this entry is broken
             }
-        } catch (const BitException&) {
+        } catch (const BitException& ex) {
+            qDebug() << "bit7z:" << ex.what();
             pBuffer.reset();
             return EEntryRead::ArchiveError; // library or archive could not be opened
         }
@@ -1305,15 +1318,15 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
     if (!bIsSameArchive) {
         if (use7z) {
             try {
-                Bit7zLibrary lib{ k7zLibraryName };
-                BitArchiveReader reader(lib, sArchivePath, BitFormat::Auto);
+                BitArchiveReader reader(SevenZipLibrary(), sArchivePath, BitFormat::Auto);
                 for (const auto& item : reader) {
                     if (!item.isDir()) {
                         zipEntries.push_back(ZipEntry(item.name(), item.index(), item.size()));
                     }
                 }
                 // The reader is destroyed here; extraction reopens the archive (extract fails otherwise).
-            } catch (const BitException&) {
+            } catch (const BitException& ex) {
+                qDebug() << "bit7z:" << ex.what();
                 DeleteCachedZip();
                 return;
             }
@@ -1366,7 +1379,7 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
         bool bAbort = false; // stop without removing the entry from the list
 
         try {
-            const EEntryRead eRead = ReadZipEntry(z, use7z, sArchivePath, zip, pBuffer);
+            const EEntryRead eRead = ReadZipEntry(z, use7z ? m_p7zLibrary.get() : nullptr, sArchivePath, zip, pBuffer);
             if (eRead == EEntryRead::OutOfMemory) {
                 request->OutOfMemory = true;
                 bAbort = true;
@@ -1420,4 +1433,12 @@ void CImageLoadThread::DeleteCachedZip()
     m_sLastZipFileName.clear();
     m_nZipCount = 0;
     zipEntries.clear();
+}
+
+// Throws BitException if 7z.so can not be loaded; the next call tries again
+Bit7zLibrary& CImageLoadThread::SevenZipLibrary() {
+    if (!m_p7zLibrary) {
+        m_p7zLibrary = std::make_unique<Bit7zLibrary>(SevenZipLibraryPath());
+    }
+    return *m_p7zLibrary;
 }

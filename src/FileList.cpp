@@ -75,6 +75,12 @@ CFileDesc::CFileDesc(const QString& sName, const QDateTime& lastModTime, const Q
     m_sTitle = QFileInfo(m_sName).fileName();
 }
 
+void CFileDesc::SetName(const QString& sName) {
+    // same normalization as in the constructor
+    m_sName = QDir::cleanPath(sName);
+    m_sTitle = QFileInfo(m_sName).fileName();
+}
+
 bool CFileDesc::SortAscending(const CFileDesc& other) const {
     if (sm_eSorting == Helpers::FS_LastModTime) {
         return m_lastModTime < other.m_lastModTime;
@@ -172,6 +178,60 @@ void CFileList::Reload(const QString& sFileName, bool clearForwardHistory) {
         m_iterStart = m_fileList.begin();
     }
     m_iter = FindFile(sCurrentFile);
+}
+
+void CFileList::FileHasRenamed(const QString& sOldFileName, const QString& sNewFileName) {
+    // Entries are stored as clean absolute paths (FindFiles() uses absoluteFilePath(), CFileDesc cleans),
+    // so normalize the parameters the same way.
+    const QString sOld = QDir::cleanPath(QFileInfo(sOldFileName).absoluteFilePath());
+    const QString sNew = QDir::cleanPath(QFileInfo(sNewFileName).absoluteFilePath());
+    if (sOld.isEmpty() || sNew.isEmpty() || sOld == sNew) {
+        return;
+    }
+
+    // The file the list was created for (used e.g. by Reload() as the start of the wrap-around).
+    // The old code compared case-insensitive (Windows); file names on Linux are case-sensitive,
+    // otherwise renaming "a.jpg" would also hit an unrelated "A.jpg".
+    if (!m_sInitialFile.isEmpty() && QDir::cleanPath(QFileInfo(m_sInitialFile).absoluteFilePath()) == sOld) {
+        m_sInitialFile = sNew;
+    }
+
+    auto iterRenamed = m_fileList.end();
+    for (auto iter = m_fileList.begin(); iter != m_fileList.end(); ++iter) {
+        const QString& sName = iter->GetName();
+        // Names are normally absolute already; the QFileInfo detour is only for the rare relative entry
+        // (e.g. a single non-image file given on the command line).
+        if (sName == sOld || (!QDir::isAbsolutePath(sName) && QDir::cleanPath(QFileInfo(sName).absoluteFilePath()) == sOld)) {
+            iter->SetName(sNew);
+            iterRenamed = iter;
+            break;   // names are unique within one list
+        }
+    }
+    if (iterRenamed == m_fileList.end()) {
+        return;
+    }
+
+    // Only a rename changes the position of the entry, and only when sorting by name (the modification
+    // time, size and random number do not change). Slide show lists keep the order of the text file.
+    //
+    // The entry is moved alone instead of calling m_fileList.sort(): the rest of the list is still sorted,
+    // so one linear pass is enough, and the sort() of a list with a comparator that is not a strict
+    // weak ordering for equal keys (descending, see operator<) could swap unrelated entries.
+    // std::list::splice() keeps all iterators valid (m_iter, m_iterStart, m_iterCheckPoint),
+    // m_iter still points to the renamed file.
+    if (!m_bIsSlideShowList && CFileDesc::GetSorting() == Helpers::FS_FileName) {
+        auto iterPos = m_fileList.begin();
+        while (iterPos != m_fileList.end() && (iterPos == iterRenamed || *iterPos < *iterRenamed)) {
+            ++iterPos;
+        }
+        m_fileList.splice(iterPos, m_fileList, iterRenamed);
+
+        // Without wrap-around the iteration starts at the first element, which may have changed.
+        // (With wrap-around m_iterStart is a position, i.e. an iterator, which stays valid.)
+        if (!m_bWrapAroundFolder) {
+            m_iterStart = m_fileList.begin();
+        }
+    }
 }
 
 bool CFileList::CurrentFileExists() const {

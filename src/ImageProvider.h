@@ -36,6 +36,11 @@ public:
     void ClearAllRequests();
     bool FreeAllPossibleMemory();
 
+    // Tells the provider that a file was renamed (full paths). Cached and pending requests of the
+    // file continue under the new name, so FindRequest() finds the image again without decoding it anew.
+    // Call from the GUI thread only, like all other methods that touch m_requestList.
+    void FileHasRenamed(const QString& sOldFileName, const QString& sNewFileName);
+
 private:
     struct CImageRequest {
         QString FileName;

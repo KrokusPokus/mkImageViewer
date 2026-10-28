@@ -5,6 +5,8 @@
 #include "ProcessParams.h"
 
 #include <climits>
+#include <QDir>
+#include <QFileInfo>
 #include <QMutexLocker>
 #include <QDebug>
 
@@ -173,6 +175,48 @@ bool CImageProvider::ClearRequest(CBaseImage* pImage, bool releaseLockedFile) {
         }
     }
     return bErased;
+}
+
+void CImageProvider::FileHasRenamed(const QString& sOldFileName, const QString& sNewFileName) {
+    // Request names come from CFileList::Current(): clean absolute paths. Normalize the same way.
+    const QString sOld = QDir::cleanPath(QFileInfo(sOldFileName).absoluteFilePath());
+    const QString sNew = QDir::cleanPath(QFileInfo(sNewFileName).absoluteFilePath());
+    if (sOld.isEmpty() || sNew.isEmpty() || sOld == sNew) {
+        return;
+    }
+
+    // 1. A rename never overwrites, so the new name did not exist before and any request still
+    //    registered under it is stale (file deleted earlier, or loaded before it vanished). It must go,
+    //    otherwise FindRequest() would return the first match, the stale one, instead of the renamed image.
+    //    Requests InUse are left alone: they belong to the image on screen and are owned by the caller.
+    for (auto iter = m_requestList.begin(); iter != m_requestList.end(); ) {
+        if ((*iter)->FileName == sNew && !(*iter)->InUse) {
+            iter = DeleteElementAt(iter);
+        } else {
+            ++iter;
+        }
+    }
+
+    // 2. Continue all requests of the file (every frame index) under the new name. Linux file names are
+    //    case-sensitive, so compare exactly (the Windows original used _tcsicmp).
+    //    FileName is only touched on the GUI thread: CImageLoadThread::CRequest copies the name in its
+    //    constructor. A load that is already running keeps using the old name and fails if the file is
+    //    gone, in which case FindRequest() drops the empty result and the next request loads it again.
+    for (const auto& pRequest : m_requestList) {
+        if (pRequest->FileName == sOld) {
+            pRequest->FileName = sNew;
+        }
+    }
+
+    // 3. The load threads cache decoders and open files by NAME (m_sLastFileName, m_sLastZipFileName,
+    //    m_pLastImageFile, ... for animations, archives and multi frame files). After the rename these
+    //    entries are stale: they would only be found again if ANOTHER file is later renamed to the old name,
+    //    and then frames of the wrong file would be decoded. So drop them. The decoder cache is not renamed
+    //    (that would need a request type in CImageLoadThread); the price is that a multi frame file is reopened
+    //    once on the next frame request. Every thread may hold such a cache, not only the first one.
+    for (int i = 0; i < m_nNumThread; i++) {
+        m_pWorkThreads[i]->ReleaseFile(sOld);
+    }
 }
 
 CImageProvider::RequestPtr CImageProvider::FindRequest(const QString& sFileName, int nFrameIndex) {

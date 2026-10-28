@@ -40,6 +40,10 @@ public:
     // Gets file size in bytes
     qint64 GetFileSize() const { return m_fileSize; }
 
+    // Renames the entry (full path). Only name and title change; times and size stay the same,
+    // as a rename does not touch the modification time. Does NOT re-sort, see CFileList::FileHasRenamed().
+    void SetName(const QString& sName);
+
 private:
     static Helpers::ESorting sm_eSorting;
     static bool sm_bSortAscending;
@@ -117,6 +121,13 @@ public:
 
     // Returns if the current file list is based on a slide show text file
     bool IsSlideShowList() const { return m_bIsSlideShowList; }
+
+    // Tells the list that a file was renamed (both parameters with full path, same directory).
+    // The entry is renamed in place and moved to its new position if the list is sorted by name,
+    // so the iterator (current file) keeps pointing to the renamed file. No directory access, no reload.
+    // Only the list of the current folder is touched: lists chained for other folders cannot contain the
+    // file (TryCreateFileList() never creates two lists for one folder).
+    void FileHasRenamed(const QString& sOldFileName, const QString& sNewFileName);
 
     // Returns if the current file exists
     bool CurrentFileExists() const;

@@ -9,6 +9,11 @@
 
 class CDirectoryWatcher : public QObject {
     Q_OBJECT
+
+signals:
+    void DirectoryFileListChanged();
+    void DisplayedFileChangedOnDisk();
+
 public:
     explicit CDirectoryWatcher(QObject* pParent = nullptr);
     virtual ~CDirectoryWatcher();
@@ -16,12 +21,22 @@ public:
     void SetCurrentFile(const QString& fileName);
     void SetCurrentDirectory(const QString& directoryName);
     void Abort();
+    void Suspend();
+    void Resume();
 
-signals:
-    void DirectoryFileListChanged();
-    void DisplayedFileChangedOnDisk();
+    // RAII: Watcher fuer die Lebensdauer des Objekts pausieren
+    class ScopedPause {
+    public:
+        explicit ScopedPause(CDirectoryWatcher& w) : m_w(w) { m_w.Suspend(); }
+        ~ScopedPause() { m_w.Resume(); }
+        ScopedPause(const ScopedPause&) = delete;
+        ScopedPause& operator=(const ScopedPause&) = delete;
+    private:
+        CDirectoryWatcher& m_w;
+    };
 
 private:
+    bool m_suspended = false;
     QString m_sCurrentDirectory;
     QString m_sCurrentFile;
 

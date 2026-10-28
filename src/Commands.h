@@ -4,9 +4,6 @@
 // ---------------------------------------------------------------------------------------------
 // Commands.h - zentrale Beschreibung aller Befehle der Anwendung
 //
-// Ersetzt:  die IDM_*-Defines in resource.h, die Datei symbols.km und die Arithmetik auf
-//           Command-IDs in MainDlg.cpp (nCommand - IDM_SLIDESHOW_START, ... * 10 + OFFSET).
-//
 // Idee: EINE Quelle der Wahrheit.
 //   - enum class Command            -> Identitaet, typsicher, im switch verwendbar
 //   - CommandInfo-Tabelle (.cpp)    -> Config-Name, Anzeigetext, Kategorie, Argument-Typ

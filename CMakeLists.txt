@@ -47,7 +47,7 @@ set(CMAKE_AUTORCC ON)
 
 qt_add_executable(mkImageViewer
     src/main.cpp
-    src/ApplyFilterAVX.h src/ApplyFilterAVX.cpp
+
     src/BasicProcessing.h src/BasicProcessing.cpp
     src/Clipboard.h src/Clipboard.cpp
     src/Commands.h src/Commands.cpp
@@ -85,7 +85,7 @@ qt_add_executable(mkImageViewer
     src/LookupTables.h
     src/MaxImageDef.h
     src/ProcessParams.h
-    src/resource.h
+
     src/WTLCompat.h
 
     res/resources.qrc

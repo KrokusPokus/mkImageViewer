@@ -1,4 +1,3 @@
-#include "resource.h"
 #include "MainDlg.h"
 #include "SettingsProvider.h"
 

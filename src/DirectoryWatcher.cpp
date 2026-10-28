@@ -114,3 +114,24 @@ void CDirectoryWatcher::SetCurrentDirectory(const QString& directoryName) {
         m_fileSystemWatcher->addPath(m_watchedDirectory);
     }
 }
+
+void CDirectoryWatcher::Suspend() {
+    if (m_aborted || m_suspended) return;
+    m_suspended = true;
+    // Entfernen statt "Signale ignorieren": ohne Watch erzeugt der Kernel gar keine Events,
+    // auch keine, die erst nach dem Wiederaktivieren in der Queue ankaemen.
+    const QStringList paths = m_fileSystemWatcher->files() + m_fileSystemWatcher->directories();
+    if (!paths.isEmpty()) {
+        m_fileSystemWatcher->removePaths(paths);
+    }
+}
+
+void CDirectoryWatcher::Resume() {
+    if (m_aborted || !m_suspended) return;
+    m_suspended = false;
+    // Neue Basiszeit, sonst wuerde die Aenderung waehrend der Pause als "Datei geaendert" gelten.
+    m_modificationTimeCurrentFile = GetLastModificationTime(m_sCurrentFile);
+    m_bModificationTimeValid = m_modificationTimeCurrentFile.isValid();
+    if (!m_watchedDirectory.isEmpty()) m_fileSystemWatcher->addPath(m_watchedDirectory);
+    if (!m_sCurrentFile.isEmpty())     m_fileSystemWatcher->addPath(m_sCurrentFile);
+}
