@@ -14,7 +14,9 @@
 #include "ResizeFilter.h"
 #include "ProcessingThreadPool.h"
 #include "KeyMap.h"
+#include "Commands.h"
 #include "DirectoryWatcher.h"
+#include "RenameDialog.h"
 
 #include <QActionGroup>
 #include <QApplication>
@@ -39,6 +41,11 @@
 #include <QUrl>
 #include <QtGlobal>
 #include <QLibrary>
+#include <QVariant>
+#include <optional>
+
+// Damit CommandInvocation als QVariant an QActions haengen kann (Kontextmenue).
+Q_DECLARE_METATYPE(Cmd::CommandInvocation)
 
 namespace {
 
@@ -64,6 +71,8 @@ namespace {
     const int NO_REMOVE_KEY_MSG = 2; // used in GotoImage() method
     const int KEEP_PARAMETERS = 4; // used in GotoImage() method
     const int NO_UPDATE_WINDOW = 8; // used in GotoImage() method
+
+    const QString APP_TITLE = "mkImageViewer";
 
     // Errors that occur during loading a file
     enum EFileLoadError {
@@ -966,7 +975,7 @@ void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
             double dZoom = -1.0;
             QSize sizeAutoZoom = GetVirtualImageSize(m_pCurrentImage->OrigSize(), m_clientRect.size(), GetAutoZoomMode(), dZoom);
             if (sizeAutoZoom != m_virtualImageSize) {
-                ExecuteCommand(GetAutoZoomMode() * 10 + IDM_AUTO_ZOOM_NONE);
+                ExecuteCommand({ Cmd::Command::SetAutoZoom, static_cast<int>(GetAutoZoomMode()) });
             } else {
                 ResetZoomTo100Percents(true);
             }
@@ -1134,20 +1143,25 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
         return;
     }
 
-    if (vkCode == Qt::Key_F1) {
-        ExecuteCommand(IDM_HELP);
-        event->accept();
-        return;
-    }
+    // (Der fest verdrahtete F1-Sonderfall ist entfallen: F1 -> Help steht jetzt in der Standard-
+    //  keymap und ist damit wie jede andere Taste umbelegbar.)
 
-    int nCommand = m_pKeyMap->GetCommandIdForKey(vkCode, bAlt, bCtrl, bShift);
-    if (nCommand > 0) {
-        if (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN || nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT) {
+    // FIX (Numpad): Qt meldet Nummernblock-Tasten mit Qt::KeypadModifier. Ohne dieses Flag war
+    // "Numpad1" nicht von "1" unterscheidbar (gleicher Key-Code Qt::Key_1) - die Belegungen
+    // aus keymap.txt haben sich gegenseitig ueberschrieben. CKeyMap faellt selbst auf die
+    // Nicht-Keypad-Belegung zurueck, wenn fuer die Numpad-Taste keine eigene existiert.
+    const bool bKeypad = event->modifiers().testFlag(Qt::KeypadModifier);
+
+    const std::optional<Cmd::CommandInvocation> inv = m_pKeyMap->GetCommandForKey(vkCode, bAlt, bCtrl, bShift, bKeypad);
+    // DoNothing wird wie bisher verbraucht (Taste belegt, aber ohne Funktion) und nicht an Qt weitergereicht.
+    if (inv) {
+        const Cmd::Command cmd = inv->id;
+        if (cmd == Cmd::Command::PanUp || cmd == Cmd::Command::PanDown || cmd == Cmd::Command::PanLeft || cmd == Cmd::Command::PanRight) {
             // Prüfung analog zum Original: Wenn eine andere Taste als die Pfeiltaste selbst das Panning triggert
-            if ((nCommand == IDM_PAN_UP && vkCode != Qt::Key_Up) ||
-                (nCommand == IDM_PAN_DOWN && vkCode != Qt::Key_Down) ||
-                (nCommand == IDM_PAN_LEFT && vkCode != Qt::Key_Left) ||
-                (nCommand == IDM_PAN_RIGHT && vkCode != Qt::Key_Right)) {
+            if ((cmd == Cmd::Command::PanUp && vkCode != Qt::Key_Up) ||
+                (cmd == Cmd::Command::PanDown && vkCode != Qt::Key_Down) ||
+                (cmd == Cmd::Command::PanLeft && vkCode != Qt::Key_Left) ||
+                (cmd == Cmd::Command::PanRight && vkCode != Qt::Key_Right)) {
                 m_bAllowSmoothPanning = false;
             }
 
@@ -1158,7 +1172,7 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
             }
         }
 
-        ExecuteCommand(nCommand);
+        ExecuteCommand(*inv);
         event->accept();
         return;
     }
@@ -1327,38 +1341,84 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////
+// Uebersetzung Befehlsargument -> Programm-Enums
+//
+// Cmd::*Arg (Commands.h) ist bewusst von Helpers::* entkoppelt. Die Zuordnung steht hier an
+// EINER Stelle (statt verteilt als "nCommand * 10 + OFFSET"-Arithmetik).
+///////////////////////////////////////////////////////////////////////////////////
+
+// Die Argumente von SetAutoZoom werden direkt in Helpers::EAutoZoomMode umgewandelt. Das ist nur
+// zulaessig, solange die Reihenfolge gleich bleibt - die alten IDs (IDM_AUTO_ZOOM_*) setzten
+// dieselbe Reihenfolge voraus. Die Asserts schlagen beim Kompilieren an, falls jemand das Enum aendert.
+// (ZM_Disabled/None ist implizit 0; sein Name ist hier nicht bekannt, daher nicht geprueft.)
+static_assert(static_cast<int>(Helpers::ZM_FillScreenNoZoom) == static_cast<int>(Cmd::AutoZoomArg::FillNoZoom), "Cmd::AutoZoomArg != Helpers::EAutoZoomMode");
+static_assert(static_cast<int>(Helpers::ZM_FitToScreen)      == static_cast<int>(Cmd::AutoZoomArg::Fit),        "Cmd::AutoZoomArg != Helpers::EAutoZoomMode");
+static_assert(static_cast<int>(Helpers::ZM_FillScreen)       == static_cast<int>(Cmd::AutoZoomArg::Fill),       "Cmd::AutoZoomArg != Helpers::EAutoZoomMode");
+static_assert(static_cast<int>(Helpers::ZM_BookMode)         == static_cast<int>(Cmd::AutoZoomArg::BookMode),   "Cmd::AutoZoomArg != Helpers::EAutoZoomMode");
+
+static auto NavigationModeForArg(Cmd::LoopModeArg arg) {
+    switch (arg) {
+        case Cmd::LoopModeArg::Recursively: return Helpers::NM_LoopSubDirectories;
+        case Cmd::LoopModeArg::Siblings:    return Helpers::NM_LoopSameDirectoryLevel;
+        case Cmd::LoopModeArg::Folder:
+        default:                            return Helpers::NM_LoopDirectory;
+    }
+}
+
 void CMainDlg::onShowContextMenu(const QPoint &pos) {
     MouseOn();
 
     QMenu menu(this);
 
+    // Jeder Menueeintrag traegt als QAction-Daten einen Cmd::CommandInvocation (Befehl + Argument).
+    // Frueher war das ein nackter int, bei dem Familien wie Slideshow-Zeiten oder Zoomstufen ueber
+    // Offsets auf IDs kodiert waren; entsprechend entfiel auch die Rueckrechnung beim Anzeigen
+    // des Haken-Zustands (z.B. "navMode * 10 + IDM_LOOP_FOLDER == id").
+    //
+    // AddCommandAction haengt (wenn gewuenscht) die aktuell belegte Taste per '\t' an den Text,
+    // sodass Qt sie rechts im Menue ausgerichtet anzeigt. Eintraege, die den Tab selbst schon fuer
+    // einen Wert nutzen ("Waiting time\t5 sec"), bekommen kein Kuerzel.
+    const CKeyMap* pKeyMap = m_pKeyMap;
+    auto AddCmd = [pKeyMap](QMenu* pMenu, const QString& sText, Cmd::Command cmd, int arg = 0, bool bShowShortcut = true) -> QAction* {
+        QString sFullText = sText;
+        if (bShowShortcut && pKeyMap != nullptr) {
+            const QString sKeys = pKeyMap->GetKeyStringForCommand(cmd, arg);
+            if (!sKeys.isEmpty()) {
+                sFullText += QLatin1Char('\t') + sKeys;
+            }
+        }
+        QAction* pAction = pMenu->addAction(sFullText);
+        pAction->setData(QVariant::fromValue(Cmd::CommandInvocation{ cmd, arg }));
+        return pAction;
+    };
+
     // 1. Navigation
-    menu.addAction(tr("Next image"))->setData(IDM_NEXT);
-    menu.addAction(tr("Previous image"))->setData(IDM_PREV);
+    AddCmd(&menu, tr("Next image"), Cmd::Command::NextImage);
+    AddCmd(&menu, tr("Previous image"), Cmd::Command::PrevImage);
 
     menu.addSeparator();
 
     // 2. Current View (Untermenü)
     QMenu* menuCurrentView = menu.addMenu(tr("Current View"));
-    menuCurrentView->addAction(tr("Rotate +90"))->setData(IDM_ROTATE_90);
-    menuCurrentView->addAction(tr("Rotate -90"))->setData(IDM_ROTATE_270);
+    AddCmd(menuCurrentView, tr("Rotate +90"), Cmd::Command::Rotate90);
+    AddCmd(menuCurrentView, tr("Rotate -90"), Cmd::Command::Rotate270);
     menuCurrentView->addSeparator();
-    menuCurrentView->addAction(tr("Mirror horizontally"))->setData(IDM_MIRROR_H);
-    menuCurrentView->addAction(tr("Mirror vertically"))->setData(IDM_MIRROR_V);
+    AddCmd(menuCurrentView, tr("Mirror horizontally"), Cmd::Command::MirrorH);
+    AddCmd(menuCurrentView, tr("Mirror vertically"), Cmd::Command::MirrorV);
     menuCurrentView->addSeparator();
-    menuCurrentView->addAction(tr("Fit to window"))->setData(IDM_FIT_TO_SCREEN);
-    menuCurrentView->addAction(tr("Fill with crop"))->setData(IDM_FILL_WITH_CROP);
-    menuCurrentView->addSeparator();
-
-    menuCurrentView->addAction("400 %")->setData(IDM_ZOOM_400);
-    menuCurrentView->addAction("200 %")->setData(IDM_ZOOM_200);
-    menuCurrentView->addAction("100 %")->setData(IDM_ZOOM_100);
-    menuCurrentView->addAction("50 %")->setData(IDM_ZOOM_50);
-    menuCurrentView->addAction("25 %")->setData(IDM_ZOOM_25);
+    AddCmd(menuCurrentView, tr("Fit to window"), Cmd::Command::FitToScreen);
+    AddCmd(menuCurrentView, tr("Fill with crop"), Cmd::Command::FillWithCrop);
     menuCurrentView->addSeparator();
 
-    QAction* actFullscreen = menuCurrentView->addAction(tr("Full screen mode"));
-    actFullscreen->setData(IDM_FULL_SCREEN_MODE);
+    AddCmd(menuCurrentView, QStringLiteral("400 %"), Cmd::Command::ZoomTo, 400);
+    AddCmd(menuCurrentView, QStringLiteral("200 %"), Cmd::Command::ZoomTo, 200);
+    AddCmd(menuCurrentView, QStringLiteral("100 %"), Cmd::Command::ZoomTo, 100);
+    AddCmd(menuCurrentView, QStringLiteral("50 %"), Cmd::Command::ZoomTo, 50);
+    AddCmd(menuCurrentView, QStringLiteral("25 %"), Cmd::Command::ZoomTo, 25);
+    menuCurrentView->addSeparator();
+
+    QAction* actFullscreen = AddCmd(menuCurrentView, tr("Full screen mode"), Cmd::Command::FullScreenMode);
     actFullscreen->setCheckable(true);
     actFullscreen->setChecked(m_bFullScreenMode);
 
@@ -1369,23 +1429,23 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     menu.addSeparator();
 
     // 3. Play folder as slideshow/movie (Untermenü)
-    QMenu* menuMovie = menu.addMenu(tr("Play folder as slideshow/movie"));
+    QMenu* menuMovie = menu.addMenu(tr("Play folder as slideshow/animation"));
 
-    QAction* actStopMovie = menuMovie->addAction(tr("Pause Slideshow/Movie\t0xff"));
-    actStopMovie->setData(IDM_STOP_MOVIE);
+    // (Der Text enthielt frueher "\t0xff" - ein Relikt aus der Win32-Zeit. Die Anzeige uebernimmt
+    //  jetzt AddCmd; fuer StopMovie ist keine Taste belegt, Esc laeuft ueber DefaultEscape.)
+    QAction* actStopMovie = AddCmd(menuMovie, tr("Pause slideshow/animation"), Cmd::Command::StopMovie);
     actStopMovie->setEnabled(m_bMovieMode);
 
     menuMovie->addSeparator();
 
+    // Ueberschrift ohne Funktion (frueher IDM_SLIDESHOW_START als Pseudo-ID): kein Befehl, keine Daten.
     QAction* actSlideStart = menuMovie->addAction(tr("Slideshow"));
-    actSlideStart->setData(IDM_SLIDESHOW_START);
     actSlideStart->setEnabled(false);
 
-    // Wartezeiten für Slideshow
-    int slideTimes[] = {1, 2, 3, 4, 5, 7, 10, 20};
-    int slideIds[] = {IDM_SLIDESHOW_1, IDM_SLIDESHOW_2, IDM_SLIDESHOW_3, IDM_SLIDESHOW_4, IDM_SLIDESHOW_5, IDM_SLIDESHOW_7, IDM_SLIDESHOW_10, IDM_SLIDESHOW_20};
-    for (int i = 0; i < 8; ++i) {
-        menuMovie->addAction(QString(tr("Waiting time\t%1 sec")).arg(slideTimes[i]))->setData(slideIds[i]);
+    // Wartezeiten für Slideshow (Sekunden pro Bild)
+    const int slideTimes[] = {1, 2, 3, 4, 5, 7, 10, 20};
+    for (int nSeconds : slideTimes) {
+        AddCmd(menuMovie, QString(tr("Waiting time\t%1 sec")).arg(nSeconds), Cmd::Command::StartSlideshow, nSeconds, false);
     }
 
     // Transition Effect (Untermenü)
@@ -1393,79 +1453,77 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     QActionGroup* groupEffect = new QActionGroup(menuEffect);
     groupEffect->setExclusive(true);
 
-    auto addEffect = [&](const QString& text, int id) {
-        QAction* act = menuEffect->addAction(text);
-        act->setData(id);
+    auto addEffect = [&](const QString& text, Cmd::TransitionEffectArg effect) {
+        QAction* act = AddCmd(menuEffect, text, Cmd::Command::SetTransitionEffect, static_cast<int>(effect), false);
         act->setCheckable(true);
         groupEffect->addAction(act);
-        if (m_eTransitionEffect + IDM_EFFECT_NONE == id) act->setChecked(true);
+        // m_eTransitionEffect hat dieselbe Reihenfolge wie Cmd::TransitionEffectArg (siehe ExecuteCommand)
+        if (static_cast<int>(m_eTransitionEffect) == static_cast<int>(effect)) act->setChecked(true);
     };
-    addEffect(tr("None"), IDM_EFFECT_NONE);
+    addEffect(tr("None"), Cmd::TransitionEffectArg::None);
     menuEffect->addSeparator();
-    addEffect(tr("Blend"), IDM_EFFECT_BLEND);
+    addEffect(tr("Blend"), Cmd::TransitionEffectArg::Blend);
     menuEffect->addSeparator();
-    addEffect(tr("Slide from right"), IDM_EFFECT_SLIDE_RL);
-    addEffect(tr("Slide from left"), IDM_EFFECT_SLIDE_LR);
-    addEffect(tr("Slide from top"), IDM_EFFECT_SLIDE_TB);
-    addEffect(tr("Slide from bottom"), IDM_EFFECT_SLIDE_BT);
+    addEffect(tr("Slide from right"), Cmd::TransitionEffectArg::SlideFromRight);
+    addEffect(tr("Slide from left"), Cmd::TransitionEffectArg::SlideFromLeft);
+    addEffect(tr("Slide from top"), Cmd::TransitionEffectArg::SlideFromTop);
+    addEffect(tr("Slide from bottom"), Cmd::TransitionEffectArg::SlideFromBottom);
     menuEffect->addSeparator();
-    addEffect(tr("Roll from right"), IDM_EFFECT_ROLL_RL);
-    addEffect(tr("Roll from left"), IDM_EFFECT_ROLL_LR);
-    addEffect(tr("Roll from top"), IDM_EFFECT_ROLL_TB);
-    addEffect(tr("Roll from bottom"), IDM_EFFECT_ROLL_BT);
+    addEffect(tr("Roll from right"), Cmd::TransitionEffectArg::RollFromRight);
+    addEffect(tr("Roll from left"), Cmd::TransitionEffectArg::RollFromLeft);
+    addEffect(tr("Roll from top"), Cmd::TransitionEffectArg::RollFromTop);
+    addEffect(tr("Roll from bottom"), Cmd::TransitionEffectArg::RollFromBottom);
     menuEffect->addSeparator();
-    addEffect(tr("Scroll from right"), IDM_EFFECT_SCROLL_RL);
-    addEffect(tr("Scroll from left"), IDM_EFFECT_SCROLL_LR);
-    addEffect(tr("Scroll from top"), IDM_EFFECT_SCROLL_TB);
-    addEffect(tr("Scroll from bottom"), IDM_EFFECT_SCROLL_BT);
+    addEffect(tr("Scroll from right"), Cmd::TransitionEffectArg::ScrollFromRight);
+    addEffect(tr("Scroll from left"), Cmd::TransitionEffectArg::ScrollFromLeft);
+    addEffect(tr("Scroll from top"), Cmd::TransitionEffectArg::ScrollFromTop);
+    addEffect(tr("Scroll from bottom"), Cmd::TransitionEffectArg::ScrollFromBottom);
 
     // Transition Speed (Untermenü)
     QMenu* menuSpeed = menuMovie->addMenu(tr("Transition Speed"));
     QActionGroup* groupSpeed = new QActionGroup(menuSpeed);
     groupSpeed->setExclusive(true);
 
-    int speedIds[] = {IDM_EFFECTTIME_VERY_FAST, IDM_EFFECTTIME_FAST, IDM_EFFECTTIME_NORMAL, IDM_EFFECTTIME_SLOW, IDM_EFFECTTIME_VERY_SLOW};
-    QString speedNames[] = {tr("Very fast"), tr("Fast"), tr("Normal"), tr("Slow"), tr("Very slow")};
-    int nIndex = (m_nTransitionTime < 180) ? 0 : (m_nTransitionTime < 375) ? 1 : (m_nTransitionTime < 750) ? 2 : (m_nTransitionTime < 1500) ? 3 : 4;
+    const Cmd::TransitionSpeedArg speedArgs[] = {
+        Cmd::TransitionSpeedArg::VeryFast, Cmd::TransitionSpeedArg::Fast, Cmd::TransitionSpeedArg::Normal,
+        Cmd::TransitionSpeedArg::Slow, Cmd::TransitionSpeedArg::VerySlow };
+    const QString speedNames[] = {tr("Very fast"), tr("Fast"), tr("Normal"), tr("Slow"), tr("Very slow")};
+    // Gegenstueck zu "125 * (1 << arg)" in ExecuteCommand: aus der Zeit wieder den Index bestimmen
+    const int nIndex = (m_nTransitionTime < 180) ? 0 : (m_nTransitionTime < 375) ? 1 : (m_nTransitionTime < 750) ? 2 : (m_nTransitionTime < 1500) ? 3 : 4;
     for (int i = 0; i < 5; ++i) {
-        QAction* act = menuSpeed->addAction(speedNames[i]);
-        act->setData(speedIds[i]);
+        QAction* act = AddCmd(menuSpeed, speedNames[i], Cmd::Command::SetTransitionSpeed, static_cast<int>(speedArgs[i]), false);
         act->setCheckable(true);
         groupSpeed->addAction(act);
-        if (nIndex + IDM_EFFECTTIME_VERY_FAST == speedIds[i]) act->setChecked(true);
+        if (nIndex == static_cast<int>(speedArgs[i])) act->setChecked(true);
     }
 
     menuMovie->addSeparator();
 
+    // Ueberschrift ohne Funktion (frueher IDM_MOVIE_START_FPS als Pseudo-ID)
     QAction* actMovieStartFps = menuMovie->addAction(tr("Movie"));
-    actMovieStartFps->setData(IDM_MOVIE_START_FPS);
     actMovieStartFps->setEnabled(false);
 
-    int fpsValues[] = {5, 10, 15, 20, 25, 30, 50, 60, 100};
-    int fpsIds[] = {IDM_MOVIE_5_FPS, IDM_MOVIE_10_FPS, IDM_MOVIE_15_FPS, IDM_MOVIE_20_FPS, IDM_MOVIE_25_FPS, IDM_MOVIE_30_FPS, IDM_MOVIE_50_FPS, IDM_MOVIE_60_FPS, IDM_MOVIE_100_FPS};
-    for (int i = 0; i < 9; ++i) {
-        menuMovie->addAction(QString(tr("Playback speed\t%1 fps")).arg(fpsValues[i]))->setData(fpsIds[i]);
+    const int fpsValues[] = {5, 10, 15, 20, 25, 30, 50, 60, 100};
+    for (int nFps : fpsValues) {
+        AddCmd(menuMovie, QString(tr("Playback speed\t%1 fps")).arg(nFps), Cmd::Command::PlayMovie, nFps, false);
     }
 
     menu.addSeparator();
 
     // 4. Haupt-Dateiaktionen
-    QAction* actReload = menu.addAction(tr("Reload image"));
-    actReload->setData(IDM_RELOAD_FULL);
+    QAction* actReload = AddCmd(&menu, tr("Reload image"), Cmd::Command::ReloadFull);
     actReload->setEnabled(m_pCurrentImage != nullptr && !m_bMovieMode);
 
-    menu.addAction(tr("Edit image in default editor"))->setData(IDM_OPEN_DEFAULT_EDITOR);
+    AddCmd(&menu, tr("Edit image in default editor"), Cmd::Command::OpenDefaultEditor);
 
-    QAction* actCopyFull = menu.addAction(tr("Copy original image content to clipboard"));
-    actCopyFull->setData(IDM_COPY_FULL);
+    QAction* actCopyFull = AddCmd(&menu, tr("Copy original image content to clipboard"), Cmd::Command::CopyFull);
     actCopyFull->setEnabled(m_pCurrentImage != nullptr);
 
-    QAction* actCopyPath = menu.addAction(tr("Copy file path to clipboard"));
-    actCopyPath->setData(IDM_COPY_PATH);
+    QAction* actCopyPath = AddCmd(&menu, tr("Copy file path to clipboard"), Cmd::Command::CopyPath);
     actCopyPath->setEnabled(m_pCurrentImage != nullptr);
 
-    menu.addAction(tr("Cut file to clipboard"))->setData(IDM_CUT_FILE);
-    menu.addAction(tr("Show in folder"))->setData(IDM_EXPLORE);
+    AddCmd(&menu, tr("Cut file to clipboard"), Cmd::Command::CutFile);
+    AddCmd(&menu, tr("Show in folder"), Cmd::Command::ExploreFile);
 
     menu.addSeparator();
 
@@ -1474,15 +1532,15 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     QActionGroup* groupFolder = new QActionGroup(menuFolderMode);
     groupFolder->setExclusive(true);
 
-    int folderIds[] = {IDM_LOOP_FOLDER, IDM_LOOP_RECURSIVELY, IDM_LOOP_SIBLINGS};
-    QString folderNames[] = {tr("Loop folder"), tr("Loop recursively"), tr("Loop siblings")};
-    int navMode = m_pFileList ? m_pFileList->GetNavigationMode() : 0;
+    const Cmd::LoopModeArg folderArgs[] = {Cmd::LoopModeArg::Folder, Cmd::LoopModeArg::Recursively, Cmd::LoopModeArg::Siblings};
+    const QString folderNames[] = {tr("Loop folder"), tr("Loop recursively"), tr("Loop siblings")};
+    // Vergleich ueber die echten Helpers::NM_*-Werte (statt "navMode * 10 + ID-Offset")
+    const int navMode = m_pFileList ? static_cast<int>(m_pFileList->GetNavigationMode()) : static_cast<int>(Helpers::NM_LoopDirectory);
     for (int i = 0; i < 3; ++i) {
-        QAction* act = menuFolderMode->addAction(folderNames[i]);
-        act->setData(folderIds[i]);
+        QAction* act = AddCmd(menuFolderMode, folderNames[i], Cmd::Command::SetLoopMode, static_cast<int>(folderArgs[i]), false);
         act->setCheckable(true);
         groupFolder->addAction(act);
-        if (navMode * 10 + IDM_LOOP_FOLDER == folderIds[i]) {
+        if (navMode == static_cast<int>(NavigationModeForArg(folderArgs[i]))) {
             act->setChecked(true);
         }
     }
@@ -1492,34 +1550,30 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     QActionGroup* groupSort = new QActionGroup(menuSort);
     groupSort->setExclusive(true);
 
-    // Korrigiert auf FS_Size statt FS_FileSize (je nach Headervalue anpassen)
     Helpers::ESorting sorting = m_pFileList ? m_pFileList->GetSorting() : Helpers::FS_FileName;
     bool isRandom = (sorting == Helpers::FS_Random);
 
-    auto addSortAction = [&](const QString& text, int id, Helpers::ESorting fs) {
-        QAction* act = menuSort->addAction(text);
-        act->setData(id);
+    auto addSortAction = [&](const QString& text, Cmd::SortModeArg mode, Helpers::ESorting fs) {
+        QAction* act = AddCmd(menuSort, text, Cmd::Command::SetSortMode, static_cast<int>(mode), false);
         act->setCheckable(true);
         groupSort->addAction(act);
         if (sorting == fs) act->setChecked(true);
     };
 
-    addSortAction(tr("File name"), IDM_SORT_NAME, Helpers::FS_FileName);
-    addSortAction(tr("Modification date"), IDM_SORT_MOD_DATE, Helpers::FS_LastModTime);
-    addSortAction(tr("File size"), IDM_SORT_SIZE, Helpers::FS_FileSize);
-    addSortAction(tr("Random"), IDM_SORT_RANDOM, Helpers::FS_Random);
+    addSortAction(tr("File name"), Cmd::SortModeArg::Name, Helpers::FS_FileName);
+    addSortAction(tr("Modification date"), Cmd::SortModeArg::ModificationDate, Helpers::FS_LastModTime);
+    addSortAction(tr("File size"), Cmd::SortModeArg::Size, Helpers::FS_FileSize);
+    addSortAction(tr("Random"), Cmd::SortModeArg::Random, Helpers::FS_Random);
 
     menuSort->addSeparator();
 
     bool isAscending = m_pFileList ? m_pFileList->IsSortedAscending() : true;
-    QAction* actAsc = menuSort->addAction(tr("Ascending"));
-    actAsc->setData(IDM_SORT_ASCENDING);
+    QAction* actAsc = AddCmd(menuSort, tr("Ascending"), Cmd::Command::SetSortOrder, static_cast<int>(Cmd::SortOrderArg::Ascending), false);
     actAsc->setCheckable(true);
     actAsc->setChecked(isAscending);
     actAsc->setEnabled(!isRandom);
 
-    QAction* actDesc = menuSort->addAction(tr("Descending"));
-    actDesc->setData(IDM_SORT_DESCENDING);
+    QAction* actDesc = AddCmd(menuSort, tr("Descending"), Cmd::Command::SetSortOrder, static_cast<int>(Cmd::SortOrderArg::Descending), false);
     actDesc->setCheckable(true);
     actDesc->setChecked(!isAscending);
     actDesc->setEnabled(!isRandom);
@@ -1529,64 +1583,63 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     QActionGroup* groupAutoZoom = new QActionGroup(menuAutoZoom);
     groupAutoZoom->setExclusive(true);
 
-    int autoZoomIds[] = {IDM_AUTO_ZOOM_NONE, IDM_AUTO_ZOOM_FIT, IDM_AUTO_ZOOM_FILL, IDM_AUTO_ZOOM_FIT_NO_ZOOM, IDM_AUTO_ZOOM_FILL_NO_ZOOM, IDM_AUTO_ZOOM_BOOK_MODE};
-    QString autoZoomNames[] = {tr("None"), tr("Fit to window"), tr("Fill with crop"), tr("Fit to window (never upsize)"), tr("Fill with crop (never upsize)"), tr("Book Mode")};
-    int autoZoomMode = GetAutoZoomMode();
+    const Cmd::AutoZoomArg autoZoomArgs[] = {
+        Cmd::AutoZoomArg::None, Cmd::AutoZoomArg::Fit, Cmd::AutoZoomArg::Fill,
+        Cmd::AutoZoomArg::FitNoZoom, Cmd::AutoZoomArg::FillNoZoom, Cmd::AutoZoomArg::BookMode };
+    const QString autoZoomNames[] = {tr("None"), tr("Fit to window"), tr("Fill with crop"), tr("Fit to window (never upsize)"), tr("Fill with crop (never upsize)"), tr("Book Mode")};
+    const int autoZoomMode = static_cast<int>(GetAutoZoomMode());
     for (int i = 0; i < 6; ++i) {
-        QAction* act = menuAutoZoom->addAction(autoZoomNames[i]);
-        act->setData(autoZoomIds[i]);
+        QAction* act = AddCmd(menuAutoZoom, autoZoomNames[i], Cmd::Command::SetAutoZoom, static_cast<int>(autoZoomArgs[i]), false);
         act->setCheckable(true);
         groupAutoZoom->addAction(act);
-        if (autoZoomMode * 10 + IDM_AUTO_ZOOM_NONE == autoZoomIds[i]) {
+        if (autoZoomMode == static_cast<int>(autoZoomArgs[i])) {
             act->setChecked(true);
         }
     }
 
     // Auto Contrast
-    QAction* actAutoContrast = menu.addAction(tr("Auto Contrast"));
-    actAutoContrast->setData(IDM_AUTO_CORRECTION);
+    QAction* actAutoContrast = AddCmd(&menu, tr("Auto Contrast"), Cmd::Command::ToggleAutoCorrection);
     actAutoContrast->setCheckable(true);
     actAutoContrast->setChecked(m_bAutoContrast);
 
     menu.addSeparator();
 
     // 8. Einstellungen & Beenden
-    menu.addAction(tr("Settings Dialog"))->setData(IDM_SETTINGS_DIALOG);
+    AddCmd(&menu, tr("Settings"), Cmd::Command::SettingsDialog);
 
     menu.addSeparator();
 
-    menu.addAction(tr("Exit"))->setData(IDM_EXIT);
+    AddCmd(&menu, tr("Exit"), Cmd::Command::Exit);
 
     // 9. Menü an Mausposition ausführen und auswerten
     QAction* pSelectedAction = menu.exec(pos);
     if (pSelectedAction != nullptr) {
-        int nCommand = pSelectedAction->data().toInt();
-        if (nCommand > 0) {
-            ExecuteCommand(nCommand);
+        // Eintraege ohne Befehl (z.B. die Ueberschriften) haben keine Daten und werden ignoriert.
+        const QVariant data = pSelectedAction->data();
+        if (data.canConvert<Cmd::CommandInvocation>()) {
+            ExecuteCommand(data.value<Cmd::CommandInvocation>());
         }
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-// Private
-///////////////////////////////////////////////////////////////////////////////////
+void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
+    using Cmd::Command;
 
-void CMainDlg::ExecuteCommand(int nCommand) {
     CSettingsProvider& sp = CSettingsProvider::This();
-    switch (nCommand) {
-        case IDM_MINIMIZE:
+    switch (inv.id) {
+        case Command::Minimize:
             this->showMinimized();
             break;
-        case IDM_EXPLORE:
+        case Command::ExploreFile:
             ExploreFile();
             break;
-        case IDM_SETTINGS_DIALOG:
+        case Command::SettingsDialog:
             sp.ShowSettingsDialog(this);
             break;
-        case IDM_RELOAD:
+        case Command::Reload:
             ReloadImage(false);
             break;
-        case IDM_RELOAD_FULL:
+        case Command::ReloadFull:
             if (m_pFileList != NULL && m_pFileList->CurrentFileExists())
                 {
                 m_pFileList->Reload(NULL);
@@ -1595,28 +1648,28 @@ void CMainDlg::ExecuteCommand(int nCommand) {
 
             ReloadImage(false);
             break;
-        case IDM_COPY:
+        case Command::CopyScreen:
             if (m_pCurrentImage != NULL) {
                 CClipboard::CopyImageToClipboard(m_pCurrentImage, m_pFileList->Current());
             }
             break;
-        case IDM_COPY_FULL:
+        case Command::CopyFull:
             if (m_pCurrentImage != NULL) {
                 CClipboard::CopyFullImageToClipboard(m_pCurrentImage, *m_pImageProcParams, CreateDefaultProcessingFlags(), m_pFileList->Current());
                 this->update();
             }
             break;
-        case IDM_COPY_PATH:
+        case Command::CopyPath:
             if (m_pCurrentImage != NULL) {
                 CClipboard::CopyPathToClipboard(m_pCurrentImage, m_pFileList->Current());
             }
             break;
-        case IDM_CUT_FILE:
+        case Command::CutFile:
             if (m_pCurrentImage != NULL) {
                 CClipboard::CutFileToClipboard(m_pFileList->Current());
             }
             break;
-        case IDM_DELETE_FILE:
+        case Command::DeleteFile:
             MouseOn();
             if (m_pCurrentImage != NULL && m_pFileList != NULL) {
                 QString currentFileName = CurrentFileName(false);
@@ -1649,30 +1702,30 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 }
             }
             break;
-        case IDM_NEXTFRAME:
+        case Command::NextFrame:
             GotoImage(POS_NextFrame);
             break;
-        case IDM_NEXTFILE:
+        case Command::NextFile:
             GotoImage(POS_NextFile);
             break;
-        case IDM_PREVFILE:
+        case Command::PrevFile:
             GotoImage(POS_PreviousFile);
             break;
-        case IDM_NEXT:
+        case Command::NextImage:
             GotoImage(POS_Next);
             break;
-        case IDM_PREV:
+        case Command::PrevImage:
             GotoImage(POS_Previous);
             break;
-        case IDM_FIRST:
+        case Command::FirstImage:
             SetToast(QStringLiteral("Jump: First image"));
             GotoImage(POS_First);
             break;
-        case IDM_LAST:
+        case Command::LastImage:
             SetToast(QStringLiteral("Jump: Last image"));
             GotoImage(POS_Last);
             break;
-        case IDM_PLAYPAUSE:
+        case Command::PlayPause:
             if (m_bIsAnimationPlaying) {
                 SetToast(QStringLiteral("Animation Paused"));
                 StopAnimation(); // stop any running animation
@@ -1681,7 +1734,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 StartAnimation();
             }
             break;
-        case IDM_PLAYPAUSENEXT:
+        case Command::PlayPauseNext:
             if (m_bIsAnimationPlaying) {
                 SetToast(QStringLiteral("Animation Paused"));
                 StopAnimation(); // stop any running animation
@@ -1692,101 +1745,60 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 GotoImage(POS_Next);
             }
             break;
-        case IDM_LOOP_FOLDER:
-        case IDM_LOOP_RECURSIVELY:
-        case IDM_LOOP_SIBLINGS:
+        case Command::SetLoopMode:
             m_pFileList->SetNavigationMode(
-                (nCommand == IDM_LOOP_FOLDER) ? Helpers::NM_LoopDirectory :
-                (nCommand == IDM_LOOP_RECURSIVELY) ? Helpers::NM_LoopSubDirectories : 
-                Helpers::NM_LoopSameDirectoryLevel);
+                NavigationModeForArg(static_cast<Cmd::LoopModeArg>(inv.arg)));
             break;
-        case IDM_SORT_NAME:
-        case IDM_SORT_MOD_DATE:
-        case IDM_SORT_SIZE:
-        case IDM_SORT_RANDOM:
+        case Command::SetSortMode:
             {
                 Helpers::ESorting nSortMode = m_pFileList->GetSorting();
                 bool bSortedAscending = m_pFileList->IsSortedAscending();
                 
-                if (nCommand != IDM_SORT_RANDOM) {
+                if (inv.arg != static_cast<int>(Cmd::SortModeArg::Random)) {
                     m_eSortModeBeforeRandom = nSortMode;
                 }
 
-                nSortMode = (nCommand == IDM_SORT_MOD_DATE) ? Helpers::FS_LastModTime :
-                            (nCommand == IDM_SORT_RANDOM) ? Helpers::FS_Random :
-                            (nCommand == IDM_SORT_SIZE) ? Helpers::FS_FileSize : Helpers::FS_FileName;
+                nSortMode = (inv.arg == static_cast<int>(Cmd::SortModeArg::ModificationDate)) ? Helpers::FS_LastModTime :
+                            (inv.arg == static_cast<int>(Cmd::SortModeArg::Random)) ? Helpers::FS_Random :
+                            (inv.arg == static_cast<int>(Cmd::SortModeArg::Size)) ? Helpers::FS_FileSize : Helpers::FS_FileName;
                 
                 ToastSortingMode(nSortMode, bSortedAscending);
                 m_pFileList->SetSorting(nSortMode, bSortedAscending);
             }
             break;
-        case IDM_SORT_ASCENDING:
-        case IDM_SORT_DESCENDING:
-            m_pFileList->SetSorting(m_pFileList->GetSorting(), nCommand == IDM_SORT_ASCENDING);
+        case Command::SetSortOrder:
+            m_pFileList->SetSorting(m_pFileList->GetSorting(), inv.arg == static_cast<int>(Cmd::SortOrderArg::Ascending));
             break;
-        case IDM_STOP_MOVIE:
+        case Command::StopMovie:
             SetToast(QStringLiteral("Slideshow Paused"));
             StopMovieMode();
             break;
-        case IDM_SLIDESHOW_RESUME:
+        case Command::ResumeSlideshow:
             {
             const int timerSec = static_cast<int>(1.0 / m_dMovieFPS);
             SetToast(QStringLiteral("Slideshow Resumed (Timer %1 s)").arg(timerSec));
             StartMovieMode(m_dMovieFPS);
             }
             break;
-        case IDM_SLIDESHOW_1:
-        case IDM_SLIDESHOW_2:
-        case IDM_SLIDESHOW_3:
-        case IDM_SLIDESHOW_4:
-        case IDM_SLIDESHOW_5:
-        case IDM_SLIDESHOW_6:
-        case IDM_SLIDESHOW_7:
-        case IDM_SLIDESHOW_8:
-        case IDM_SLIDESHOW_9:
-        case IDM_SLIDESHOW_10:
-        case IDM_SLIDESHOW_20:
+        case Command::StartSlideshow:
             {
-            int nValue = nCommand - IDM_SLIDESHOW_START;
+            const int nValue = inv.arg;   // Sekunden pro Bild
             SetToast(QStringLiteral("Starting Slideshow (Timer %1 s)").arg(nValue));
             StartMovieMode(1.0/nValue);
             }
             break;
-        case IDM_EFFECT_NONE:
-        case IDM_EFFECT_BLEND:
-        case IDM_EFFECT_SLIDE_RL:
-        case IDM_EFFECT_SLIDE_LR:
-        case IDM_EFFECT_SLIDE_TB:
-        case IDM_EFFECT_SLIDE_BT:
-        case IDM_EFFECT_ROLL_RL:
-        case IDM_EFFECT_ROLL_LR:
-        case IDM_EFFECT_ROLL_TB:
-        case IDM_EFFECT_ROLL_BT:
-        case IDM_EFFECT_SCROLL_RL:
-        case IDM_EFFECT_SCROLL_LR:
-        case IDM_EFFECT_SCROLL_TB:
-        case IDM_EFFECT_SCROLL_BT:
-            m_eTransitionEffect = (Helpers::ETransitionEffect)(nCommand - IDM_EFFECT_NONE);
+        case Command::SetTransitionEffect:
+            // Die Reihenfolge von Cmd::TransitionEffectArg entspricht der von Helpers::ETransitionEffect
+            // (wie bisher die Reihenfolge der IDM_EFFECT_*-IDs).
+            m_eTransitionEffect = static_cast<Helpers::ETransitionEffect>(inv.arg);
             break;
-        case IDM_EFFECTTIME_VERY_FAST:
-        case IDM_EFFECTTIME_FAST:
-        case IDM_EFFECTTIME_NORMAL:
-        case IDM_EFFECTTIME_SLOW:
-        case IDM_EFFECTTIME_VERY_SLOW:
-            m_nTransitionTime = 125 * (1 << (nCommand - IDM_EFFECTTIME_VERY_FAST));
+        case Command::SetTransitionSpeed:
+            m_nTransitionTime = 125 * (1 << inv.arg);   // VeryFast=125 ms ... VerySlow=2000 ms
             break;
-        case IDM_MOVIE_5_FPS:
-        case IDM_MOVIE_10_FPS:
-        case IDM_MOVIE_15_FPS:
-        case IDM_MOVIE_20_FPS:
-        case IDM_MOVIE_25_FPS:
-        case IDM_MOVIE_30_FPS:
-        case IDM_MOVIE_50_FPS:
-        case IDM_MOVIE_60_FPS:
-        case IDM_MOVIE_100_FPS:
+        case Command::PlayMovie:
             {
                 QString toastText;
-                const int nValue = nCommand - IDM_MOVIE_START_FPS;
+                const int nValue = inv.arg;   // Bilder pro Sekunde
 
                 if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation()) {
                     const int targetFrameTime = 1000 / nValue;
@@ -1811,10 +1823,10 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 }
             }
             break;
-        case IDM_ROTATE_90:
-        case IDM_ROTATE_270:
+        case Command::Rotate90:
+        case Command::Rotate270:
             if (m_pCurrentImage != NULL) {
-                uint32 nRotationDelta = (nCommand == IDM_ROTATE_90) ? 90 : 270;
+                uint32 nRotationDelta = (inv.id == Command::Rotate90) ? 90 : 270;
                 m_nRotation = (m_nRotation + nRotationDelta) % 360;
                 m_nUserRotation = (m_nUserRotation + nRotationDelta) % 360;
                 m_pCurrentImage->Rotate(nRotationDelta);
@@ -1824,19 +1836,19 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 this->update();
             }
             break;
-        case IDM_MIRROR_H:
-        case IDM_MIRROR_V:
+        case Command::MirrorH:
+        case Command::MirrorV:
             if (m_pCurrentImage != NULL) {
-                m_pCurrentImage->Mirror(nCommand == IDM_MIRROR_H);
+                m_pCurrentImage->Mirror(inv.id == Command::MirrorH);
                 this->update();
             }
             break;
-        case IDM_AUTO_CORRECTION:
+        case Command::ToggleAutoCorrection:
             m_bAutoContrast = !m_bAutoContrast;
             SetToast(m_bAutoContrast ? QStringLiteral("Auto Contrast: ON") : QStringLiteral("Auto Contrast: OFF"));
             this->update();
             break;
-        case IDM_KEEP_PARAMETERS:
+        case Command::KeepParameters:
             m_bKeepParams = !m_bKeepParams;
             if (m_bKeepParams) {
                 *m_pImageProcParamsKept = *m_pImageProcParams;
@@ -1845,19 +1857,19 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
             }
             break;
-        case IDM_FIT_TO_SCREEN:
-        case IDM_FIT_TO_SCREEN_NO_ENLARGE:
-            ResetZoomToFitScreen(false, nCommand == IDM_FIT_TO_SCREEN, true);
+        case Command::FitToScreen:
+        case Command::FitToScreenNoEnlarge:
+            ResetZoomToFitScreen(false, inv.id == Command::FitToScreen, true);
             break;
-        case IDM_FILL_WITH_CROP:
+        case Command::FillWithCrop:
             ResetZoomToFitScreen(true, true, true);
             break;
-        case IDM_TOGGLE_AUTO_ZOOM_FIT:
+        case Command::ToggleAutoZoomFit:
             {
             // This command is meant to be used with keyboard shortcuts.
             // It toggles the AutoZoomMode between FitToScreen and None,
             // or, in case of BookMode, between FitToScreen and BookMode.
-            // This is meant as an alternative to IDM_TOGGLE_FIT_TO_SCREEN_100_PERCENTS,
+            // This is meant as an alternative to Command::ToggleFitTo100,
             // which changes the view size only for the current image.
                 bool bIsBookModeFile = false;
                 Helpers::EAutoZoomMode eAutoZoomMode = Helpers::ZM_FitToScreen;
@@ -1900,16 +1912,16 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 this->update();
             }
             break;
-        case IDM_TOGGLE_FIT_TO_SCREEN_100_PERCENTS:
-        case IDM_TOGGLE_FILL_WITH_CROP_100_PERCENTS:
+        case Command::ToggleFitTo100:
+        case Command::ToggleFillWithCropTo100:
             m_bShowZoomFactor = true;
             if (fabs(m_dZoom - 1) < 0.01) {
-                ResetZoomToFitScreen(nCommand == IDM_TOGGLE_FILL_WITH_CROP_100_PERCENTS, true, true);
+                ResetZoomToFitScreen(inv.id == Command::ToggleFillWithCropTo100, true, true);
             } else {
                 ResetZoomTo100Percents(m_bMouseOn);
             }
             break;
-        case IDM_FULL_SCREEN_MODE: {
+        case Command::FullScreenMode: {
             m_bFullScreenMode = !m_bFullScreenMode;
             m_dZoomAtResizeStart = 1.0;
 
@@ -1935,36 +1947,26 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             StartLowQTimer(ZOOM_TIMEOUT);
             break;
         }
-        case IDM_ZOOM_400:
-            PerformZoom(4.0, false, m_bMouseOn);
+        case Command::ZoomTo:
+            // Argument = Prozent. 100 % ist "echte Groesse" und hat eine eigene Funktion
+            // (ResetZoomTo100Percents zoomt im Fenstermodus immer auf die Mausposition).
+            if (inv.arg == 100) {
+                ResetZoomTo100Percents(m_bMouseOn);
+            } else {
+                PerformZoom(inv.arg / 100.0, false, m_bMouseOn);
+            }
             break;
-        case IDM_ZOOM_200:
-            PerformZoom(2.0, false, m_bMouseOn);
+        case Command::ZoomIn:
+        case Command::ZoomOut:
+            PerformZoom((inv.id == Command::ZoomIn) ? 1 : -1, true, m_bMouseOn);
             break;
-        case IDM_ZOOM_100:
-            ResetZoomTo100Percents(m_bMouseOn);
-            break;
-        case IDM_ZOOM_50:
-            PerformZoom(0.5, false, m_bMouseOn);
-            break;
-        case IDM_ZOOM_25:
-            PerformZoom(0.25, false, m_bMouseOn);
-            break;
-        case IDM_ZOOM_INC:
-        case IDM_ZOOM_DEC:
-            PerformZoom((nCommand == IDM_ZOOM_INC) ? 1 : -1, true, m_bMouseOn);
-            break;
-        case IDM_ZOOM_MODE:
+        case Command::ZoomMode:
             m_bZoomModeOnLeftMouse = !m_bZoomModeOnLeftMouse;
             break;
-        case IDM_AUTO_ZOOM_NONE:
-        case IDM_AUTO_ZOOM_FIT_NO_ZOOM:
-        case IDM_AUTO_ZOOM_FILL_NO_ZOOM:
-        case IDM_AUTO_ZOOM_FIT:
-        case IDM_AUTO_ZOOM_FILL:
-        case IDM_AUTO_ZOOM_BOOK_MODE:
+        case Command::SetAutoZoom:
             {
-                Helpers::EAutoZoomMode eAutoZoomMode = (Helpers::EAutoZoomMode)((nCommand - IDM_AUTO_ZOOM_NONE) / 10);
+                // Die Reihenfolge von Cmd::AutoZoomArg entspricht Helpers::EAutoZoomMode (siehe static_assert oben).
+                Helpers::EAutoZoomMode eAutoZoomMode = static_cast<Helpers::EAutoZoomMode>(inv.arg);
                 if (m_eAutoZoomModeFullscreen == m_eAutoZoomModeWindowed)
                     m_eAutoZoomModeFullscreen = m_eAutoZoomModeWindowed = eAutoZoomMode;
                 else if (m_bFullScreenMode)
@@ -1976,10 +1978,10 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 this->update();
                 break;
             }
-        case IDM_EXIT:
+        case Command::Exit:
             CleanupAndTerminate();
             break;
-        case IDM_DEFAULT_ESC:
+        case Command::DefaultEscape:
             if (m_bMovieMode) {
                 SetToast(QStringLiteral("Slideshow Paused"));
                 StopMovieMode(); // stop any running movie/slideshow
@@ -1990,28 +1992,28 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_bShowInfo = false;
                 this->update();
             } else if (m_bFullScreenMode) {
-                ExecuteCommand(IDM_FULL_SCREEN_MODE);
+                ExecuteCommand(Cmd::CommandInvocation{ Command::FullScreenMode, 0 });
             } else {
                 CleanupAndTerminate();
             }
             break;
-        case IDM_CONTRAST_CORRECTION_INC:
-        case IDM_CONTRAST_CORRECTION_DEC:
+        case Command::ContrastCorrectionInc:
+        case Command::ContrastCorrectionDec:
             if (m_bAutoContrast) {
-                double dInc = (nCommand == IDM_CONTRAST_CORRECTION_INC) ? 0.05 : -0.05;
+                double dInc = (inv.id == Command::ContrastCorrectionInc) ? 0.05 : -0.05;
                 m_pImageProcParams->ContrastCorrectionFactor = std::max(0.0, std::min(1.0, m_pImageProcParams->ContrastCorrectionFactor + dInc));
                 this->update();
             }
             break;
-        case IDM_COLOR_CORRECTION_INC:
-        case IDM_COLOR_CORRECTION_DEC:
+        case Command::ColorCorrectionInc:
+        case Command::ColorCorrectionDec:
             if (m_bAutoContrast) {
-                double dInc = (nCommand == IDM_COLOR_CORRECTION_INC) ? 0.05 : -0.05;
+                double dInc = (inv.id == Command::ColorCorrectionInc) ? 0.05 : -0.05;
                 m_pImageProcParams->ColorCorrectionFactor = std::max(-0.5, std::min(0.5, m_pImageProcParams->ColorCorrectionFactor + dInc));
                 this->update();
             }
             break;
-        case IDM_TOGGLE_TRANSPARENCY:
+        case Command::ToggleTransparency:
             if (m_eTransparencyMode == Helpers::TP_BLEND)
             {
                 m_eTransparencyMode = Helpers::TP_CHECKERBOARD;
@@ -2032,7 +2034,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             m_pCurrentImage = NULL;
             ReloadImage(true);
             break;
-        case IDM_TOGGLE_USE_EMBEDDED_COLOR_PROFILES:
+        case Command::ToggleEmbeddedColorProfiles:
             m_bUseEmbeddedColorProfiles = !m_bUseEmbeddedColorProfiles;
             CSettingsProvider::This().SetUseEmbeddedColorProfiles(m_bUseEmbeddedColorProfiles);
             if (m_bUseEmbeddedColorProfiles == false) {
@@ -2045,22 +2047,22 @@ void CMainDlg::ExecuteCommand(int nCommand) {
             m_pCurrentImage = NULL;
             ReloadImage(true);
             break;
-        case IDM_TOGGLE_RESAMPLING_QUALITY:
+        case Command::ToggleResamplingQuality:
             m_bHQResampling = !m_bHQResampling;
             SetToast(m_bHQResampling? QStringLiteral("Resampling: enabled"): QStringLiteral("Resampling: disabled"));
             this->update();
             break;
-        case IDM_PAN_UP:
-        case IDM_PAN_DOWN:
-        case IDM_PAN_RIGHT:
-        case IDM_PAN_LEFT:
+        case Command::PanUp:
+        case Command::PanDown:
+        case Command::PanRight:
+        case Command::PanLeft:
             if (sp.SmartPanningKeys() == false) {
                 if (m_pCurrentImage != NULL) {
                     int iRealHeight = (int) (m_dZoom * (m_pCurrentImage->OrigHeight()));
                     int iRealWidth = (int) (m_dZoom * (m_pCurrentImage->OrigWidth()));
 
-                    if (((iRealHeight > m_clientRect.height()) && (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN))
-                     || (( iRealWidth >  m_clientRect.width()) && (nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT))) {
+                    if (((iRealHeight > m_clientRect.height()) && (inv.id == Command::PanUp || inv.id == Command::PanDown))
+                     || (( iRealWidth >  m_clientRect.width()) && (inv.id == Command::PanLeft || inv.id == Command::PanRight))) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
@@ -2068,24 +2070,24 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                                 m_panTimerId = startTimer(17);
                             }
                         } else {
-                            PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
-                                (nCommand == IDM_PAN_UP) ? PAN_STEP : (nCommand == IDM_PAN_DOWN) ? -PAN_STEP : 0, false);
+                            PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
+                                (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
                         }                    
                     } else {
-                        PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
-                            (nCommand == IDM_PAN_UP) ? PAN_STEP : (nCommand == IDM_PAN_DOWN) ? -PAN_STEP : 0, false);
+                        PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
+                            (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
                     }
                 } else {
-                    PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
-                        (nCommand == IDM_PAN_UP) ? PAN_STEP : (nCommand == IDM_PAN_DOWN) ? -PAN_STEP : 0, false);
+                    PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
+                        (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
                 }
             } else {
                 if (m_pCurrentImage != NULL) {
                     int iRealHeight = (int) (m_dZoom * (m_pCurrentImage->OrigHeight()));
                     int iRealWidth = (int) (m_dZoom * (m_pCurrentImage->OrigWidth()));
 
-                    if (((iRealHeight > m_clientRect.height()) && (nCommand == IDM_PAN_UP || nCommand == IDM_PAN_DOWN))
-                     || (( iRealWidth >  m_clientRect.width()) && (nCommand == IDM_PAN_LEFT || nCommand == IDM_PAN_RIGHT))) {
+                    if (((iRealHeight > m_clientRect.height()) && (inv.id == Command::PanUp || inv.id == Command::PanDown))
+                     || (( iRealWidth >  m_clientRect.width()) && (inv.id == Command::PanLeft || inv.id == Command::PanRight))) {
                         if (m_bAllowSmoothPanning) {
                             if (m_bPanTimerActive == false) {
                                 m_bPanTimerActive = true;
@@ -2093,21 +2095,21 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                                 m_panTimerId = startTimer(17);
                             }
                         } else {
-                            PerformPan((nCommand == IDM_PAN_LEFT) ? PAN_STEP : (nCommand == IDM_PAN_RIGHT) ? -PAN_STEP : 0,
-                                (nCommand == IDM_PAN_UP) ? PAN_STEP : (nCommand == IDM_PAN_DOWN) ? -PAN_STEP : 0, false);
+                            PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
+                                (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
                         }                    
                     } else {
                         if (GetAutoZoomMode() != Helpers::ZM_BookMode) {
-                            if (nCommand == IDM_PAN_RIGHT)
+                            if (inv.id == Command::PanRight)
                                 GotoImage(POS_Next);
-                            else if (nCommand == IDM_PAN_LEFT)
+                            else if (inv.id == Command::PanLeft)
                                 GotoImage(POS_Previous);
                         } else {
                             if (iRealHeight > m_clientRect.height()) {
                                 if (m_bPanTimerActive == false) {
-                                    if ((m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (nCommand == IDM_PAN_LEFT)) {    // Upper Border!
+                                    if ((m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (inv.id == Command::PanLeft)) {    // Upper Border!
                                         GotoImage(POS_Previous);
-                                    } else if ((-m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (nCommand == IDM_PAN_RIGHT)) {    //Lower Border!
+                                    } else if ((-m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (inv.id == Command::PanRight)) {    //Lower Border!
                                         GotoImage(POS_Next);
                                     } else {
                                         if (m_bAllowSmoothPanning) {
@@ -2115,15 +2117,15 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                                             if (m_panTimerId != 0) killTimer(m_panTimerId);
                                             m_panTimerId = startTimer(17);
                                         } else {
-                                            PerformPan(0, ((nCommand == IDM_PAN_UP) || (nCommand == IDM_PAN_LEFT)) ? PAN_STEP : ((nCommand == IDM_PAN_DOWN) || (nCommand == IDM_PAN_RIGHT)) ? -PAN_STEP : 0, false);
+                                            PerformPan(0, ((inv.id == Command::PanUp) || (inv.id == Command::PanLeft)) ? PAN_STEP : ((inv.id == Command::PanDown) || (inv.id == Command::PanRight)) ? -PAN_STEP : 0, false);
                                         }
                                     }
                                 }
                             } else {
                                 if (m_bPanTimerActive == false) {
-                                    if (nCommand == IDM_PAN_RIGHT)
+                                    if (inv.id == Command::PanRight)
                                         GotoImage(POS_Next);
-                                    else if (nCommand == IDM_PAN_LEFT)
+                                    else if (inv.id == Command::PanLeft)
                                         GotoImage(POS_Previous);
                                 }
                             }
@@ -2131,14 +2133,14 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                     }
                 } else {
                     // No image. No dimensions. Panning impossible. GotoImage
-                    if (nCommand == IDM_PAN_RIGHT)
+                    if (inv.id == Command::PanRight)
                         GotoImage(POS_Next);
-                    else if (nCommand == IDM_PAN_LEFT)
+                    else if (inv.id == Command::PanLeft)
                         GotoImage(POS_Previous);
                 }
             }
             break;
-        case IDM_CONTEXT_MENU:
+        case Command::ContextMenu:
             {
                 QPoint globalMousePos = QCursor::pos();
 
@@ -2155,7 +2157,7 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 onShowContextMenu(globalMousePos);
             }
             break;
-        case IDM_TOGGLE_SORT_RANDOM:
+        case Command::ToggleSortRandom:
             if (m_pFileList != NULL) {
                 Helpers::ESorting nSortMode = m_pFileList->GetSorting();
                 bool bSortedAscending = m_pFileList->IsSortedAscending();
@@ -2171,15 +2173,35 @@ void CMainDlg::ExecuteCommand(int nCommand) {
                 m_pFileList->SetSorting(nSortMode, bSortedAscending);
             }
             break;
-        case IDM_TOGGLE_INFO_OVERLAY:
+        case Command::ToggleInfoOverlay:
             m_bShowInfo = !m_bShowInfo;
             this->update();
             break;
-        case IDM_CHANGE_FOLDER_LANGUAGE:
+        case Command::ChangeFolderLanguage:
             ChangeFolderLanguage();
             break;
-        case IDM_OPEN_DEFAULT_EDITOR:
+        case Command::OpenDefaultEditor:
             OpenDefaultEditor();
+            break;
+        case Command::RenameFile:
+                {
+                QString currentPath = CurrentFileName(false);
+
+                RenameDialog dlg(currentPath, this);
+                if (dlg.exec() == QDialog::Accepted) {
+                    QString newPath = dlg.newFilePath();
+                    OpenFile(newPath, false);
+                }
+            }
+            break;
+        case Command::Help:
+            // (frueher fest verdrahtet in keyPressEvent: if (vkCode == Qt::Key_F1) ExecuteCommand(IDM_HELP);
+            //  jetzt regulaerer Eintrag der Standard-keymap, dadurch umbelegbar.)
+            // Der alte switch hatte fuer IDM_HELP keinen case - die Hilfe ist noch nicht umgesetzt.
+            break;
+        case Command::DoNothing:
+        case Command::Count:
+            // DoNothing: Taste ist bewusst "belegt, aber ohne Funktion". Count ist kein echter Befehl.
             break;
     }
 }
@@ -2907,7 +2929,7 @@ void CMainDlg::StartMovieMode(double dFPS) {
     }
     // Keep parameters during movie mode
     if (!m_bKeepParams && dFPS > cdFPSMovie) {
-        ExecuteCommand(IDM_KEEP_PARAMETERS);
+        ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
     }
     // Turn off high quality resamping and auto corrections when requested to play many frames per second
     if (dFPS > cdFPSMovie) {
@@ -2926,7 +2948,7 @@ void CMainDlg::StopMovieMode() {
         // undo changes done on processing parameters due to movie mode
         if (!GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_KeepParams)) {
             if (m_bKeepParams) {
-                ExecuteCommand(IDM_KEEP_PARAMETERS);
+                ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
             }
         }
         if (m_bProcFlagsTouched) {
@@ -3074,7 +3096,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     // 1. Fenstertitel aktualisieren
     QString sWindowText;
     if (sCurrentFileName.isEmpty()) {
-        sWindowText = QStringLiteral(APP_TITLE);
+        sWindowText = APP_TITLE;
     } else {
         QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
 
@@ -3086,7 +3108,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
         sWindowText = QStringLiteral("%1%2 - %3")
                           .arg(visibleName)
                           .arg(indexStr)
-                          .arg(QStringLiteral(APP_TITLE));
+                          .arg(APP_TITLE);
     }
 
     if ((s_PrevTitleText != sWindowText) || bForce) {
@@ -3195,10 +3217,11 @@ bool CMainDlg::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteComm
     bool bCtrl = modifiers.testFlag(Qt::ControlModifier);
     bool bShift = modifiers.testFlag(Qt::ShiftModifier);
 
-    int nCommand = m_pKeyMap->GetCommandIdForKey(nMouseButtonCode, bAlt, bCtrl, bShift);
-    if (nCommand > 0) {
+    const std::optional<Cmd::CommandInvocation> inv = m_pKeyMap->GetCommandForKey(nMouseButtonCode, bAlt, bCtrl, bShift);
+    // DoNothing zaehlt als "belegt": die Maustaste wird verbraucht, tut aber nichts (siehe ExecuteCommand).
+    if (inv) {
         if (bExecuteCommand) {
-            ExecuteCommand(nCommand);
+            ExecuteCommand(*inv);
         }
         return true;
     }
@@ -3394,7 +3417,7 @@ void CMainDlg::StartAnimation() {
     m_eProcFlagsBeforeMovie = CreateDefaultProcessingFlags(m_bKeepParams);
     m_bKeepParametersBeforeAnimation = IsKeepParams();
     if (!m_bKeepParametersBeforeAnimation) {
-        ExecuteCommand(IDM_KEEP_PARAMETERS);
+        ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
     }
 
     m_bAutoContrast = false;
@@ -3458,7 +3481,7 @@ void CMainDlg::StopAnimation() {
         return;
     }
     if (IsKeepParams() != m_bKeepParametersBeforeAnimation) {
-        ExecuteCommand(IDM_KEEP_PARAMETERS);
+        ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
     }
     if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_AutoContrast)) {
         m_bAutoContrast = true;
@@ -3814,7 +3837,7 @@ void CMainDlg::onDisplayedFileChangedOnDisk() {
         m_pCurrentImage != NULL &&
         m_pFileList != NULL &&
         m_pFileList->CanOpenCurrentFileForReading()) {
-        ExecuteCommand(IDM_RELOAD);
+        ExecuteCommand({ Cmd::Command::Reload, 0 });
     }
 }
 

@@ -198,7 +198,7 @@ void CSettingsProvider::ReloadAllSettings() {
 // ============================================================================
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
-    setWindowTitle(tr("mkImageViewer - Einstellungen"));
+    setWindowTitle(tr("Einstellungen"));
     resize(750, 580);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);

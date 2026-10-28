@@ -1,6 +1,9 @@
 #ifndef KEYMAP_H
 #define KEYMAP_H
 
+#include "Commands.h"
+
+#include <optional>
 #include <unordered_map>
 #include <QString>
 
@@ -13,27 +16,41 @@ enum InternalMouseCodes {
     Mouse_DblClk
 };
 
-// KeyMap
+// KeyMap: ordnet Tasten/Maustasten (mit Modifiern) Befehlen aus Commands.h zu.
 class CKeyMap
 {
 public:
-    // Reads the keymap file with logic for loading from different locations, including the default
+    // Laedt keymap.txt (Suchreihenfolge siehe KeyMap.cpp). Existiert keine, wird die eingebaute
+    // Standardbelegung einmalig als keymap.txt ausgeschrieben und geladen.
     CKeyMap();
 
-    // Gets a command Id for a keycode and modifier keys. Returns -1 if no command available for this key.
-    int GetCommandIdForKey(int nVirtualKeyCode, bool bAlt, bool bCtrl, bool bShift);
+    // Liefert den Befehl (inkl. Argument) fuer eine Taste samt Modifiern, std::nullopt wenn die
+    // Taste nicht belegt ist.
+    //
+    // bKeypad: Qt meldet Nummernblock-Tasten als dieselbe Taste wie die Haupttastatur plus
+    // Qt::KeypadModifier. Fuer Key-Events event->modifiers().testFlag(Qt::KeypadModifier)
+    // uebergeben, fuer Maustasten false (Default).
+    //
+    // Lookup-Reihenfolge (siehe .cpp): exakter Treffer, dann Rueckfaelle fuer Keypad- und
+    // Shift-Symboltasten, damit z.B. das Numpad-'+' weiter eine "Plus"-Belegung ausloest.
+    std::optional<Cmd::CommandInvocation> GetCommandForKey(int nVirtualKeyCode, bool bAlt, bool bCtrl, bool bShift, bool bKeypad = false) const;
 
-    // Gets the string describing the keyboard shortcut for a given command, empty string if none
-    QString GetKeyStringForCommand(int nCommandId);
+    // Text der Kuerzel fuer einen Befehl (z.B. fuer Menues), mehrere mit '/' getrennt, leer wenn keins.
+    // Die Reihenfolge ist deterministisch (Tastatur vor Maus, weniger Modifier zuerst, dann alphabetisch).
+    QString GetKeyStringForCommand(const Cmd::CommandInvocation& inv) const;
+    QString GetKeyStringForCommand(Cmd::Command cmd, int arg = 0) const {
+        return GetKeyStringForCommand(Cmd::CommandInvocation{ cmd, arg });
+    }
 
     // gets a combined key code
-    static int GetCombinedKeyCode(int keyCode, bool alt, bool control, bool shift);
+    static int GetCombinedKeyCode(int keyCode, bool alt, bool control, bool shift, bool keypad = false);
 
 private:
 
-    // key is the key code, value the command ID
-    std::unordered_map<int, int> m_keyMap;
+    // key is the combined key code, value the command incl. argument
+    std::unordered_map<int, Cmd::CommandInvocation> m_keyMap;
 
+    void LoadFromText(const QString& sText, const QString& sSourceName);
     void AddDefaultEscapeHandling();
 };
 

@@ -15,6 +15,7 @@
 #include <QSystemSemaphore>
 #include <QString>
 #include <QDataStream>
+#include <QTranslator>
 
 // Eindeutige Namen für Shared Memory und Semaphor
 const QString kShmKey = "mkImageViewer_Instance_Registry_v1";
@@ -73,7 +74,7 @@ void RegisterPid(qint64 myPid, bool registerInstance, QSharedMemory& shm, QSyste
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    QApplication::setApplicationName(APP_TITLE);
+    QApplication::setApplicationName("mkImageViewer");
 
     QImageReader::setAllocationLimit(0);
     std::setlocale(LC_ALL, "");
@@ -151,6 +152,11 @@ int main(int argc, char *argv[])
 
     int nRet = 0;
     try {
+        QTranslator translator;
+        if (translator.load(QLocale::system(), "mkImageViewer", "_", ":/i18n")) {
+            app.installTranslator(&translator);
+        }
+
         CMainDlg dlgMain(sStartupFile);
 
         QObject::connect(&localServer, &QLocalServer::newConnection, &dlgMain, [&localServer, &dlgMain]() {

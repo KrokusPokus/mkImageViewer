@@ -50,6 +50,7 @@ qt_add_executable(mkImageViewer
     src/ApplyFilterAVX.h src/ApplyFilterAVX.cpp
     src/BasicProcessing.h src/BasicProcessing.cpp
     src/Clipboard.h src/Clipboard.cpp
+    src/Commands.h src/Commands.cpp
     src/DirectoryWatcher.h src/DirectoryWatcher.cpp
     src/EXIFReader.h src/EXIFReader.cpp
     src/FileList.h src/FileList.cpp
@@ -66,6 +67,7 @@ qt_add_executable(mkImageViewer
     src/ProcessingThreadPool.h src/ProcessingThreadPool.cpp
     src/ReaderBMP.h src/ReaderBMP.cpp
     src/ReaderTGA.h src/ReaderTGA.cpp
+    src/RenameDialog.h src/RenameDialog.cpp
     src/ResizeFilter.h src/ResizeFilter.cpp
     src/SettingsProvider.h src/SettingsProvider.cpp
     src/WorkThread.h src/WorkThread.cpp
@@ -87,6 +89,14 @@ qt_add_executable(mkImageViewer
     src/WTLCompat.h
 
     res/resources.qrc
+)
+
+qt_add_translations(mkImageViewer
+    TS_FILES
+        i18n/mkImageViewer_de.ts
+        i18n/mkImageViewer_en.ts
+    RESOURCE_PREFIX
+        "/i18n"
 )
 
 target_compile_definitions(mkImageViewer PRIVATE
@@ -141,3 +151,38 @@ target_link_libraries(mkImageViewer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_dec.so
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_threads.so
 )
+
+# Beschleunigt den Start unter Linux, indem ungenutzte Shared Libraries ignoriert werden
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(mkImageViewer PRIVATE -Wl,--as-needed)
+endif()
+
+install(TARGETS mkImageViewer
+    BUNDLE  DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+#qt_generate_deploy_app_script(
+#    TARGET mkImageViewer
+#    OUTPUT_SCRIPT deploy_script
+#    NO_UNSUPPORTED_PLATFORM_ERROR
+#)
+#install(SCRIPT ${deploy_script})
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
+)
+
+if(LINUX)
+    add_custom_command(TARGET mkImageViewer POST_BUILD
+        # Erster Kopiervorgang
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:mkImageViewer>
+            $ENV{HOME}/.local/bin/mkImageViewer
+
+        COMMENT "Copying mkFolderWidget to ~/.local/bin/"
+    )
+endif()

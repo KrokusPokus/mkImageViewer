@@ -6,6 +6,7 @@
 #include "resource.h"
 #include "ProcessParams.h"
 #include "Helpers.h"
+#include "Commands.h"
 
 #include <QMainWindow>
 #include <QCoreApplication>
@@ -82,7 +83,7 @@ public:
     void DoDragging();
     void EndDragging();
     void SetCursorForMoveSection();
-    void ExecuteCommand(int nCommand);
+    void ExecuteCommand(const Cmd::CommandInvocation& inv);
     bool ShouldAcceptFile(const QString& filePath);
 
 private:
