@@ -21,6 +21,11 @@ public:
         Success = true;
     }
 
+    // Process one slice of the image (rows offsetY to offsetY + sizeY - 1) on the calling thread. Each thread of
+    // the pool processes one slice. The default implementation splits the slice into strips and calls
+    // ProcessStrip() for each of them.
+    virtual bool ProcessSlice(int offsetY, int sizeY);
+
     // Process one strip of the image, starting at row offsetY and having the specified y-size
     virtual bool ProcessStrip(int offsetY, int sizeY) = 0;
 
@@ -37,13 +42,12 @@ public:
 class CProcessingThreadPool {
 public:
     static CProcessingThreadPool& This();
-    void CreateThreadPoolThreads();
+    // nNumCores: total number of threads used for processing (worker threads + calling thread)
+    void CreateThreadPoolThreads(int nNumCores);
     void StopAllThreads();
     bool Process(CProcessingRequest* pRequest);
 
 private:
-    static CProcessingThreadPool* sm_instance;
-
     CProcessingThread** m_threads;
     int m_nNumThreads;
 

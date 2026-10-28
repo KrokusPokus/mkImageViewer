@@ -121,8 +121,8 @@ public:
     static void* SampleDown_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
         CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter);
 
-    // Same as above, SIMD (AVX2/SSE/MMX) implementation.
-    // Notice that the A channel is not processed and set to fixed value 0xFF.
+    // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns NULL if memory is exhausted.
+    // Notice that the A channel is not processed. The AVX2 implementation sets it to 0xFF, with SSE/MMX it is undefined.
     // Notice that the returned image is always 32 bpp!
     static void* SampleDown_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
         CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, SIMDArchitecture simd);
@@ -134,8 +134,8 @@ public:
     static void* SampleUp_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
         CSize sourceSize, const void* pPixels, int nChannels);
 
-    // Same as above, SIMD (AVX2/SSE/MMX) implementation.
-    // Notice that the A channel is not processed and set to fixed value 0xFF.
+    // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns NULL if memory is exhausted.
+    // Notice that the A channel is not processed. The AVX2 implementation sets it to 0xFF, with SSE/MMX it is undefined.
     // Notice that the returned image is always 32 bpp!
     static void* SampleUp_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
         CSize sourceSize, const void* pPixels, int nChannels, SIMDArchitecture simd);

@@ -138,6 +138,9 @@ namespace {
         if ((abcd[2] & 0x04000000) == 0) { // XSAVE bit, support for xgetbv
             return (cpuType = Helpers::CPU_SSE);
         }
+        if ((abcd[2] & 0x00001000) == 0) { // FMA bit, the AVX2 resampling uses FMA instructions
+            return (cpuType = Helpers::CPU_SSE);
+        }
 
         // 2. Check if operating system supports AVX(2) via xgetbv (Standard auf allen x86-Compilern)
         unsigned long long xcr0 = _xgetbv(0);

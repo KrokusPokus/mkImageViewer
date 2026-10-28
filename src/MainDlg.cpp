@@ -470,7 +470,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_pFileList->SetNavigationMode(sp.Navigation());
 
     // create thread pool for processing requests on multiple CPU cores
-    CProcessingThreadPool::This().CreateThreadPoolThreads();
+    CProcessingThreadPool::This().CreateThreadPoolThreads(CSettingsProvider::This().NumberOfCoresToUse());
 
     int nReadAheadBuffers = (CSettingsProvider::This().CacheRange() * 2) + 1;    // The +1 is the current image
 
