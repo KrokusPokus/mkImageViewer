@@ -34,22 +34,15 @@ CImageProvider::CImageRequest::~CImageRequest() {
     delete Image; // CBaseImage is a complete type here (JPEGImage.h)
 }
 
-CImageProvider::CImageProvider(QObject* pParent, int nNumThreads, int nNumBuffers)
+CImageProvider::CImageProvider(QObject* pParent, int nNumBuffers)
     : QObject(pParent),
-    m_nNumThread(std::max(1, nNumThreads)),
+    m_pLoadThread(std::make_unique<CImageLoadThread>()),
     m_nNumBuffers(std::max(0, nNumBuffers)),
     m_nCurrentTimeStamp(0) {
-    m_pWorkThreads = new CImageLoadThread*[m_nNumThread];
-    for (int i = 0; i < m_nNumThread; i++) {
-        m_pWorkThreads[i] = new CImageLoadThread();
-    }
 }
 
 CImageProvider::~CImageProvider(void) {
-    for (int i = 0; i < m_nNumThread; i++) {
-        delete m_pWorkThreads[i];
-    }
-    delete[] m_pWorkThreads;
+    // The load thread is terminated by its destructor (m_pLoadThread) before the requests are released
 }
 
 CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirection eDirection,
@@ -167,7 +160,7 @@ bool CImageProvider::ClearRequest(CBaseImage* pImage, bool releaseLockedFile) {
         const auto& req = *iter;
         if (req->Ready && req->Image == pImage) {
             if (releaseLockedFile) {
-                m_pWorkThreads[0]->ReleaseFile(req->FileName);
+                m_pLoadThread->ReleaseFile(req->FileName);
             }
             DeleteElementAt(iter);
             bErased = true;
@@ -213,10 +206,8 @@ void CImageProvider::FileHasRenamed(const QString& sOldFileName, const QString& 
     //    entries are stale: they would only be found again if ANOTHER file is later renamed to the old name,
     //    and then frames of the wrong file would be decoded. So drop them. The decoder cache is not renamed
     //    (that would need a request type in CImageLoadThread); the price is that a multi frame file is reopened
-    //    once on the next frame request. Every thread may hold such a cache, not only the first one.
-    for (int i = 0; i < m_nNumThread; i++) {
-        m_pWorkThreads[i]->ReleaseFile(sOld);
-    }
+    //    once on the next frame request.
+    m_pLoadThread->ReleaseFile(sOld);
 }
 
 CImageProvider::RequestPtr CImageProvider::FindRequest(const QString& sFileName, int nFrameIndex) {
@@ -307,54 +298,23 @@ CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileN
     //qDebug() << "StartNewRequest() sFileName:" << sFileName << "nFrameIndex:" << nFrameIndex;
     auto pRequest = std::make_shared<CImageRequest>(sFileName, nFrameIndex);
     m_requestList.push_back(pRequest);
-    pRequest->HandlingThread = SearchThreadForNewRequest();
+    CImageLoadThread* pLoadThread = m_pLoadThread.get(); // lives as long as this provider
 
-    pRequest->Handle = pRequest->HandlingThread->AsyncLoad(
+    pRequest->Handle = pLoadThread->AsyncLoad(
         pRequest->FileName,
         nFrameIndex,
         processParams,
-        [pRequest](int handle) {
+        [pRequest, pLoadThread](int handle) {
             QMutexLocker l(&pRequest->Mutex);
-            if (pRequest->HandlingThread) {
-                CImageData d = pRequest->HandlingThread->GetLoadedImage(handle);
-                pRequest->Image = d.Image;
-                pRequest->OutOfMemory = d.IsRequestFailedOutOfMemory;
-                pRequest->ExceptionError = d.IsRequestFailedException;
-            }
+            CImageData d = pLoadThread->GetLoadedImage(handle);
+            pRequest->Image = d.Image;
+            pRequest->OutOfMemory = d.IsRequestFailedOutOfMemory;
+            pRequest->ExceptionError = d.IsRequestFailedException;
             pRequest->Ready = true;
             pRequest->WaitCondition.wakeAll();
         }
         );
     return pRequest;
-}
-
-CImageLoadThread* CImageProvider::SearchThreadForNewRequest(void) {
-    for (int i = 0; i < m_nNumThread; i++) {
-        bool bFree = true;
-        CImageLoadThread* pThisThread = m_pWorkThreads[i];
-
-        for (const auto& request : m_requestList) {
-            if (request->HandlingThread == pThisThread && !request->Ready) {
-                bFree = false;
-                break;
-            }
-        }
-        if (bFree) {
-            return pThisThread;
-        }
-    }
-
-    int nSmallestHandle = INT_MAX;
-    CImageLoadThread* pOldestThread = nullptr;
-
-    for (const auto& request : m_requestList) {
-        if (request->HandlingThread != nullptr && !request->Ready && request->Handle < nSmallestHandle) {
-            nSmallestHandle = request->Handle;
-            pOldestThread = request->HandlingThread;
-        }
-    }
-
-    return (pOldestThread == nullptr) ? m_pWorkThreads[0] : pOldestThread;
 }
 
 void CImageProvider::RemoveUnusedImages(bool bRemoveAlsoActiveRequests) {

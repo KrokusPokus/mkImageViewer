@@ -52,7 +52,6 @@ namespace {
     const int MIN_WND_WIDTH = 320;
     const int MIN_WND_HEIGHT = 240;
 
-    const int NUM_THREADS = 1; // number of readahead threads to use. Use "1" since the ImageLoaders aren't thread save and JxlReader/PngReaderer/WebpReaderWriter can't do out of order frame access!
     const int ZOOM_TIMEOUT = 50; // refinement done after this many milliseconds
     const int ZOOM_TEXT_TIMEOUT = 1000; // zoom label disappears after this many milliseconds
 
@@ -475,7 +474,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     int nReadAheadBuffers = (CSettingsProvider::This().CacheRange() * 2) + 1;    // The +1 is the current image
 
     // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
-    m_pImageProvider = new CImageProvider(this, NUM_THREADS, nReadAheadBuffers);
+    m_pImageProvider = new CImageProvider(this, nReadAheadBuffers);
 
     m_pCurrentImage = m_pImageProvider->RequestImage(m_pFileList,
                                                     CImageProvider::FORWARD,
@@ -2633,7 +2632,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
     // Clear from cache only for POS_Current POS_AwayFromCurrent, which are involved in reloading on file/directory changes and deletion.
     if (ePos == POS_Current || ePos == POS_AwayFromCurrent) {
-        // When (ePos == POS_AwayFromCurrent), it will additionally releaseLockedFile in m_pWorkThreads
+        // When (ePos == POS_AwayFromCurrent), it will additionally releaseLockedFile in the load thread
         m_pImageProvider->ClearRequest(m_pCurrentImage, ePos == POS_AwayFromCurrent);
     }
     m_pCurrentImage = NULL;

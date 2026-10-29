@@ -25,7 +25,8 @@ public:
         BACKWARD
     };
 
-    CImageProvider(QObject* pParent, int nNumThreads, int nNumBuffers);
+    // nNumBuffers: number of images that are read ahead (besides the requested one)
+    CImageProvider(QObject* pParent, int nNumBuffers);
     ~CImageProvider(void);
 
     CBaseImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const QString& sFileName, int nFrameIndex,
@@ -53,7 +54,6 @@ private:
         bool OutOfMemory;
         bool ExceptionError;
         int AccessTimeStamp;
-        CImageLoadThread* HandlingThread;
 
         QMutex Mutex;
         QWaitCondition WaitCondition;
@@ -68,8 +68,7 @@ private:
             IsActive(true),
             OutOfMemory(false),
             ExceptionError(false),
-            AccessTimeStamp(-1),
-            HandlingThread(nullptr) {}
+            AccessTimeStamp(-1) {}
 
         // Defined in JPEGProvider.cpp: CBaseImage is only forward declared here, so a delete in the header
         // would not run ~CBaseImage() (undefined behavior, all pixel buffers of the image would leak).
@@ -79,12 +78,18 @@ private:
     using RequestPtr = std::shared_ptr<CImageRequest>;
 
     std::list<RequestPtr> m_requestList;
-    CImageLoadThread** m_pWorkThreads;
-    int m_nNumThread;
+
+    // The one and only load thread, deliberately only one:
+    //  - The image readers are not thread safe: PNG, AVIF and JPEG XL keep the decoder state of animations in
+    //    global or static caches (g_cache in wrapperPNG.cpp and wrapperAVIF.cpp, JxlReader::cache).
+    //  - Latency: the requested image must be delivered as fast as possible, then the most likely next image is
+    //    prepared. Decoding and resampling of a single image already use all cores (thread pool, multithreaded
+    //    decoders). A second load thread would compete for cores and memory bandwidth and slow down the image the
+    //    user is waiting for. The requests are processed one after the other, in the order they were started.
+    std::unique_ptr<CImageLoadThread> m_pLoadThread;
     int m_nNumBuffers;
     int m_nCurrentTimeStamp;
 
-    CImageLoadThread* SearchThreadForNewRequest(void);
     void RemoveUnusedImages(bool bRemoveAlsoReadAhead);
     RequestPtr StartRequestAndWaitUntilReady(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams);
     RequestPtr StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams);
