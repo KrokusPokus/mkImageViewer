@@ -95,7 +95,8 @@ void CDirectoryWatcher::SetCurrentFile(const QString& fileName) {
     m_modificationTimeCurrentFile = GetLastModificationTime(m_sCurrentFile);
     m_bModificationTimeValid = m_modificationTimeCurrentFile.isValid();
 
-    if (!m_sCurrentFile.isEmpty()) {
+    // Waehrend einer Pause nur den Namen merken, Resume() setzt die Ueberwachung
+    if (!m_sCurrentFile.isEmpty() && !m_suspended) {
         m_fileSystemWatcher->addPath(m_sCurrentFile);
     }
 }
@@ -110,7 +111,8 @@ void CDirectoryWatcher::SetCurrentDirectory(const QString& directoryName) {
 
     m_watchedDirectory = fullPath;
 
-    if (!m_watchedDirectory.isEmpty()) {
+    // Waehrend einer Pause nur den Namen merken, Resume() setzt die Ueberwachung
+    if (!m_watchedDirectory.isEmpty() && !m_suspended) {
         m_fileSystemWatcher->addPath(m_watchedDirectory);
     }
 }

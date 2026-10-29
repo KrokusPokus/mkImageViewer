@@ -2183,6 +2183,9 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                     break;   // nothing displayed, nothing to rename
                 }
 
+                // Watcher pausieren, bis der Block endet: Die eigene Umbenennung soll kein
+                // "Ordner geaendert" bzw. "Datei geaendert" ausloesen (unnoetiges Neueinlesen).
+                CDirectoryWatcher::ScopedPause pause(*m_pDirectoryWatcher);
                 RenameDialog dlg(currentPath, this);
                 if (dlg.exec() == QDialog::Accepted) {
                     // No OpenFile(): the image on screen stays valid. The file list, the image cache,
