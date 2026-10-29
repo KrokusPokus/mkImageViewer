@@ -23,7 +23,8 @@ public:
     // may causes access violations (use OriginalPixels() instead).
     // nChannels can be 1 (greyscale image), 3 (BGR color image) or 4 (BGRA color image, A ignored)
     // pEXIFData can be a pointer to the APP1 block containing the EXIF data. If this pointer is null
-    // no EXIF data is available.
+    // no EXIF data is available. The block is copied with the length stored in it (bytes 2 and 3), so the
+    // caller must make sure that the buffer is that long (Helpers::FindEXIFBlock() and the readers do).
     // The image format is a hint about the original image format this image was created from.
     // The bIsAnimation, nFrameIndex, nNumberOfFrames and nFrameTimeMs are used for multiframe images, e.g. animated GIFs.
     // Frame index is zero based and the frame time is given in milliseconds.

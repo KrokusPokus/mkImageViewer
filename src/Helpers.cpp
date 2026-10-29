@@ -110,7 +110,17 @@ namespace Helpers {
 
     void* FindEXIFBlock(void* pJPEGStream, int nStreamLength) {
         uint8* pEXIFBlock = (uint8*)Helpers::FindJPEGMarker(pJPEGStream, nStreamLength, 0xE1);
-        if (pEXIFBlock != NULL && strncmp((const char*)(pEXIFBlock + 4), "Exif", 4) != 0) {
+        if (pEXIFBlock == NULL) {
+            return NULL;
+        }
+        // The segment (marker, length, "Exif\0\0", data) must be completely inside of the stream: the length comes from
+        // the file, and CBaseImage copies as many bytes as it says
+        const int nAvailable = nStreamLength - static_cast<int>(pEXIFBlock - static_cast<uint8*>(pJPEGStream));
+        if (nAvailable < 10) {
+            return NULL;
+        }
+        const int nSegmentSize = pEXIFBlock[2] * 256 + pEXIFBlock[3] + 2;
+        if (nSegmentSize < 10 || nSegmentSize > nAvailable || memcmp(pEXIFBlock + 4, "Exif", 4) != 0) {
             return NULL;
         }
         return pEXIFBlock;
@@ -137,9 +147,14 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
         return {};
     }
     
+    // marker (2), length (2), comment: the comment must be completely inside of the stream (the length comes from the file)
+    const int nAvailable = nStreamLength - static_cast<int>(pCommentSeg - static_cast<const uint8_t*>(pJPEGStream));
+    if (nAvailable < 4) {
+        return {};
+    }
     pCommentSeg += 2;
     const int nCommentLen = pCommentSeg[0] * 256 + pCommentSeg[1] - 2;
-    if (nCommentLen <= 0) {
+    if (nCommentLen <= 0 || nCommentLen > nAvailable - 4) {
         return {};
     }
 

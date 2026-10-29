@@ -189,7 +189,8 @@ namespace Helpers {
     // To find the first non-marker block, set nMarker to zero.
     const void* FindJPEGMarker(const void* pJPEGStream, int nStreamLength, unsigned char nMarker);
 
-    // Finds the EXIF block in the JPEG bytes stream, NULL if no EXIF block
+    // Finds the EXIF block in the JPEG bytes stream, NULL if no EXIF block or if the block (by its length field)
+    // reaches beyond the end of the stream
     void* FindEXIFBlock(void* pJPEGStream, int nStreamLength);
 
     // try to convert a string from UTF-8. Returns empty string if no valid UTF-8 encoded string.
