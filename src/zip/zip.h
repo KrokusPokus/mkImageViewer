@@ -241,6 +241,31 @@ extern ZIP_EXPORT int zip_entry_close(struct zip_t *zip);
  */
 extern ZIP_EXPORT const char *zip_entry_name(struct zip_t *zip);
 
+/* mkImageViewer extension (not part of kuba-zip) */
+/**
+ * Returns if the name of the current zip entry is UTF-8 encoded (bit 11 of the
+ * general purpose bit flag). If not, the ZIP specification defines CP437.
+ *
+ * @param zip: zip archive handler.
+ *
+ * @return 1 if UTF-8, 0 if not, or negative number (< 0) on error.
+ */
+extern ZIP_EXPORT int zip_entry_isutf8(struct zip_t *zip);
+
+/* mkImageViewer extension (not part of kuba-zip) */
+/**
+ * Returns the UTF-8 name of the current zip entry from an Info-ZIP Unicode Path
+ * extra field (0x7075), written e.g. by 7-Zip and Windows for names stored in a
+ * legacy code page. The field is only used if its CRC-32 matches the stored name.
+ *
+ * @param zip: zip archive handler.
+ * @param size: receives the length of the name in bytes (not 0-terminated).
+ *
+ * @return pointer to the UTF-8 name within the central directory (valid while the
+ *         archive is open), or NULL if there is no valid Unicode Path extra field.
+ */
+extern ZIP_EXPORT const char *zip_entry_unicodepath(struct zip_t *zip, size_t *size);
+
 /**
  * Returns an index of the current zip entry.
  *

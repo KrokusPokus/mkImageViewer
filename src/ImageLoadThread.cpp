@@ -1259,8 +1259,47 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
 
 // #################################################
 
-ZipEntry::ZipEntry(const char* a_pchName, unsigned int a_index, unsigned long long a_size) :
-    name(QString::fromUtf8(a_pchName)),
+namespace {
+
+// CP437 (original IBM PC code page) to Unicode for the bytes 0x80 to 0xFF, 0x00 to 0x7F are ASCII
+const char16_t kCP437High[128] = {
+    0x00C7, 0x00FC, 0x00E9, 0x00E2, 0x00E4, 0x00E0, 0x00E5, 0x00E7, 0x00EA, 0x00EB, 0x00E8, 0x00EF, 0x00EE, 0x00EC, 0x00C4, 0x00C5,
+    0x00C9, 0x00E6, 0x00C6, 0x00F4, 0x00F6, 0x00F2, 0x00FB, 0x00F9, 0x00FF, 0x00D6, 0x00DC, 0x00A2, 0x00A3, 0x00A5, 0x20A7, 0x0192,
+    0x00E1, 0x00ED, 0x00F3, 0x00FA, 0x00F1, 0x00D1, 0x00AA, 0x00BA, 0x00BF, 0x2310, 0x00AC, 0x00BD, 0x00BC, 0x00A1, 0x00AB, 0x00BB,
+    0x2591, 0x2592, 0x2593, 0x2502, 0x2524, 0x2561, 0x2562, 0x2556, 0x2555, 0x2563, 0x2551, 0x2557, 0x255D, 0x255C, 0x255B, 0x2510,
+    0x2514, 0x2534, 0x252C, 0x251C, 0x2500, 0x253C, 0x255E, 0x255F, 0x255A, 0x2554, 0x2569, 0x2566, 0x2560, 0x2550, 0x256C, 0x2567,
+    0x2568, 0x2564, 0x2565, 0x2559, 0x2558, 0x2552, 0x2553, 0x256B, 0x256A, 0x2518, 0x250C, 0x2588, 0x2584, 0x258C, 0x2590, 0x2580,
+    0x03B1, 0x00DF, 0x0393, 0x03C0, 0x03A3, 0x03C3, 0x00B5, 0x03C4, 0x03A6, 0x0398, 0x03A9, 0x03B4, 0x221E, 0x03C6, 0x03B5, 0x2229,
+    0x2261, 0x00B1, 0x2265, 0x2264, 0x2320, 0x2321, 0x00F7, 0x2248, 0x00B0, 0x2219, 0x00B7, 0x221A, 0x207F, 0x00B2, 0x25A0, 0x00A0,
+};
+
+// Name of the current entry of a ZIP archive (zip_entry_openbyindex). Per ZIP specification the name is UTF-8 if
+// bit 11 of the general purpose flags is set, otherwise CP437. Archivers like 7-Zip or Windows store names that are
+// representable in CP437 that way and add an Info-ZIP Unicode Path extra field with the UTF-8 name, which takes
+// precedence (it is only returned if its CRC matches the stored name).
+QString ZipEntryName(struct zip_t* pZip) {
+    const char* pchName = zip_entry_name(pZip);
+    if (pchName == nullptr) {
+        return QString();
+    }
+    if (zip_entry_isutf8(pZip) == 1) {
+        return QString::fromUtf8(pchName);
+    }
+    size_t nUnicodeLen = 0;
+    if (const char* pchUnicode = zip_entry_unicodepath(pZip, &nUnicodeLen)) {
+        return QString::fromUtf8(pchUnicode, static_cast<qsizetype>(nUnicodeLen));
+    }
+    QString sName;
+    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pchName); *p != 0; ++p) {
+        sName += (*p < 0x80) ? QChar(*p) : QChar(kCP437High[*p - 0x80]);
+    }
+    return sName;
+}
+
+} // namespace
+
+ZipEntry::ZipEntry(const QString& a_name, unsigned int a_index, unsigned long long a_size) :
+    name(a_name),
     index(a_index),
     size(a_size)
 {
@@ -1351,7 +1390,7 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                 }
                 const char* pchName = zip_entry_name(zip.get());
                 if (pchName != nullptr && !zip_entry_isdir(zip.get())) {
-                    zipEntries.push_back(ZipEntry(pchName, static_cast<unsigned int>(i), zip_entry_size(zip.get())));
+                    zipEntries.push_back(ZipEntry(ZipEntryName(zip.get()), static_cast<unsigned int>(i), zip_entry_size(zip.get())));
                 }
                 zip_entry_close(zip.get());
             }

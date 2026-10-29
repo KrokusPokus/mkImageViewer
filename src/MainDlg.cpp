@@ -3100,7 +3100,7 @@ QString CMainDlg::CurrentFileName(bool bFileNameOnly) {
 }
 
 // Full path of the current file for display (native separators). For an image in an archive the name of the
-// file within the archive is appended, e.g. "/path/to/archive.zip:image.jpg".
+// file within the archive is appended, e.g. "/path/to/archive.zip/image.jpg".
 QString CMainDlg::CurrentDisplayPath() {
     QString sPath = CurrentFileName(false);
     if (!sPath.isEmpty() && m_pCurrentImage != nullptr && m_pCurrentImage->InArchive() &&

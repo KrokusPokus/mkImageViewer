@@ -37,7 +37,7 @@ public:
     unsigned int index;
     unsigned long long size;
 
-    ZipEntry(const char* a_pchName, unsigned int a_index, unsigned long long a_size);
+    ZipEntry(const QString& a_name, unsigned int a_index, unsigned long long a_size);
     ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned long long a_size);
 };
 

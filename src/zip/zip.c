@@ -1470,6 +1470,61 @@ const char *zip_entry_name(struct zip_t *zip) {
   return zip->entry.name;
 }
 
+/* mkImageViewer extension (not part of kuba-zip) */
+int zip_entry_isutf8(struct zip_t *zip) {
+  const mz_uint8 *pHeader;
+  if (!zip) {
+    // zip_t handler is not initialized
+    return ZIP_ENOINIT;
+  }
+  if (zip->entry.index < 0) {
+    return ZIP_EINVIDX;
+  }
+  pHeader = mz_zip_get_cdh(&zip->archive, (mz_uint)zip->entry.index);
+  if (!pHeader) {
+    return ZIP_ENOHDR;
+  }
+  return (MZ_READ_LE16(pHeader + MZ_ZIP_CDH_BIT_FLAG_OFS) &
+          MZ_ZIP_GENERAL_PURPOSE_BIT_FLAG_UTF8)
+             ? 1
+             : 0;
+}
+
+/* mkImageViewer extension (not part of kuba-zip) */
+const char *zip_entry_unicodepath(struct zip_t *zip, size_t *size) {
+  const mz_uint8 *pHeader, *pName, *pExtra, *pExtraEnd;
+  mz_uint nameLen, extraLen;
+  if (!zip || !size || zip->entry.index < 0) {
+    return NULL;
+  }
+  pHeader = mz_zip_get_cdh(&zip->archive, (mz_uint)zip->entry.index);
+  if (!pHeader) {
+    return NULL;
+  }
+  nameLen = MZ_READ_LE16(pHeader + MZ_ZIP_CDH_FILENAME_LEN_OFS);
+  extraLen = MZ_READ_LE16(pHeader + MZ_ZIP_CDH_EXTRA_LEN_OFS);
+  pName = pHeader + MZ_ZIP_CENTRAL_DIR_HEADER_SIZE;
+  pExtra = pName + nameLen;
+  pExtraEnd = pExtra + extraLen;
+  // extra field: sequence of (2 bytes id, 2 bytes data size, data)
+  while (pExtra + 4 <= pExtraEnd) {
+    mz_uint id = MZ_READ_LE16(pExtra);
+    mz_uint dataSize = MZ_READ_LE16(pExtra + 2);
+    const mz_uint8 *pData = pExtra + 4;
+    if (pData + dataSize > pExtraEnd) {
+      break;
+    }
+    // Unicode Path: 1 byte version (1), 4 bytes CRC-32 of the stored name, UTF-8 name
+    if (id == 0x7075 && dataSize >= 5 && pData[0] == 1 &&
+        MZ_READ_LE32(pData + 1) == mz_crc32(MZ_CRC32_INIT, pName, nameLen)) {
+      *size = dataSize - 5;
+      return (const char *)(pData + 5);
+    }
+    pExtra = pData + dataSize;
+  }
+  return NULL;
+}
+
 ssize_t zip_entry_index(struct zip_t *zip) {
   if (!zip) {
     // zip_t handler is not initialized
