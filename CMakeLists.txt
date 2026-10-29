@@ -5,6 +5,10 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "This project only supports 64-bit systems.")
 endif()
 
+# Kein RPATH: alle dynamischen Bibliotheken kommen aus dem System. CMake erzeugte sonst einen RUNPATH aus leeren
+# Eintraegen, die der Loader als aktuelles Arbeitsverzeichnis deutet (SKIP_BUILD_RPATH am Target wirkte nicht).
+set(CMAKE_SKIP_RPATH ON)
+
 # C++20 Standard erzwingen
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -41,6 +45,13 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools N
 
 # --- 3. DRITTANBIETER (ZLIB) GLOBAL BEREITSTELLEN ---
 find_package(ZLIB REQUIRED)
+
+# AVIF, HEIF, JPEG XL und Little CMS kommen aus den Systempaketen (Arch: libavif, libheif, libjxl, lcms2)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(AVIF REQUIRED IMPORTED_TARGET libavif)
+pkg_check_modules(HEIF REQUIRED IMPORTED_TARGET libheif)
+pkg_check_modules(JXL REQUIRED IMPORTED_TARGET libjxl libjxl_threads)
+pkg_check_modules(LCMS2 REQUIRED IMPORTED_TARGET lcms2)
 
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON)
@@ -109,24 +120,8 @@ target_compile_definitions(mkImageViewer PRIVATE
 target_include_directories(mkImageViewer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bit7z/include
-)
-
-# Bibliothekspfade (mit src/ erweitert)
-target_link_directories(mkImageViewer PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjpeg-turbo/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/${ARCH_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/bit7z/${ARCH_DIR}
 )
 
 # Bibliotheken verknuepfen
@@ -144,17 +139,20 @@ target_link_libraries(mkImageViewer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebp.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebpdemux.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libsharpyuv.a
-# dynamic (Linux .so)
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/lcms2/lib64/liblcms2.so
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libavif/lib64/libavif.so
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libheif/lib64/libheif.so
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_dec.so
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjxl/lib64/libjxl_threads.so
+# dynamic (Systempakete, siehe pkg_check_modules oben)
+    PkgConfig::LCMS2
+    PkgConfig::AVIF
+    PkgConfig::HEIF
+    PkgConfig::JXL
 )
 
 # Beschleunigt den Start unter Linux, indem ungenutzte Shared Libraries ignoriert werden
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(mkImageViewer PRIVATE -Wl,--as-needed)
+    # Symbole der statisch gelinkten Bibliotheken (libpng 1.8, zlib, libjpeg-turbo, libwebp, ...) nicht exportieren.
+    # Sonst landen Aufrufe von Qt/FreeType, die gegen die System-Versionen gebaut sind (z.B. libpng 1.6), in diesen
+    # Kopien: libpng meldet dann "Application built with libpng-1.6.x but running with 1.8.0" und verweigert den Dienst.
+    target_link_options(mkImageViewer PRIVATE -Wl,--exclude-libs,ALL)
 endif()
 
 install(TARGETS mkImageViewer
@@ -186,3 +184,28 @@ if(LINUX)
         COMMENT "Copying mkFolderWidget to ~/.local/bin/"
     )
 endif()
+
+# --- 4. BENCHMARK-/TESTPROGRAMM FUER DIE RESAMPLING-PIPELINE (ohne GUI) ---
+# Siehe PERF_PLAN.md, Phase 1. Linkt die Processing-Dateien direkt, mit denselben Compiler-Flags.
+find_package(Qt6 REQUIRED COMPONENTS Gui)
+
+add_executable(resample_bench
+    tools/resample_bench/main.cpp
+    src/BasicProcessing.cpp
+    src/ResizeFilter.cpp
+    src/XMMImage.cpp
+    src/ProcessingThreadPool.cpp
+    src/WorkThread.cpp
+)
+
+target_compile_definitions(resample_bench PRIVATE
+    $<$<CONFIG:Debug>:_DEBUG>
+    $<$<CONFIG:Release>:NDEBUG>
+)
+
+target_include_directories(resample_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(resample_bench PRIVATE Qt6::Core Qt6::Gui)
+
+set_target_properties(resample_bench PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
