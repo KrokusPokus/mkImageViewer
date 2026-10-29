@@ -61,7 +61,8 @@ CLocalDensityCorr::CLocalDensityCorr(const CBaseImage & image, bool bFullConstru
 
     for (int j = 0; j < m_nPSIHeight; j++) {
         uint32 nX = 0;
-        const uint8* pSrcStart = pSourcePixels + nLineSize*(nY >> 16);
+        // 64 bit offset: images can have more than 4 GiB of pixel data
+        const uint8* pSrcStart = pSourcePixels + (size_t)nLineSize*(nY >> 16);
         uint16* pSubSampImage = m_pPointSampledImage + j*m_nPSIWidth*3;
         for (int i = 0; i < m_nPSIWidth; i++) {
             const uint8* pSrc = (nChannels == 3) ? pSrcStart + (nX >> 16)*3 : pSrcStart + (nX >> 16)*4;

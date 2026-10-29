@@ -461,11 +461,8 @@ void* CBaseImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
 
     // ApplyCorrectionLUTandLDC() could have failed, then recreate the DIBs
     if (pDIB == NULL) {
-        // if the image is reprocessed more than once, it is worth to convert the original to 4 channels
-        // as this is faster for further processing
-        if (!m_bFirstReprocessing) {
-            ConvertSrcTo4Channels();
-        }
+        // The original is kept with 3 channels: resampling is equally fast for 3 and 4 channels, a conversion
+        // would cost time and memory (rotation and mirroring convert to 4 channels when needed)
 
         bParametersChanged = true;
 
