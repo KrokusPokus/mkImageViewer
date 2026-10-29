@@ -46,6 +46,8 @@ public:
     void CreateThreadPoolThreads(int nNumCores);
     void StopAllThreads();
     bool Process(CProcessingRequest* pRequest);
+    // Number of threads processing a request in parallel (worker threads + calling thread)
+    int NumberOfThreads() const { return m_nNumThreads + 1; }
 
 private:
     CProcessingThread** m_threads;

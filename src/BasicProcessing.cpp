@@ -19,6 +19,10 @@
 #include <cmath>
 #include <cstring>
 
+#if defined(__linux__)
+#include <unistd.h> // sysconf() for the cache sizes
+#endif
+
 // This macro allows for aligned definition of a 16 byte value with initialization of the 8 components
 // to a single value
 #define DECLARE_ALIGNED_DQWORD(name, initializer) \
@@ -1600,9 +1604,26 @@ static void FilterToDIB_AVX(const CXMMImage* pSourceImg, int nTargetWidth, int n
 // they stay in the L2 cache as far as possible. A strip has at least 8 lines.
 constexpr int AVX_STRIP_BUDGET_BYTES = 256 * 1024;
 
-// Size budget for the ring buffer of converted source lines. If the ring for the full width of a slice would be
-// larger, the slice is processed in tiles of target columns (see SampleSlice_HQ_AVX).
-constexpr int AVX_RING_BUDGET_BYTES = 128 * 1024;
+// Cache sizes of the CPU in bytes: L2 per core, L3 shared by all cores. Queried once from the operating system,
+// defaults if unknown.
+struct CCacheSizes {
+    size_t nL2 = 256 * 1024;
+    size_t nL3 = 8 * 1024 * 1024;
+};
+
+static const CCacheSizes& GetCacheSizes() {
+    static const CCacheSizes sizes = [] {
+        CCacheSizes c;
+#if defined(__linux__)
+        long nL2 = sysconf(_SC_LEVEL2_CACHE_SIZE);
+        long nL3 = sysconf(_SC_LEVEL3_CACHE_SIZE);
+        if (nL2 > 0) c.nL2 = (size_t)nL2;
+        if (nL3 > 0) c.nL3 = (size_t)nL3;
+#endif
+        return c;
+    }();
+    return sizes;
+}
 
 // Longest vertical kernel for the target lines nFirstLine to nFirstLine + nLines - 1 (= lines of the ring buffer)
 static int MaxFilterLen(const AVXFilterKernelBlock& kernels, int nFirstLine, int nLines) {
@@ -1715,9 +1736,13 @@ static bool SampleTile_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CSi
 
 // Resamples one slice of the target image (lines fullTargetOffset.y to fullTargetOffset.y + clippedTargetSize.cy - 1)
 // on the calling thread (AVX), see SampleTile_HQ_AVX. pTarget points to the first line of the slice in the target DIB.
-// For strong downsampling (long vertical kernels) the ring buffer for the full width would not fit in the L2 cache,
+// For strong downsampling (long vertical kernels) the ring buffer for the full width would not fit in the cache,
 // then the slice is split into tiles of target columns. The source columns at the tile borders are converted
 // and filtered vertically twice (overlap of the horizontal kernel), the results are identical.
+// Tile width: the ring buffer should use at most half of the L2 cache. For very strong downsampling this would need
+// tiles narrower than MIN_L2_TILE_WIDTH, where the overlap gets expensive. Then the ring buffer gets half of the
+// L3 share of a thread instead (L3 / threads / 2), with tiles between MIN_TILE_WIDTH and MIN_L2_TILE_WIDTH.
+// Measured on i7-10700K, 40000x30591 -> 1478x1130, 8 threads: tile width 64: 867 ms, 24 (chosen): 376 ms.
 static bool SampleSlice_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
     CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, uint8* pTarget) {
 
@@ -1726,14 +1751,23 @@ static bool SampleSlice_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CS
     CAutoAVXFilter filterX(sourceSize.cx, fullTargetSize.cx, eFilter);
     const AVXFilterKernelBlock& kernelsX = filterX.Kernels();
 
-    const int MIN_TILE_WIDTH = 64;
-    int nRingLines = MaxFilterLen(kernelsY, fullTargetOffset.y, clippedTargetSize.cy);
+    const int MIN_L2_TILE_WIDTH = 64;
+    const int MIN_TILE_WIDTH = 8;
+    const CCacheSizes& cache = GetCacheSizes();
+    const size_t nBytesPerSourceColumn = (size_t)MaxFilterLen(kernelsY, fullTargetOffset.y, clippedTargetSize.cy) * 3 * sizeof(float);
+    const double dTargetPerSourceColumn = (double)fullTargetSize.cx / sourceSize.cx;
+    // widest tile (in target columns, multiple of 8) whose ring buffer fits into nBudget bytes
+    auto tileWidthFor = [&](size_t nBudget) {
+        return (int)((double)(nBudget / nBytesPerSourceColumn) * dTargetPerSourceColumn) & ~7;
+    };
     double dSourceColumns = (double)sourceSize.cx * clippedTargetSize.cx / fullTargetSize.cx;
-    int nMaxSourceColumns = AVX_RING_BUDGET_BYTES / (nRingLines * 3 * (int)sizeof(float));
     int nTileWidth = clippedTargetSize.cx;
-    if (dSourceColumns > nMaxSourceColumns) {
-        nTileWidth = (int)(nMaxSourceColumns * (double)fullTargetSize.cx / sourceSize.cx) & ~7;
-        nTileWidth = std::max(MIN_TILE_WIDTH, nTileWidth);
+    if (dSourceColumns * nBytesPerSourceColumn > cache.nL2 / 2) {
+        nTileWidth = tileWidthFor(cache.nL2 / 2);
+        if (nTileWidth < MIN_L2_TILE_WIDTH) {
+            const int nThreads = std::max(1, CProcessingThreadPool::This().NumberOfThreads());
+            nTileWidth = std::clamp(tileWidthFor(cache.nL3 / nThreads / 2), MIN_TILE_WIDTH, MIN_L2_TILE_WIDTH);
+        }
     }
 
     for (int nTileStart = 0; nTileStart < clippedTargetSize.cx; nTileStart += nTileWidth) {
