@@ -72,7 +72,6 @@ qt_add_executable(mkImageViewer
     src/BaseImage.h src/BaseImage.cpp
     src/ImageProvider.h src/ImageProvider.cpp
     src/KeyMap.h src/KeyMap.cpp
-    src/LocalDensityCorr.h src/LocalDensityCorr.cpp
     src/MainDlg.h src/MainDlg.cpp
     src/MultiMonitorSupport.h src/MultiMonitorSupport.cpp
     src/ProcessingThreadPool.h src/ProcessingThreadPool.cpp

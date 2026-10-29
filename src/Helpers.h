@@ -184,20 +184,12 @@ namespace Helpers {
         return (value + padvalue - 1) & ~(padvalue - 1);
     }
 
-    // calculate CRC table for a CRC check
-    void CalcCRCTable(unsigned int crc_table[256]);
-
     // Finds a JPEG marker (beginning with 0xFF) in a JPEG stream. 
     // To find the first non-marker block, set nMarker to zero.
     const void* FindJPEGMarker(const void* pJPEGStream, int nStreamLength, unsigned char nMarker);
 
     // Finds the EXIF block in the JPEG bytes stream, NULL if no EXIF block
     void* FindEXIFBlock(void* pJPEGStream, int nStreamLength);
-
-    // Calculates a hash value over the given JPEG stream having the given length (in bytes).
-    // All blocks and tables in the JPEG stream are not included into the hash to allow
-    // e.g. commenting the JPEG or changing some EXIF information without changing the hash.
-    int64_t CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength);
 
     // try to convert a string from UTF-8. Returns empty string if no valid UTF-8 encoded string.
     QString TryConvertFromUTF8(const uint8_t* pComment, int nLengthInBytes);

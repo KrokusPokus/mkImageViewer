@@ -73,20 +73,6 @@ namespace Helpers {
         return QSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
     }
 
-    // calculate CRT table
-    void CalcCRCTable(unsigned int crc_table[256]) {
-         for (int n = 0; n < 256; n++) {
-           unsigned int c = (unsigned int) n;
-           for (int k = 0; k < 8; k++) {
-             if (c & 1)
-               c = 0xedb88320L ^ (c >> 1);
-             else
-               c = c >> 1;
-           }
-           crc_table[n] = c;
-         }
-    }
-
     const void* FindJPEGMarker(const void* pJPEGStream, int nStreamLength, unsigned char nMarker) {
         const uint8_t* pStream = static_cast<const uint8_t*>(pJPEGStream);
         if (pStream == nullptr || nStreamLength < 3 || pStream[0] != 0xFF || pStream[1] != 0xD8) {
@@ -129,40 +115,6 @@ namespace Helpers {
         }
         return pEXIFBlock;
     }
-
-    int64_t CalculateJPEGFileHash(void* pJPEGStream, int nStreamLength) {
-        uint8* pStream = (uint8*) pJPEGStream;
-        const void* pPixelStart = FindJPEGMarker(pJPEGStream, nStreamLength, 0);
-        if (pPixelStart == NULL) {
-            return 0;
-        }
-        int nIndex = (int)((uint8*)pPixelStart - (uint8*)pJPEGStream + 1);
-        
-        // take whole stream in case of inconsistency or if remaining part is too small
-        if (nStreamLength - nIndex < 4) {
-            nIndex = 0;
-            assert(false);
-        }
-
-        // now we can calculate the hash over the compressed pixel data
-        // do not look at every byte due to performance reasons
-        const int nTotalLookups = 10000;
-        int nIncrement = (nStreamLength - nIndex)/nTotalLookups;
-        nIncrement = std::max(1, nIncrement);
-
-        unsigned int crc_table[256];
-        CalcCRCTable(crc_table);
-        uint32 crcValue = 0xffffffff;
-        unsigned int sumValue = 0;
-        while (nIndex < nStreamLength) {
-            sumValue += pStream[nIndex];
-            crcValue = crc_table[(crcValue ^ pStream[nIndex]) & 0xff] ^ (crcValue >> 8);
-            nIndex += nIncrement;
-        }
-
-        return ((int64_t)crcValue << 32) + sumValue;
-    }
-
 
 // Versucht streng als validen UTF-8-String zu dekodieren (entspricht TryConvertFromUTF8)
 QString TryConvertFromUTF8(const uint8_t* pComment, int nLengthInBytes) {

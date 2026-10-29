@@ -6,7 +6,6 @@
 #include <QString>
 
 class CHistogram;
-class CLocalDensityCorr;
 class CEXIFReader;
 
 // Represents a rectangle to dim out in the image
@@ -25,17 +24,13 @@ public:
     // nChannels can be 1 (greyscale image), 3 (BGR color image) or 4 (BGRA color image, A ignored)
     // pEXIFData can be a pointer to the APP1 block containing the EXIF data. If this pointer is null
     // no EXIF data is available.
-    // The nJPEGHash hash value gives a hash over the compressed JPEG pixels that uniquely identifies the
-    // JPEG image. It can be zero in which case a pixel based hash value is internally created.
     // The image format is a hint about the original image format this image was created from.
     // The bIsAnimation, nFrameIndex, nNumberOfFrames and nFrameTimeMs are used for multiframe images, e.g. animated GIFs.
     // Frame index is zero based and the frame time is given in milliseconds.
-    // The pLDC object is used internally only for thumbnail image creation to avoid duplication. In all other situations,
-    // its value must be NULL.
     // If RAW metadata is specified, ownership of this memory is transferred to this class.
 
     CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
-        int64_t nJPEGHash, EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs, bool bInArchive);
+        EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs, bool bInArchive);
 
     ~CBaseImage(void);
 
@@ -45,7 +40,7 @@ public:
     // clippingSize: Sub-rectangle in fullTargetSize to render (the returned DIB has this size)
     // targetOffset: Offset of the clipping rectangle in full target size
     // imageProcParams: Processing parameters, such as contrast and brightness
-    // eProcFlags: Processing flags, e.g. apply LDC
+    // eProcFlags: Processing flags, e.g. high quality resampling, auto contrast
     // Return value:
     // The returned DIB is a 32 bpp DIB (BGRA). Note that the returned pointer must not
     // be deleted by the caller and is only valid until another call to GetDIB() is done, the CBaseImage
@@ -68,9 +63,6 @@ public:
     // Rotate the image clockwise by 90, 180 or 270 degrees. All other angles are invalid.
     // Applies to original pixels!
     bool Rotate(int nRotation);
-
-    // Gets the hash value of the pixels, for JPEGs the hash is on the compressed pixels
-    int64_t GetPixelHash() const { return m_nPixelHash; }
 
     // Original image size. Operations on the original pixels will change this size!
     int OrigWidth() const { return m_nOrigWidth; }
@@ -221,7 +213,6 @@ private:
     int m_nOrigWidth, m_nOrigHeight; // these may changes by rotation
     int m_nInitOrigWidth, m_nInitOrigHeight; // original width of image when constructed (before any rotation and crop)
     int m_nOriginalChannels;
-    int64_t m_nPixelHash;
     EImageFormat m_eImageFormat;
 
     // multiframe and GIF animation related data
@@ -231,12 +222,8 @@ private:
     int m_nNumberOfFrames;
     int m_nFrameTimeMs;
 
-    // Thumbnail related stuff
-    bool m_bIsThumbnailImage;
-    CHistogram* m_pCachedProcessedHistogram;
-
-    // Processed data of size m_ClippingSize, with LUT/LDC applied and without
-    // The version without LUT/LDC is used to efficiently reapply a different LUT/LDC
+    // Processed data of size m_ClippingSize, with LUT applied and without
+    // The version without LUT is used to efficiently reapply a different LUT
     // Size of the DIBs is m_ClippingSize
     void* m_pDIBPixelsLUTProcessed;
     void* m_pDIBPixels;
@@ -267,12 +254,11 @@ private:
     uint64_t m_dibLoadDelayMs;
     uint64_t m_fileLoadDelayMs;
 
-    // stuff needed to perform LUT and LDC processing
+    // stuff needed to perform LUT processing
     uint8* m_pLUTAllChannels; // for global contrast and brightness correction
     uint8* m_pLUTRGB; // B,G,R three channel LUT
     int32* m_pSaturationLUTs; // Saturation LUTs
-    CLocalDensityCorr* m_pLDC;
-    bool m_bLDCOwned;
+    CHistogram* m_pHistogram; // histogram of the original pixels, for the automatic correction
     float m_fColorCorrectionFactors[6];
     float m_fColorCorrectionFactorsNull[6];
 
@@ -295,15 +281,15 @@ private:
     // If bOnlyCheck is set to true, the method does nothing but only checks if the existing processed DIB
     // can be used (return != NULL) or not (return == NULL)
     // The out parameter bParametersChanged returns if one of the parameters relevant for image processing has been changed since the last call
-    void* ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
+    void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
         void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset,
         void * pSourceDIB, CSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged);
 
-    void* ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
+    void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
         void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset, 
         void * pSourceDIB, CSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB) {
         bool bNotUsed;
-        return ApplyCorrectionLUTandLDC(imageProcParams, eProcFlags, pCachedTargetDIB, fullTargetSize, targetOffset, 
+        return ApplyCorrectionLUT(imageProcParams, eProcFlags, pCachedTargetDIB, fullTargetSize, targetOffset, 
             pSourceDIB, dibSize, bOnlyCheck, bCanTakeOwnershipOfSourceDIB, bNotUsed);
     }
 

@@ -21,91 +21,48 @@ static int64_t CalculateSum(const int* pHistogram) {
 // CHistogram class
 ///////////////////////////////////////////////////////////////////////////////////
 
-CHistogram::CHistogram(const CBaseImage & image, bool bUseOrigPixels)
-    : m_ChannelR{ 0 },
-    m_ChannelG{ 0 },
-    m_ChannelB{ 0 },
-    m_ChannelGrey{ 0 }
-{
-    const int NUM_VALUES = 50000;
+CHistogram::CHistogram(const CBaseImage & image) {
+    // The sampling grid is the one of the former local density correction (LDC), which computed this histogram as
+    // a side product. Kept unchanged, so the automatic correction gives the same results as before.
+    const int NUM_VALUES = 120000;
 
-    m_nBMean = m_nGMean = m_nRMean = 0;
-    m_bUseOrigPixels = bUseOrigPixels;
-    m_fNightshot = -1.0f;
+    int channelR[256]{ 0 }, channelG[256]{ 0 }, channelB[256]{ 0 };
+    int channelGrey[256]{ 0 };
 
-    int nWidth, nHeight, nChannels;
-    const uint8* pSourcePixels;
-    if (bUseOrigPixels || image.DIBPixels() == NULL) {
-        nWidth = image.OrigWidth();
-        nHeight = image.OrigHeight();
-        nChannels = image.OriginalChannels();
-        pSourcePixels = (const uint8*)image.OriginalPixels();
-    } else {
-        nWidth = image.DIBWidth();
-        nHeight = image.DIBHeight();
-        nChannels = 4;
-        pSourcePixels = (const uint8*)image.DIBPixels();
-    }
-    
-    int64_t nNumPixels = (int64_t)nWidth * nHeight; // can exceed 2^31
-    int nGrid = (int) (0.5 + sqrt(1.0 + (double)(nNumPixels/NUM_VALUES)));
-    int nPixPerLine = std::max(1, nWidth / nGrid);
-    int nLines = std::max(1, nHeight / nGrid);
+    int nWidth = image.OrigWidth();
+    int nHeight = image.OrigHeight();
+    int nChannels = image.OriginalChannels();
+    const uint8* pSourcePixels = (const uint8*)image.OriginalPixels();
+
+    double dFactor = (double)nWidth/nHeight;
+    int nSamplesX = Helpers::DoPadding((int)(dFactor*sqrt(NUM_VALUES/dFactor)), 4);
+    int nSamplesY = Helpers::DoPadding((int)(nSamplesX/dFactor), 4);
+
+    uint32 nY = 0;
+    uint32 nIncX = (uint32)nWidth*65536/nSamplesX;
+    uint32 nIncY = (uint32)nHeight*65536/nSamplesY;
     int nLineSize = Helpers::DoPadding(nWidth * nChannels, 4);
-    for (int j = 0; j < nLines; j++) {
-        // 64 bit offset: images can have more than 2 GiB of pixel data
-        const uint8* pSrc = pSourcePixels + (size_t)nLineSize*j*nGrid;
-        if (nChannels == 3) {
-            for (int i = 0; i < nPixPerLine; i++) {
-                m_ChannelB[pSrc[0]]++; m_nBMean += pSrc[0];
-                m_ChannelG[pSrc[1]]++; m_nGMean += pSrc[1];
-                m_ChannelR[pSrc[2]]++; m_nRMean += pSrc[2];
-                m_ChannelGrey[(pSrc[0]*128 + pSrc[1]*640 + pSrc[2]*256) >> 10]++;
-                pSrc += nGrid*3;
-            }
-        } else {
-            for (int i = 0; i < nPixPerLine; i++) {
-                m_ChannelB[pSrc[0]]++; m_nBMean += pSrc[0];
-                m_ChannelG[pSrc[1]]++; m_nGMean += pSrc[1];
-                m_ChannelR[pSrc[2]]++; m_nRMean += pSrc[2];
-                m_ChannelGrey[(pSrc[0]*128 + pSrc[1]*640 + pSrc[2]*256) >> 10]++;
-                pSrc += nGrid*4;
-            }
+
+    for (int j = 0; j < nSamplesY; j++) {
+        uint32 nX = 0;
+        // 64 bit offset: images can have more than 4 GiB of pixel data
+        const uint8* pSrcStart = pSourcePixels + (size_t)nLineSize*(nY >> 16);
+        for (int i = 0; i < nSamplesX; i++) {
+            const uint8* pSrc = (nChannels == 3) ? pSrcStart + (nX >> 16)*3 : pSrcStart + (nX >> 16)*4;
+            channelB[pSrc[0]]++;
+            channelG[pSrc[1]]++;
+            channelR[pSrc[2]]++;
+            channelGrey[(pSrc[0]*128 + pSrc[1]*640 + pSrc[2]*256) >> 10]++;
+            nX += nIncX;
         }
+        nY += nIncY;
     }
-    m_nTotalValues = nPixPerLine*nLines;
-    m_nBMean /= m_nTotalValues;
-    m_nGMean /= m_nTotalValues;
-    m_nRMean /= m_nTotalValues;
+
+    Init(channelB, channelG, channelR, channelGrey);
 }
 
-CHistogram::CHistogram(const void* pPixels, const CSize& size)
-    : m_ChannelR{ 0 },
-    m_ChannelG{ 0 },
-    m_ChannelB{ 0 },
-    m_ChannelGrey{ 0 }
-{
-    m_nBMean = m_nGMean = m_nRMean = 0;
-    m_fNightshot = -1.0f;
-
-    const uint8* pDIBPixels = (const uint8*) pPixels;
-    int nNumPixels = size.cx * size.cy;
-    for (int j = 0; j < nNumPixels; j++) {
-        m_ChannelB[pDIBPixels[0]]++; m_nBMean += pDIBPixels[0];
-        m_ChannelG[pDIBPixels[1]]++; m_nGMean += pDIBPixels[1];
-        m_ChannelR[pDIBPixels[2]]++; m_nRMean += pDIBPixels[2];
-        m_ChannelGrey[(pDIBPixels[0]*128 + pDIBPixels[1]*640 + pDIBPixels[2]*256) >> 10]++;
-        pDIBPixels += 4;
-    }
-    m_nTotalValues = nNumPixels;
-    m_nBMean /= nNumPixels;
-    m_nGMean /= nNumPixels;
-    m_nRMean /= nNumPixels;
-}
-
-CHistogram::CHistogram(const int* pChannelB, const int* pChannelG, const int* pChannelR, const int* pChannelGrey) {
+void CHistogram::Init(const int* pChannelB, const int* pChannelG, const int* pChannelR, const int* pChannelGrey) {
     m_nTotalValues = 0;
-    m_fNightshot = -1.0f;
     for (int i = 0; i < 256; i++) {
         m_nTotalValues += pChannelGrey[i];
     }
@@ -116,7 +73,6 @@ CHistogram::CHistogram(const int* pChannelB, const int* pChannelG, const int* pC
     memcpy(m_ChannelG, pChannelG, sizeof(int)*256);
     memcpy(m_ChannelR, pChannelR, sizeof(int)*256);
     memcpy(m_ChannelGrey, pChannelGrey, sizeof(int)*256);
-    m_bUseOrigPixels = true;
 }
 
 // Gets relative area of a part of the histogram, 1.0 is full histogram area

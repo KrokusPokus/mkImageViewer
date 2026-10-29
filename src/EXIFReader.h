@@ -92,8 +92,6 @@ public:
     int GetImageOrientation() const { return m_nImageOrientation; }
     bool ImageOrientationPresent() const { return m_nImageOrientation > 0; }
 
-    bool HasJPEGCompressedThumbnail() const { return m_bHasJPEGCompressedThumbnail; }
-    int GetJPEGThumbStreamLen() const { return m_nJPEGThumbStreamLen; }
     int GetThumbnailWidth() const { return m_nThumbWidth; }
     int GetThumbnailHeight() const { return m_nThumbHeight; }
 
@@ -120,10 +118,8 @@ private:
     double m_dFNumber;
     int m_nISOSpeed;
     int m_nImageOrientation;
-    bool m_bHasJPEGCompressedThumbnail;
     int m_nThumbWidth;
     int m_nThumbHeight;
-    int m_nJPEGThumbStreamLen;
     GPSCoordinate* m_pLatitude;
     GPSCoordinate* m_pLongitude;
     double m_dAltitude;

@@ -57,10 +57,6 @@ static void* SampleUp_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOff
     CSize sourceSize, const void* pIJLPixels, int nChannels, bool bSSE,
     uint8* pTarget);
 
-static void* ApplyLDC32bpp_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize dibSize,
-    CSize ldcMapSize, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap,
-    float fBlackPt, float fWhitePt, float fBlackPtSteepness, uint32* pTarget);
-
 //---------------------------------------------------------------------------------------------
 
 // Sets FTZ (flush to zero) and DAZ (denormals are zero) for the current thread while in scope and restores
@@ -127,42 +123,6 @@ public:
     int Channels;
     EFilterType Filter;
     CBasicProcessing::SIMDArchitecture SIMD;
-};
-
-class CRequestLDC : public CProcessingRequest {
-public:
-    CRequestLDC(const void* pSourcePixels, CSize sourceSize, void* pTargetPixels,
-        CSize fullTargetSize, CPoint fullTargetOffset,
-        CSize ldcMapSize, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap,
-        float fBlackPt, float fWhitePt, float fBlackPtSteepness)
-        : CProcessingRequest(pSourcePixels, sourceSize, pTargetPixels, fullTargetSize, fullTargetOffset, sourceSize) {
-        LDCMapSize = ldcMapSize;
-        SatLUTs = pSatLUTs;
-        LUT = pLUT;
-        LDCMap = pLDCMap;
-        BlackPt = fBlackPt;
-        WhitePt = fWhitePt;
-        BlackPtSteepness = fBlackPtSteepness;
-    }
-
-    virtual bool ProcessStrip(int offsetY, int sizeY) {
-        return NULL != ApplyLDC32bpp_Core(FullTargetSize,
-            CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
-            CSize(ClippedTargetSize.cx, sizeY),
-            LDCMapSize,
-            (const uint32*)SourcePixels + ClippedTargetSize.cx * offsetY,
-            SatLUTs, LUT, LDCMap,
-            BlackPt, WhitePt, BlackPtSteepness,
-            (uint32*)TargetPixels + ClippedTargetSize.cx * offsetY);
-    }
-
-    CSize LDCMapSize;
-    const int32* SatLUTs;
-    const uint8* LUT;
-    const uint8* LDCMap;
-    float BlackPt;
-    float WhitePt;
-    float BlackPtSteepness;
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -279,129 +239,6 @@ void* CBasicProcessing::ApplySaturationAnd3ChannelLUT32bpp(int nWidth, int nHeig
             pTgt++; pSrc++;
         }
     }
-    return pTarget;
-}
-
-// Create the LDC response LUT between black and white points. This LUT makes sure
-// that neither black nor white point is altered by the LDC.
-static int32* CreateMulLUT(float fBlackPt, float fWhitePt, float fBlackPtSteepness) {
-    const float cfFactor = 0.8f; // multiplication factor -> Strength of LDC
-    const float cfSteepnessBlack = 0.6f; // how fast is the full strength reached after black pt
-    const float cfSteepnessWhite = 0.6f; // how fast is the full strength reached after white pt
-
-    int32* pNewLUT = new int32[256];
-    if (fWhitePt <= fBlackPt) {
-        memset(pNewLUT, 0, 256*sizeof(int32));
-        return pNewLUT;
-    }
-    fBlackPtSteepness = std::max(0.0f, std::min(1.0f, (1.0f - 0.98f*fBlackPtSteepness)));
-    float fMid = (fBlackPt + fWhitePt)/2;
-    float fEndSlopeB = fBlackPt +cfSteepnessBlack*(fMid - fBlackPt);
-    float fEndSlopeW = fWhitePt - cfSteepnessWhite*(fWhitePt - fMid);
-    for (int i = 0; i < 256; i++) {
-        int nLUTValue;
-        float f = i*(1.0f/255.0f);
-        if (f < fBlackPt) {
-            nLUTValue = 0;
-        } else if (f >= fWhitePt) {
-            nLUTValue = 0;
-        } else {
-            if (f < fEndSlopeB) {
-                float fValue = (f - fBlackPt)/(fEndSlopeB - fBlackPt);
-                nLUTValue = (int)(cfFactor*16384*powf(fValue, fBlackPtSteepness) + 0.5f);
-            } else if (f > fEndSlopeW) {
-                nLUTValue = (int)(cfFactor*16384*(1.0f - (f - fEndSlopeW)/(fWhitePt - fEndSlopeW)) + 0.5f);
-            } else {
-                nLUTValue = (int)(cfFactor*16384 + 0.5f);
-            }
-        }
-        pNewLUT[i] = (int32)nLUTValue;
-    }
-    return pNewLUT;
-}
-
-void* ApplyLDC32bpp_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize dibSize,
-                                      CSize ldcMapSize, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap,
-                                      float fBlackPt, float fWhitePt, float fBlackPtSteepness, uint32* pTarget) {
-
-    uint32 nIncrementX, nIncrementY;
-    nIncrementX = (ldcMapSize.cx == 1) ? 0 : (uint32)((65536*(uint32)(ldcMapSize.cx - 1))/(fullTargetSize.cx - 1) - 1);
-    nIncrementY = (ldcMapSize.cy == 1) ? 0 : (uint32)((65536*(uint32)(ldcMapSize.cy - 1))/(fullTargetSize.cy - 1) - 1);
-
-    uint32 nCurY = fullTargetOffset.y*nIncrementY;
-    uint32 nStartX = fullTargetOffset.x*nIncrementX;
-
-    const int cnScaler = 1 << 16;
-    const int cnMax = 255 * cnScaler;
-    const int32* pMulLUT = CreateMulLUT(fBlackPt, fWhitePt, fBlackPtSteepness);
-    const uint32* pSrc = (uint32*)pDIBPixels;
-    uint32* pTgt = pTarget;
-    for (int j = 0; j < dibSize.cy; j++) {
-        uint32 nCurYTrunc = nCurY >> 16;
-        uint32 nCurYFrac = nCurY & 0xFFFF;
-        const uint8* pLDCMapSrc = pLDCMap + ldcMapSize.cx * nCurYTrunc;
-        uint32 nCurX = nStartX;
-        if (pSatLUTs == NULL) {
-            for (int i = 0; i < dibSize.cx; i++) {
-                // perform bilinear interpolation of mask
-                uint32 nCurXTrunc = nCurX >> 16;
-                uint32 nCurXFrac = nCurX & 0xFFFF;
-                uint32 nMaskTopLeft  = pLDCMapSrc[nCurXTrunc];
-                uint32 nMaskTopRight = pLDCMapSrc[nCurXTrunc + 1];
-                uint32 nMaskBottomLeft = pLDCMapSrc[nCurXTrunc + ldcMapSize.cx];
-                uint32 nMaskBottomRight = pLDCMapSrc[nCurXTrunc + ldcMapSize.cx + 1];
-                uint32 nLeft = ((int)nCurYFrac*(int)(nMaskBottomLeft - nMaskTopLeft) >> 16) + nMaskTopLeft;
-                uint32 nRight = ((int)nCurYFrac*(int)(nMaskBottomRight - nMaskTopRight) >> 16) + nMaskTopRight;
-                int32 nMaskValue = ((int)nCurXFrac*(int)(nRight - nLeft) >> 16) + nLeft - 127;
-
-                uint32 nSrcPixels = *pSrc;
-                uint32 nBlue = pLUT[nSrcPixels & 0xFF];
-                nBlue = nBlue + (nMaskValue*pMulLUT[nBlue] >> 14);
-                uint32 nGreen = pLUT[((nSrcPixels >> 8) & 0xFF) + 256];
-                nGreen = nGreen + (nMaskValue*pMulLUT[nGreen] >> 14);
-                uint32 nRed = pLUT[((nSrcPixels >> 16) & 0xFF) + 512];
-                nRed = nRed + (nMaskValue*pMulLUT[nRed] >> 14);
-
-                *pTgt = std::max(0, std::min(255, (int)nBlue)) + std::max(0, std::min(255, (int)nGreen))*256 + std::max(0, std::min(255, (int)nRed))*65536 + ALPHA_OPAQUE;
-                pTgt++; pSrc++;
-                nCurX += nIncrementX;
-            }
-        } else {
-            for (int i = 0; i < dibSize.cx; i++) {
-                // perform bilinear interpolation of mask
-                uint32 nCurXTrunc = nCurX >> 16;
-                uint32 nCurXFrac = nCurX & 0xFFFF;
-                uint32 nMaskTopLeft  = pLDCMapSrc[nCurXTrunc];
-                uint32 nMaskTopRight = pLDCMapSrc[nCurXTrunc + 1];
-                uint32 nMaskBottomLeft = pLDCMapSrc[nCurXTrunc + ldcMapSize.cx];
-                uint32 nMaskBottomRight = pLDCMapSrc[nCurXTrunc + ldcMapSize.cx + 1];
-                uint32 nLeft = ((int)nCurYFrac*(int)(nMaskBottomLeft - nMaskTopLeft) >> 16) + nMaskTopLeft;
-                uint32 nRight = ((int)nCurYFrac*(int)(nMaskBottomRight - nMaskTopRight) >> 16) + nMaskTopRight;
-                int32 nMaskValue = ((int)nCurXFrac*(int)(nRight - nLeft) >> 16) + nLeft - 127;
-
-                // Apply saturation LUTs and three channel LUT
-                uint32 nSrcPixels = *pSrc;
-                int32 nSrcBlue = nSrcPixels & 0xFF;
-                int32 nSrcGreen = (nSrcPixels >> 8) & 0xFF;
-                int32 nSrcRed = (nSrcPixels >> 16) & 0xFF;
-                int32 nRed = pSatLUTs[nSrcRed] + pSatLUTs[256 + nSrcGreen] + pSatLUTs[512 + nSrcBlue];
-                int32 nGreen = pSatLUTs[768 + nSrcRed] + pSatLUTs[1024 + nSrcGreen] + pSatLUTs[512 + nSrcBlue];
-                int32 nBlue = pSatLUTs[768 + nSrcRed] + pSatLUTs[256 + nSrcGreen] + pSatLUTs[1280 + nSrcBlue];
-                nBlue = pLUT[std::max(0, std::min(cnMax, nBlue)) >> 16];
-                nBlue = nBlue + (nMaskValue*pMulLUT[nBlue] >> 14);
-                nGreen = pLUT[(std::max(0, std::min(cnMax, nGreen)) >> 16) + 256];
-                nGreen = nGreen + (nMaskValue*pMulLUT[nGreen] >> 14);
-                nRed = pLUT[(std::max(0, std::min(cnMax, nRed)) >> 16) + 512];
-                nRed = nRed + (nMaskValue*pMulLUT[nRed] >> 14);
-
-                *pTgt = std::max(0, std::min(255, (int)nBlue)) + std::max(0, std::min(255, (int)nGreen))*256 + std::max(0, std::min(255, (int)nRed))*65536 + ALPHA_OPAQUE;
-                pTgt++; pSrc++;
-                nCurX += nIncrementX;
-            }
-        }
-        nCurY += nIncrementY;
-    }
-    delete[] pMulLUT;
     return pTarget;
 }
 

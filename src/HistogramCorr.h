@@ -9,14 +9,8 @@ class CBaseImage;
 // Histogram (R,G,B,Grey) of an image
 class CHistogram {
 public:
-    // If bUseOrigPixels is set to true, the original pixels (uncropped and not resized) are used.
-    // If bUseOrigPixels is set to false, the cropped and resized subrectangle is used.
-    CHistogram(const CBaseImage & image, bool bUseOrigPixels);
-    // Create histogram of 32 bpp DIB
-    CHistogram(const void* pPixels, const CSize& size);
-    // Creating histogram with already known channel histograms. The histogram channels are copied and must
-    // contain 256 entries each.
-    CHistogram(const int* pChannelB, const int* pChannelG, const int* pChannelR, const int* pChannelGrey);
+    // Histogram of the original pixels of the image, from a grid of about 120000 point samples
+    explicit CHistogram(const CBaseImage & image);
 
     // Gets the number of pixels used to build the histogram
     int GetTotalValues() const { return m_nTotalValues; }
@@ -39,9 +33,9 @@ private:
     int m_ChannelB[256];
     int m_ChannelGrey[256];
     int m_nRMean, m_nGMean, m_nBMean;
-    bool m_bUseOrigPixels;
 
-    float m_fNightshot;
+    // Takes over the channel histograms (256 entries each) and calculates the totals and mean values
+    void Init(const int* pChannelB, const int* pChannelG, const int* pChannelR, const int* pChannelGrey);
 };
 
 // Automatic contrast correction by histogram analysis

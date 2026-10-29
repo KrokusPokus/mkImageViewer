@@ -237,8 +237,6 @@ CEXIFReader::CEXIFReader(void* pApp1Block, EImageFormat eImageFormat)
     m_pLastIFD0 = nullptr;
     m_pIFD1 = nullptr;
     m_pLastIFD1 = nullptr;
-    m_bHasJPEGCompressedThumbnail = false;
-    m_nJPEGThumbStreamLen = 0;
     m_pLatitude = nullptr;
     m_pLongitude = nullptr;
     m_dAltitude = UNKNOWN_DOUBLE_VALUE;
@@ -396,8 +394,6 @@ CEXIFReader::CEXIFReader(void* pApp1Block, EImageFormat eImageFormat)
                 if (pSOF != nullptr) {
                     m_nThumbWidth = pSOF[7] * 256 + pSOF[8];
                     m_nThumbHeight = pSOF[5] * 256 + pSOF[6];
-                    m_nJPEGThumbStreamLen = nJPEGBytes;
-                    m_bHasJPEGCompressedThumbnail = true;
                 }
             }
         } else {

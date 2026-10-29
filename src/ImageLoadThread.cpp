@@ -425,7 +425,7 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     if (bHasAlphaChannel) {
         Helpers::BlendAlpha(reinterpret_cast<uint32*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
     }
-    CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat,
+    CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, frame.eFormat,
                                             frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs, frame.bInArchive);
     pDIB.release(); // owned by the CBaseImage now
     pJPEGImage->SetArchiveFileName(frame.sArchiveFileName);
@@ -705,23 +705,21 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
         Helpers::BlendAlpha(reinterpret_cast<uint32*>(d.pixels.get()), d.nWidth, d.nHeight, eTransparency);
     }
 
-    // JPEG: the EXIF block is part of the file data (CBaseImage copies it) and the hash identifies the file
+    // JPEG: the EXIF block is part of the file data (CBaseImage copies it)
     void* pEXIF = d.pExif;
-    int64_t nHash = 0;
     if (eFormat == IF_JPEG) {
         pEXIF = Helpers::FindEXIFBlock(in.pData, static_cast<int>(in.nSize));
-        nHash = Helpers::CalculateJPEGFileHash(in.pData, static_cast<int>(in.nSize));
     }
 
     std::unique_ptr<CBaseImage> pImage;
     if (target.bInArchive) {
         // For an entry of an archive "the frame" is the entry
-        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
+        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, eFormat,
                                     target.bMultipleFiles, target.nEntryIndex, target.nArchiveCount, kMangaFrameTimeMs, target.bInArchive));
         pImage->SetArchiveFileName(target.sArchiveFileName);
         pImage->SetArchiveFileSize(target.nArchiveFileSize);
     } else {
-        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
+        pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, eFormat,
                                     d.bHasAnimation, d.nFrameIndex, d.nFrameCount, d.nFrameTimeMs, target.bInArchive));
     }
     d.pixels.release(); // owned by the CBaseImage now
