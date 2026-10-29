@@ -259,8 +259,6 @@ private:
     uint8* m_pLUTRGB; // B,G,R three channel LUT
     int32* m_pSaturationLUTs; // Saturation LUTs
     CHistogram* m_pHistogram; // histogram of the original pixels, for the automatic correction
-    float m_fColorCorrectionFactors[6];
-    float m_fColorCorrectionFactorsNull[6];
 
     // Internal GetDIB() implementation with (low quality) rotation with GetDIB().
     // bUsingOriginalDIB is output parameter and contains if the cached DIB could be used and no processing has been done

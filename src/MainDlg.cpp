@@ -120,13 +120,12 @@ namespace {
             sp.Contrast(),
             sp.Gamma(),
             sp.Saturation(),
-            0.0, // ColorCorrectionFactor
             0.5); // ContrastCorrectionFactor
     }
 
     // Gets hardcoded processing parameters, turning off all processing
     CImageProcessingParams GetNoProcessingParams() {
-        return CImageProcessingParams(0.0, 1.0, 1.0, 0.0, 0.5);
+        return CImageProcessingParams(0.0, 1.0, 1.0, 0.5);
     }
 
     // Gets default image processing flags as set in INI file
@@ -1995,14 +1994,6 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             if (m_bAutoContrast) {
                 double dInc = (inv.id == Command::ContrastCorrectionInc) ? 0.05 : -0.05;
                 m_pImageProcParams->ContrastCorrectionFactor = std::max(0.0, std::min(1.0, m_pImageProcParams->ContrastCorrectionFactor + dInc));
-                this->update();
-            }
-            break;
-        case Command::ColorCorrectionInc:
-        case Command::ColorCorrectionDec:
-            if (m_bAutoContrast) {
-                double dInc = (inv.id == Command::ColorCorrectionInc) ? 0.05 : -0.05;
-                m_pImageProcParams->ColorCorrectionFactor = std::max(-0.5, std::min(0.5, m_pImageProcParams->ColorCorrectionFactor + dInc));
                 this->update();
             }
             break;

@@ -48,12 +48,11 @@ public:
     // strength of brightness correction in 0 .. 1
     static void SetBrightnessCorrectionStrength(float fStrength) { sm_BrightnessCorrStrength = fStrength; }
 
-    // Calculate a three channel correction LUT for color and contrast correction given a histogram
-    // In fColorCastCorrection the order is C/R, M/G, Y/B
+    // Calculate a three channel correction LUT for contrast and brightness correction given a histogram
+    // (black and white point per channel, no color cast correction)
     // The returned LUT contains 3 * 256 entries, BBBB...GGGG...RRRR... format
-    static uint8* CalculateCorrectionLUT(const CHistogram & histogram, float fColorCorrectionFactor,
-        float fBrightnessCorrectionFactor,
-        const float fColorCorrectionStrength[6], float fContrastCorrectionFactor);
+    static uint8* CalculateCorrectionLUT(const CHistogram & histogram,
+        float fBrightnessCorrectionFactor, float fContrastCorrectionFactor);
 
     // Combine the given two LUTs into a three channel LUT. Result(value) = 3CLUT(1CLUT(value))
     // If both LUTs are NULL, an identity LUT is returned.
@@ -62,8 +61,6 @@ public:
 
 private:
     CHistogramCorr(void);
-
-    static float CalcColorCastCorr(int nChannel, float fCast, const float fColorCorrectionStrength[6]);
 
     static float sm_ContrastCorrectionStrength;
     static float sm_BrightnessCorrStrength;

@@ -155,8 +155,6 @@ constexpr std::array<CommandInfo, kCommandCount> kTable = {{
     make(Command::KeepParameters,        "KeepParameters",        Category::View, CMD_TR("Keep parameters between images")).legacy("IDM_KEEP_PARAMETERS"),
     make(Command::ContrastCorrectionInc, "ContrastCorrectionInc", Category::View, CMD_TR("Increase contrast correction")).legacy("IDM_CONTRAST_CORRECTION_INC"),
     make(Command::ContrastCorrectionDec, "ContrastCorrectionDec", Category::View, CMD_TR("Decrease contrast correction")).legacy("IDM_CONTRAST_CORRECTION_DEC"),
-    make(Command::ColorCorrectionInc,    "ColorCorrectionInc",    Category::View, CMD_TR("Increase color correction")).legacy("IDM_COLOR_CORRECTION_INC"),
-    make(Command::ColorCorrectionDec,    "ColorCorrectionDec",    Category::View, CMD_TR("Decrease color correction")).legacy("IDM_COLOR_CORRECTION_DEC"),
     make(Command::ToggleTransparency,    "ToggleTransparency",    Category::View, CMD_TR("Toggle transparency mode")).legacy("IDM_TOGGLE_TRANSPARENCY"),
     make(Command::ToggleEmbeddedColorProfiles, "ToggleEmbeddedColorProfiles", Category::View, CMD_TR("Toggle embedded color profiles")).legacy("IDM_TOGGLE_USE_EMBEDDED_COLOR_PROFILES"),
     make(Command::ToggleResamplingQuality,     "ToggleResamplingQuality",     Category::View, CMD_TR("Toggle resampling quality")).legacy("IDM_TOGGLE_RESAMPLING_QUALITY"),

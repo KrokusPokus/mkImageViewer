@@ -58,7 +58,6 @@ static CBasicProcessing::SIMDArchitecture ToSIMDArchitecture(Helpers::CPUType cp
 CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
                     EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs, bool bInArchive)
     : m_rotationParams{ 0 },
-    m_fColorCorrectionFactorsNull{ 0 },
     m_bInArchive(bInArchive)
 {
     if (nChannels == 3 || nChannels == 4) {
@@ -124,11 +123,7 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_TargetOffset = CPoint(0, 0);
 
     // Histogram of the original pixels for the automatic correction (computed here, i.e. in the load thread)
-    m_pHistogram = new CHistogram(*this);
-
-    // Initialize to INI value
-    memcpy(m_fColorCorrectionFactors, CSettingsProvider::This().ColorCorrectionAmounts(), sizeof(m_fColorCorrectionFactors));
-}
+    m_pHistogram = new CHistogram(*this);}
 
 CBaseImage::~CBaseImage(void) {
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
@@ -486,8 +481,7 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
     bool bNoLUTsApplied = bNoContrastAndGammaLUT && !bAutoContrast && !bMustUseSaturationLUTs;
     bool bContrastOrGammaChanged = fabs(imageProcParams.Contrast - m_imageProcParams.Contrast) > 1e-4 ||
         fabs(imageProcParams.Gamma - m_imageProcParams.Gamma) > 1e-4;
-    bool bCorrectionFactorChanged = fabs(imageProcParams.ColorCorrectionFactor-m_imageProcParams.ColorCorrectionFactor) > 1e-4 || 
-        fabs(imageProcParams.ContrastCorrectionFactor-m_imageProcParams.ContrastCorrectionFactor) > 1e-4;
+    bool bCorrectionFactorChanged = fabs(imageProcParams.ContrastCorrectionFactor-m_imageProcParams.ContrastCorrectionFactor) > 1e-4;
     bool bSaturationChanged = fabs(imageProcParams.Saturation - m_imageProcParams.Saturation) > 1e-4;
     bool bMustReapplyLUTs = bAutoContrast != bAutoContrastOld
                         || bCorrectionFactorChanged
@@ -531,11 +525,9 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
     
     if (bMustUse3ChannelLUT && (m_pLUTRGB == NULL || bCorrectionFactorChanged || bAutoContrast != bAutoContrastOld)) {
         delete[] m_pLUTRGB;
-        float fColorCorrFactor = bAutoContrast ? (float) imageProcParams.ColorCorrectionFactor : 0.0f;
         float fBrightnessCorrFactor = bAutoContrast ? 1.0f : 0.0f;
         float fContrastCorrFactor = bAutoContrast ? (float) imageProcParams.ContrastCorrectionFactor : 0.0f;
-        m_pLUTRGB = CHistogramCorr::CalculateCorrectionLUT(*pHistogram, fColorCorrFactor, fBrightnessCorrFactor,
-            bAutoContrast ? m_fColorCorrectionFactors : m_fColorCorrectionFactorsNull, fContrastCorrFactor);
+        m_pLUTRGB = CHistogramCorr::CalculateCorrectionLUT(*pHistogram, fBrightnessCorrFactor, fContrastCorrFactor);
     } else if (!bMustUse3ChannelLUT) {
         delete[] m_pLUTRGB;
         m_pLUTRGB = NULL;

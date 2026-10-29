@@ -87,8 +87,6 @@ enum class Command : std::uint16_t {
     KeepParameters,
     ContrastCorrectionInc,
     ContrastCorrectionDec,
-    ColorCorrectionInc,
-    ColorCorrectionDec,
     ToggleTransparency,
     ToggleEmbeddedColorProfiles,
     ToggleResamplingQuality,

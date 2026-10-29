@@ -37,8 +37,6 @@
 
 namespace {
 
-    constexpr float COLOR_CORR_DEFAULT_FACTORS[6] = {0.2f, 0.1f, 0.3f, 0.3f, 0.3f, 0.15f};
-
     // Scrollbereich um jeden Tab legen für kleine Bildschirmauflösungen
     QWidget* makeScrollable(QWidget* content) {
         QScrollArea* area = new QScrollArea();
@@ -433,10 +431,6 @@ QWidget* SettingsDialog::createCorrectionTab() {
     m_spinAutoBrightnessAmount->setSingleStep(0.05);
     layout->addRow(tr("Auto-Helligkeit Stärke:"), m_spinAutoBrightnessAmount);
 
-    m_editColorCorrection = new QLineEdit();
-    m_editColorCorrection->setToolTip(tr("Format: R: 0.2 G: 0.1 B: 0.35 C: 0.1 M: 0.3 Y: 0.15"));
-    layout->addRow(tr("Farbkanalkorrektur:"), m_editColorCorrection);
-
     return makeScrollable(panel);
 }
 
@@ -532,18 +526,6 @@ void SettingsDialog::loadFromSettings() {
     m_spinAutoContrastAmount->setValue(settings.m_dAutoContrastAmount);
     m_spinAutoBrightnessAmount->setValue(settings.m_dAutoBrightnessAmount);
 
-    if (settings.m_fColorCorrections[0] >= 0) {
-        m_editColorCorrection->setText(QString("R: %1 G: %2 B: %3 C: %4 M: %5 Y: %6")
-                                           .arg(settings.m_fColorCorrections[0])
-                                           .arg(settings.m_fColorCorrections[1])
-                                           .arg(settings.m_fColorCorrections[2])
-                                           .arg(settings.m_fColorCorrections[3])
-                                           .arg(settings.m_fColorCorrections[4])
-                                           .arg(settings.m_fColorCorrections[5]));
-    } else {
-        m_editColorCorrection->setText("");
-    }
-
     // Tab 7
     m_spinMaxSlideShowFileListSize->setValue(settings.m_nMaxSlideShowFileListSize);
     m_comboSlideShowTransitionEffect->setCurrentText(ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect));
@@ -588,7 +570,6 @@ void SettingsDialog::saveToSettings() {
     settings.WriteString("AutoZoomModeFullscreen", m_comboAutoZoomModeFullscreen->currentText());
     settings.WriteString("BackgroundColor", QString("%1 %2 %3").arg(m_colorBg.red()).arg(m_colorBg.green()).arg(m_colorBg.blue()));
     settings.WriteString("CPUType", m_comboCpuType->currentText());
-    settings.WriteString("ColorCorrection", m_editColorCorrection->text());
     settings.WriteString("DeleteConfirmation", m_comboDeleteConfirmation->currentText());
     settings.WriteString("DownSamplingFilter", m_comboDownSamplingFilter->currentText());
     settings.WriteString("FileDisplayOrder", m_comboFileDisplayOrder->currentText());
@@ -598,10 +579,6 @@ void SettingsDialog::saveToSettings() {
     settings.WriteString("SlideShowTransitionEffect", m_comboSlideShowTransitionEffect->currentText());
     settings.WriteString("TransparencyColor", QString("%1 %2 %3").arg(m_colorTrans.red()).arg(m_colorTrans.green()).arg(m_colorTrans.blue()));
     settings.WriteString("TransparencyMode", m_comboTransparencyMode->currentText());
-}
-
-const float* CSettingsProvider::ColorCorrectionAmounts() {
-    return (m_fColorCorrections[0] < 0) ? COLOR_CORR_DEFAULT_FACTORS : m_fColorCorrections;
 }
 
 void CSettingsProvider::ReadStickyWindowRect() {
@@ -764,27 +741,6 @@ CSettingsProvider::CSettingsProvider() {
     m_bReloadWhenDisplayedImageChanged = GetBool("ReloadWhenDisplayedImageChanged", true);
 
     m_minimalWindowSize = GetSize("MinimalWindowSize", QSize(320, 240));
-
-    // Pure Qt-basiertes Parsing für ColorCorrections
-    QString sColorCorrections = GetString("ColorCorrection", "");
-    std::fill(std::begin(m_fColorCorrections), std::end(m_fColorCorrections), -1.0f);
-    if (!sColorCorrections.isEmpty()) {
-        // Erwartetes Format: "R: 0.2 G: 0.1 B: 0.3 C: 0.3 M: 0.3 Y: 0.15"
-        const auto parts = sColorCorrections.split(' ', Qt::SkipEmptyParts);
-        if (parts.size() == 12) {
-            bool ok = true;
-            float values[6];
-            for (int i = 0; i < 6; ++i) {
-                values[i] = parts[i * 2 + 1].toFloat(&ok);
-                if (!ok) break;
-            }
-            if (ok) {
-                for (int i = 0; i < 6; ++i) {
-                    m_fColorCorrections[i] = std::clamp(values[i], 0.0f, 1.0f);
-                }
-            }
-        }
-    }
 
     // -------------------------------------------------------------------------------------------
     // [GF] Custom non-writable ini settings of this mod

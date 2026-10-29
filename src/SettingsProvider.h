@@ -86,7 +86,6 @@ private:
     class QCheckBox* m_checkAutoContrastCorrection;
     class QDoubleSpinBox* m_spinAutoContrastAmount;
     class QDoubleSpinBox* m_spinAutoBrightnessAmount;
-    class QLineEdit* m_editColorCorrection;
 
     // Diashow
     class QSpinBox*  m_spinMaxSlideShowFileListSize;
@@ -150,7 +149,6 @@ public:
     double ZoomPauseFactor() const { return m_zoomPauseFactor; }  // while internally this is represented in doubles, using a whole number percent simplifies it for the user... configuring doubles is not user friendly at all
 
     EFilterType DownsamplingFilter() const { return m_eDownsamplingFilter; }
-    const float* ColorCorrectionAmounts(); // can't be declared inline due to compiler bug...sad but true
     Helpers::CPUType AlgorithmImplementation() const { return m_eCPUAlgorithm; }
     Helpers::EAutoZoomMode AutoZoomMode() const { return m_eAutoZoomMode; }
     Helpers::EAutoZoomMode AutoZoomModeFullscreen() const { return m_eAutoZoomModeFullscreen; }
@@ -213,7 +211,6 @@ private:
     int m_nDisplayMonitor{-1};
     bool m_bAutoContrastCorrection{false};
     double m_dAutoContrastAmount{0.5};
-    float m_fColorCorrections[6];
     double m_dAutoBrightnessAmount{0.2};
     int m_nMaxSlideShowFileListSize{200};
     Helpers::ETransitionEffect m_eSlideShowTransitionEffect;

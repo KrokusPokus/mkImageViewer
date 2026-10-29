@@ -157,15 +157,12 @@ static float CalcBWColorCompensation(float fMidPt, float fBlackPt, float fWhiteP
 ///////////////////////////////////////////////////////////////////////////////////
 
 uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
-                                              float fColorCorrectionFactor,
                                               float fBrightnessCorrectionFactor,
-                                              const float fColorCorrectionStrength[6],
                                               float fContrastCorrectionFactor) {
 
     const float cCuttingLevel = 0.001f; // black/white point cutting level
     const float cBrightnessCorr = 1.0f; // strength of brightness correction
     const float cLog0dot5 = log10f(0.5f);
-    const float cCastFactor = 0.3f;
 
     float fContrastStrengthLog = (sm_ContrastCorrectionStrength == 0) ? 100 : log10f(sm_ContrastCorrectionStrength)/cLog0dot5;
     float fContrastFactorLog = (fContrastCorrectionFactor == 0) ? 100 : log10f(fContrastCorrectionFactor)/cLog0dot5;
@@ -202,33 +199,10 @@ uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
     float fCorr = cBrightnessCorr*(fMidPt*(1.0f - fA) - fB);
     fCorr = std::max(0.0f, fCorr);
 
-    // make sure not to change the color in the middle area or the histogram
-    float fMiddleGrey = (histogram.GetBMean() + histogram.GetGMean() + histogram.GetRMean())/(255.0f*3);
-    float fBYCast = histogram.GetBMean()/255.0f - fMiddleGrey;
-    float fGMCast = histogram.GetGMean()/255.0f - fMiddleGrey;
-    float fRCCast = histogram.GetRMean()/255.0f - fMiddleGrey;
-
     float fYMean = fA*fMidPt + fB;
     float fCorrBlue  = fYMean - CalcBWColorCompensation(fMidPt, fBlackPtB, fWhitePtB);
     float fCorrGreen = fYMean - CalcBWColorCompensation(fMidPt, fBlackPtG, fWhitePtG);
     float fCorrRed   = fYMean - CalcBWColorCompensation(fMidPt, fBlackPtR, fWhitePtR);
-
-    float fCastCorrB = CalcColorCastCorr(0, fBYCast, fColorCorrectionStrength); 
-    float fCastCorrG = CalcColorCastCorr(1, fGMCast, fColorCorrectionStrength);
-    float fCastCorrR = CalcColorCastCorr(2, fRCCast, fColorCorrectionStrength);
-    float fCastMean = (fCastCorrB + fCastCorrG + fCastCorrR)/3;
-    float fMaxCast = std::max(abs(fCastCorrB - fCastMean), std::max(abs(fCastCorrG - fCastMean), abs(fCastCorrR - fCastMean)));
-    float fCastFact = 0.05f/std::max(0.00001f, fMaxCast);
-    float fCastMult;
-    if (fColorCorrectionFactor > 0) {
-        fCastMult = 2*(2.0f*fCastFact - 1)*fColorCorrectionFactor + 1;
-    } else {
-        fCastMult = 2*(fCastFact + 1)*fColorCorrectionFactor + 1;
-    }
-    
-    fCorrBlue = fCorrBlue - fCastMult*fCastCorrB;
-    fCorrGreen = fCorrGreen - fCastMult*fCastCorrG;
-    fCorrRed = fCorrRed - fCastMult*fCastCorrR;
 
     float fMeanGrey = (histogram.GetBMean()*0.1f + histogram.GetGMean()*0.6f + histogram.GetRMean()*0.3f)/255;
     float fBrightnessAdd = (fMeanGrey < 0.5f) ? (0.5f - fMeanGrey)*sm_BrightnessCorrStrength*fBrightnessCorrectionFactor : 0.0f;
@@ -258,34 +232,6 @@ uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
     CalculateLUT(&(pLUT[512]), fBlackPtR, fWhitePtR, fCorr);
     */
     return pLUT;
-}
-
-float CHistogramCorr::CalcColorCastCorr(int nChannel, float fCast, const float fColorCorrectionStrength[6]) {
-    if (nChannel == 0) {
-        if (fCast > 0.0f) {
-            // Blue cast
-            return fCast*fColorCorrectionStrength[2];
-        } else {
-            // Yellow cast
-            return fCast*fColorCorrectionStrength[5];
-        }
-    } else if (nChannel == 1) {
-        if (fCast > 0.0f) {
-            // Green cast
-            return fCast*fColorCorrectionStrength[1];
-        } else {
-            // Magenta cast
-            return fCast*fColorCorrectionStrength[4];
-        }
-    } else {
-        if (fCast > 0.0f) {
-            // Red cast
-            return fCast*fColorCorrectionStrength[0];
-        } else {
-            // Cyan cast
-            return fCast*fColorCorrectionStrength[3];
-        }
-    }
 }
 
 uint8* CHistogramCorr::CombineLUTs(const uint8* pSingleChannelLUT, const uint8* pThreeChannelLUT) {

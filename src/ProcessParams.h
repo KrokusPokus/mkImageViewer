@@ -24,11 +24,10 @@ static inline bool GetProcessingFlag(EProcessingFlags eFlags, EProcessingFlags e
 // Parameters for image processing, geometry independent
 class CImageProcessingParams {
 public:
-    CImageProcessingParams(double dContrast, double dGamma, double dSaturation, double dColorCorrectionFactor, double dContrastCorrectionFactor) {
+    CImageProcessingParams(double dContrast, double dGamma, double dSaturation, double dContrastCorrectionFactor) {
         Contrast = dContrast;
         Gamma = dGamma;
         Saturation = dSaturation;
-        ColorCorrectionFactor = dColorCorrectionFactor;
         ContrastCorrectionFactor = dContrastCorrectionFactor;
     }
 
@@ -36,14 +35,12 @@ public:
         Contrast = -1;
         Gamma = -1;
         Saturation = -1;
-        ColorCorrectionFactor = -1;
         ContrastCorrectionFactor = -1;
     }
 
     double Contrast; // in [-0.5..0.5], 0 means no contrast enhancement
     double Gamma; // in [0.5..2], 1 means no gamma (brightness) correction
     double Saturation; // in [0..2], 1 means saturation unchanged
-    double ColorCorrectionFactor; // in [-0.5..0.5], 0 means no color correction
     double ContrastCorrectionFactor; // in [0..1], 0 means no contrast correction
 };
 
