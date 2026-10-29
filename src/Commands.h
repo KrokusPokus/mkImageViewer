@@ -84,7 +84,6 @@ enum class Command : std::uint16_t {
 
     // Bildverarbeitung / Anzeige-Schalter
     ToggleAutoCorrection,
-    KeepParameters,
     ContrastCorrectionInc,
     ContrastCorrectionDec,
     ToggleBWMode,

@@ -104,7 +104,6 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_pDIBPixelsLUTProcessed = NULL;
     m_pLastDIB = NULL;
     
-    m_pLUTAllChannels = NULL;
     m_pLUTRGB = NULL;
     m_pSaturationLUTs = NULL;
     m_eProcFlags = PFLAG_None;
@@ -132,8 +131,6 @@ CBaseImage::~CBaseImage(void) {
     m_pDIBPixels = NULL;
     delete[] static_cast<uint8_t*>(m_pDIBPixelsLUTProcessed);
     m_pDIBPixelsLUTProcessed = NULL;
-    delete[] m_pLUTAllChannels;
-    m_pLUTAllChannels = NULL;
     delete[] m_pLUTRGB;
     m_pLUTRGB = NULL;
     delete[] m_pSaturationLUTs;
@@ -476,16 +473,12 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
     bool bAutoContrast = GetProcessingFlag(eProcFlags, PFLAG_AutoContrast);
     bool bAutoContrastOld = GetProcessingFlag(m_eProcFlags, PFLAG_AutoContrast);
 
-    bool bNoContrastAndGammaLUT = fabs(imageProcParams.Contrast) < 1e-4 && fabs(imageProcParams.Gamma - 1) < 1e-4;
     bool bMustUseSaturationLUTs = fabs(imageProcParams.Saturation - 1.0) > 1e-4;
-    bool bNoLUTsApplied = bNoContrastAndGammaLUT && !bAutoContrast && !bMustUseSaturationLUTs;
-    bool bContrastOrGammaChanged = fabs(imageProcParams.Contrast - m_imageProcParams.Contrast) > 1e-4 ||
-        fabs(imageProcParams.Gamma - m_imageProcParams.Gamma) > 1e-4;
+    bool bNoLUTsApplied = !bAutoContrast && !bMustUseSaturationLUTs;
     bool bCorrectionFactorChanged = fabs(imageProcParams.ContrastCorrectionFactor-m_imageProcParams.ContrastCorrectionFactor) > 1e-4;
     bool bSaturationChanged = fabs(imageProcParams.Saturation - m_imageProcParams.Saturation) > 1e-4;
     bool bMustReapplyLUTs = bAutoContrast != bAutoContrastOld
                         || bCorrectionFactorChanged
-                        || bContrastOrGammaChanged
                         || bSaturationChanged;
     bool bMustUse3ChannelLUT = bAutoContrast;
 
@@ -506,12 +499,6 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
 
     if (pSourceDIB == NULL) {
         return NULL;
-    }
-
-    // Recalculate LUTs if needed
-    if (bContrastOrGammaChanged || m_pLUTAllChannels == NULL) {
-        delete[] m_pLUTAllChannels;
-        m_pLUTAllChannels = bNoContrastAndGammaLUT ? NULL : CBasicProcessing::CreateSingleChannelLUT(imageProcParams.Contrast, imageProcParams.Gamma);
     }
 
     // Calculate the histogram if needed (after rotation)
@@ -548,16 +535,21 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
     }
 
     if (!bNoLUTsApplied) {
-        // LUT --> apply correction
-        uint8* pLUT = CHistogramCorr::CombineLUTs(m_pLUTAllChannels, m_pLUTRGB);
+        // LUT --> apply correction. Without auto contrast only the saturation is changed (identity LUT).
+        uint8 identityLUT[3*256];
+        const uint8* pLUT = m_pLUTRGB;
+        if (pLUT == NULL) {
+            for (int i = 0; i < 256; i++) {
+                identityLUT[i] = identityLUT[i + 256] = identityLUT[i + 256*2] = (uint8)i;
+            }
+            pLUT = identityLUT;
+        }
 
         if (bMustUseSaturationLUTs) {
             pCachedTargetDIB = CBasicProcessing::ApplySaturationAnd3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, m_pSaturationLUTs, pLUT);
         } else {
             pCachedTargetDIB = CBasicProcessing::Apply3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, pLUT);
         }
-
-        delete[] pLUT;
     } else if (bCanTakeOwnershipOfSourceDIB) {
         // no LUTs, just take over ownership of source DIB if we are allowed
         pCachedTargetDIB = pSourceDIB;

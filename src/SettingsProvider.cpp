@@ -289,6 +289,9 @@ QWidget* SettingsDialog::createGuiTab() {
     m_checkShowFilePathInTitle = new QCheckBox(tr("Vollständigen Dateipfad in Titelleiste anzeigen"));
     layout->addRow(m_checkShowFilePathInTitle);
 
+    m_checkShowAppNameInTitle = new QCheckBox(tr("Programmnamen \"mkImageViewer\" in Titelleiste anzeigen"));
+    layout->addRow(m_checkShowAppNameInTitle);
+
     m_checkTitleBarUseFileIcon = new QCheckBox(tr("Dateityp-Icon in der Titelleiste nutzen"));
     layout->addRow(m_checkTitleBarUseFileIcon);
 
@@ -403,21 +406,6 @@ QWidget* SettingsDialog::createCorrectionTab() {
     QWidget* panel = new QWidget();
     QFormLayout* layout = new QFormLayout(panel);
 
-    m_spinContrast = new QDoubleSpinBox();
-    m_spinContrast->setRange(-0.5, 0.5);
-    m_spinContrast->setSingleStep(0.05);
-    layout->addRow(tr("Kontrast (-0.5 .. 0.5):"), m_spinContrast);
-
-    m_spinGamma = new QDoubleSpinBox();
-    m_spinGamma->setRange(0.1, 10.0);
-    m_spinGamma->setSingleStep(0.1);
-    layout->addRow(tr("Gamma (0.1 .. 10.0):"), m_spinGamma);
-
-    m_spinSaturation = new QDoubleSpinBox();
-    m_spinSaturation->setRange(0.0, 2.0);
-    m_spinSaturation->setSingleStep(0.1);
-    layout->addRow(tr("Sättigung (0.0 .. 2.0):"), m_spinSaturation);
-
     m_checkAutoContrastCorrection = new QCheckBox(tr("Automatische Kontrastkorrektur aktivieren"));
     layout->addRow(m_checkAutoContrastCorrection);
 
@@ -458,9 +446,6 @@ QWidget* SettingsDialog::createSlideshowTab() {
     m_spinSlideShowEffectTimeMs->setSuffix(" ms");
     layout->addRow(tr("Effektdauer:"), m_spinSlideShowEffectTimeMs);
 
-    m_checkKeepParams = new QCheckBox(tr("Parameter beim Bildwechsel beibehalten (KeepParameters)"));
-    layout->addRow(m_checkKeepParams);
-
     return makeScrollable(panel);
 }
 
@@ -489,6 +474,7 @@ void SettingsDialog::loadFromSettings() {
     m_spinMinWidth->setValue(settings.m_minimalWindowSize.width());
     m_spinMinHeight->setValue(settings.m_minimalWindowSize.height());
     m_checkShowFilePathInTitle->setChecked(settings.m_bShowFullPathInTitle);
+    m_checkShowAppNameInTitle->setChecked(settings.m_bShowAppNameInTitle);
     m_checkTitleBarUseFileIcon->setChecked(settings.m_bTitleBarUseFileIcon);
     m_spinDisplayMonitor->setValue(settings.m_nDisplayMonitor);
     m_colorBg = settings.m_colorBackground;
@@ -519,9 +505,6 @@ void SettingsDialog::loadFromSettings() {
     m_spinBookModePageHeight->setValue(settings.m_nBookModePageHeight);
 
     // Tab 6
-    m_spinContrast->setValue(settings.m_dContrast);
-    m_spinGamma->setValue(settings.m_dGamma);
-    m_spinSaturation->setValue(settings.m_dSaturation);
     m_checkAutoContrastCorrection->setChecked(settings.m_bAutoContrastCorrection);
     m_spinAutoContrastAmount->setValue(settings.m_dAutoContrastAmount);
     m_spinAutoBrightnessAmount->setValue(settings.m_dAutoBrightnessAmount);
@@ -530,7 +513,6 @@ void SettingsDialog::loadFromSettings() {
     m_spinMaxSlideShowFileListSize->setValue(settings.m_nMaxSlideShowFileListSize);
     m_comboSlideShowTransitionEffect->setCurrentText(ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect));
     m_spinSlideShowEffectTimeMs->setValue(settings.m_nSlideShowEffectTimeMs);
-    m_checkKeepParams->setChecked(settings.m_bKeepParams);
 }
 
 void SettingsDialog::saveToSettings() {
@@ -543,9 +525,9 @@ void SettingsDialog::saveToSettings() {
     settings.WriteBool("FileSortAscending", m_checkFileSortAscending->isChecked());
     settings.WriteBool("ForceQImageReader", m_checkForceQImageReader->isChecked());
     settings.WriteBool("HighQualityResampling", m_checkHighQualityResampling->isChecked());
-    settings.WriteBool("KeepParameters", m_checkKeepParams->isChecked());
     settings.WriteBool("NavigateWithMouseWheel", m_checkNavigateMouseWheel->isChecked());
     settings.WriteBool("ReloadWhenDisplayedImageChanged", m_checkReloadWhenImageChanged->isChecked());
+    settings.WriteBool("ShowAppNameInTitle", m_checkShowAppNameInTitle->isChecked());
     settings.WriteBool("ShowFilePathInTitle", m_checkShowFilePathInTitle->isChecked());
     settings.WriteBool("SingleFullScreenInstance", m_checkSingleFullScreenInstance->isChecked());
     settings.WriteBool("SmartPanningKeys", m_checkSmartPanningKeys->isChecked());
@@ -555,10 +537,7 @@ void SettingsDialog::saveToSettings() {
     settings.WriteBool("WrapAroundFolder", m_checkWrapAroundFolder->isChecked());
     settings.WriteDouble("AutoBrightnessCorrectionAmount", m_spinAutoBrightnessAmount->value());
     settings.WriteDouble("AutoContrastCorrectionAmount", m_spinAutoContrastAmount->value());
-    settings.WriteDouble("Contrast", m_spinContrast->value());
-    settings.WriteDouble("Gamma", m_spinGamma->value());
     settings.WriteDouble("MouseWheelZoomSpeed", m_spinMouseWheelZoomSpeed->value());
-    settings.WriteDouble("Saturation", m_spinSaturation->value());
     settings.WriteInt("BookModePageHeight", m_spinBookModePageHeight->value());
     settings.WriteInt("CPUCoresUsed", m_spinCpuCores->value());
     settings.WriteInt("CacheRange", m_spinCacheRange->value());
@@ -644,6 +623,7 @@ CSettingsProvider::CSettingsProvider() {
     
     m_bShowFullScreen = GetBool("ShowFullScreen", false);
     m_bShowFullPathInTitle = GetBool("ShowFilePathInTitle", true);
+    m_bShowAppNameInTitle = GetBool("ShowAppNameInTitle", true);
 
     QString sCPU = GetString("CPUType", "AutoDetect");
     if (sCPU.compare("Generic", Qt::CaseInsensitive) == 0) {
@@ -756,9 +736,6 @@ CSettingsProvider::CSettingsProvider() {
 }
 
 void CSettingsProvider::ReadWriteableINISettings() {
-    m_dContrast = GetDouble("Contrast", 0.0, -0.5, 0.5);
-    m_dGamma = GetDouble("Gamma", 1.0, 0.1, 10.0);
-    m_dSaturation = GetDouble("Saturation", 1.0, 0.0, 2.0);
     m_bAutoContrastCorrection = GetBool("AutoContrastCorrection", false);
 
     QString sNavigation = GetString("FolderNavigation", "LoopFolder");
@@ -786,7 +763,6 @@ void CSettingsProvider::ReadWriteableINISettings() {
     m_eAutoZoomModeFullscreen = GetAutoZoomMode("AutoZoomModeFullscreen", m_eAutoZoomMode);
 
     m_bHQRS = GetBool("HighQualityResampling", true);
-    m_bKeepParams = GetBool("KeepParameters", false);
     m_eSlideShowTransitionEffect = ConvertTransitionEffectFromString(GetString("SlideShowTransitionEffect", ""));
 
     // -------------------------------------------------------------------------------------------
@@ -810,9 +786,6 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
                                      Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
                                      Helpers::ETransitionEffect eSlideShowTransitionEffect) {
 
-    WriteDouble("Contrast", procParams.Contrast);
-    WriteDouble("Gamma", procParams.Gamma);
-    WriteDouble("Saturation", procParams.Saturation);
     WriteBool("AutoContrastCorrection", GetProcessingFlag(eProcFlags, PFLAG_AutoContrast));
 
     QString sNavigation = "LoopFolder";
@@ -840,7 +813,6 @@ void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
     WriteString("AutoZoomModeFullscreen", GetAutoZoomModeString(eAutoZoomModeFullScreen));
 
     WriteBool("HighQualityResampling", GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling));
-    WriteBool("KeepParameters", GetProcessingFlag(eProcFlags, PFLAG_KeepParams));
 
     WriteString("SlideShowTransitionEffect", ConvertTransitionEffectToString(eSlideShowTransitionEffect));
 

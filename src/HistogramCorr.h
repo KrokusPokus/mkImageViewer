@@ -54,11 +54,6 @@ public:
     static uint8* CalculateCorrectionLUT(const CHistogram & histogram,
         float fBrightnessCorrectionFactor, float fContrastCorrectionFactor);
 
-    // Combine the given two LUTs into a three channel LUT. Result(value) = 3CLUT(1CLUT(value))
-    // If both LUTs are NULL, an identity LUT is returned.
-    // The returned LUT contains 3 * 256 entries, BBBB...GGGG...RRRR... format
-    static uint8* CombineLUTs(const uint8* pSingleChannelLUT, const uint8* pThreeChannelLUT);
-
 private:
     CHistogramCorr(void);
 

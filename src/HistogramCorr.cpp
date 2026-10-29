@@ -233,26 +233,3 @@ uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
     */
     return pLUT;
 }
-
-uint8* CHistogramCorr::CombineLUTs(const uint8* pSingleChannelLUT, const uint8* pThreeChannelLUT) {
-    uint8* pLUT = new uint8[256*3];
-    if (pSingleChannelLUT == NULL && pThreeChannelLUT == NULL) {
-        // return identity LUT
-        for (int i = 0; i < 256; i++) {
-            pLUT[i] = pLUT[i + 256] = pLUT[i + 256*2] = i;
-        }
-    } else if (pSingleChannelLUT == NULL) {
-        memcpy(pLUT, pThreeChannelLUT, 3*256);
-    } else if (pThreeChannelLUT == NULL) {
-        memcpy(pLUT, pSingleChannelLUT, 256);
-        memcpy(pLUT + 256, pSingleChannelLUT, 256);
-        memcpy(pLUT + 256*2, pSingleChannelLUT, 256);
-    } else {
-        for (int i = 0; i < 256; i++) {
-            pLUT[i] = pThreeChannelLUT[pSingleChannelLUT[i]];
-            pLUT[i + 256] = pThreeChannelLUT[pSingleChannelLUT[i] + 256];
-            pLUT[i + 256*2] = pThreeChannelLUT[pSingleChannelLUT[i] + 256*2];
-        }
-    }
-    return pLUT;
-}

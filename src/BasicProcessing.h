@@ -74,10 +74,6 @@ public:
     // Crop specified 32 bpp image. Returns NULL if cropRect is not fully inside source image.
     static void* Crop32bpp(int nWidth, int nHeight, const void* pDIBPixels, CRect cropRect);
 
-    // Create a lookup-table for brightness and contrast correction.
-    // dContrastEnh is in [-0.5 .. 0.5], dGamma in [0.1 .. 10]
-    // The lookup table contains 256 uint8 entries (single channel LUT)
-    static uint8* CreateSingleChannelLUT(double dContrastEnh, double dGamma);
 
     // Creates lookup tables for color saturation correction.
     // dSaturation must be between 0 and 2

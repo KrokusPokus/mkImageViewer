@@ -179,6 +179,9 @@ private:
     void StopMovieMode();
     void StartLowQTimer(int nTimeout);
     void InitParametersForNewImage();
+    // Keep zoom, offsets, rotation and processing parameters between images (only used internally while an
+    // animation or the movie mode is running). Switching it on takes over the current state.
+    void SetKeepParams(bool bKeep);
     void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
     void onLoadFileAsynch(); // WM_COPYDATAhandler and OnAnotherInstanceStarted() call this via invokeMethod()
     void OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath);

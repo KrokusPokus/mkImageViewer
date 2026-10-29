@@ -152,7 +152,6 @@ constexpr std::array<CommandInfo, kCommandCount> kTable = {{
 
     // Bildverarbeitung / Anzeige-Schalter
     make(Command::ToggleAutoCorrection,  "ToggleAutoCorrection",  Category::View, CMD_TR("Auto contrast")).legacy("IDM_AUTO_CORRECTION"),
-    make(Command::KeepParameters,        "KeepParameters",        Category::View, CMD_TR("Keep parameters between images")).legacy("IDM_KEEP_PARAMETERS"),
     make(Command::ContrastCorrectionInc, "ContrastCorrectionInc", Category::View, CMD_TR("Increase contrast correction")).legacy("IDM_CONTRAST_CORRECTION_INC"),
     make(Command::ContrastCorrectionDec, "ContrastCorrectionDec", Category::View, CMD_TR("Decrease contrast correction")).legacy("IDM_CONTRAST_CORRECTION_DEC"),
     make(Command::ToggleBWMode,          "ToggleBWMode",          Category::View, CMD_TR("Toggle black and white mode")),

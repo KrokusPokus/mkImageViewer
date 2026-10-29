@@ -113,19 +113,17 @@ namespace {
         return locale.toString(size, 'f', precision) + " " + units[unitIndex];
     }
 
-    // Gets default image processing parameters as set in INI file
+    // Gets default image processing parameters (saturation unchanged; the black and white mode is applied
+    // in CMainDlg::GetEffectiveProcessingParams())
     CImageProcessingParams GetDefaultProcessingParams() {
-        CSettingsProvider& sp = CSettingsProvider::This();
         return CImageProcessingParams(
-            sp.Contrast(),
-            sp.Gamma(),
-            sp.Saturation(),
+            1.0,  // Saturation
             0.5); // ContrastCorrectionFactor
     }
 
     // Gets hardcoded processing parameters, turning off all processing
     CImageProcessingParams GetNoProcessingParams() {
-        return CImageProcessingParams(0.0, 1.0, 1.0, 0.5);
+        return CImageProcessingParams(1.0, 0.5);
     }
 
     // Gets default image processing flags as set in INI file
@@ -306,7 +304,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_dZoomKept = -1;
     m_offsetKept = CPoint(0, 0);
 
-    m_bKeepParams = sp.KeepParams();
+    m_bKeepParams = false;
     m_eAutoZoomModeWindowed = sp.AutoZoomMode();
     m_eAutoZoomModeFullscreen = sp.AutoZoomModeFullscreen();
 
@@ -1849,15 +1847,6 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             SetToast(m_bBWMode ? QStringLiteral("Black and white: ON") : QStringLiteral("Black and white: OFF"));
             this->update();
             break;
-        case Command::KeepParameters:
-            m_bKeepParams = !m_bKeepParams;
-            if (m_bKeepParams) {
-                *m_pImageProcParamsKept = *m_pImageProcParams;
-                m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
-                m_dZoomKept = m_bUserZoom ? m_dZoom : -1;
-                m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
-            }
-            break;
         case Command::FitToScreen:
         case Command::FitToScreenNoEnlarge:
             ResetZoomToFitScreen(false, inv.id == Command::FitToScreen, true);
@@ -2913,6 +2902,16 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
     }
 }
 
+void CMainDlg::SetKeepParams(bool bKeep) {
+    if (bKeep && !m_bKeepParams) {
+        *m_pImageProcParamsKept = *m_pImageProcParams;
+        m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, true);
+        m_dZoomKept = m_bUserZoom ? m_dZoom : -1;
+        m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
+    }
+    m_bKeepParams = bKeep;
+}
+
 void CMainDlg::ResetParamsToDefault() {
     CSettingsProvider& sp = CSettingsProvider::This();
     m_nRotation = 0;
@@ -2956,7 +2955,7 @@ void CMainDlg::StartMovieMode(double dFPS) {
     }
     // Keep parameters during movie mode
     if (!m_bKeepParams && dFPS > cdFPSMovie) {
-        ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
+        SetKeepParams(true);
     }
     // Turn off high quality resamping and auto corrections when requested to play many frames per second
     if (dFPS > cdFPSMovie) {
@@ -2975,7 +2974,7 @@ void CMainDlg::StopMovieMode() {
         // undo changes done on processing parameters due to movie mode
         if (!GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_KeepParams)) {
             if (m_bKeepParams) {
-                ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
+                SetKeepParams(false);
             }
         }
         if (m_bProcFlagsTouched) {
@@ -3134,10 +3133,10 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
             indexStr = QString(GetMultiframeIndex(m_pCurrentImage));
         }
 
-        sWindowText = QStringLiteral("%1%2 - %3")
-                          .arg(visibleName)
-                          .arg(indexStr)
-                          .arg(APP_TITLE);
+        sWindowText = visibleName + indexStr;
+        if (CSettingsProvider::This().ShowAppNameInTitle()) {
+            sWindowText += QStringLiteral(" - ") + APP_TITLE;
+        }
     }
 
     if ((s_PrevTitleText != sWindowText) || bForce) {
@@ -3454,7 +3453,7 @@ void CMainDlg::StartAnimation() {
     m_eProcFlagsBeforeMovie = CreateDefaultProcessingFlags(m_bKeepParams);
     m_bKeepParametersBeforeAnimation = IsKeepParams();
     if (!m_bKeepParametersBeforeAnimation) {
-        ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
+        SetKeepParams(true);
     }
 
     m_bAutoContrast = false;
@@ -3518,7 +3517,7 @@ void CMainDlg::StopAnimation() {
         return;
     }
     if (IsKeepParams() != m_bKeepParametersBeforeAnimation) {
-        ExecuteCommand({ Cmd::Command::KeepParameters, 0 });
+        SetKeepParams(m_bKeepParametersBeforeAnimation);
     }
     if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_AutoContrast)) {
         m_bAutoContrast = true;

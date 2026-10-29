@@ -129,56 +129,6 @@ public:
 // LUT creation for saturation, contrast and brightness and application of LUT
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-uint8* CBasicProcessing::CreateSingleChannelLUT(double dContrastEnh, double dGamma) {
-    dContrastEnh = std::min(0.5, std::max(-0.5, dContrastEnh));
-    dGamma = std::min(10.0, std::max(0.1, dGamma));
-
-    double dX = 0.0;
-    double dInc = 1.0/255.0;
-    double dValue;
-    uint8* pLUT = new uint8[256];
-
-    if (dContrastEnh >= 0) {
-        // we define a piecewise function with quadratic terms on the left and right
-        // and a linear term between
-        dContrastEnh = dContrastEnh*0.5;
-        double dA = 1.0/(1 - dContrastEnh);
-        double dB = -dA*dContrastEnh/2;
-
-        double dXs = (0.25 - dB)/dA;
-        double dXe = (0.75 - dB)/dA;
-
-        double dAs = (dA*dXs - 0.25)/(dXs*dXs);
-        double dBs = dA - 2*dAs*dXs;
-
-        for (int i = 0; i < 256; i++) {
-            if (dX < dXs) {
-                dValue = dAs*dX*dX + dBs*dX;
-            } else if (dX > dXe) {
-                dValue = 1.0 - (dAs*(1.0 - dX)*(1.0 - dX) + dBs*(1.0 - dX));
-            } else {
-                dValue = dA*dX + dB;
-            }
-            pLUT[i] = (uint8) (0.5 + 255*pow(std::min(1.0, std::max(0.0, dValue)), dGamma));
-            dX += dInc;
-        }
-    } else {
-        // define a quadratic piecewise S-curve
-        double dFactor = -dContrastEnh*1.5;
-        for (int i = 0; i < 256; i++) {
-            if (dX < 0.5) {
-                dValue = dX + dFactor*(0.25*0.25 - (dX - 0.25)*(dX - 0.25));
-            } else  {
-                dValue = dX - dFactor*(0.25*0.25 - (dX - 0.75)*(dX - 0.75));
-            }
-            pLUT[i] = (uint8) (0.5 + 255*pow(std::min(1.0, std::max(0.0, dValue)), dGamma));
-            dX += dInc;
-        }
-    }
-
-    return pLUT;
-}
-
 int32* CBasicProcessing::CreateColorSaturationLUTs(double dSaturation) {
     const double cdScaler = 1 << 16;
     int32* pLUTs = new int32[6 * 256];

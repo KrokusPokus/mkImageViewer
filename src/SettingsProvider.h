@@ -47,6 +47,7 @@ private:
     class QSpinBox*  m_spinMinWidth;
     class QSpinBox*  m_spinMinHeight;
     class QCheckBox* m_checkShowFilePathInTitle;
+    class QCheckBox* m_checkShowAppNameInTitle;
     class QCheckBox* m_checkTitleBarUseFileIcon;
     class QSpinBox*  m_spinDisplayMonitor;
 
@@ -80,9 +81,6 @@ private:
     class QCheckBox* m_checkSmartPanningKeys;
 
     // Bildkorrektur
-    class QDoubleSpinBox* m_spinContrast;
-    class QDoubleSpinBox* m_spinGamma;
-    class QDoubleSpinBox* m_spinSaturation;
     class QCheckBox* m_checkAutoContrastCorrection;
     class QDoubleSpinBox* m_spinAutoContrastAmount;
     class QDoubleSpinBox* m_spinAutoBrightnessAmount;
@@ -91,7 +89,6 @@ private:
     class QSpinBox*  m_spinMaxSlideShowFileListSize;
     class QComboBox* m_comboSlideShowTransitionEffect;
     class QSpinBox*  m_spinSlideShowEffectTimeMs;
-    class QCheckBox* m_checkKeepParams;
 
     // Hilfsmethoden zum Erstellen der Tabs
     QWidget* createProgramTab();
@@ -121,10 +118,10 @@ public:
     bool ExplicitWindowRect() const { return m_bExplicitWindowRect; }
     bool HighQualityResampling() const { return m_bHQRS; }
     bool IsSortedAscending() const { return m_bIsSortedAscending; }
-    bool KeepParams() const { return m_bKeepParams; }
     bool NavigateWithMouseWheel() const { return m_bNavigateMouseWheel; }
     bool ReloadWhenDisplayedImageChanged() const { return m_bReloadWhenDisplayedImageChanged; }
     bool ShowFullPathInTitle() const { return m_bShowFullPathInTitle; }
+    bool ShowAppNameInTitle() const { return m_bShowAppNameInTitle; }
     bool ShowFullScreen() const { return m_bShowFullScreen; }
     bool SingleFullScreenInstance() const { return m_bSingleFullScreenInstance; }
     bool SmartPanningKeys() const { return m_bSmartPanningKeys; }
@@ -142,10 +139,7 @@ public:
 
     double AutoBrightnessAmount() const { return m_dAutoBrightnessAmount; }
     double AutoContrastAmount() const { return m_dAutoContrastAmount; }
-    double Contrast() const { return m_dContrast; }
-    double Gamma() const { return m_dGamma; }
     double MouseWheelZoomSpeed() const { return m_dMouseWheelZoomSpeed; }
-    double Saturation() const { return m_dSaturation; }
     double ZoomPauseFactor() const { return m_zoomPauseFactor; }  // while internally this is represented in doubles, using a whole number percent simplifies it for the user... configuring doubles is not user friendly at all
 
     EFilterType DownsamplingFilter() const { return m_eDownsamplingFilter; }
@@ -190,13 +184,10 @@ private:
     QString m_settingsFileFullPath;
     QString m_stateFileFullPath;
 
-    double m_dContrast{0.0};
-    double m_dGamma{1.0};
-    double m_dSaturation{1.0};
     bool m_bHQRS{true};
     bool m_bShowFullPathInTitle{false};
+    bool m_bShowAppNameInTitle{true};
     bool m_bShowFullScreen{false};
-    bool m_bKeepParams{false};
     Helpers::CPUType m_eCPUAlgorithm;
     int m_nNumCores{1};
     int m_nNumCoresIni{0};

@@ -255,7 +255,6 @@ private:
     uint64_t m_fileLoadDelayMs;
 
     // stuff needed to perform LUT processing
-    uint8* m_pLUTAllChannels; // for global contrast and brightness correction
     uint8* m_pLUTRGB; // B,G,R three channel LUT
     int32* m_pSaturationLUTs; // Saturation LUTs
     CHistogram* m_pHistogram; // histogram of the original pixels, for the automatic correction
