@@ -24,7 +24,8 @@
 bool CReaderTGA::IsAlphaChannelValid(int width, int height, uint32_t* pImageData)
 {
     uint32_t pixel = 0;
-    for (int i = 0; i < width * height; i++)
+    const std::size_t numPixels = static_cast<std::size_t>(width) * height; // can exceed 2^31
+    for (std::size_t i = 0; i < numPixels; i++)
     {
         pixel = pixel | (*pImageData & 0xFF000000);
         pImageData++;
@@ -88,11 +89,25 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
     // check memory footprint
     targetChannels = (bits == 32) ? 4 : 3;
     int targetStride = Helpers::DoPadding(width * targetChannels, 4);
-    uint32_t numberOfBytesRequired = targetStride * height;
 
     if ((double)width * height > MAX_IMAGE_PIXELS)
     {
         bOutOfMemory = true;
+        return nullptr;
+    }
+    // 64 bit: width and height can be up to 65535 each, so the product overflows 32 bit (the buffer would be
+    // allocated far too small and the decoding below would write beyond it)
+    const std::size_t numberOfBytesRequired = static_cast<std::size_t>(targetStride) * height;
+
+    // The file must be able to hold the pixel data at all, before memory is allocated for it: uncompressed every
+    // pixel needs its bytes, with RLE one packet (1 byte + 1 pixel) covers at most 128 pixels.
+    const std::size_t numPixelsTotal = static_cast<std::size_t>(width) * height;
+    const std::size_t bytesPerSourcePixel = (bits + 7) / 8;
+    const std::size_t minDataBytes = (imageType == TGA_RLE_INDEXED || imageType == TGA_RLE_RGB || imageType == TGA_RLE_MONO)
+        ? (numPixelsTotal + 127) / 128 * (1 + bytesPerSourcePixel)
+        : numPixelsTotal * bytesPerSourcePixel;
+    if (bufsize < 18 + static_cast<std::size_t>(length) + (isIndexed ? 768 : 0) + minDataBytes)
+    {
         return nullptr;
     }
 
@@ -258,18 +273,18 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
 
         // Create some variables to hold the rleID, current colors read, channels, & stride.
         uint8_t rleID = 0;
-        int colorsRead = 0;
+        std::size_t colorsRead = 0; // byte offset in the target, can exceed 2^31
         int channels = bits / 8;
         int x = 0;
         int padding = targetStride - targetChannels * width;
-        int i = 0;
+        std::size_t i = 0;
 
         uint8_t colors[4];
         uint8_t* pColors = colors;
         pImage = pImageData;
 
         // Load in all the pixel data
-        int numPixels = width * height;
+        const std::size_t numPixels = static_cast<std::size_t>(width) * height;
         while (i < numPixels)
         {
             if (static_cast<std::size_t>(pBuf - static_cast<const char*>(pBuffer)) + 1 > bufsize)

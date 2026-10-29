@@ -33,7 +33,8 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
 
     bOutOfMemory = false;
 
-    int off = 0, amtRead = 0;
+    // size_t: offsets and sizes come from the file and must never become negative
+    std::size_t off = 0, amtRead = 0;
     char* pBuf = (char*)pBuffer;
     /* Read the header */
     amtRead += 14;
@@ -45,7 +46,7 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     header.offset = *((uint32*)pBuf); pBuf += sizeof(uint32);
 
     /* Read and check the information header */
-    int size = sizeof(BMINFOHEADER);
+    std::size_t size = sizeof(BMINFOHEADER);
     amtRead += size;
     if (bufsize < amtRead) return NULL;
     memcpy(&infoheader, pBuf, size);
@@ -55,8 +56,9 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     if (infoheader.bits != 24 && infoheader.bits != 32 && infoheader.bits != 8) {
         return NULL;
     }
-    /* Not too big files */
-    if (infoheader.width > MAX_IMAGE_DIMENSION || infoheader.width <= 0 || abs(infoheader.height) > MAX_IMAGE_DIMENSION) {
+    /* Not too big files (height is negative for top-down DIBs) */
+    if (infoheader.width <= 0 || infoheader.width > (int)MAX_IMAGE_DIMENSION ||
+        infoheader.height == 0 || infoheader.height < -(int)MAX_IMAGE_DIMENSION || infoheader.height > (int)MAX_IMAGE_DIMENSION) {
         return NULL;
     }
     if ((double)infoheader.width * abs(infoheader.height) > MAX_IMAGE_PIXELS) {
@@ -67,7 +69,7 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     // read palette for 8 bpp DIBs
     uint8 palette[4 * 256];
     if (infoheader.bits == 8) {
-        off = infoheader.size + 14;
+        off = (std::size_t)infoheader.size + 14;
         if (bufsize < off) return NULL;
         pBuf = ((char*)pBuffer) + off;
         size = 256 * 4;
@@ -94,10 +96,16 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
 
     int bytesPerPixel = infoheader.bits / 8;
     int paddedWidth = Helpers::DoPadding(infoheader.width * bytesPerPixel, 4);
-    int fileSizeBytes = infoheader.height * paddedWidth;
-    if (fileSizeBytes <= 0 || fileSizeBytes > MAX_BMP_FILE_SIZE) {
-        bOutOfMemory = fileSizeBytes > MAX_BMP_FILE_SIZE;
+    // 64 bit: width and height can be up to 65535 each, so the product overflows an int (the buffer would be
+    // allocated far too small and the copy below would write beyond it)
+    int64_t nImageBytes = (int64_t)infoheader.height * paddedWidth;
+    if (nImageBytes > MAX_BMP_FILE_SIZE) {
+        bOutOfMemory = true;
         return NULL; // corrupt or manipulated header
+    }
+    int fileSizeBytes = (int)nImageBytes; // <= MAX_BMP_FILE_SIZE, fits into an int
+    if (bufsize - off < (std::size_t)fileSizeBytes) {
+        return NULL; // the file can not contain the pixel data: do not allocate memory for it
     }
 
     uint8* pDest = new(std::nothrow) uint8[fileSizeBytes];
@@ -105,7 +113,7 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
         bOutOfMemory = true;
         return NULL;
     }
-    uint8* pStart = bFlipped ? pDest + paddedWidth * (infoheader.height - 1) : pDest;
+    uint8* pStart = bFlipped ? pDest + (std::size_t)paddedWidth * (infoheader.height - 1) : pDest;
     for (int nLine = 0; nLine < infoheader.height; nLine++) {
         amtRead += paddedWidth;
         if (bufsize < amtRead)
@@ -122,6 +130,10 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     if (infoheader.bits == 8) {
         uint8* pTemp = (uint8*)CBasicProcessing::Convert8bppTo32bppDIB(infoheader.width, infoheader.height, pDest, palette);
         delete[] pDest;
+        if (pTemp == NULL) {
+            bOutOfMemory = true;
+            return NULL;
+        }
         pDest = pTemp;
         infoheader.bits = 32;
     }
