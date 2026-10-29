@@ -69,6 +69,8 @@ public:
     CPoint GetOffsets() { return m_offsets; }
     CImageProcessingParams* GetImageProcessingParams() { return m_pImageProcParams; }
     EProcessingFlags CreateDefaultProcessingFlags(bool bKeepParams = false);
+    // Current processing parameters as passed to the image processing, with the black and white mode applied
+    CImageProcessingParams GetEffectiveProcessingParams() const;
     void DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect, QPainter& painter);
 
     void UpdateWindowTitle(bool bForce = false);
@@ -118,6 +120,7 @@ private:
     CImageProcessingParams* m_pImageProcParams;
     bool m_bHQResampling;
     bool m_bAutoContrast;
+    bool m_bBWMode = false; // black and white mode (saturation 0), applies to all images until toggled off
     bool m_bKeepParams;
 
     // set of parameters used when m_bKeepParams is true

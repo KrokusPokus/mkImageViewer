@@ -561,7 +561,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         void* pDIBData = m_pCurrentImage->GetDIB(newSize,
                                                  clippedSize,
                                                  offsetsInImage,
-                                                 *m_pImageProcParams,
+                                                 GetEffectiveProcessingParams(),
                                                  CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, false));
 
         // Das rohe DIB über Qt QImage hochperformant zeichnen
@@ -1399,6 +1399,10 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     AddCmd(menuCurrentView, tr("Mirror horizontally"), Cmd::Command::MirrorH);
     AddCmd(menuCurrentView, tr("Mirror vertically"), Cmd::Command::MirrorV);
     menuCurrentView->addSeparator();
+    QAction* actBWMode = AddCmd(menuCurrentView, tr("Black and white"), Cmd::Command::ToggleBWMode);
+    actBWMode->setCheckable(true);
+    actBWMode->setChecked(m_bBWMode);
+    menuCurrentView->addSeparator();
     AddCmd(menuCurrentView, tr("Fit to window"), Cmd::Command::FitToScreen);
     AddCmd(menuCurrentView, tr("Fill with crop"), Cmd::Command::FillWithCrop);
     menuCurrentView->addSeparator();
@@ -1647,7 +1651,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::CopyFull:
             if (m_pCurrentImage != NULL) {
-                CClipboard::CopyFullImageToClipboard(m_pCurrentImage, *m_pImageProcParams, CreateDefaultProcessingFlags(), m_pFileList->Current());
+                CClipboard::CopyFullImageToClipboard(m_pCurrentImage, GetEffectiveProcessingParams(), CreateDefaultProcessingFlags(), m_pFileList->Current());
                 this->update();
             }
             break;
@@ -1838,6 +1842,11 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
         case Command::ToggleAutoCorrection:
             m_bAutoContrast = !m_bAutoContrast;
             SetToast(m_bAutoContrast ? QStringLiteral("Auto Contrast: ON") : QStringLiteral("Auto Contrast: OFF"));
+            this->update();
+            break;
+        case Command::ToggleBWMode:
+            m_bBWMode = !m_bBWMode;
+            SetToast(m_bBWMode ? QStringLiteral("Black and white: ON") : QStringLiteral("Black and white: OFF"));
             this->update();
             break;
         case Command::KeepParameters:
@@ -3204,7 +3213,15 @@ void CMainDlg::PrefetchDIB(const QRect& clientRect) {
     QSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.size(), GetAutoZoomMode(), m_dZoom);
     QSize clippedSize(std::min<long>(clientRect.width(), newSize.width()), std::min<long>(clientRect.height(), newSize.height()));
     CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, LimitOffsets(m_offsets, clientRect.size(), newSize));
-    m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, *m_pImageProcParams, CreateDefaultProcessingFlags());
+    m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, GetEffectiveProcessingParams(), CreateDefaultProcessingFlags());
+}
+
+CImageProcessingParams CMainDlg::GetEffectiveProcessingParams() const {
+    CImageProcessingParams params = *m_pImageProcParams;
+    if (m_bBWMode) {
+        params.Saturation = 0.0;
+    }
+    return params;
 }
 
 double CMainDlg::GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect) {
