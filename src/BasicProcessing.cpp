@@ -512,8 +512,8 @@ void CBasicProcessing::MirrorVInplace(int nWidth, int nHeight, int nStride, void
                 pTgt++; pSource++;
             }
         } else {
-            uint8* pSource = (uint8*)pDIBPixels + (nHeight - 1 - j) * nStride;
-            uint8* pTgt = (uint8*)pDIBPixels + j * nStride;
+            uint8* pSource = (uint8*)pDIBPixels + (size_t)(nHeight - 1 - j) * nStride;
+            uint8* pTgt = (uint8*)pDIBPixels + (size_t)j * nStride;
             for (int i = 0; i < nStride; i++) {
                 uint8 t = *pTgt;
                 *pTgt = *pSource;
@@ -555,9 +555,9 @@ void CBasicProcessing::Convert32bppTo24bppDIB(int nWidth, int nHeight, void* pDI
     for (int j = 0; j < nHeight; j++) {
         const uint8* pSourceDIB;
         if (bFlip) {
-            pSourceDIB = (uint8*)pDIBSource + (nHeight - 1 - j)*nWidth*4;
+            pSourceDIB = (uint8*)pDIBSource + (size_t)(nHeight - 1 - j)*nWidth*4;
         } else {
-            pSourceDIB = (uint8*)pDIBSource + j*nWidth*4;
+            pSourceDIB = (uint8*)pDIBSource + (size_t)j*nWidth*4;
         }
         for (int i = 0; i < nWidth; i++) {
             *pTargetDIB++ = pSourceDIB[0];
@@ -652,14 +652,14 @@ void* CBasicProcessing::PointSample(CSize fullTargetSize, CPoint fullTargetOffse
     CSize sourceSize, const void* pPixels, int nChannels) {
     if (fullTargetSize.cx < 1 || fullTargetSize.cy < 1 ||
         clippedTargetSize.cx < 1 || clippedTargetSize.cy < 1 ||
-        fullTargetOffset.x < 0 || fullTargetOffset.x < 0 ||
+        fullTargetOffset.x < 0 || fullTargetOffset.y < 0 ||
         clippedTargetSize.cx + fullTargetOffset.x > fullTargetSize.cx ||
         clippedTargetSize.cy + fullTargetOffset.y > fullTargetSize.cy ||
         pPixels == NULL || (nChannels != 3 && nChannels != 4)) {
         return NULL;
     }
 
-    uint8* pDIB = new(std::nothrow) uint8[clippedTargetSize.cx*4 * clippedTargetSize.cy];
+    uint8* pDIB = new(std::nothrow) uint8[(size_t)clippedTargetSize.cx * 4 * clippedTargetSize.cy];
     if (pDIB == NULL) return NULL;
 
     uint32 nIncrementX, nIncrementY;
@@ -679,7 +679,8 @@ void* CBasicProcessing::PointSample(CSize fullTargetSize, CPoint fullTargetOffse
     uint32 nCurY = fullTargetOffset.y*nIncrementY;
     uint32 nStartX = fullTargetOffset.x*nIncrementX;
     for (int j = 0; j < clippedTargetSize.cy; j++) {
-        pSrc = (uint8*)pPixels + nPaddedSourceWidth * (nCurY >> 16);
+        // 64 bit offset: images can have more than 4 GiB of pixel data
+        pSrc = (uint8*)pPixels + (size_t)nPaddedSourceWidth * (nCurY >> 16);
         uint32 nCurX = nStartX;
         if (nChannels == 3) {
             for (int i = 0; i < clippedTargetSize.cx; i++) {
@@ -827,7 +828,7 @@ static uint8* ApplyFilter(int nSourceWidth, int nTargetWidth, int nHeight,
                           int nFilterOffset,
                           const uint8* pSource) {
 
-    uint8* pTarget = new(std::nothrow) uint8[nTargetWidth*4*nHeight];
+    uint8* pTarget = new(std::nothrow) uint8[(size_t)nTargetWidth*4*nHeight];
     if (pTarget == NULL) return NULL;
 
     // width of new image is (after rotation) : nHeight
@@ -838,7 +839,7 @@ static uint8* ApplyFilter(int nSourceWidth, int nTargetWidth, int nHeight,
     uint8* pTargetPixelLine = NULL;
     const int FP_05 = 255; // rounding correction because in filter 1.0 is 16383 but we shift by 14 what is a division by 16384
     for (int j = 0; j < nHeight; j++) {
-        pSourcePixelLine = ((uint8*) pSource) + nPaddedSourceWidth * (j + nStartY);
+        pSourcePixelLine = ((uint8*) pSource) + (size_t)nPaddedSourceWidth * (j + nStartY);
         pTargetPixelLine = pTarget + 4*j;
         uint8* pTargetPixel = pTargetPixelLine;
         uint32 nX = nStartX_FP;
