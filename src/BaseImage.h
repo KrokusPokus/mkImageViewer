@@ -174,14 +174,6 @@ public:
     void SetJPEGComment(const QString& sComment) { m_sJPEGComment = sComment; }
     QString GetJPEGComment() { return m_sJPEGComment; }
 
-    // Sets and gets the name of the image file within the archive (only for images in an archive, empty otherwise)
-    void SetArchiveFileName(const QString& sName) { m_sArchiveFileName = sName; }
-    const QString& ArchiveFileName() const { return m_sArchiveFileName; }
-
-    // Sets and gets the size in bytes (uncompressed) of the image file within the archive (only for images in an archive, 0 otherwise)
-    void SetArchiveFileSize(unsigned long long nSize) { m_nArchiveFileSize = nSize; }
-    unsigned long long ArchiveFileSize() const { return m_nArchiveFileSize; }
-
     // Converts the target offset from 'center of image' based format to pixel coordinate format 
     static CPoint ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset);
 
@@ -208,8 +200,6 @@ private:
     int m_nEXIFSize;
     CEXIFReader* m_pEXIFReader;
     QString m_sJPEGComment;
-    QString m_sArchiveFileName;
-    unsigned long long m_nArchiveFileSize = 0;
     int m_nOrigWidth, m_nOrigHeight; // these may changes by rotation
     int m_nInitOrigWidth, m_nInitOrigHeight; // original width of image when constructed (before any rotation and crop)
     int m_nOriginalChannels;

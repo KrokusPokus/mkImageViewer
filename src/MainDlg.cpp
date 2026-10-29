@@ -78,12 +78,24 @@ namespace {
         FileLoad_Ok = 0,
         FileLoad_LoadError = 1,
         FileLoad_SlideShowListInvalid = 2,
-        FileLoad_NoFilesInDirectory = 3,
-
-        // these can be combined with other error codes, so make sure they work with bit arithmetic
-        FileLoad_OutOfMemory = 65536,
-        FileLoad_ExceptionError = 32768
+        FileLoad_NoFilesInDirectory = 3
     };
+
+    // Text for the reason why an image could not be loaded
+    QString LoadErrorReasonText(ELoadError eReason) {
+        switch (eReason) {
+        case ELoadError::FileNotFound:    return QStringLiteral("File not found");
+        case ELoadError::FileNotReadable: return QStringLiteral("File could not be opened or read");
+        case ELoadError::ArchiveError:    return QStringLiteral("Archive could not be opened");
+        case ELoadError::ArchiveEmpty:    return QStringLiteral("Archive contains no images");
+        case ELoadError::NotDecodable:    return QStringLiteral("Corrupt or unsupported image data");
+        case ELoadError::TooLarge:        return QStringLiteral("Image or file too large");
+        case ELoadError::OutOfMemory:     return QStringLiteral("Not enough memory available");
+        case ELoadError::Exception:       return QStringLiteral("An exception error has occured");
+        case ELoadError::None:            break;
+        }
+        return QString();
+    }
 
     QString FormatFileSize(qint64 bytes) {
         static const QLocale locale = QLocale::system();
@@ -192,19 +204,21 @@ namespace {
             );
     }
 
-    // Draws an error text for the given file loading error, and detailed load error code (bit combination of EFileLoadError codes)
-    void DrawImageLoadErrorText(QPainter& painter, const QRect& clientRect, const QString& failedFileName, int nFileLoadError, int nLoadErrorDetail) {
-        const bool bOutOfMemory = (nLoadErrorDetail & FileLoad_OutOfMemory) != 0;
-        const bool bExceptionError = (nLoadErrorDetail & FileLoad_ExceptionError) != 0;
-
+    // Draws an error text for the given file loading error (EFileLoadError), with the reason and, for a page of an
+    // archive, the page number
+    // nFileSize: size shown for FileLoad_LoadError (for an image in an archive the size of that image, not of the archive)
+    void DrawImageLoadErrorText(QPainter& painter, const QRect& clientRect, const QString& failedFileName, qint64 nFileSize,
+                                int nFileLoadError, ELoadError eReason, const CImagePosition& position) {
         QString message;
 
         switch (nFileLoadError) {
         case FileLoad_LoadError:
             {
-            QFileInfo fileInfo(failedFileName);
-            QString sFileSize = FormatFileSize(fileInfo.size());
+            QString sFileSize = FormatFileSize(nFileSize);
             message = QStringLiteral("File could not be read:\n\n%1\nFile size: %2").arg(failedFileName, sFileSize);
+            if (position.IsMultiPageArchive()) {
+                message += QStringLiteral("\nPage %1 of %2").arg(position.FrameIndex + 1).arg(position.FrameCount);
+            }
             break;
             }
 
@@ -220,16 +234,9 @@ namespace {
             return;
         }
 
-        if (bOutOfMemory) {
+        if (nFileLoadError == FileLoad_LoadError && eReason != ELoadError::None) {
             message += QLatin1Char('\n');
-            message += QStringLiteral("Reason:") + QLatin1Char(' ') +
-                       QStringLiteral("Not enough memory available");
-        }
-        else if (nFileLoadError == FileLoad_LoadError) {
-            if (bExceptionError) {
-                message += QLatin1Char('\n');
-                message += QStringLiteral("An exception error has occured.");
-            }
+            message += QStringLiteral("Reason: ") + LoadErrorReasonText(eReason);
         }
 
         QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), clientRect.height());
@@ -318,8 +325,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_pFileList = NULL;
     m_pImageProvider = NULL;
     m_pCurrentImage = NULL;
-    m_bOutOfMemoryLastImage = false;
-    m_bExceptionErrorLastImage = false;
     m_nLastLoadError = FileLoad_Ok;
 
     m_nLastSlideShowImageTickCount = 0;
@@ -468,13 +473,11 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
     m_pImageProvider = new CImageProvider(this, nReadAheadBuffers);
 
-    m_pCurrentImage = m_pImageProvider->RequestImage(m_pFileList,
-                                                    CImageProvider::FORWARD,
-                                                    m_pFileList->Current(),
-                                                    nFrameIndex,
-                                                    CreateProcessParams(!m_bFullScreenMode),
-                                                    m_bOutOfMemoryLastImage,
-                                                    m_bExceptionErrorLastImage);
+    TakeLoadResult(m_pImageProvider->RequestImage(m_pFileList,
+                                                  CImageProvider::FORWARD,
+                                                  m_pFileList->Current(),
+                                                  nFrameIndex,
+                                                  CreateProcessParams(!m_bFullScreenMode)));
 
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
@@ -609,9 +612,9 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             if (!sFullPath.isEmpty()) {
                 QFileInfo fileInfo(sFullPath);
                 // for images in an archive: size of the file within the archive, not of the archive
-                const bool bArchiveEntry = m_pCurrentImage->InArchive() && !m_pCurrentImage->ArchiveFileName().isEmpty();
-                QString sFileSize = FormatFileSize(bArchiveEntry ? static_cast<qint64>(m_pCurrentImage->ArchiveFileSize())
-                                                                 : fileInfo.size());
+                const CImagePosition position = CurrentPosition();
+                const bool bArchiveEntry = position.InArchive && !position.EntryName.isEmpty();
+                QString sFileSize = FormatFileSize(bArchiveEntry ? static_cast<qint64>(position.EntrySize) : fileInfo.size());
                 QString visiblePath = CurrentDisplayPath(); // for images in an archive "archive/file"
 
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
@@ -814,17 +817,24 @@ void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect,
         painter.drawText(rectText, Qt::AlignCenter | Qt::TextWordWrap, message);
     }
     else if (pCurrentImage == NULL) {
+        const CImagePosition position = CurrentPosition();
         QString sFileName;
+        qint64 nFileSize = 0;
         if (m_nLastLoadError == FileLoad_SlideShowListInvalid) {
             sFileName = m_sStartupFile;
         } else if (m_nLastLoadError == FileLoad_NoFilesInDirectory) {
             sFileName = m_pFileList->CurrentDirectory();
+        } else if (position.InArchive && !position.EntryName.isEmpty()) {
+            // a page of the archive could not be read: the image file within the archive and its size
+            sFileName = CurrentDisplayPath();
+            nFileSize = static_cast<qint64>(position.EntrySize);
         } else {
-            sFileName = CurrentFileName(false);
+            // a file, or an archive that could not be opened: the file itself and its size
+            sFileName = QDir::toNativeSeparators(CurrentFileName(false));
+            nFileSize = QFileInfo(CurrentFileName(false)).size();
         }
 
-        DrawImageLoadErrorText(painter, clientRect, sFileName, m_nLastLoadError,
-                               (m_bOutOfMemoryLastImage ? FileLoad_OutOfMemory : 0) | (m_bExceptionErrorLastImage ? FileLoad_ExceptionError : 0));
+        DrawImageLoadErrorText(painter, clientRect, sFileName, nFileSize, m_nLastLoadError, m_eLoadErrorReason, position);
     }
 }
 void CMainDlg::resizeEvent(QResizeEvent* event) {
@@ -2403,13 +2413,11 @@ void CMainDlg::OpenFile(const QString& fileName) {
     m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
     m_pImageProvider->ClearAllRequests();
 
-    m_pCurrentImage = m_pImageProvider->RequestImage(m_pFileList,
-                                                    CImageProvider::FORWARD,
-                                                    m_pFileList->Current(),
-                                                    nFrameIndex,
-                                                    CreateProcessParams(false),
-                                                    m_bOutOfMemoryLastImage,
-                                                    m_bExceptionErrorLastImage);
+    TakeLoadResult(m_pImageProvider->RequestImage(m_pFileList,
+                                                  CImageProvider::FORWARD,
+                                                  m_pFileList->Current(),
+                                                  nFrameIndex,
+                                                  CreateProcessParams(false)));
 
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
 
@@ -2486,27 +2494,31 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     // if we are at the last image,
     // if we're at the last index of a multi-framed image (not animation)
     // don't wrap around to index 0
+    // The position is also known if the current image could not be loaded (e.g. a page of an archive)
+    const CImagePosition position = CurrentPosition();
+    const bool bImageLoaded = (m_pCurrentImage != NULL);
+
     bool bNoWrapAroundEdgeFrame = !CSettingsProvider::This().WrapAroundFolder() &&
-        (m_pCurrentImage == NULL ? false : m_pCurrentImage->NumberOfFrames() > 1 && !m_pCurrentImage->IsAnimation());
+        position.FrameCount > 1 && !position.IsAnimation;
 
     int nFrameIndex = 0;
     bool bCheckIfSameImage = true;
     m_pFileList->SetCheckpoint();
     CFileList* pOldFileList = m_pFileList;
-    int nOldFrameIndex = (m_pCurrentImage == NULL) ? 0 : m_pCurrentImage->FrameIndex();
+    int nOldFrameIndex = position.FrameIndex;
     CImageProvider::EReadAheadDirection eDirection = CImageProvider::FORWARD;
 
     switch (ePos) {
         case POS_First:
-            if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
+            if (position.IsMultiPageArchive()) {
                 nFrameIndex = 0;
             } else {
                 m_pFileList->First();
             }
             break;
         case POS_Last:
-            if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-                nFrameIndex = m_pCurrentImage->NumberOfFrames() - 1;
+            if (position.IsMultiPageArchive()) {
+                nFrameIndex = position.FrameCount - 1;
             } else {
                 m_pFileList->Last();
             }
@@ -2515,7 +2527,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         case POS_NextFrame:
             {
                 bool bGotoNextImage = true;
-                nFrameIndex = Helpers::GetFrameIndex(m_pCurrentImage, +1, ePos == POS_NextFrame, bGotoNextImage);
+                nFrameIndex = Helpers::GetFrameIndex(position, bImageLoaded, +1, ePos == POS_NextFrame, bGotoNextImage);
                 if (bGotoNextImage)
                     m_pFileList = m_pFileList->Next();
                 else
@@ -2525,7 +2537,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         case POS_NextFile:
         case POS_NextSlideShow:
             {
-                if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
+                if (position.IsMultiPageArchive()) {
                     SaveBookmark();
                 }
 
@@ -2549,7 +2561,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
             break;
         case POS_PreviousFile:
             {
-                if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
+                if (position.IsMultiPageArchive()) {
                     SaveBookmark();
                 }
                 
@@ -2575,15 +2587,15 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         case POS_Previous:
             {
                 bool bGotoPrevImage;
-                nFrameIndex = Helpers::GetFrameIndex(m_pCurrentImage, -1, false, bGotoPrevImage);
+                nFrameIndex = Helpers::GetFrameIndex(position, bImageLoaded, -1, false, bGotoPrevImage);
                 if (bGotoPrevImage) m_pFileList = m_pFileList->Prev();
                 eDirection = CImageProvider::BACKWARD;
                 bNoWrapAroundEdgeFrame = false; // previous image at edge is not a wraparound
                 break;
             }
         case POS_Current:
-            if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-                nFrameIndex = m_pCurrentImage->FrameIndex();
+            if (position.IsMultiPageArchive()) {
+                nFrameIndex = position.FrameIndex;
             }
             bCheckIfSameImage = false; // do something even when not moving iterator on filelist
             break;
@@ -2622,6 +2634,8 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
     // do not perform a new image request if flagged
     if (nFlags & NO_REQUEST) {
+        m_currentPosition = CImagePosition{}; // nothing known about the file the list is on now
+        m_eLoadErrorReason = ELoadError::None;
         return;
     }
 
@@ -2632,13 +2646,11 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
 /* Debugging */ qDebug() << "GotoImage()->RequestImage()  nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
-    m_pCurrentImage = m_pImageProvider->RequestImage(m_pFileList,
-                                                    (ePos == POS_AwayFromCurrent) ? CImageProvider::NONE : eDirection,
-                                                    m_pFileList->Current(),
-                                                    nFrameIndex,
-                                                    procParams,
-                                                    m_bOutOfMemoryLastImage,
-                                                    m_bExceptionErrorLastImage);
+    TakeLoadResult(m_pImageProvider->RequestImage(m_pFileList,
+                                                  (ePos == POS_AwayFromCurrent) ? CImageProvider::NONE : eDirection,
+                                                  m_pFileList->Current(),
+                                                  nFrameIndex,
+                                                  procParams));
 
     m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current().isEmpty()) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
 
@@ -3082,12 +3094,12 @@ QString CMainDlg::CurrentFileName(bool bFileNameOnly) {
 }
 
 // Full path of the current file for display (native separators). For an image in an archive the name of the
-// file within the archive is appended, e.g. "/path/to/archive.zip/image.jpg".
+// file within the archive is appended, e.g. "/path/to/archive.zip/image.jpg" (also if that file could not be read).
 QString CMainDlg::CurrentDisplayPath() {
     QString sPath = CurrentFileName(false);
-    if (!sPath.isEmpty() && m_pCurrentImage != nullptr && m_pCurrentImage->InArchive() &&
-        !m_pCurrentImage->ArchiveFileName().isEmpty()) {
-        sPath += QLatin1Char('/') + m_pCurrentImage->ArchiveFileName();
+    const CImagePosition position = CurrentPosition();
+    if (!sPath.isEmpty() && position.InArchive && !position.EntryName.isEmpty()) {
+        sPath += QLatin1Char('/') + position.EntryName;
     }
     return QDir::toNativeSeparators(sPath);
 }
@@ -3128,10 +3140,8 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     } else {
         QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
 
-        QString indexStr;
-        if (m_pCurrentImage != nullptr) {
-            indexStr = QString(GetMultiframeIndex(m_pCurrentImage));
-        }
+        // also for a page of an archive that could not be read
+        const QString indexStr = GetMultiframeIndex(CurrentPosition());
 
         sWindowText = visibleName + indexStr;
         if (CSettingsProvider::This().ShowAppNameInTitle()) {
@@ -3660,9 +3670,11 @@ void CMainDlg::SaveBookmark() {
 
     if (isArchive) {
         // In Archiven: 1-basierter Frame-Index
-        if (m_pCurrentImage && m_pCurrentImage->ContainerHasMultipleImages()) {
-            const int nCurrentFrame = m_pCurrentImage->FrameIndex();
-            if (nCurrentFrame > 0 && nCurrentFrame < m_pCurrentImage->NumberOfFrames() - 1) {
+        const CImagePosition position = CurrentPosition(); // also known if the page could not be read
+        if (position.IsMultiPageArchive()) {
+            const int nCurrentFrame = position.FrameIndex;
+            const int nFrameCount = position.FrameCount;
+            if (nCurrentFrame > 0 && nCurrentFrame < nFrameCount - 1) {
                 bIsEndpoint = false;
             }
             newValueStr = QString::number(nCurrentFrame + 1);
@@ -3697,6 +3709,22 @@ void CMainDlg::SaveBookmark() {
     iniSettings.endGroup();
 }
 
+void CMainDlg::TakeLoadResult(const CImageLoadResult& result) {
+    m_pCurrentImage = result.Image;
+    m_currentPosition = result.Position;
+    m_eLoadErrorReason = result.Error;
+}
+
+CImagePosition CMainDlg::CurrentPosition() const {
+    const QString sCurrentFile = (m_pFileList != nullptr) ? m_pFileList->Current() : QString();
+    if (!sCurrentFile.isEmpty() && m_currentPosition.FileName == sCurrentFile) {
+        return m_currentPosition;
+    }
+    CImagePosition position; // the file list moved on without a request: nothing known about the file yet
+    position.FileName = sCurrentFile;
+    return position;
+}
+
 // Brings all state that depends on the file name up to date after the DISPLAYED file has been renamed
 // on disk (by RenameDialog). The image itself is not touched or reloaded, so it stays in the cache.
 void CMainDlg::OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath) {
@@ -3716,6 +3744,9 @@ void CMainDlg::OnCurrentFileRenamed(const QString& sOldPath, const QString& sNew
 
     if (QDir::cleanPath(m_sStartupFile) == QDir::cleanPath(sOldPath)) {
         m_sStartupFile = sNewPath;
+    }
+    if (QDir::cleanPath(m_currentPosition.FileName) == QDir::cleanPath(sOldPath)) {
+        m_currentPosition.FileName = m_pFileList->Current();
     }
 
     UpdateWindowTitle();
@@ -3782,13 +3813,11 @@ void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
 }
 
 // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
-QString CMainDlg::GetMultiframeIndex(CBaseImage* pImage) {
-    const bool isMultiFrame = (pImage != nullptr) && (pImage->NumberOfFrames() > 1);
-    
-    if (isMultiFrame && !pImage->IsAnimation()) {
+QString CMainDlg::GetMultiframeIndex(const CImagePosition& position) {
+    if (position.FrameCount > 1 && !position.IsAnimation) {
         return QStringLiteral(" [%1/%2]")
-            .arg(pImage->FrameIndex() + 1)
-            .arg(pImage->NumberOfFrames());
+            .arg(position.FrameIndex + 1)
+            .arg(position.FrameCount);
     }
     
     return QString();

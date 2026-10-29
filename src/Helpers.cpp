@@ -191,21 +191,22 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
 }
 
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
-    int GetFrameIndex(CBaseImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage) {
-        bool isMultiFrame = pImage != NULL && pImage->NumberOfFrames() > 1;
-        bool isAnimation = pImage != NULL && pImage->IsAnimation();
-        bool bInArchive = pImage != NULL && pImage->InArchive();
+    int GetFrameIndex(const CImagePosition& position, bool bImageLoaded, int iOffset, bool bSwitchFrame, bool & switchImage) {
+        const int nNumberOfFrames = position.FrameCount;
+        bool isMultiFrame = nNumberOfFrames > 1;
+        bool isAnimation = position.IsAnimation;
+        bool bInArchive = position.InArchive;
         int nFrameIndex = 0;
         switchImage = true;
         if (isMultiFrame) {
             switchImage = false;
-            nFrameIndex = pImage->FrameIndex() + iOffset;
+            nFrameIndex = position.FrameIndex + iOffset;
             if (isAnimation) {
                 if (bSwitchFrame) {
                     if (nFrameIndex < 0) {
-                        nFrameIndex = nFrameIndex + pImage->NumberOfFrames();
-                    } else if (nFrameIndex > pImage->NumberOfFrames() - 1) {
-                        nFrameIndex = nFrameIndex - pImage->NumberOfFrames();
+                        nFrameIndex = nFrameIndex + nNumberOfFrames;
+                    } else if (nFrameIndex > nNumberOfFrames - 1) {
+                        nFrameIndex = nFrameIndex - nNumberOfFrames;
                     }
                 } else {
                     switchImage = true;
@@ -213,18 +214,18 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
                 }
             } else if (bInArchive) {
                 if (nFrameIndex < 0) {
-                    nFrameIndex = nFrameIndex + pImage->NumberOfFrames();
-                } else if (nFrameIndex > pImage->NumberOfFrames() - 1) {
-                    nFrameIndex = nFrameIndex - pImage->NumberOfFrames();
+                    nFrameIndex = nFrameIndex + nNumberOfFrames;
+                } else if (nFrameIndex > nNumberOfFrames - 1) {
+                    nFrameIndex = nFrameIndex - nNumberOfFrames;
                 }
             } else {
-                if (nFrameIndex < 0 || nFrameIndex >= pImage->NumberOfFrames()) {
+                if (nFrameIndex < 0 || nFrameIndex >= nNumberOfFrames) {
                     nFrameIndex = 0;
                     switchImage = true;
                 }
             }
         }
-        if (bSwitchFrame && pImage == NULL) {
+        if (bSwitchFrame && !bImageLoaded) {
             switchImage = false; // never switch image when error during animation playing
         }
 

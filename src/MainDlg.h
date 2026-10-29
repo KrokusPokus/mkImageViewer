@@ -95,8 +95,15 @@ private:
     CDirectoryWatcher* m_pDirectoryWatcher = NULL; // notifies the main window when the current file changed or a file in the current directory was added or deleted
     CImageProvider * m_pImageProvider; // reads image (of any format, not only JPEGs) files, using read ahead
     CBaseImage * m_pCurrentImage; // currently displayed image
-    bool m_bOutOfMemoryLastImage; // true if the last image could not be requested because not enough memory
-    bool m_bExceptionErrorLastImage; // true if the last image could not be requested because of an unhandled exception
+    // Result of the last image request: position (file, frame, number of frames) and why the image could not be
+    // loaded. The position is known also without an image, so navigation (e.g. through the pages of an archive)
+    // does not depend on whether the current page could be read.
+    CImagePosition m_currentPosition;
+    ELoadError m_eLoadErrorReason = ELoadError::None;
+    // Takes over image, position and reason of an image request
+    void TakeLoadResult(const CImageLoadResult& result);
+    // Position of the current file of the file list (frame 0 of 1 if nothing is known about it)
+    CImagePosition CurrentPosition() const;
     int m_nLastLoadError; // one of EFileLoadError
     
     // Current parameter set
@@ -217,7 +224,7 @@ private:
     void SaveBookmark();
     bool IsBookModeFile(const QString& filePath);
     double MaxRatio(double valA, double valB);
-    QString GetMultiframeIndex(CBaseImage* pImage);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
+    QString GetMultiframeIndex(const CImagePosition& position);    // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
     QString formatOutputZoomFactor(double m_dZoom);
     void onShowContextMenu(const QPoint &pos);
 

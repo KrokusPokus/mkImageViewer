@@ -36,6 +36,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
+#include <QSet>
 #include <QImage>
 #include <QImageReader>
 #include <QSize>
@@ -111,30 +112,32 @@ public:
     CErrorModeGuard& operator=(const CErrorModeGuard&) = delete;
 };
 
-// Reads a whole file into a freshly allocated buffer.
-// Returns nullptr on failure. bOutOfMemory is set only if the file is too large or the allocation failed.
-std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, qint64 nMaxSize, qint64& nFileSize, bool& bOutOfMemory) {
+// Reads a whole file into a freshly allocated buffer. Returns nullptr on failure, eError tells why.
+std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, qint64 nMaxSize, qint64& nFileSize, ELoadError& eError) {
     nFileSize = 0;
-    bOutOfMemory = false;
+    eError = ELoadError::None;
 
     QFile file(sFileName);
     if (!file.open(QIODevice::ReadOnly)) {
+        eError = ELoadError::FileNotReadable;
         return nullptr;
     }
     const qint64 nSize = file.size();
     if (nSize <= 0) {
+        eError = ELoadError::NotDecodable; // empty file
         return nullptr;
     }
     if (nSize > std::min<qint64>(nMaxSize, INT_MAX)) {
-        bOutOfMemory = true;
+        eError = ELoadError::TooLarge;
         return nullptr;
     }
     std::unique_ptr<char[]> pBuffer(new (std::nothrow) char[static_cast<size_t>(nSize)]);
     if (!pBuffer) {
-        bOutOfMemory = true;
+        eError = ELoadError::OutOfMemory;
         return nullptr;
     }
     if (file.read(pBuffer.get(), nSize) != nSize) {
+        eError = ELoadError::FileNotReadable;
         return nullptr;
     }
     nFileSize = nSize;
@@ -302,8 +305,6 @@ struct CImageFrameInfo {
     int nFrameCount = 1;
     int nFrameTimeMs = 100;
     bool bInArchive = false;
-    QString sArchiveFileName; // name of the entry within the archive (only if bInArchive)
-    unsigned long long nArchiveFileSize = 0; // size of the entry in bytes (uncompressed, only if bInArchive)
 };
 
 // Maps the format name reported by QImageReader::format() to the image format used by CBaseImage.
@@ -428,8 +429,6 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, frame.eFormat,
                                             frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs, frame.bInArchive);
     pDIB.release(); // owned by the CBaseImage now
-    pJPEGImage->SetArchiveFileName(frame.sArchiveFileName);
-    pJPEGImage->SetArchiveFileSize(frame.nArchiveFileSize);
     return pJPEGImage;
 }
 
@@ -464,7 +463,7 @@ CBaseImage* DecodeBufferWithQt(const void* pData, int nSize, void* pEXIFData, co
 
 // Failed:       this single entry could not be read (corrupt data, CRC error, ...) -> skip it like a non-image
 // ArchiveError: the archive itself could not be opened -> abort and keep the entry list intact
-enum class EEntryRead { Ok, Empty, Failed, ArchiveError, OutOfMemory };
+enum class EEntryRead { Ok, Empty, Failed, ArchiveError, TooLarge, OutOfMemory };
 
 struct ZipCloser {
     void operator()(struct zip_t* pZip) const { zip_close(pZip); }
@@ -480,7 +479,7 @@ EEntryRead ReadZipEntry(const ZipEntry& z, Bit7zLibrary* p7zLibrary, const std::
         return EEntryRead::Empty;
     }
     if (z.size > kMaxZipEntrySize) {
-        return EEntryRead::OutOfMemory;
+        return EEntryRead::TooLarge;
     }
     pBuffer.reset(new (std::nothrow) char[static_cast<size_t>(z.size)]);
     if (!pBuffer) {
@@ -692,8 +691,6 @@ CImageFrameInfo MakeFrameInfo(EImageFormat eFormat, const CDecodeTarget& target)
         info.nFrameIndex = target.nEntryIndex;
         info.nFrameCount = target.nArchiveCount;
         info.nFrameTimeMs = kMangaFrameTimeMs;
-        info.sArchiveFileName = target.sArchiveFileName;
-        info.nArchiveFileSize = target.nArchiveFileSize;
     }
     return info;
 }
@@ -716,8 +713,6 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
         // For an entry of an archive "the frame" is the entry
         pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, eFormat,
                                     target.bMultipleFiles, target.nEntryIndex, target.nArchiveCount, kMangaFrameTimeMs, target.bInArchive));
-        pImage->SetArchiveFileName(target.sArchiveFileName);
-        pImage->SetArchiveFileSize(target.nArchiveFileSize);
     } else {
         pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, eFormat,
                                     d.bHasAnimation, d.nFrameIndex, d.nFrameCount, d.nFrameTimeMs, target.bInArchive));
@@ -764,10 +759,16 @@ CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
             auto& rq = static_cast<CRequest&>(*r);
             if (rq.Processed && !rq.Deleted && rq.RequestHandle == nHandle) {
                 rq.Deleted = true;
-                return CImageData(rq.Image, rq.OutOfMemory, rq.ExceptionError);
+                CImageData d;
+                d.Image = rq.Image;
+                d.Error = rq.Error;
+                d.Position = rq.Position;
+                return d;
             }
         }
-        return CImageData(nullptr, false, false);
+        CImageData d; // cancelled before it was processed
+        d.Error = ELoadError::Exception;
+        return d;
     });
 }
 
@@ -821,6 +822,30 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
     CRequest& rq = static_cast<CRequest&>(request);
     const uint64_t startTimeMs = Helpers::GetTimeMs();
 
+    // Fills the position, also if the image could not be read. Outside of an archive a failed load has frame 0 of 1
+    // (the count is unknown); ProcessReadZipRequest() sets the position of an archive page itself.
+    ScopeExit fillPosition([&rq] {
+        if (rq.Image != nullptr) {
+            rq.Error = ELoadError::None;
+            rq.Position.FrameIndex = rq.Image->FrameIndex();
+            rq.Position.FrameCount = rq.Image->NumberOfFrames();
+            rq.Position.IsAnimation = rq.Image->IsAnimation();
+            rq.Position.InArchive = rq.Image->InArchive();
+        } else {
+            if (rq.Error == ELoadError::None) {
+                rq.Error = ELoadError::NotDecodable;
+            }
+            if (!rq.Position.InArchive) {
+                rq.Position = CImagePosition{};
+            }
+        }
+    });
+
+    if (!QFileInfo::exists(rq.FileName)) {
+        rq.Error = ELoadError::FileNotFound;
+        return;
+    }
+
     EImageFormat eFormat = GetImageFormat(rq.FileName);
     if (eFormat != IF_ZIP && CSettingsProvider::This().ForceQImageReader()) {
         eFormat = IF_Unknown; // der default-Zweig des switch ist der Qt-Pfad
@@ -859,7 +884,7 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
         if (!ProcessImageAfterLoad(&rq)) {
             delete rq.Image;
             rq.Image = nullptr;
-            rq.OutOfMemory = true;
+            rq.Error = ELoadError::OutOfMemory;
         }
     }
 }
@@ -960,10 +985,8 @@ void CImageLoadThread::ProcessReadFileRequest(CRequest* request, EImageFormat eF
     std::unique_ptr<char[]> pBuffer;
     qint64 nFileSize = 0;
     if (!bUseCachedDecoder) {
-        bool bOutOfMemory = false;
-        pBuffer = ReadWholeFile(request->FileName, static_cast<qint64>(MaxFileSizeForFormat(eFormat)), nFileSize, bOutOfMemory);
+        pBuffer = ReadWholeFile(request->FileName, static_cast<qint64>(MaxFileSizeForFormat(eFormat)), nFileSize, request->Error);
         if (!pBuffer) {
-            request->OutOfMemory = bOutOfMemory;
             return;
         }
     }
@@ -972,7 +995,7 @@ void CImageLoadThread::ProcessReadFileRequest(CRequest* request, EImageFormat eF
 
 // Decodes the encoded image in pBuffer and stores the result in request->Image. This is the only place that knows
 // how to turn the data of a format into a CBaseImage, for single files and for entries of an archive alike.
-// On failure request->OutOfMemory / request->ExceptionError are set accordingly.
+// On failure request->Error tells why.
 //
 // Buffer ownership (pBuffer is empty if a cached animation is continued):
 //  - WebpReaderWriter, PngReader and AvifReader copy what they need for an animation into their own cache,
@@ -1001,7 +1024,7 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
                 return EDecodeStatus::Ok;
             }
             if (bQtOutOfMemory) {
-                request->OutOfMemory = true;
+                request->Error = ELoadError::OutOfMemory;
                 return EDecodeStatus::OutOfMemory;
             }
             return EDecodeStatus::NotDecodable;
@@ -1046,11 +1069,11 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
         // The state of a decoder is unknown after a failure
         DeleteCachedDecoder(eFormat);
         if (d.bOutOfMemory) {
-            request->OutOfMemory = true;
+            request->Error = ELoadError::OutOfMemory;
             return EDecodeStatus::OutOfMemory;
         }
         if (bException && eFormat != IF_AVIF) {
-            request->ExceptionError = true;
+            request->Error = ELoadError::Exception;
             return EDecodeStatus::Exception;
         }
 
@@ -1079,16 +1102,16 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
             }
         }
         if (bException && status == EDecodeStatus::NotDecodable) {
-            request->ExceptionError = true;
+            request->Error = ELoadError::Exception;
             return EDecodeStatus::Exception;
         }
         return status;
     } catch (const std::bad_alloc&) {
-        request->OutOfMemory = true;
+        request->Error = ELoadError::OutOfMemory;
         DeleteCachedDecoder(eFormat);
         return EDecodeStatus::OutOfMemory;
     } catch (...) {
-        request->ExceptionError = true;
+        request->Error = ELoadError::Exception;
         DeleteCachedDecoder(eFormat);
         return EDecodeStatus::Exception;
     }
@@ -1109,6 +1132,7 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
             DeleteCachedQtImageReader();
             auto pFile = std::make_unique<QFile>(request->FileName);
             if (!pFile->open(QIODevice::ReadOnly)) {
+                request->Error = ELoadError::FileNotReadable;
                 return;
             }
             m_pLastImageFile = std::move(pFile);
@@ -1130,7 +1154,9 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
             }
             m_bLastQtAnimation = bSupportsAnimation && m_nLastQtFrameCount > 1;
             // reject too large images before any pixel is decoded
-            if (!IsImageSizeAcceptable(m_pLastImageReader->size(), request->OutOfMemory)) {
+            bool bTooManyPixels = false;
+            if (!IsImageSizeAcceptable(m_pLastImageReader->size(), bTooManyPixels)) {
+                request->Error = ELoadError::TooLarge;
                 DeleteCachedQtImageReader();
                 return;
             }
@@ -1187,19 +1213,21 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
         request->Image = ConvertQImageToJPEGImage(std::move(image), nullptr,
                                                   CImageFrameInfo{ eFormat, bIsAnimation, nFrameIndex, nFrameCount, nFrameTimeMs },
                                                   bOutOfMemory, request->ProcessParams.TransparencyMode);
-        request->OutOfMemory = request->Image == nullptr && bOutOfMemory;
+        if (request->Image == nullptr && bOutOfMemory) {
+            request->Error = ELoadError::OutOfMemory;
+        }
         if (!bIsAnimation) {
             DeleteCachedQtImageReader();
         }
     } catch (const std::bad_alloc&) {
         delete request->Image;
         request->Image = nullptr;
-        request->OutOfMemory = true;
+        request->Error = ELoadError::OutOfMemory;
         DeleteCachedQtImageReader();
     } catch (...) {
         delete request->Image;
         request->Image = nullptr;
-        request->ExceptionError = true;
+        request->Error = ELoadError::Exception;
         DeleteCachedQtImageReader();
     }
 }
@@ -1294,6 +1322,18 @@ QString ZipEntryName(struct zip_t* pZip) {
     return sName;
 }
 
+// Only entries with these extensions are listed (formats DecodeFromBuffer() can read from an archive). The list is
+// made once when the archive is opened and never changed afterwards: the index of an entry is its page number.
+bool IsArchiveImageEntry(const QString& sEntryName) {
+    static const QSet<QString> kExtensions = {
+        QStringLiteral("jpg"), QStringLiteral("jpeg"), QStringLiteral("jfif"), QStringLiteral("bmp"), QStringLiteral("png"),
+        QStringLiteral("tif"), QStringLiteral("tiff"), QStringLiteral("gif"), QStringLiteral("webp"), QStringLiteral("jxl"),
+        QStringLiteral("avif"), QStringLiteral("heif"), QStringLiteral("heic"), QStringLiteral("hif"), QStringLiteral("tga"),
+        QStringLiteral("qoi"), QStringLiteral("ico")
+    };
+    return kExtensions.contains(QFileInfo(sEntryName).suffix().toLower());
+}
+
 } // namespace
 
 ZipEntry::ZipEntry(const QString& a_name, unsigned int a_index, unsigned long long a_size) :
@@ -1336,12 +1376,12 @@ ZipEntry::ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned 
  */
 void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
     bool bIsSameArchive = false;
-    bool bMultipleFiles = false;
     int nArchiveItemIndex = request->FrameIndex;
 
     if (request->FileName == m_sLastZipFileName) {
         if (m_nZipCount <= 0) {
-            return; // abort as no valid image entries in archive; all marked as non-image
+            request->Error = ELoadError::ArchiveEmpty;
+            return;
         }
         bIsSameArchive = true;
     } else {
@@ -1367,18 +1407,23 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                 for (const auto& item : reader) {
                     if (!item.isDir()) {
                         // path within the archive (including folders), as for ZIP entries
-                        zipEntries.push_back(ZipEntry(item.path(), item.index(), item.size()));
+                        ZipEntry entry(item.path(), item.index(), item.size());
+                        if (IsArchiveImageEntry(entry.name)) {
+                            zipEntries.push_back(std::move(entry));
+                        }
                     }
                 }
                 // The reader is destroyed here; extraction reopens the archive (extract fails otherwise).
             } catch (const BitException& ex) {
                 qDebug() << "bit7z:" << ex.what();
                 DeleteCachedZip();
+                request->Error = ELoadError::ArchiveError;
                 return;
             }
         } else {
             zip.reset(zip_open(sArchivePath.c_str(), 0, 'r'));
             if (!zip) {
+                request->Error = ELoadError::ArchiveError;
                 return;
             }
             const auto nTotal = zip_entries_total(zip.get());
@@ -1388,90 +1433,82 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                 }
                 const char* pchName = zip_entry_name(zip.get());
                 if (pchName != nullptr && !zip_entry_isdir(zip.get())) {
-                    zipEntries.push_back(ZipEntry(ZipEntryName(zip.get()), static_cast<unsigned int>(i), zip_entry_size(zip.get())));
+                    const QString sName = ZipEntryName(zip.get());
+                    if (IsArchiveImageEntry(sName)) {
+                        zipEntries.push_back(ZipEntry(sName, static_cast<unsigned int>(i), zip_entry_size(zip.get())));
+                    }
                 }
                 zip_entry_close(zip.get());
             }
         }
 
-        m_nZipCount = static_cast<int>(zipEntries.size()); // count of valid entries only
+        // The list is kept for this archive (also if it has no image at all), entries are never removed from it
+        m_nZipCount = static_cast<int>(zipEntries.size());
+        m_sLastZipFileName = request->FileName;
         if (m_nZipCount <= 0) {
+            request->Error = ELoadError::ArchiveEmpty;
             return;
-        }
-        if (m_nZipCount > 1) {
-            m_sLastZipFileName = request->FileName;
         }
     }
 
-    bMultipleFiles = m_nZipCount > 1;
     nArchiveItemIndex = std::clamp(nArchiveItemIndex, 0, m_nZipCount - 1);
     request->FrameIndex = nArchiveItemIndex;
+    // The position in the archive is known from here on, also if this page can not be read
+    request->Position.InArchive = true;
+    request->Position.FrameIndex = nArchiveItemIndex;
+    request->Position.FrameCount = m_nZipCount;
 
-    bool bSuccess = false;
-    while (!bSuccess) {
-        const ZipEntry z = zipEntries[static_cast<size_t>(nArchiveItemIndex)];
+    // One attempt: an entry that can not be read just yields no image, it keeps its index (page number)
+    const ZipEntry z = zipEntries[static_cast<size_t>(nArchiveItemIndex)];
+    request->Position.EntryName = z.name;
+    request->Position.EntrySize = z.size;
 
-        std::unique_ptr<char[]> pBuffer;
-        // Declared after pBuffer, so it runs before the buffer is released: drops every decoder that might
-        // have cached something for this entry (JXL would otherwise point into a freed buffer).
-        ScopeExit dropDecoders([this] {
-            DeleteCachedWebpDecoder();
-            DeleteCachedPngDecoder();
-            DeleteCachedJxlDecoder();
-            DeleteCachedAvifDecoder();
-        });
-        CErrorModeGuard errorModeGuard;
+    std::unique_ptr<char[]> pBuffer;
+    // Declared after pBuffer, so it runs before the buffer is released: drops every decoder that might
+    // have cached something for this entry (JXL would otherwise point into a freed buffer).
+    ScopeExit dropDecoders([this] {
+        DeleteCachedWebpDecoder();
+        DeleteCachedPngDecoder();
+        DeleteCachedJxlDecoder();
+        DeleteCachedAvifDecoder();
+    });
+    CErrorModeGuard errorModeGuard;
 
-        bool bAbort = false; // stop without removing the entry from the list
-
-        try {
-            const EEntryRead eRead = ReadZipEntry(z, use7z ? m_p7zLibrary.get() : nullptr, sArchivePath, zip, pBuffer);
-            if (eRead == EEntryRead::OutOfMemory) {
-                request->OutOfMemory = true;
-                bAbort = true;
-            } else if (eRead == EEntryRead::ArchiveError) {
-                DeleteCachedZip(); // force a fresh listing on the next request
-                bAbort = true;
-            } else if (eRead == EEntryRead::Ok) {
-                unsigned char header[16] = { 0 };
-                memcpy(header, pBuffer.get(), static_cast<size_t>(std::min<uint64_t>(sizeof(header), z.size)));
-                const EImageFormat eFormat = GetImageFormatInMemory(header, z.name);
-                if (z.size > MaxFileSizeForFormat(eFormat)) {
-                    request->OutOfMemory = true;
-                    bAbort = true;
-                } else {
-                    const CDecodeTarget target{ .bInArchive = true, .bMultipleFiles = bMultipleFiles,
-                                               .nArchiveCount = m_nZipCount, .nEntryIndex = nArchiveItemIndex,
-                                               .sArchiveFileName = z.name, .nArchiveFileSize = z.size };
-                    const EDecodeStatus eStatus = DecodeFromBuffer(request, eFormat, pBuffer, static_cast<size_t>(z.size), target);
-                    bSuccess = (eStatus == EDecodeStatus::Ok);
-                    // OutOfMemory / Exception: the request carries the flag, stop here. Anything else skips the entry.
-                    bAbort = (eStatus == EDecodeStatus::OutOfMemory || eStatus == EDecodeStatus::Exception);
-                }
+    try {
+        const EEntryRead eRead = ReadZipEntry(z, use7z ? m_p7zLibrary.get() : nullptr, sArchivePath, zip, pBuffer);
+        if (eRead == EEntryRead::OutOfMemory) {
+            request->Error = ELoadError::OutOfMemory;
+        } else if (eRead == EEntryRead::TooLarge) {
+            request->Error = ELoadError::TooLarge;
+        } else if (eRead == EEntryRead::ArchiveError) {
+            DeleteCachedZip(); // the archive could not be opened (changed or removed): list it again on the next request
+            request->Error = ELoadError::ArchiveError;
+        } else if (eRead == EEntryRead::Failed) {
+            request->Error = ELoadError::FileNotReadable; // this entry could not be extracted (e.g. CRC error)
+        } else if (eRead == EEntryRead::Empty) {
+            request->Error = ELoadError::NotDecodable;
+        } else if (eRead == EEntryRead::Ok) {
+            unsigned char header[16] = { 0 };
+            memcpy(header, pBuffer.get(), static_cast<size_t>(std::min<uint64_t>(sizeof(header), z.size)));
+            const EImageFormat eFormat = GetImageFormatInMemory(header, z.name);
+            if (z.size > MaxFileSizeForFormat(eFormat)) {
+                request->Error = ELoadError::TooLarge;
+            } else {
+                const CDecodeTarget target{ .bInArchive = true, .bMultipleFiles = m_nZipCount > 1,
+                                           .nArchiveCount = m_nZipCount, .nEntryIndex = nArchiveItemIndex };
+                // The reason of a failure is in request->Error (none set: not decodable, see ProcessRequest())
+                DecodeFromBuffer(request, eFormat, pBuffer, static_cast<size_t>(z.size), target);
             }
-            // eRead == Empty or Failed: falls through, the entry is skipped like a non-image
         }
-        catch (...) {
-            delete request->Image;
-            request->Image = nullptr;
-            bSuccess = false;
-            request->ExceptionError = true;
-            bAbort = true;
-        }
+    }
+    catch (...) {
+        delete request->Image;
+        request->Image = nullptr;
+        request->Error = ELoadError::Exception;
+    }
 
-        if (bSuccess || bAbort || request->OutOfMemory || request->ExceptionError) {
-            break;
-        }
-
-        // The entry is definitely not a (supported) image: erase it and try the next file in the archive
-        qDebug() << "ProcessReadZipRequest() Failed to open item index" << nArchiveItemIndex << " name:" << z.name << " bytes:" << z.size;
-
-        zipEntries.erase(zipEntries.begin() + nArchiveItemIndex);
-        if ((--m_nZipCount <= 0) || (nArchiveItemIndex >= m_nZipCount)) {
-            break;
-        }
-        request->FrameIndex = nArchiveItemIndex;
-        bMultipleFiles = m_nZipCount > 1;
+    if (request->Image == nullptr) {
+        qDebug() << "ProcessReadZipRequest() Failed to read item index" << nArchiveItemIndex << " name:" << z.name << " bytes:" << z.size;
     }
 }
 

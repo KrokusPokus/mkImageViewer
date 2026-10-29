@@ -1,6 +1,7 @@
 #ifndef HELPERS_H
 #define HELPERS_H
 
+#include "ImageLoadResult.h"
 #include "ImageProcessingTypes.h" // defines int8, uint8, int16, uint16, int32, uint32, EFilterType, EImageFormat
 #include "WTLCompat.h"
 
@@ -198,7 +199,8 @@ namespace Helpers {
     QString GetJPEGComment(const void* pJPEGStream, int nStreamLength);
 
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
-    int GetFrameIndex(CBaseImage* pImage, int iOffset, bool bSwitchFrame, bool & switchImage);
+    // bImageLoaded: false if the image at 'position' could not be loaded
+    int GetFrameIndex(const CImagePosition& position, bool bImageLoaded, int iOffset, bool bSwitchFrame, bool & switchImage);
 
     uint64_t GetTimeMs();
 

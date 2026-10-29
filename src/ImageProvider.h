@@ -10,6 +10,8 @@
 #include <QWaitCondition>
 #include <QDebug>
 
+#include "ImageLoadResult.h"
+
 class CBaseImage;
 class CImageLoadThread;
 class CFileList;
@@ -29,8 +31,10 @@ public:
     CImageProvider(QObject* pParent, int nNumBuffers);
     ~CImageProvider(void);
 
-    CBaseImage* RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const QString& sFileName, int nFrameIndex,
-                             const CProcessParams & processParams, bool& bOutOfMemory, bool& bExceptionError);
+    // Returns the image (nullptr if it could not be loaded), the reason of a failure and the position (file, frame,
+    // number of frames). The position is also known if the image could not be loaded, e.g. for a page of an archive.
+    CImageLoadResult RequestImage(CFileList* pFileList, EReadAheadDirection eDirection, const QString& sFileName, int nFrameIndex,
+                                  const CProcessParams & processParams);
 
     void NotifyNotUsed(CBaseImage* pImage);
     bool ClearRequest(CBaseImage* pImage, bool releaseLockedFile = false);
@@ -51,8 +55,8 @@ private:
         int Handle;
         bool InUse;
         bool IsActive;
-        bool OutOfMemory;
-        bool ExceptionError;
+        ELoadError Error = ELoadError::None;
+        CImagePosition Position;    // FileName is not set here (FileName above is the current name)
         int AccessTimeStamp;
 
         QMutex Mutex;
@@ -66,8 +70,6 @@ private:
             Handle(-1),
             InUse(false),
             IsActive(true),
-            OutOfMemory(false),
-            ExceptionError(false),
             AccessTimeStamp(-1) {}
 
         // Defined in JPEGProvider.cpp: CBaseImage is only forward declared here, so a delete in the header

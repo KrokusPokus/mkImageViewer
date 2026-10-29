@@ -12,10 +12,10 @@
 
 namespace {
 
-bool CanReadAhead(CBaseImage* pImage) {
-    bool isMultiFrame = pImage != nullptr && pImage->NumberOfFrames() > 1;
-    bool isAnimation = pImage != nullptr && pImage->IsAnimation();
-    bool bInArchive = pImage != nullptr && pImage->InArchive();
+bool CanReadAhead(const CImagePosition& position) {
+    bool isMultiFrame = position.FrameCount > 1;
+    bool isAnimation = position.IsAnimation;
+    bool bInArchive = position.InArchive;
     if (isMultiFrame) {
         if (isAnimation) {
             return false;
@@ -45,13 +45,12 @@ CImageProvider::~CImageProvider(void) {
     // The load thread is terminated by its destructor (m_pLoadThread) before the requests are released
 }
 
-CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirection eDirection,
-                                        const QString& sFileName, int nFrameIndex, const CProcessParams & processParams,
-                                        bool& bOutOfMemory, bool& bExceptionError) {
+CImageLoadResult CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirection eDirection,
+                                              const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
     if (sFileName.isEmpty()) {
-        bOutOfMemory = false;
-        bExceptionError = false;
-        return nullptr;
+        CImageLoadResult result;
+        result.Error = ELoadError::FileNotFound;
+        return result;
     }
 
     RequestPtr pRequest = FindRequest(sFileName, nFrameIndex);
@@ -83,7 +82,7 @@ CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirecti
     pRequest->InUse = true;
     pRequest->AccessTimeStamp = m_nCurrentTimeStamp++;
 
-    if (pRequest->OutOfMemory) {
+    if (pRequest->Error == ELoadError::OutOfMemory) {
         bWasOutOfMemory = true;
         if (FreeAllPossibleMemory()) {
             DeleteElement(pRequest);
@@ -105,9 +104,12 @@ CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirecti
 
     //qDebug() << "CImageProvider::RequestImage() m_requestList.size:" << m_requestList.size();
 
-    bOutOfMemory = pRequest->OutOfMemory;
-    bExceptionError = pRequest->ExceptionError;
-    return pRequest->Image;
+    CImageLoadResult result;
+    result.Image = pRequest->Image;
+    result.Error = pRequest->Error;
+    result.Position = pRequest->Position;
+    result.Position.FileName = pRequest->FileName;
+    return result;
 }
 
 void CImageProvider::NotifyNotUsed(CBaseImage* pImage) {
@@ -245,7 +247,7 @@ void CImageProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirec
     SetAllRequestsInactive();
     pLastReadyRequest->IsActive = true;
 
-    if (CanReadAhead(pLastReadyRequest->Image) == false) {
+    if (CanReadAhead(pLastReadyRequest->Position) == false) {
         return;
     }
 
@@ -261,9 +263,9 @@ void CImageProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirec
         eDirection = (iDistance > 0) ? FORWARD : BACKWARD;
 
         bool bSwitchImage = true;
-        int nFrameIndex = Helpers::GetFrameIndex(pLastReadyRequest->Image, iDistance, true, bSwitchImage);
+        int nFrameIndex = Helpers::GetFrameIndex(pLastReadyRequest->Position, pLastReadyRequest->Image != nullptr, iDistance, true, bSwitchImage);
 
-        if (bSwitchImage == false && CanReadAhead(pLastReadyRequest->Image) == false) {
+        if (bSwitchImage == false && CanReadAhead(pLastReadyRequest->Position) == false) {
             bSwitchImage = true;
             nFrameIndex = 0;
         }
@@ -306,8 +308,8 @@ CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileN
             QMutexLocker l(&pRequest->Mutex);
             CImageData d = pLoadThread->GetLoadedImage(handle);
             pRequest->Image = d.Image;
-            pRequest->OutOfMemory = d.IsRequestFailedOutOfMemory;
-            pRequest->ExceptionError = d.IsRequestFailedException;
+            pRequest->Error = d.Error;
+            pRequest->Position = d.Position;
             pRequest->Ready = true;
             pRequest->WaitCondition.wakeAll();
         }

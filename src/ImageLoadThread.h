@@ -1,6 +1,7 @@
 #ifndef IMAGELOADTHREAD_H
 #define IMAGELOADTHREAD_H
 
+#include "ImageLoadResult.h"
 #include "ProcessParams.h"
 #include "WorkThread.h"
 #include "libbit7z/include/bittypes.hpp"
@@ -23,8 +24,6 @@ struct CDecodeTarget {
     bool bMultipleFiles = false;
     int  nArchiveCount = 1;
     int  nEntryIndex = 0;
-    QString sArchiveFileName; // name of the entry within the archive (only if bInArchive)
-    unsigned long long nArchiveFileSize = 0; // size of the entry in bytes (uncompressed, only if bInArchive)
 };
 
 class CBaseImage;
@@ -41,18 +40,14 @@ public:
     ZipEntry(const bit7z::tstring& a_name, unsigned int a_index, unsigned long long a_size);
 };
 
+// Result of a load request: the image (nullptr if it could not be loaded), the reason and the position
+// (without file name, the caller knows it)
 class CImageData
 {
 public:
-    CBaseImage* Image;
-    bool IsRequestFailedOutOfMemory;
-    bool IsRequestFailedException;
-
-    CImageData(CBaseImage* pImage, bool isRequestFailedOutOfMemory, bool isRequestFailedException) {
-        Image = pImage;
-        IsRequestFailedOutOfMemory = isRequestFailedOutOfMemory;
-        IsRequestFailedException = isRequestFailedException;
-    }
+    CBaseImage* Image = nullptr;
+    ELoadError Error = ELoadError::None;
+    CImagePosition Position;
 };
 
 class CImageLoadThread : public CWorkThread
@@ -87,8 +82,6 @@ private:
             CompletedCallback = callback;
             RequestHandle = ++m_curHandle;
             Image = NULL;
-            OutOfMemory = false;
-            ExceptionError = false;
         }
 
         QString FileName;
@@ -97,8 +90,8 @@ private:
         int RequestHandle;
         CBaseImage* Image;
         CProcessParams ProcessParams;
-        bool OutOfMemory;
-        bool ExceptionError;
+        ELoadError Error = ELoadError::None;  // why Image is nullptr
+        CImagePosition Position;              // filled at the end of ProcessRequest(), also on failure
     };
 
     class CReleaseFileRequest : public CRequestBase {
