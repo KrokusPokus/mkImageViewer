@@ -62,6 +62,7 @@ public:
     int GetRotation() { return m_nRotation; }
     CBaseImage* GetCurrentImage() { return m_pCurrentImage; }
     QString CurrentFileName(bool bFileNameOnly);
+    QString CurrentDisplayPath();
     const QRect& WindowRectOnClose() { return m_windowRectOnClose; } // only valid after having closed the window
     double GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect);
     Helpers::EAutoZoomMode GetAutoZoomMode() { return m_bFullScreenMode ? m_eAutoZoomModeFullscreen : m_eAutoZoomModeWindowed; }

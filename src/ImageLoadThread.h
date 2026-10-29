@@ -23,6 +23,8 @@ struct CDecodeTarget {
     bool bMultipleFiles = false;
     int  nArchiveCount = 1;
     int  nEntryIndex = 0;
+    QString sArchiveFileName; // name of the entry within the archive (only if bInArchive)
+    unsigned long long nArchiveFileSize = 0; // size of the entry in bytes (uncompressed, only if bInArchive)
 };
 
 class CBaseImage;

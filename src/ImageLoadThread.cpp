@@ -302,6 +302,8 @@ struct CImageFrameInfo {
     int nFrameCount = 1;
     int nFrameTimeMs = 100;
     bool bInArchive = false;
+    QString sArchiveFileName; // name of the entry within the archive (only if bInArchive)
+    unsigned long long nArchiveFileSize = 0; // size of the entry in bytes (uncompressed, only if bInArchive)
 };
 
 // Maps the format name reported by QImageReader::format() to the image format used by CBaseImage.
@@ -426,6 +428,8 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, 0, frame.eFormat,
                                             frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs, frame.bInArchive);
     pDIB.release(); // owned by the CBaseImage now
+    pJPEGImage->SetArchiveFileName(frame.sArchiveFileName);
+    pJPEGImage->SetArchiveFileSize(frame.nArchiveFileSize);
     return pJPEGImage;
 }
 
@@ -688,6 +692,8 @@ CImageFrameInfo MakeFrameInfo(EImageFormat eFormat, const CDecodeTarget& target)
         info.nFrameIndex = target.nEntryIndex;
         info.nFrameCount = target.nArchiveCount;
         info.nFrameTimeMs = kMangaFrameTimeMs;
+        info.sArchiveFileName = target.sArchiveFileName;
+        info.nArchiveFileSize = target.nArchiveFileSize;
     }
     return info;
 }
@@ -712,6 +718,8 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
         // For an entry of an archive "the frame" is the entry
         pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
                                     target.bMultipleFiles, target.nEntryIndex, target.nArchiveCount, kMangaFrameTimeMs, target.bInArchive));
+        pImage->SetArchiveFileName(target.sArchiveFileName);
+        pImage->SetArchiveFileSize(target.nArchiveFileSize);
     } else {
         pImage.reset(new CBaseImage(d.nWidth, d.nHeight, d.pixels.get(), pEXIF, d.nChannels, nHash, eFormat,
                                     d.bHasAnimation, d.nFrameIndex, d.nFrameCount, d.nFrameTimeMs, target.bInArchive));
@@ -1321,7 +1329,8 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                 BitArchiveReader reader(SevenZipLibrary(), sArchivePath, BitFormat::Auto);
                 for (const auto& item : reader) {
                     if (!item.isDir()) {
-                        zipEntries.push_back(ZipEntry(item.name(), item.index(), item.size()));
+                        // path within the archive (including folders), as for ZIP entries
+                        zipEntries.push_back(ZipEntry(item.path(), item.index(), item.size()));
                     }
                 }
                 // The reader is destroyed here; extraction reopens the archive (extract fails otherwise).
@@ -1395,7 +1404,8 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
                     bAbort = true;
                 } else {
                     const CDecodeTarget target{ .bInArchive = true, .bMultipleFiles = bMultipleFiles,
-                                               .nArchiveCount = m_nZipCount, .nEntryIndex = nArchiveItemIndex };
+                                               .nArchiveCount = m_nZipCount, .nEntryIndex = nArchiveItemIndex,
+                                               .sArchiveFileName = z.name, .nArchiveFileSize = z.size };
                     const EDecodeStatus eStatus = DecodeFromBuffer(request, eFormat, pBuffer, static_cast<size_t>(z.size), target);
                     bSuccess = (eStatus == EDecodeStatus::Ok);
                     // OutOfMemory / Exception: the request carries the flag, stop here. Anything else skips the entry.

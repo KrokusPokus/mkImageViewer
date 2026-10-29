@@ -621,8 +621,11 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
 
             if (!sFullPath.isEmpty()) {
                 QFileInfo fileInfo(sFullPath);
-                QString sFileSize = FormatFileSize(fileInfo.size());
-                QString visiblePath = QDir::toNativeSeparators(sFullPath);
+                // for images in an archive: size of the file within the archive, not of the archive
+                const bool bArchiveEntry = m_pCurrentImage->InArchive() && !m_pCurrentImage->ArchiveFileName().isEmpty();
+                QString sFileSize = FormatFileSize(bArchiveEntry ? static_cast<qint64>(m_pCurrentImage->ArchiveFileSize())
+                                                                 : fileInfo.size());
+                QString visiblePath = CurrentDisplayPath(); // for images in an archive "archive/file"
 
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     if (m_bIsAnimationPlaying) {
@@ -3096,6 +3099,17 @@ QString CMainDlg::CurrentFileName(bool bFileNameOnly) {
     }
 }
 
+// Full path of the current file for display (native separators). For an image in an archive the name of the
+// file within the archive is appended, e.g. "/path/to/archive.zip:image.jpg".
+QString CMainDlg::CurrentDisplayPath() {
+    QString sPath = CurrentFileName(false);
+    if (!sPath.isEmpty() && m_pCurrentImage != nullptr && m_pCurrentImage->InArchive() &&
+        !m_pCurrentImage->ArchiveFileName().isEmpty()) {
+        sPath += QLatin1Char('/') + m_pCurrentImage->ArchiveFileName();
+    }
+    return QDir::toNativeSeparators(sPath);
+}
+
 QRect CMainDlg::GetZoomTextRect() {
     int nEndX = m_clientRect.right() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
     int nStartX = nEndX - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_WIDTH);
@@ -3122,7 +3136,8 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     static QString s_PrevTitleText;
 
     const bool bShowFullPathInTitle = CSettingsProvider::This().ShowFullPathInTitle();
-    const QString sCurrentFileName = CurrentFileName(!bShowFullPathInTitle);
+    // full path: for images in an archive including the name of the file within the archive
+    const QString sCurrentFileName = bShowFullPathInTitle ? CurrentDisplayPath() : CurrentFileName(true);
 
     // 1. Fenstertitel aktualisieren
     QString sWindowText;
