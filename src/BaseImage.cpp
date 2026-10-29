@@ -458,7 +458,9 @@ void* CBaseImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
         m_dibLoadDelayMs = dibLoadDelayMs;
     }
 
+    // Only now, after ApplyCorrectionLUT(): it compares the new parameters with these to detect a change
     m_eProcFlags = eProcFlags;
+    m_imageProcParams = imageProcParams;
 
     m_pLastDIB = pDIB;
     
@@ -616,6 +618,8 @@ void CBaseImage::InvalidateAllCachedPixelData() {
     m_pLastDIB = NULL;
     delete m_pHistogram; // the sampling grid changes with rotation, the histogram must be recalculated
     m_pHistogram = NULL;
+    delete[] m_pLUTRGB; // calculated from the histogram
+    m_pLUTRGB = NULL;
     delete[] static_cast<uint8_t*>(m_pDIBPixels);
     m_pDIBPixels = NULL;
     delete[] static_cast<uint8_t*>(m_pDIBPixelsLUTProcessed);
