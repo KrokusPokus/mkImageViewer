@@ -67,7 +67,8 @@ public:
     // Marks the request for deletion - only call once with the same handle
     CImageData GetLoadedImage(int nHandle);
 
-    // Releases the cached image file if an image of the specified name is cached
+    // Drops everything that is cached for the file of the given name: decoders of animations, the open file of
+    // the Qt reader and the list of entries of an archive. Waits until the requests queued before are processed.
     void ReleaseFile(const QString& strFileName);
 
 private:

@@ -806,6 +806,9 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
         if (rq.FileName == m_sLastAvifFileName) {
             DeleteCachedAvifDecoder();
         }
+        if (rq.FileName == m_sLastZipFileName) {
+            DeleteCachedZip(); // the list of entries of the archive
+        }
         return;
     }
 

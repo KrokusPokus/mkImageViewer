@@ -46,6 +46,11 @@ public:
     // Call from the GUI thread only, like all other methods that touch m_requestList.
     void FileHasRenamed(const QString& sOldFileName, const QString& sNewFileName);
 
+    // The file has to be read anew (reload, e.g. after it was changed on disk): the load thread drops what it keeps
+    // for the file (decoders, archive listing) and all cached images of the file (every frame or page) are removed.
+    // Images in use are not touched. Call from the GUI thread only.
+    void ReloadFile(const QString& sFileName);
+
 private:
     struct CImageRequest {
         QString FileName;

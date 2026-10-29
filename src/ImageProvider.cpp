@@ -210,6 +210,23 @@ void CImageProvider::FileHasRenamed(const QString& sOldFileName, const QString& 
     m_pLoadThread->ReleaseFile(sOld);
 }
 
+void CImageProvider::ReloadFile(const QString& sFileName) {
+    if (sFileName.isEmpty()) {
+        return;
+    }
+    // ReleaseFile() waits until the requests queued before it are processed: afterwards no request of the file is
+    // still being decoded with the old state, and all of them are ready.
+    m_pLoadThread->ReleaseFile(sFileName);
+    for (auto iter = m_requestList.begin(); iter != m_requestList.end(); ) {
+        const auto& pRequest = *iter;
+        if (pRequest->FileName == sFileName && !pRequest->InUse && pRequest->Ready) {
+            iter = DeleteElementAt(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
 CImageProvider::RequestPtr CImageProvider::FindRequest(const QString& sFileName, int nFrameIndex) {
     if (sFileName.isEmpty()) {
         return nullptr;

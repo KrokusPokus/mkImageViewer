@@ -2630,6 +2630,11 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         // When (ePos == POS_AwayFromCurrent), it will additionally releaseLockedFile in the load thread
         m_pImageProvider->ClearRequest(m_pCurrentImage, ePos == POS_AwayFromCurrent);
     }
+    if (ePos == POS_Current) {
+        // Reload: read the file anew. Otherwise a file changed on disk would be shown from what the load thread keeps
+        // (decoder of an animation, list of entries of an archive) and from other cached frames or pages of it.
+        m_pImageProvider->ReloadFile(m_pFileList->Current());
+    }
     m_pCurrentImage = NULL;
 
     // do not perform a new image request if flagged
