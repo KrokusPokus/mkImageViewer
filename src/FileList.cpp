@@ -105,7 +105,7 @@ bool CFileDesc::operator < (const CFileDesc& other) const {
 ///////////////////////////////////////////////////////////////////////////////////
 
 CFileList::CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWatcher, 
-    Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel, bool forceSorting)
+    Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel)
     : m_directoryWatcher(directoryWatcher)
 {
     CFileDesc::SetSorting(eInitialSorting, isSortedAscending);
@@ -138,9 +138,6 @@ CFileList::CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWa
         }
     } else {
         sm_eMode = Helpers::NM_LoopDirectory;
-        if (forceSorting) {
-            m_fileList.sort();
-        }
         m_iter = m_iterStart = m_fileList.begin();
     }
 }

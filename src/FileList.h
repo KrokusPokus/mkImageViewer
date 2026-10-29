@@ -64,7 +64,7 @@ public:
     // sInitialFile is the initial file to show with path. It can either be an image file, a directory
     // or a text file containing file names to display.
     CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWatcher,
-              Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel = 0, bool forceSorting = false);
+              Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel = 0);
     ~CFileList();
 
     // Reload file list for given file, if empty for current file

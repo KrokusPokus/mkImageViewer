@@ -328,8 +328,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
 
     m_nLastSlideShowImageTickCount = 0;
     m_dMovieFPS = 1.0;
-    m_nAutoStartSlideShow = false;
-    m_eForcedSorting = Helpers::FS_Undefined;
 
     m_eProcFlagsBeforeMovie = PFLAG_None;
     m_nRotation = 0;
@@ -460,11 +458,9 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     // intitialize list of files to show with startup file (and folder)
     m_pFileList = new CFileList(m_sStartupFile,
                                 *m_pDirectoryWatcher,
-                                (m_eForcedSorting == Helpers::FS_Undefined) ? sp.Sorting() : m_eForcedSorting,
+                                sp.Sorting(),
                                 sp.IsSortedAscending(),
-                                sp.WrapAroundFolder(),
-                                0,
-                                m_eForcedSorting != Helpers::FS_Undefined);
+                                sp.WrapAroundFolder());
 
     m_pFileList->SetNavigationMode(sp.Navigation());
 
@@ -505,10 +501,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     }
 
     m_bLockPaint = false;
-
-    if (m_nAutoStartSlideShow > 0) {
-        StartMovieMode(1.0 / m_nAutoStartSlideShow);
-    }
 
     StartLowQTimer(ZOOM_TIMEOUT);    // Start out in low quality scaling to get something on the screen asap. Feels more responsive with huge images.
 
@@ -1222,7 +1214,7 @@ void CMainDlg::dropEvent(QDropEvent* event) {
                     }
                 }
 
-                OpenFile(filePath, false);
+                OpenFile(filePath);
                 event->acceptProposedAction();
             }
         }
@@ -2290,7 +2282,7 @@ void CMainDlg::ChangeFolderLanguage() {
         for (const auto& ext : extensions) {
             const QString candidatePath = targetFileBasePath + ext;
             if (QFileInfo::exists(candidatePath)) {
-                OpenFile(candidatePath, false);
+                OpenFile(candidatePath);
                 break;
             }
         }
@@ -2362,7 +2354,7 @@ void CMainDlg::ExploreFile() {
                                          });
 }
 
-void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
+void CMainDlg::OpenFile(const QString& fileName) {
     StopMovieMode();
     StopAnimation();
 
@@ -2424,7 +2416,7 @@ void CMainDlg::OpenFile(const QString& fileName, bool bAfterStartup) {
                                                     CImageProvider::FORWARD,
                                                     m_pFileList->Current(),
                                                     nFrameIndex,
-                                                    CreateProcessParams(!m_bFullScreenMode && bAfterStartup),
+                                                    CreateProcessParams(false),
                                                     m_bOutOfMemoryLastImage,
                                                     m_bExceptionErrorLastImage);
 
@@ -3967,7 +3959,7 @@ void CMainDlg::onLoadFileAsynch() {
         StopMovieMode();
         StopAnimation();
         MouseOn();
-        OpenFile(m_sStartupFile, false);
+        OpenFile(m_sStartupFile);
     }
 }
 

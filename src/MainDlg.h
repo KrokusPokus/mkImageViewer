@@ -89,9 +89,6 @@ public:
 private:
 
     QString m_sStartupFile; // file passed on command line
-    int m_nAutoStartSlideShow; // if positive: Auto start slide show with given interval in seconds, passed on command line
-    bool m_bAutoExit;
-    Helpers::ESorting m_eForcedSorting; // forced sorting mode on command line
     CFileList* m_pFileList; // used for navigation
     CDirectoryWatcher* m_pDirectoryWatcher = NULL; // notifies the main window when the current file changed or a file in the current directory was added or deleted
     CImageProvider * m_pImageProvider; // reads image (of any format, not only JPEGs) files, using read ahead
@@ -168,7 +165,7 @@ private:
     bool m_bSelectZoom;  // keeps track of select-to-zoom mode when CTRL+SHIFT+LMouse
 
     void ExploreFile();
-    void OpenFile(const QString& fileName, bool bAfterStartup);
+    void OpenFile(const QString& fileName);
     void GotoImage(EImagePosition ePos, int nFlags);
     bool PerformZoom(double dValue, bool bExponent, bool bZoomToMouse);
     double GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge);
