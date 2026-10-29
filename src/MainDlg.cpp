@@ -306,7 +306,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_eProcessingFlagsKept = PFLAG_HighQualityResampling;
     m_dZoomKept = -1;
     m_offsetKept = CPoint(0, 0);
-    m_bCurrentImageInParamDB = false;
 
     m_bKeepParams = sp.KeepParams();
     m_eAutoZoomModeWindowed = sp.AutoZoomMode();
@@ -3043,23 +3042,13 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
     if (bSynchronize) {
         // after loading an image, the per image processing parameters must be synchronized with
         // the current processing parameters
-        m_bCurrentImageInParamDB = false;
-
         if (m_pCurrentImage != NULL) {
-            m_bCurrentImageInParamDB = m_pCurrentImage->IsInParamDB();
-
             if (!m_bKeepParams) {
                 // [GF] Do not restore these to how they were when the image was loaded before. If the user has intentionally changed these settings since that time, the current settings should be respected.
-                //m_bHQResampling = GetProcessingFlag(m_pCurrentImage->GetInitialProcessFlags(), PFLAG_HighQualityResampling);
-                //m_bAutoContrast = GetProcessingFlag(m_pCurrentImage->GetInitialProcessFlags(), PFLAG_AutoContrast);
 
                 m_nRotation = m_pCurrentImage->GetInitialRotation();
                 m_dZoom = m_pCurrentImage->GetInititialZoom();
                 m_offsets = m_pCurrentImage->GetInitialOffsets();
-
-                if (m_pCurrentImage->HasZoomStoredInParamDB()) {
-                    m_bUserZoom = m_bUserPan = true;
-                }
 
                 *m_pImageProcParams = m_pCurrentImage->GetInitialProcessParams();
             }

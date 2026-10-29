@@ -151,7 +151,6 @@ private:
     void ProcessReadZipRequest(CRequest* request);
     bool ValidateZipFrameIndex(int nInitialIndex, int &nFrameIndex);
 
-    static void SetFileDependentProcessParams(CRequest * request);
     static bool ProcessImageAfterLoad(CRequest * request);
 
     //static QAtomicInt m_curHandle;

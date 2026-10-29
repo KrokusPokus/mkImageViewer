@@ -125,7 +125,6 @@ private:
     EProcessingFlags m_eProcessingFlagsKept;
     double m_dZoomKept;
     QPoint m_offsetKept;
-    bool m_bCurrentImageInParamDB;
     bool m_bCurrentImageIsSpecialProcessing;
 
     bool m_bDragging;

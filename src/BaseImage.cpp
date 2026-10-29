@@ -111,18 +111,14 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_pLUTRGB = NULL;
     m_pSaturationLUTs = NULL;
     m_eProcFlags = PFLAG_None;
-    m_eProcFlagsInitial = PFLAG_None;
     m_nInitialRotation = 0;
     m_dInitialZoom = -1;
     m_initialOffsets = CPoint(0, 0);
-    m_bInParamDB = false;
-    m_bHasZoomStoredInParamDB = false;
     //m_bIsThumbnailImage = bIsThumbnailImage;
     m_pCachedProcessedHistogram = NULL;
 
     m_bCropped = false;
     m_bIsDestructivelyProcessed = false;
-    m_bIsProcessedNoParamDB = false;
     m_bRotationByEXIF = false;
     m_bFirstReprocessing = true;
     m_dibLoadDelayMs = 0;
@@ -139,7 +135,7 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
         m_nPixelHash = m_pLDC->GetPixelHash();
     }
 
-    // Initialize to INI value, may be overriden later by parameter DB
+    // Initialize to INI value
     memcpy(m_fColorCorrectionFactors, CSettingsProvider::This().ColorCorrectionAmounts(), sizeof(m_fColorCorrectionFactors));
 }
 
@@ -366,7 +362,6 @@ bool CBaseImage::Mirror(bool bHorizontally) {
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
     m_pOrigPixels = pNewOriginalPixels;
     MarkAsDestructivelyProcessed();
-    m_bIsProcessedNoParamDB = true;
     return true;
 }
 
@@ -384,29 +379,20 @@ void CBaseImage::VerifyDIBPixelsCreated() {
     }
 }
 
-void CBaseImage::RestoreInitialParameters(const QString& sFileName, const CImageProcessingParams& imageProcParams,
-                                          EProcessingFlags & procFlags, int nRotation, double dZoom, 
-                                          CPoint offsets, CSize targetSize, CSize monitorSize) {
-    // zoom and offsets must be initialized in all cases as they may not bo in param DB even when other parameters are
+void CBaseImage::RestoreInitialParameters(const CImageProcessingParams& imageProcParams, int nRotation, double dZoom,
+                                          CPoint offsets) {
     m_dInitialZoom = dZoom;
     m_initialOffsets = offsets;
-
     m_nInitialRotation = GetRotationFromEXIF(nRotation);
-    m_eProcFlagsInitial = procFlags;
-    procFlags = m_eProcFlagsInitial;
     m_imageProcParamsInitial = imageProcParams;
 }
 
-void CBaseImage::SetFileDependentProcessParams(const QString& sFileName, CProcessParams* pParams) {
-    m_bInParamDB = false;
-    m_bHasZoomStoredInParamDB = false;
-
+void CBaseImage::SetInitialProcessParams(CProcessParams* pParams) {
     pParams->RotationParams.Rotation = GetRotationFromEXIF(pParams->RotationParams.Rotation);
 
     m_nInitialRotation = pParams->RotationParams.Rotation;
     m_dInitialZoom = pParams->Zoom;
     m_initialOffsets = pParams->Offsets;
-    m_eProcFlagsInitial = pParams->ProcFlags;
     m_imageProcParamsInitial = pParams->ImageProcParams;
 }
 

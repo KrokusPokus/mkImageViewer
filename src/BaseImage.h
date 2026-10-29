@@ -101,9 +101,6 @@ public:
     // Returns if this image's original pixels have been processed destructively (e.g. cropped or rotated by non-90 degrees steps)
     bool IsDestructivelyProcessed() { return m_bIsDestructivelyProcessed; }
 
-    // Returns if this image has been processed in a way not supported to be stored in the parameter DB.
-    bool IsProcessedNoParamDB() { return m_bIsProcessedNoParamDB; }
-
     // raw access to original pixels - do not delete or store the returned pointer
     void* OriginalPixels() { return  m_pOrigPixels; }
     const void* OriginalPixels() const { return m_pOrigPixels; }
@@ -124,9 +121,6 @@ public:
     // Gets the DIB last processed. If none, the last used parameters are taken to generate the DIB - if bGenerateDIBIfNeeded is true 
     void* DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded);
 
-    // Gets the image processing flags as set as default (may varies from file to file)
-    EProcessingFlags GetInitialProcessFlags() const { return m_eProcFlagsInitial; }
-
     // Gets the image processing flags last used to process an image
     EProcessingFlags GetLastProcessFlags() const { return m_eProcFlags; }
     
@@ -145,25 +139,13 @@ public:
     // Gets the offsets as set as default (can vary from file to file)
     CPoint GetInitialOffsets() const { return m_initialOffsets; }
 
-    // Restores the initial parameters to the parameters dependent on the directory (not the file)
-    // Outputs the processing flags set for this directory
-    void RestoreInitialParameters(const QString& sFileName, const CImageProcessingParams& imageProcParams, 
-        EProcessingFlags & procFlags, int nRotation, double dZoom, CPoint offsets, CSize targetSize, CSize monitorSize);
+    // Sets the initial parameters again, from the parameters of a new request. Used when an image that was read
+    // ahead (with the parameters of that time) is requested. The rotation is completed by the EXIF orientation.
+    void RestoreInitialParameters(const CImageProcessingParams& imageProcParams, int nRotation, double dZoom, CPoint offsets);
 
-    // To be called after creation of the object to initialize the initial processing parameters.
-    // Input are the global defaults for the processing parameters, output (in pParams) are the
-    // processing parameters for this file (maybe different from the global ones)
-    void SetFileDependentProcessParams(const QString& sFileName, CProcessParams* pParams);
-
-    // Gets if the image was found in parameter DB
-    bool IsInParamDB() const { return m_bInParamDB; }
-
-    // Sets that this image is now in the parameter DB or is removed from the parameter DB
-    // (called after the user saves/deletes the image from param DB)
-    void SetIsInParamDB(bool bSet) { m_bInParamDB = bSet; }
-
-    // Gets if zoom and offset values are stored for this image in the parameter DB
-    bool HasZoomStoredInParamDB() const { return m_bHasZoomStoredInParamDB; }
+    // To be called after creation of the object to initialize the initial parameters from the parameters of the
+    // load request. The rotation in pParams is completed by the EXIF orientation of the image.
+    void SetInitialProcessParams(CProcessParams* pParams);
 
     // Gets the EXIF data block (including the APP1 marker in the first two bytes) of the image. Returns NULL if none.
     void* GetEXIFData() { return m_pEXIFData; }
@@ -264,16 +246,14 @@ private:
     CImageProcessingParams m_imageProcParams;
     EProcessingFlags m_eProcFlags;
 
-    // Initial image processing parameters and flags, as set with SetFileDependentProcessParams()
+    // Initial image processing parameters, as set with SetInitialProcessParams() / RestoreInitialParameters()
     CImageProcessingParams m_imageProcParamsInitial;
-    EProcessingFlags m_eProcFlagsInitial;
     int m_nInitialRotation;
     double m_dInitialZoom;
     CPoint m_initialOffsets;
 
     bool m_bCropped; // Image has been cropped
     bool m_bIsDestructivelyProcessed; // Original image pixels destructively processed (i.e. cropped or size changed)
-    bool m_bIsProcessedNoParamDB;
     CRotationParams m_rotationParams; // current rotation
     bool m_bRotationByEXIF; // is the rotation given by EXIF
 
@@ -282,8 +262,6 @@ private:
     CSize m_ClippingSize; // this is the size of the DIB
     CPoint m_TargetOffset;
 
-    bool m_bInParamDB; // true if image found in param DB
-    bool m_bHasZoomStoredInParamDB; // true if image in param DB and entry contains zoom and offset values
     bool m_bFirstReprocessing; // true if never reprocessed before, some optimizations may be not done initially
 
     uint64_t m_dibLoadDelayMs;

@@ -1209,8 +1209,8 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
 bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
     qDebug() << "CImageLoadThread::ProcessImageAfterLoad() request->FileName:" << request->FileName << "request->FrameIndex:" << request->FrameIndex;
 
-    // set process parameters depending on filename
-    request->Image->SetFileDependentProcessParams(request->FileName, &(request->ProcessParams));
+    // initial parameters of the image from the request (rotation completed by the EXIF orientation)
+    request->Image->SetInitialProcessParams(&(request->ProcessParams));
 
     // First do rotation, this maybe modifies the width and height
     if (!request->Image->VerifyRotation(CRotationParams(request->ProcessParams.RotationParams, request->ProcessParams.RotationParams.Rotation + request->ProcessParams.UserRotation))) {

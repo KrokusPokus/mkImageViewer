@@ -74,10 +74,8 @@ CBaseImage* CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDirecti
     } else {
         CBaseImage* pImage = pRequest->Image;
         if (pImage != nullptr) {
-            EProcessingFlags procFlags = processParams.ProcFlags;
-            pImage->RestoreInitialParameters(sFileName, processParams.ImageProcParams, procFlags,
-                                             processParams.RotationParams.Rotation, processParams.Zoom, processParams.Offsets,
-                                             CSize(processParams.TargetWidth, processParams.TargetHeight), processParams.MonitorSize);
+            pImage->RestoreInitialParameters(processParams.ImageProcParams, processParams.RotationParams.Rotation,
+                                             processParams.Zoom, processParams.Offsets);
         }
         //qDebug() << "CImageProvider::RequestImage() found in cache: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
     }
