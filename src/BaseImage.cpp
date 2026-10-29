@@ -340,13 +340,10 @@ bool CBaseImage::VerifyRotation(const CRotationParams& rotationParams) {
 }
 
 bool CBaseImage::Rotate(int nRotation) {
-    // Rotation can only be done in 32 bpp
-    if (!ConvertSrcTo4Channels()) {
-        return false;
-    }
-
     InvalidateAllCachedPixelData();
-    void* pNewOriginalPixels = CBasicProcessing::Rotate32bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, nRotation);
+    void* pNewOriginalPixels = (m_nOriginalChannels == 3)
+        ? CBasicProcessing::Rotate24bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, nRotation)
+        : CBasicProcessing::Rotate32bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, nRotation);
     if (pNewOriginalPixels == NULL) return false;
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
     m_pOrigPixels = pNewOriginalPixels;
@@ -361,13 +358,10 @@ bool CBaseImage::Rotate(int nRotation) {
 }
 
 bool CBaseImage::Mirror(bool bHorizontally) {
-    // Rotation can only be done in 32 bpp
-    if (!ConvertSrcTo4Channels()) {
-        return false;
-    }
-
     InvalidateAllCachedPixelData();
-    void* pNewOriginalPixels = CBasicProcessing::Mirror32bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, bHorizontally);
+    void* pNewOriginalPixels = (m_nOriginalChannels == 3)
+        ? CBasicProcessing::Mirror24bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, bHorizontally)
+        : CBasicProcessing::Mirror32bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, bHorizontally);
     if (pNewOriginalPixels == NULL) return false;
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
     m_pOrigPixels = pNewOriginalPixels;
@@ -462,7 +456,7 @@ void* CBaseImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
     // ApplyCorrectionLUTandLDC() could have failed, then recreate the DIBs
     if (pDIB == NULL) {
         // The original is kept with 3 channels: resampling is equally fast for 3 and 4 channels, a conversion
-        // would cost time and memory (rotation and mirroring convert to 4 channels when needed)
+        // would cost time and memory (rotation and mirroring also work on 3 channels)
 
         bParametersChanged = true;
 
@@ -606,19 +600,6 @@ void* CBaseImage::ApplyCorrectionLUTandLDC(const CImageProcessingParams & imageP
     }
 
     return pCachedTargetDIB;
-}
-
-bool CBaseImage::ConvertSrcTo4Channels() {
-    if (m_nOriginalChannels == 3) {
-        void* pNewOriginalPixels = CBasicProcessing::Convert3To4Channels(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels);
-        if (pNewOriginalPixels != NULL) {
-            delete[] static_cast<uint8_t*>(m_pOrigPixels);
-            m_pOrigPixels = pNewOriginalPixels;
-            m_nOriginalChannels = 4;
-        }
-        return pNewOriginalPixels != NULL;
-    }
-    return true;
 }
 
 CBaseImage::EResizeType CBaseImage::GetResizeType(CSize targetSize, CSize sourceSize) {

@@ -329,9 +329,6 @@ private:
             pSourceDIB, dibSize, bOnlyCheck, bCanTakeOwnershipOfSourceDIB, bNotUsed);
     }
 
-    // makes sure that the input image (m_pOrigPixels) is a 4 channel BGRA image (converts if necessary)
-    bool ConvertSrcTo4Channels();
-
     // Get if from source to target size it is down or upsampling
     EResizeType GetResizeType(CSize targetSize, CSize sourceSize);
 

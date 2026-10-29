@@ -96,7 +96,13 @@ bool CProcessingThreadPool::Process(CProcessingRequest* pRequest) {
             // All slices except the last one (processed by the calling thread) are multiples of StripPadding.
             int nBlocks = (nTargetCY + pRequest->StripPadding - 1) / pRequest->StripPadding;
             int nNumThreadsUsed = std::min(m_nNumThreads + 1, nBlocks);
-            assert(nNumThreadsUsed > 1);
+            if (pRequest->MaxThreads > 0) {
+                nNumThreadsUsed = std::min(nNumThreadsUsed, pRequest->MaxThreads);
+            }
+            if (nNumThreadsUsed <= 1) {
+                CProcessingThread::DoProcess(pRequest, 0, nTargetCY);
+                return pRequest->Success;
+            }
             auto sliceCY = [&](int nThread) {
                 return (nBlocks / nNumThreadsUsed + (nThread < nBlocks % nNumThreadsUsed ? 1 : 0)) * pRequest->StripPadding;
             };

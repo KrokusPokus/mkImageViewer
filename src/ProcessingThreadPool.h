@@ -18,6 +18,7 @@ public:
         FullTargetOffset = fullTargetOffset;
         ClippedTargetSize = clippedTargetSize;
         StripPadding = 4;
+        MaxThreads = 0;
         Success = true;
     }
 
@@ -36,6 +37,7 @@ public:
     CPoint FullTargetOffset;
     CSize ClippedTargetSize;
     int StripPadding;
+    int MaxThreads; // maximal number of threads used for this request, 0: all threads of the pool
     bool Success;
 };
 
