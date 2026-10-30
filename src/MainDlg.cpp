@@ -330,7 +330,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_nLastSlideShowImageTickCount = 0;
     m_dMovieFPS = 1.0;
 
-    m_eProcFlagsBeforeMovie = PFLAG_None;
     m_nRotation = 0;
     m_nUserRotation = 0;
     m_dZoomAtResizeStart = 1.0;
@@ -339,7 +338,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_bUserZoom = false;
     m_bUserPan = false;
     m_bMovieMode = false;
-    m_bProcFlagsTouched = false;
     m_bResizeForNewImage = false;
     m_dZoom = -1.0;
     m_dStartZoom = -1.0;
@@ -364,7 +362,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_monitorRect = QRect(0, 0, 0, 0);
     m_windowRectOnClose = QRect(0, 0, 0, 0);
     m_bMouseOn = false;
-    m_bKeepParametersBeforeAnimation = false;
     m_bIsAnimationPlaying = false;
     m_nLastAnimationOffset = 0;
     m_nExpectedNextAnimationTickCount = 0;
@@ -1052,7 +1049,8 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                             this->update();
                         }
                     } else {
-                        uint iRealHeight = static_cast<uint>(m_dZoom * (m_pCurrentImage->OrigHeight()));
+                        double dZoom = m_dZoom > 0 ? m_dZoom : 1.0; // not yet known (-1) until the next paint
+                        unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
                         if (iRealHeight > m_clientRect.height()) {
                             if (PerformPan(0, PAN_STEP, false) == true) {
@@ -1245,13 +1243,18 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
             }
         }
 
-        GotoImage((timerId == m_animationTimerId) ? POS_NextFrame : POS_NextSlideShow, NO_REMOVE_KEY_MSG);
+        // Decide before GotoImage(): it restarts the animation timer with a new id for every frame. Checked afterwards,
+        // every frame of an animation counted as a slide show step and restarted the display time of the slide show,
+        // so a slide show never got past an animated image.
+        const bool bAnimationFrame = (timerId == m_animationTimerId);
 
-        if (timerId == m_slideshowTimerId && UseSlideShowTransitionEffect()) {
+        GotoImage(bAnimationFrame ? POS_NextFrame : POS_NextSlideShow, NO_REMOVE_KEY_MSG);
+
+        if (!bAnimationFrame && UseSlideShowTransitionEffect()) {
             //AnimateTransition();
         }
 
-        if (timerId != m_animationTimerId) {
+        if (!bAnimationFrame) {
             m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
         }
     }
@@ -2594,7 +2597,9 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                 break;
             }
         case POS_Current:
-            if (position.IsMultiPageArchive()) {
+            // Reload stays on the page: pages of an archive, pages of a multi page file (e.g. TIFF).
+            // An animation starts again with its first frame.
+            if (position.FrameCount > 1 && !position.IsAnimation) {
                 nFrameIndex = position.FrameIndex;
             }
             bCheckIfSameImage = false; // do something even when not moving iterator on filelist
@@ -2667,8 +2672,9 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
     /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos7  m_offsets.x:" << m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
-    // If current image is animated, start playback
-    if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
+    // If current image is animated, start playback. In a slide show it plays (and loops) until the display time of the
+    // slide show is over. Not in a movie: there an image is only shown for a fraction of a second.
+    if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation() && !IsFastMovieMode()) {
         if (m_bIsAnimationPlaying) {
             AdjustAnimationFrameTime();
         } else {
@@ -2960,27 +2966,21 @@ void CMainDlg::StopSlideShowTimer(void) {
     }
 }
 
+// If more than this number of images per second is requested, the slide show is a movie
+static const double kMovieFps = 4.9;
+
+bool CMainDlg::IsFastMovieMode() const {
+    return m_bMovieMode && m_dMovieFPS > kMovieFps;
+}
+
+void CMainDlg::UpdateKeepParams() {
+    SetKeepParams(IsFastMovieMode() || m_bIsAnimationPlaying);
+}
+
 void CMainDlg::StartMovieMode(double dFPS) {
-    // if more than this number of frames are requested per seconds, it is considered to be a movie
-    const double cdFPSMovie = 4.9;
-
     m_dMovieFPS = dFPS;
-
-    // Save processing flags at the time movie mode starts
-    if (!m_bMovieMode) {
-        m_eProcFlagsBeforeMovie = CreateDefaultProcessingFlags(m_bKeepParams);
-    }
-    // Keep parameters during movie mode
-    if (!m_bKeepParams && dFPS > cdFPSMovie) {
-        SetKeepParams(true);
-    }
-    // Turn off high quality resamping and auto corrections when requested to play many frames per second
-    if (dFPS > cdFPSMovie) {
-        m_bProcFlagsTouched = true;
-        m_bHQResampling = false;
-        m_bAutoContrast = false;
-    }
     m_bMovieMode = true;
+    UpdateKeepParams();
     StartSlideShowTimer(Helpers::RoundToInt(1000.0/dFPS));
     AfterNewImageLoaded(false, false);
     update();
@@ -2988,22 +2988,8 @@ void CMainDlg::StartMovieMode(double dFPS) {
 
 void CMainDlg::StopMovieMode() {
     if (m_bMovieMode) {
-        // undo changes done on processing parameters due to movie mode
-        if (!GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_KeepParams)) {
-            if (m_bKeepParams) {
-                SetKeepParams(false);
-            }
-        }
-        if (m_bProcFlagsTouched) {
-            if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_AutoContrast)) {
-                m_bAutoContrast = true;
-            }
-            if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_HighQualityResampling)) {
-                m_bHQResampling = true;
-            }
-        }
         m_bMovieMode = false;
-        m_bProcFlagsTouched = false;
+        UpdateKeepParams();
         StopSlideShowTimer();
         AfterNewImageLoaded(false, false);
         this->update();
@@ -3465,15 +3451,8 @@ void CMainDlg::StartAnimation() {
     if (m_bIsAnimationPlaying) {
         return;
     }
-    m_eProcFlagsBeforeMovie = CreateDefaultProcessingFlags(m_bKeepParams);
-    m_bKeepParametersBeforeAnimation = IsKeepParams();
-    if (!m_bKeepParametersBeforeAnimation) {
-        SetKeepParams(true);
-    }
-
-    m_bAutoContrast = false;
     m_bIsAnimationPlaying = true;
-    m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
+    UpdateKeepParams();
 
     m_nLastAnimationOffset = 0;
     
@@ -3531,12 +3510,6 @@ void CMainDlg::StopAnimation() {
     if (!m_bIsAnimationPlaying) {
         return;
     }
-    if (IsKeepParams() != m_bKeepParametersBeforeAnimation) {
-        SetKeepParams(m_bKeepParametersBeforeAnimation);
-    }
-    if (GetProcessingFlag(m_eProcFlagsBeforeMovie, PFLAG_AutoContrast)) {
-        m_bAutoContrast = true;
-    }
 
     // Animations-Timer über die Qt-interne ID stoppen
     if (m_animationTimerId != 0) {
@@ -3545,6 +3518,7 @@ void CMainDlg::StopAnimation() {
     }
 
     m_bIsAnimationPlaying = false;
+    UpdateKeepParams();
 }
 
 // ---------------------------------------------------------------------------------------------

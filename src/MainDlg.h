@@ -141,8 +141,6 @@ private:
     bool m_bDoDragging;
     bool m_bMovieMode;
     double m_dMovieFPS;
-    bool m_bProcFlagsTouched;
-    EProcessingFlags m_eProcFlagsBeforeMovie;
     QPoint m_offsets; // Note: These offsets are center of image based
     QPoint m_DIBOffsets;
     int m_nCapturedX, m_nCapturedY;
@@ -157,7 +155,6 @@ private:
     bool m_bShowZoomFactor;
     bool m_bSpanVirtualDesktop;
     bool m_bMouseOn;
-    bool m_bKeepParametersBeforeAnimation;
     bool m_bIsAnimationPlaying;
     int m_nLastAnimationOffset;
     qint64 m_nExpectedNextAnimationTickCount;
@@ -184,6 +181,11 @@ private:
     void StopSlideShowTimer(void);
     void StartMovieMode(double dFPS);
     void StopMovieMode();
+    // Slide show with more than kMovieFps images per second ("movie"): animations are not played there
+    bool IsFastMovieMode() const;
+    // Zoom, offsets and rotation are kept from image to image while a movie or an animation runs.
+    // F3/F4 (resampling quality, auto contrast) are never changed by these modes, they are up to the user.
+    void UpdateKeepParams();
     void StartLowQTimer(int nTimeout);
     void InitParametersForNewImage();
     // Keep zoom, offsets, rotation and processing parameters between images (only used internally while an

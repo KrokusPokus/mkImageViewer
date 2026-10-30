@@ -82,22 +82,35 @@ void CFileDesc::SetName(const QString& sName) {
 }
 
 bool CFileDesc::SortAscending(const CFileDesc& other) const {
+    // The sort key; if it is equal (same date or size is common, e.g. the pages of an extracted archive), the name
+    // decides, and if that is equal too (natural, case-insensitive order), the full path: the order is always unique.
     if (sm_eSorting == Helpers::FS_LastModTime) {
-        return m_lastModTime < other.m_lastModTime;
+        if (m_lastModTime != other.m_lastModTime) {
+            return m_lastModTime < other.m_lastModTime;
+        }
     }
     else if (sm_eSorting == Helpers::FS_Random) {
-        return m_nRandomOrderNumber < other.m_nRandomOrderNumber;
+        if (m_nRandomOrderNumber != other.m_nRandomOrderNumber) {
+            return m_nRandomOrderNumber < other.m_nRandomOrderNumber;
+        }
     }
     else if (sm_eSorting == Helpers::FS_FileSize) {
-        return m_fileSize < other.m_fileSize;
+        if (m_fileSize != other.m_fileSize) {
+            return m_fileSize < other.m_fileSize;
+        }
     }
-    else { // Helpers::FS_Name / Standard
-        return GetLogicalCollator().compare(m_sTitle, other.m_sTitle) < 0;
+    // Helpers::FS_FileName, and the tie-breaker of the other sortings
+    const int nByName = GetLogicalCollator().compare(m_sTitle, other.m_sTitle);
+    if (nByName != 0) {
+        return nByName < 0;
     }
+    return m_sName < other.m_sName;
 }
 
 bool CFileDesc::operator < (const CFileDesc& other) const {
-    return SortAscending(other) ^ (!sm_bSortAscending);
+    // Descending: "other before this". Not "not this before other", that is true in both directions for equal
+    // entries and breaks the rules std::list::sort() relies on.
+    return sm_bSortAscending ? SortAscending(other) : other.SortAscending(*this);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -208,15 +221,14 @@ void CFileList::FileHasRenamed(const QString& sOldFileName, const QString& sNewF
         return;
     }
 
-    // Only a rename changes the position of the entry, and only when sorting by name (the modification
-    // time, size and random number do not change). Slide show lists keep the order of the text file.
+    // A rename can change the position of the entry with every sorting: by name directly, by date, size or
+    // random number when the key is equal to that of other entries (the name decides then, see operator<).
+    // Slide show lists keep the order of the text file.
     //
     // The entry is moved alone instead of calling m_fileList.sort(): the rest of the list is still sorted,
-    // so one linear pass is enough, and the sort() of a list with a comparator that is not a strict
-    // weak ordering for equal keys (descending, see operator<) could swap unrelated entries.
-    // std::list::splice() keeps all iterators valid (m_iter, m_iterStart, m_iterCheckPoint),
-    // m_iter still points to the renamed file.
-    if (!m_bIsSlideShowList && CFileDesc::GetSorting() == Helpers::FS_FileName) {
+    // so one linear pass is enough. std::list::splice() keeps all iterators valid (m_iter, m_iterStart,
+    // m_iterCheckPoint), m_iter still points to the renamed file.
+    if (!m_bIsSlideShowList) {
         auto iterPos = m_fileList.begin();
         while (iterPos != m_fileList.end() && (iterPos == iterRenamed || *iterPos < *iterRenamed)) {
             ++iterPos;
@@ -431,6 +443,18 @@ std::list<CFileDesc>::iterator CFileList::FindFile(const QString& sName) {
         return m_fileList.begin();
     }
 
+    // First exactly this file: entries are clean absolute paths. File names on Linux are case-sensitive
+    // (IMG.jpg and img.jpg are different files), and a slide show list can contain files of the same name
+    // from different folders.
+    const QString sPath = QDir::cleanPath(QFileInfo(sName).absoluteFilePath());
+    for (auto iter = m_fileList.begin(); iter != m_fileList.end(); ++iter) {
+        if (iter->GetName() == sPath) {
+            return iter;
+        }
+    }
+
+    // Not found as given (e.g. on a case-insensitive file system with the name in different case):
+    // the first entry with this file name, ignoring case
     for (auto iter = m_fileList.begin(); iter != m_fileList.end(); ++iter) {
         if (iter->GetTitle().compare(searchTitle, Qt::CaseInsensitive) == 0) {
             return iter;

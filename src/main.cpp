@@ -89,7 +89,8 @@ int main(int argc, char *argv[])
     const QStringList args = parser.positionalArguments();
     QString sStartupFile;
     if (!args.isEmpty()) {
-        sStartupFile = QDir::cleanPath(args.first());
+        // absolute: the path may be handed to another, already running instance with a different working directory
+        sStartupFile = QDir::cleanPath(QFileInfo(args.first()).absoluteFilePath());
         QFileInfo fileInfo(sStartupFile);
         if (fileInfo.isDir()) {
             if (!sStartupFile.endsWith('/') && !sStartupFile.endsWith('\\')) {

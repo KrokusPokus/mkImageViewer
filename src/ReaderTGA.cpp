@@ -142,7 +142,8 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
 
     uint8_t* pImage = pImageData;
 
-    if (imageType == TGA_MONO)
+    // An RGB image with 8 bits per pixel is read as grey, like in the RLE path below (no other branch fills the image)
+    if (imageType == TGA_MONO || (imageType == TGA_RGB && bits == 8))
     {
         // this is always 8 bpp (checked above)
         for (int y = 0; y < height; y++)
@@ -274,7 +275,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
         // Create some variables to hold the rleID, current colors read, channels, & stride.
         uint8_t rleID = 0;
         std::size_t colorsRead = 0; // byte offset in the target, can exceed 2^31
-        int channels = bits / 8;
+        int channels = (bits + 7) / 8; // bytes per pixel in the file (15 bits: 2 bytes)
         int x = 0;
         int padding = targetStride - targetChannels * width;
         std::size_t i = 0;
@@ -355,6 +356,12 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
                             pImage[colorsRead + 1] = pColors[0];
                             pImage[colorsRead + 2] = pColors[0];
                         }
+                    } else if (bits == 16 || bits == 15) {
+                        // 5 bits each for B, G and R, as in the uncompressed path
+                        uint16_t pixel = static_cast<uint16_t>(pColors[0] | (pColors[1] << 8));
+                        pImage[colorsRead + 0] = static_cast<uint8_t>((pixel & 0x1f) << 3);
+                        pImage[colorsRead + 1] = static_cast<uint8_t>(((pixel >> 5) & 0x1f) << 3);
+                        pImage[colorsRead + 2] = static_cast<uint8_t>(((pixel >> 10) & 0x1f) << 3);
                     } else {
                         pImage[colorsRead + 0] = pColors[0];
                         pImage[colorsRead + 1] = pColors[1];
