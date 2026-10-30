@@ -71,6 +71,15 @@ public:
     // the Qt reader and the list of entries of an archive. Waits until the requests queued before are processed.
     void ReleaseFile(const QString& strFileName);
 
+    // Cancels the load requests with the given handles that have not been started yet. Their completion
+    // callbacks are NOT called. Returns the handles that were cancelled.
+    std::vector<int> CancelPendingLoads(const std::vector<int>& handles);
+
+    // If the running load request has one of the given handles, asks it to stop before rotation and resampling.
+    // It completes as usual (the callback is called) without image, or with the image if it was already past that
+    // point. Returns the handle of the request that was asked, or -1.
+    int AbortRunningLoad(const std::vector<int>& handles);
+
 private:
 
     // Request for loading an image

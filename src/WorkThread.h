@@ -15,6 +15,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <exception>
+#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -61,6 +62,8 @@ public:
     std::atomic<bool> Processed{false};                        // finished (successfully, failed or cancelled)
     std::atomic<bool> Deleted{false};                          // owner is no longer interested in the request
     std::atomic<bool> Cancelled{false};                        // was never run (shutdown / removed before start)
+    std::atomic<bool> AbortRequested{false};                   // the owner asks a running request to stop early;
+                                                               // ProcessRequest() checks it where it can stop
     std::exception_ptr Error;                                  // exception thrown by ProcessRequest(), if any
 };
 
@@ -89,6 +92,17 @@ public:
 
     // Like Terminate(), but does not wait for the worker (it is joined later in the destructor).
     void Abort();
+
+    // Cancels and removes all queued requests that have not been started yet and for which pred returns true.
+    // The running request is never touched. Removed requests are marked Deleted: OnCancelled() is not called,
+    // the owner already knows. pred runs under the queue lock and must not call back into CWorkThread.
+    // Returns the cancelled requests.
+    std::vector<RequestPtr> CancelUnstartedRequests(const std::function<bool(const CRequestBase&)>& pred);
+
+    // Sets AbortRequested on the running request if pred returns true for it. The request still completes
+    // normally (Processed, event, AfterFinishProcess()); it only stops early if ProcessRequest() checks the flag.
+    // pred runs under the queue lock. Returns the request that was asked to stop, or nullptr.
+    RequestPtr RequestAbortRunning(const std::function<bool(const CRequestBase&)>& pred);
 
 protected:
     // Runs on the worker thread.

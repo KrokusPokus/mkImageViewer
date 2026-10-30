@@ -93,6 +93,8 @@ private:
     //    prepared. Decoding and resampling of a single image already use all cores (thread pool, multithreaded
     //    decoders). A second load thread would compete for cores and memory bandwidth and slow down the image the
     //    user is waiting for. The requests are processed one after the other, in the order they were started.
+    //    Exception: before the user waits for an image, read ahead requests that are queued are dropped and a
+    //    running one that is no longer needed is stopped before resampling (CancelPendingReadAhead()).
     std::unique_ptr<CImageLoadThread> m_pLoadThread;
     int m_nNumBuffers;
     int m_nCurrentTimeStamp;
@@ -106,6 +108,15 @@ private:
     void DeleteElement(RequestPtr pRequest);
     bool IsDestructivelyProcessed(CBaseImage* pImage);
     void SetAllRequestsInactive();
+
+    // Called before waiting for pKeep, so that it does not wait behind images nobody needs now:
+    //  - drops all requests the load thread has not started yet (except pKeep); StartNewRequestBundle() queues the
+    //    still needed neighbours again afterwards, behind pKeep;
+    //  - asks a running request to stop before resampling if its file is not in the read ahead range around
+    //    sFileName (a running neighbour that is needed anyway is not stopped: its work would be lost).
+    // Both are removed from the list. A stopped request still completes; its result is released together with the
+    // request object, which only the completion callback holds then.
+    void CancelPendingReadAhead(const RequestPtr& pKeep, CFileList* pFileList, EReadAheadDirection eDirection, const QString& sFileName);
 };
 
 #endif // IMAGEPROVIDER_H

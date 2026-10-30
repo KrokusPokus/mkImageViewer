@@ -776,6 +776,29 @@ void CImageLoadThread::ReleaseFile(const QString& strFileName) {
     try { ProcessAndWait(std::make_shared<CReleaseFileRequest>(strFileName)); } catch (...) {}
 }
 
+std::vector<int> CImageLoadThread::CancelPendingLoads(const std::vector<int>& handles) {
+    const auto cancelled = CancelUnstartedRequests([&handles](const CRequestBase& r) {
+        if (r.Type == CReleaseFileRequest::ReleaseFileRequest) return false;  // never drop a release
+        const int nHandle = static_cast<const CRequest&>(r).RequestHandle;
+        return std::find(handles.begin(), handles.end(), nHandle) != handles.end();
+    });
+    std::vector<int> result;
+    result.reserve(cancelled.size());
+    for (const auto& r : cancelled) {
+        result.push_back(static_cast<const CRequest&>(*r).RequestHandle);
+    }
+    return result;
+}
+
+int CImageLoadThread::AbortRunningLoad(const std::vector<int>& handles) {
+    const auto aborted = RequestAbortRunning([&handles](const CRequestBase& r) {
+        if (r.Type == CReleaseFileRequest::ReleaseFileRequest) return false;
+        const int nHandle = static_cast<const CRequest&>(r).RequestHandle;
+        return std::find(handles.begin(), handles.end(), nHandle) != handles.end();
+    });
+    return aborted ? static_cast<const CRequest&>(*aborted).RequestHandle : -1;
+}
+
 void CImageLoadThread::OnCancelled(CRequestBase& r) {
     if (r.Type != CReleaseFileRequest::ReleaseFileRequest) {
         auto& rq = static_cast<CRequest&>(r);
@@ -879,6 +902,15 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
         dropCaches(Keep_Qt | Keep_Zip);
         ProcessReadQtImageRequest(&rq);
         break;
+    }
+
+    // The owner does not need the image any more (read ahead out of range): skip rotation and resampling,
+    // which take the most time after decoding, and free the memory right away
+    if (rq.Image != nullptr && rq.AbortRequested) {
+        delete rq.Image;
+        rq.Image = nullptr;
+        rq.Error = ELoadError::Aborted;
+        return;
     }
 
     // then process the image if read was successful

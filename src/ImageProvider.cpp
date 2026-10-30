@@ -4,6 +4,7 @@
 #include "FileList.h"
 #include "ProcessParams.h"
 
+#include <algorithm>
 #include <climits>
 #include <QDir>
 #include <QFileInfo>
@@ -64,6 +65,8 @@ CImageLoadResult CImageProvider::RequestImage(CFileList* pFileList, EReadAheadDi
 
     // Warten auf das Laden des Bildes via QWaitCondition
     if (!pRequest->Ready) {
+        // Queued read ahead requests would be processed first (one load thread, first in first out)
+        CancelPendingReadAhead(pRequest, pFileList, eDirection, sFileName);
         qDebug() << "CImageProvider::RequestImage() Start waiting for request completion: Frame" << pRequest->FrameIndex << "of" << pRequest->FileName;
         QMutexLocker locker(&pRequest->Mutex);
         while (!pRequest->Ready) {
@@ -377,6 +380,63 @@ std::list<CImageProvider::RequestPtr>::iterator CImageProvider::DeleteElementAt(
 
 void CImageProvider::DeleteElement(RequestPtr pRequest) {
     m_requestList.remove(pRequest);
+}
+
+void CImageProvider::CancelPendingReadAhead(const RequestPtr& pKeep, CFileList* pFileList, EReadAheadDirection eDirection,
+                                            const QString& sFileName) {
+    std::vector<int> handles;
+    for (const auto& pRequest : m_requestList) {
+        if (pRequest != pKeep && !pRequest->Ready) {
+            handles.push_back(pRequest->Handle);
+        }
+    }
+    if (handles.empty()) {
+        return;
+    }
+
+    auto removeFromList = [this](const std::vector<int>& removed) {
+        m_requestList.remove_if([&removed](const RequestPtr& pRequest) {
+            return std::find(removed.begin(), removed.end(), pRequest->Handle) != removed.end();
+        });
+    };
+
+    // 1. Not yet started: dropping costs nothing, needed neighbours are queued again after pKeep
+    const std::vector<int> cancelled = m_pLoadThread->CancelPendingLoads(handles);
+    removeFromList(cancelled);
+
+    // 2. The running request (at most one): only stop it if it is not needed around the new image.
+    //    Compared by file name, which keeps all frames of the file and is on the safe side.
+    std::vector<int> candidates;
+    for (const auto& pRequest : m_requestList) {
+        if (pRequest != pKeep && !pRequest->Ready && pRequest->FileName != sFileName) {
+            candidates.push_back(pRequest->Handle);
+        }
+    }
+    if (candidates.empty()) {
+        return;
+    }
+    if (pFileList != nullptr && (eDirection == FORWARD || eDirection == BACKWARD)) {
+        // the same neighbours StartNewRequestBundle() will request (m_nNumBuffers - 1 of them, alternating)
+        const int nRange = m_nNumBuffers / 2;
+        QStringList neighbours;
+        for (int i = 1; i <= nRange; i++) {
+            neighbours.append(pFileList->PeekNextPrev(i, true));
+            neighbours.append(pFileList->PeekNextPrev(i, false));
+        }
+        std::erase_if(candidates, [this, &neighbours](int nHandle) {
+            for (const auto& pRequest : m_requestList) {
+                if (pRequest->Handle == nHandle) {
+                    return neighbours.contains(pRequest->FileName);
+                }
+            }
+            return true;
+        });
+    }
+    const int nAborted = m_pLoadThread->AbortRunningLoad(candidates);
+    if (nAborted != -1) {
+        qDebug() << "CImageProvider::CancelPendingReadAhead() stopping running read ahead, handle" << nAborted;
+        removeFromList({ nAborted });
+    }
 }
 
 bool CImageProvider::IsDestructivelyProcessed(CBaseImage* pImage) {

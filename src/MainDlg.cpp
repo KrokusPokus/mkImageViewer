@@ -92,6 +92,7 @@ namespace {
         case ELoadError::TooLarge:        return QStringLiteral("Image or file too large");
         case ELoadError::OutOfMemory:     return QStringLiteral("Not enough memory available");
         case ELoadError::Exception:       return QStringLiteral("An exception error has occured");
+        case ELoadError::Aborted:
         case ELoadError::None:            break;
         }
         return QString();

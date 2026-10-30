@@ -115,6 +115,47 @@ void CWorkThread::Abort() {
     CancelPendingRequests();
 }
 
+std::vector<CWorkThread::RequestPtr> CWorkThread::CancelUnstartedRequests(const std::function<bool(const CRequestBase&)>& pred) {
+    std::vector<RequestPtr> cancelled;
+    std::vector<RequestPtr> toFinish;
+    {
+        // The worker takes the next request under the same lock: a request is either running (skipped)
+        // or will never be started.
+        std::lock_guard<std::mutex> lock(m_mutex);
+        for (auto it = m_requestList.begin(); it != m_requestList.end(); ) {
+            const RequestPtr& r = *it;
+            if (r.get() != m_pCurrent && !r->Processed && pred(*r)) {
+                r->Deleted = true;              // cancelled by the owner: no OnCancelled()
+                CancelLocked(r, toFinish);
+                cancelled.push_back(r);
+                it = m_requestList.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    FinishCancelled(toFinish);  // signals waiters (EventFinished); OnCancelled() is skipped because of Deleted
+    return cancelled;
+}
+
+CWorkThread::RequestPtr CWorkThread::RequestAbortRunning(const std::function<bool(const CRequestBase&)>& pred) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_pCurrent == nullptr) {
+        return nullptr;
+    }
+    // The running request stays in the list until it is finished, so it can be found there
+    for (const RequestPtr& r : m_requestList) {
+        if (r.get() == m_pCurrent) {
+            if (!r->Processed && pred(*r)) {
+                r->AbortRequested = true;
+                return r;
+            }
+            break;
+        }
+    }
+    return nullptr;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Private
 /////////////////////////////////////////////////////////////////////////////////////////////

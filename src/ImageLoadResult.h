@@ -15,7 +15,8 @@ enum class ELoadError {
     NotDecodable,       // the data is corrupt or the format is not supported
     TooLarge,           // file size or image dimensions above the limits
     OutOfMemory,        // memory could not be allocated
-    Exception           // unexpected exception in a decoder
+    Exception,          // unexpected exception in a decoder
+    Aborted             // read ahead stopped by the owner before processing (internal, never shown)
 };
 
 // Where an image is: file and frame (page of an archive, frame of an animation or multi page file).
