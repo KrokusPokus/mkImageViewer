@@ -84,15 +84,8 @@ namespace Helpers {
         TE_ScrollBT,
     };
 
-    // Confirmation required for file deletion
-    enum EDeleteConfirmation {
-        DC_Always,
-        DC_OnlyWhenNoRecycleBin,
-        DC_Never
-    };
-
     inline float DPIScalingFactor = -1.0f; // is updated to ::GetDeviceCaps(dc, LOGPIXELSX)/96.0f during OnInitDialog()
-    
+
     // Maximum and minimum allowed zoom factors for images
     const double ZoomMax = DBL_MAX; // unbound the maximum zoom, previously set at 16.0 (1600%)
     const double ZoomMin = DBL_MIN; // unbound the minimum zoom, previously set at 0.1 (10%)

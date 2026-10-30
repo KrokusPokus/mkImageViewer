@@ -78,8 +78,7 @@ namespace {
     enum EFileLoadError {
         FileLoad_Ok = 0,
         FileLoad_LoadError = 1,
-        FileLoad_SlideShowListInvalid = 2,
-        FileLoad_NoFilesInDirectory = 3
+        FileLoad_NoFilesInDirectory = 2
     };
 
     // Text for the reason why an image could not be loaded
@@ -222,10 +221,6 @@ namespace {
             }
             break;
             }
-
-        case FileLoad_SlideShowListInvalid:
-            message = QStringLiteral("File does not contain a list of file names:\n\n%1").arg(failedFileName);
-            break;
 
         case FileLoad_NoFilesInDirectory:
             message = QStringLiteral("Directory does not contain any image files to display:\n\n%1").arg(failedFileName);
@@ -389,9 +384,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
 
     m_eSortModeBeforeRandom = Helpers::FS_FileName;
 
-    //setMinimumSize(0, 0);
-    QSize minimalSize = sp.MinimalWindowSize();
-    setMinimumSize(std::max(0, minimalSize.width()), std::max(0, minimalSize.height()));
+    setMinimumSize(160, 120);
 
     this->setWindowTitle(APP_TITLE);
 
@@ -813,9 +806,7 @@ void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect,
         const CImagePosition position = CurrentPosition();
         QString sFileName;
         qint64 nFileSize = 0;
-        if (m_nLastLoadError == FileLoad_SlideShowListInvalid) {
-            sFileName = m_sStartupFile;
-        } else if (m_nLastLoadError == FileLoad_NoFilesInDirectory) {
+        if (m_nLastLoadError == FileLoad_NoFilesInDirectory) {
             sFileName = m_pFileList->CurrentDirectory();
         } else if (position.InArchive && !position.EntryName.isEmpty()) {
             // a page of the archive could not be read: the image file within the archive and its size
@@ -1681,12 +1672,8 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                     break;
                 }
 
-                Helpers::EDeleteConfirmation confirmationPolicy = CSettingsProvider::This().DeleteConfirmation();
-                if (confirmationPolicy != Helpers::DC_Never) {
-                    bool bRecycleOnly = false;
-                    if (!showDeleteConfirmationDialog({currentFileName}, bRecycleOnly)) {
-                        break;
-                    }
+                if (!showDeleteConfirmationDialog({currentFileName}, false)) {
+                    break;
                 }
 
                 CFileList* fileListOfDeletedImage = m_pFileList;
@@ -3194,9 +3181,6 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
 int CMainDlg::GetLoadErrorAfterOpenFile() {
     if (m_pCurrentImage == NULL) {
         if (CurrentFileName(false).isEmpty()) {
-            if (m_pFileList->IsSlideShowList()) {
-                return FileLoad_SlideShowListInvalid;
-            }
             return FileLoad_NoFilesInDirectory;
         }
         return FileLoad_LoadError;

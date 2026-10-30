@@ -133,24 +133,17 @@ CFileList::CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWa
 
     const QString sExtension = initialInfo.suffix().toLower();
     const bool bImageFile = !bIsDirectory && IsImageFile(sExtension);
-    
-    m_bIsSlideShowList = !bIsDirectory && !bImageFile && TryReadingSlideShowList(m_sInitialFile);
 
     m_directoryWatcher.SetCurrentDirectory(m_sDirectory);
 
-    if (!m_bIsSlideShowList) {
-        if (bImageFile || bIsDirectory) {
-            FindFiles();
-            m_iter = FindFile(m_sInitialFile);
-            m_iterStart = bWrapAroundFolder ? m_iter : m_fileList.begin();
-        } else {
-            if (initialInfo.exists()) {
-                m_fileList.emplace_back(m_sInitialFile, initialInfo.lastModified(), initialInfo.birthTime(), initialInfo.size());
-            }
-            m_iter = m_iterStart = m_fileList.begin();
-        }
+    if (bImageFile || bIsDirectory) {
+        FindFiles();
+        m_iter = FindFile(m_sInitialFile);
+        m_iterStart = bWrapAroundFolder ? m_iter : m_fileList.begin();
     } else {
-        sm_eMode = Helpers::NM_LoopDirectory;
+        if (initialInfo.exists()) {
+            m_fileList.emplace_back(m_sInitialFile, initialInfo.lastModified(), initialInfo.birthTime(), initialInfo.size());
+        }
         m_iter = m_iterStart = m_fileList.begin();
     }
 }
@@ -180,13 +173,8 @@ void CFileList::Reload(const QString& sFileName, bool clearForwardHistory) {
         m_next = nullptr;
     }
 
-    if (!m_bIsSlideShowList) {
-        FindFiles();
-        m_iterStart = m_bWrapAroundFolder ? FindFile(m_sInitialFile) : m_fileList.begin();
-    } else {
-        VerifyFiles();
-        m_iterStart = m_fileList.begin();
-    }
+    FindFiles();
+    m_iterStart = m_bWrapAroundFolder ? FindFile(m_sInitialFile) : m_fileList.begin();
     m_iter = FindFile(sCurrentFile);
 }
 
@@ -223,23 +211,20 @@ void CFileList::FileHasRenamed(const QString& sOldFileName, const QString& sNewF
 
     // A rename can change the position of the entry with every sorting: by name directly, by date, size or
     // random number when the key is equal to that of other entries (the name decides then, see operator<).
-    // Slide show lists keep the order of the text file.
     //
     // The entry is moved alone instead of calling m_fileList.sort(): the rest of the list is still sorted,
     // so one linear pass is enough. std::list::splice() keeps all iterators valid (m_iter, m_iterStart,
     // m_iterCheckPoint), m_iter still points to the renamed file.
-    if (!m_bIsSlideShowList) {
-        auto iterPos = m_fileList.begin();
-        while (iterPos != m_fileList.end() && (iterPos == iterRenamed || *iterPos < *iterRenamed)) {
-            ++iterPos;
-        }
-        m_fileList.splice(iterPos, m_fileList, iterRenamed);
+    auto iterPos = m_fileList.begin();
+    while (iterPos != m_fileList.end() && (iterPos == iterRenamed || *iterPos < *iterRenamed)) {
+        ++iterPos;
+    }
+    m_fileList.splice(iterPos, m_fileList, iterRenamed);
 
-        // Without wrap-around the iteration starts at the first element, which may have changed.
-        // (With wrap-around m_iterStart is a position, i.e. an iterator, which stays valid.)
-        if (!m_bWrapAroundFolder) {
-            m_iterStart = m_fileList.begin();
-        }
+    // Without wrap-around the iteration starts at the first element, which may have changed.
+    // (With wrap-around m_iterStart is a position, i.e. an iterator, which stays valid.)
+    if (!m_bWrapAroundFolder) {
+        m_iterStart = m_fileList.begin();
     }
 }
 
@@ -384,10 +369,6 @@ bool CFileList::IsSortedAscending() const {
 }
 
 void CFileList::SetNavigationMode(Helpers::ENavigationMode eMode) {
-    if (m_bIsSlideShowList) {
-        return;
-    }
-
     sm_eMode = eMode;
     DeleteHistory();
     m_nLevel = 0;
@@ -631,57 +612,8 @@ void CFileList::FindFiles() {
     m_fileList.sort();
 }
 
-void CFileList::VerifyFiles() {
-    auto iter = m_fileList.begin();
-    while (iter != m_fileList.end()) {
-        if (!QFileInfo::exists(iter->GetName())) {
-            iter = m_fileList.erase(iter);
-        } else {
-            ++iter;
-        }
-    }
-}
-
 bool CFileList::IsImageFile(const QString& sEnding) {
     return GetSupportedFileEndingList().contains(sEnding.toLower());
-}
-
-bool CFileList::TryReadingSlideShowList(const QString& sSlideShowFile) {
-    QFile file(sSlideShowFile);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return false;
-    }
-
-    QTextStream in(&file);
-    // Qt-TextStream erkennt automatisch UTF-8/UTF-16/ANSI
-    
-    int lineCount = 0;
-    const int maxLines = CSettingsProvider::This().MaxSlideShowFileListSize() * 1024;
-
-    while (!in.atEnd() && lineCount < maxLines) {
-        QString line = in.readLine().trimmed();
-        lineCount++;
-
-        if (line.isEmpty()) continue;
-
-        // Anführungszeichen aufräumen
-        if (line.startsWith(QLatin1Char('"')) && line.endsWith(QLatin1Char('"'))) {
-            line = line.mid(1, line.length() - 2);
-        }
-
-        QFileInfo checkFile;
-        if (QDir::isAbsolutePath(line)) {
-            checkFile.setFile(line);
-        } else {
-            checkFile.setFile(m_sDirectory, line);
-        }
-
-        if (checkFile.exists() && !checkFile.isDir()) {
-            m_fileList.emplace_back(checkFile.absoluteFilePath(), checkFile.lastModified(), checkFile.birthTime(), checkFile.size());
-        }
-    }
-
-    return !m_fileList.empty();
 }
 
 bool CFileList::IsEndpoint() {

@@ -119,9 +119,6 @@ public:
     // Check if we are now on another image since the last checkpoint was set
     bool ChangedSinceCheckpoint() const { return m_iterCheckPoint != m_iter; }
 
-    // Returns if the current file list is based on a slide show text file
-    bool IsSlideShowList() const { return m_bIsSlideShowList; }
-
     // Tells the list that a file was renamed (both parameters with full path, same directory).
     // The entry is renamed in place and moved to its new position if the list is sorted by name,
     // so the iterator (current file) keeps pointing to the renamed file. No directory access, no reload.
@@ -144,7 +141,6 @@ private:
     static Helpers::ENavigationMode sm_eMode;
 
     bool m_bDeleteHistory{ true };
-    bool m_bIsSlideShowList{ false };
     bool m_bWrapAroundFolder{ false };
     int m_nLevel{ 0 };
     QString m_sInitialFile;
@@ -170,9 +166,7 @@ private:
     CFileList* WrapToNextImage();
     CFileList* WrapToPrevImage();
     void FindFiles();
-    void VerifyFiles();
     static bool IsImageFile(const QString& sEnding);
-    bool TryReadingSlideShowList(const QString& sSlideShowFile);
 };
 
 #endif // FILELIST_H

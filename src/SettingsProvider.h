@@ -34,7 +34,6 @@ private:
     // UI-Controls (Member für den Zugriff beim Speichern/Laden)
     // Programm & System
     class QComboBox* m_comboLanguage;
-    class QComboBox* m_comboDeleteConfirmation;
     class QComboBox* m_comboSingleInstance;
     class QComboBox* m_comboCpuType;
     class QSpinBox*  m_spinCpuCores;
@@ -44,8 +43,6 @@ private:
     class QCheckBox* m_checkShowFullScreen;
     class QCheckBox* m_checkBookModeLaunchFullscreen;
     class QCheckBox* m_checkSingleFullScreenInstance;
-    class QSpinBox*  m_spinMinWidth;
-    class QSpinBox*  m_spinMinHeight;
     class QCheckBox* m_checkShowFilePathInTitle;
     class QCheckBox* m_checkShowAppNameInTitle;
     class QCheckBox* m_checkTitleBarUseFileIcon;
@@ -86,7 +83,6 @@ private:
     class QDoubleSpinBox* m_spinAutoBrightnessAmount;
 
     // Diashow
-    class QSpinBox*  m_spinMaxSlideShowFileListSize;
     class QComboBox* m_comboSlideShowTransitionEffect;
     class QSpinBox*  m_spinSlideShowEffectTimeMs;
 
@@ -135,7 +131,6 @@ public:
     QColor ColorBackground() const { return m_colorBackground; }
     QColor ColorTransparency() const { return m_colorTransparency; }
     QRect StickyWindowRect() const { return m_stickyWindowRect; }
-    QSize MinimalWindowSize() const { return m_minimalWindowSize; }
 
     double AutoBrightnessAmount() const { return m_dAutoBrightnessAmount; }
     double AutoContrastAmount() const { return m_dAutoContrastAmount; }
@@ -146,7 +141,6 @@ public:
     Helpers::CPUType AlgorithmImplementation() const { return m_eCPUAlgorithm; }
     Helpers::EAutoZoomMode AutoZoomMode() const { return m_eAutoZoomMode; }
     Helpers::EAutoZoomMode AutoZoomModeFullscreen() const { return m_eAutoZoomModeFullscreen; }
-    Helpers::EDeleteConfirmation DeleteConfirmation() const { return m_eDeleteConfirmation; }
     Helpers::ENavigationMode Navigation() const { return m_eNavigation; }
     Helpers::ESingleInstanceMode SingleInstanceMode() const { return m_eSingleInstanceMode; }
     Helpers::ESorting Sorting() const { return m_eSorting; }
@@ -156,7 +150,6 @@ public:
     int BookModePageHeight() const { return m_nBookModePageHeight; }
     int CacheRange() const { return m_nCacheRange; }
     int DisplayMonitor() const { return m_nDisplayMonitor; }
-    int MaxSlideShowFileListSize() const { return m_nMaxSlideShowFileListSize; }
     int NumberOfCoresToUse() const { return m_nNumCores; }
     int SlideShowEffectTimeMs() const { return m_nSlideShowEffectTimeMs; }
 
@@ -203,13 +196,11 @@ private:
     bool m_bAutoContrastCorrection{false};
     double m_dAutoContrastAmount{0.5};
     double m_dAutoBrightnessAmount{0.2};
-    int m_nMaxSlideShowFileListSize{200};
     Helpers::ETransitionEffect m_eSlideShowTransitionEffect;
     int m_nSlideShowEffectTimeMs{200};
     Helpers::ESingleInstanceMode m_eSingleInstanceMode;
     bool m_bSingleFullScreenInstance{true};
     bool m_bWrapAroundFolder{true};
-    Helpers::EDeleteConfirmation m_eDeleteConfirmation;
     bool m_bAutoRotateEXIF{true};
     bool m_bUseEmbeddedColorProfiles{true};
     QRect m_stickyWindowRect;
@@ -220,7 +211,6 @@ private:
     QColor m_colorBackground;
     QColor m_colorTransparency;
     bool m_bReloadWhenDisplayedImageChanged{true};
-    QSize m_minimalWindowSize;
 
     double m_zoomPauseFactor{1.0};
 
