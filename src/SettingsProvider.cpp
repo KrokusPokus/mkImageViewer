@@ -62,6 +62,7 @@ namespace {
         case Helpers::ZM_FillScreenNoZoom: return "FillNoZoom";
         case Helpers::ZM_None:             return "None";
         case Helpers::ZM_BookMode:         return "BookMode";
+        case Helpers::ZM_FitToScreenNoZoom: return "FitNoZoom";
         default:                           return "FitNoZoom";
         }
     }
@@ -909,13 +910,14 @@ QColor CSettingsProvider::GetColor(const QString& sKey, const QColor& defaultCol
 }
 
 Helpers::EAutoZoomMode CSettingsProvider::GetAutoZoomMode(const QString& sKey, Helpers::EAutoZoomMode defaultZoomMode) const {
-    QString sAutoZoomMode = GetString(sKey, "FitNoZoom");
-    if (sAutoZoomMode.compare("Fit", Qt::CaseInsensitive) == 0) {
-        return Helpers::ZM_FitToScreen;
-    } else if (sAutoZoomMode.compare("Fill", Qt::CaseInsensitive) == 0) {
-        return Helpers::ZM_FillScreen;
-    } else if (sAutoZoomMode.compare("FillNoZoom", Qt::CaseInsensitive) == 0) {
-        return Helpers::ZM_FillScreenNoZoom;
+    // All values the settings dialog offers (GetAutoZoomModeString()); a missing key or an unknown value gives the default
+    const QString sAutoZoomMode = GetString(sKey, GetAutoZoomModeString(defaultZoomMode));
+    static const Helpers::EAutoZoomMode modes[] = { Helpers::ZM_FitToScreen, Helpers::ZM_FitToScreenNoZoom, Helpers::ZM_FillScreen,
+                                                    Helpers::ZM_FillScreenNoZoom, Helpers::ZM_BookMode, Helpers::ZM_None };
+    for (Helpers::EAutoZoomMode eMode : modes) {
+        if (sAutoZoomMode.compare(GetAutoZoomModeString(eMode), Qt::CaseInsensitive) == 0) {
+            return eMode;
+        }
     }
     return defaultZoomMode;
 }

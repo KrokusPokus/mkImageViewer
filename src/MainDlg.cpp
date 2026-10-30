@@ -437,7 +437,8 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
         }
     }
 
-    m_clientRect = m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultWindowRect();
+    // in device pixels (the factor of the window is only exact after it is shown; resizeEvent()/paintEvent() correct it)
+    m_clientRect = QRect(QPoint(0, 0), (m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultWindowRect()).size() * devicePixelRatioF());
 
     this->setWindowIcon(QIcon(":/icons/mainframes.ico"));
 
@@ -521,10 +522,10 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     QPainter painter(this);
     m_dRealizedZoom = 1.0;
 
-    m_clientRect = rect();
+    m_clientRect = QRect(QPoint(0, 0), ClientSizePx());
 
     QColor backColor = CSettingsProvider::This().ColorBackground();
-    painter.fillRect(m_clientRect, backColor);
+    painter.fillRect(rect(), backColor);
 
     if (m_pCurrentImage != NULL) {
         qint64 startTime = QDateTime::currentMSecsSinceEpoch();
@@ -562,7 +563,13 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             int xDest = (m_clientRect.width() - clippedSize.width()) / 2 + m_DIBOffsets.x();
             int yDest = (m_clientRect.height() - clippedSize.height()) / 2 + m_DIBOffsets.y();
 
+            // Draw in device pixels: undo Qt's scaling, so every DIB pixel lands on one pixel of the window buffer
+            // (pure copy without filtering, also with scaling like 125 % or 150 %)
+            painter.save();
+            const qreal dpr = devicePixelRatioF();
+            painter.scale(1.0 / dpr, 1.0 / dpr);
             painter.drawImage(xDest, yDest, dibImage);
+            painter.restore();
         }
 
         if (m_bZoomMode) m_offsets = unlimitedOffsets;
@@ -637,7 +644,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             // QPainter Konfiguration für Text
             painter.setFont(QFont("Consolas", 10));
 
-            QRect textRect = m_clientRect.adjusted(20, 20, -20, -20);
+            QRect textRect = rect().adjusted(20, 20, -20, -20);
 
             // 1. Exakte Ausdehnung des Textes (inkl. Wortumbruch) im Vorfeld berechnen
             QRect boundingRect = painter.boundingRect(
@@ -725,7 +732,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         painter.drawText(toastRect, Qt::AlignRight | Qt::AlignTop, m_strToast);
     }
 
-    DisplayErrors(m_pCurrentImage, m_clientRect, painter);
+    DisplayErrors(m_pCurrentImage, rect(), painter);
 
     // Startup: the low quality preview is on the screen now, request the high quality version right away.
     // Queued, so the preview is handed to the compositor before the high quality resampling starts.
@@ -836,7 +843,7 @@ void CMainDlg::resizeEvent(QResizeEvent* event) {
     float dZoomForFit = GetZoomFactorForFitToScreen(bFillCrop, bAllowZoomIn);
     bool bKeepFitToScreen = !m_bResizeForNewImage && (MaxRatio(m_dZoom, dZoomForFit) < 1.01);
 
-    m_clientRect = QRect(0, 0, width(), height());
+    m_clientRect = QRect(QPoint(0, 0), ClientSizePx());
 
     this->update();
 
@@ -859,11 +866,11 @@ void CMainDlg::closeEvent(QCloseEvent* event) {
 }
 
 void CMainDlg::mousePressEvent(QMouseEvent* event) {
-    m_nMouseX = event->pos().x();
-    m_nMouseY = event->pos().y();
+    m_nMouseX = ToPx(event->pos()).x();
+    m_nMouseY = ToPx(event->pos()).y();
 
     if (event->button() == Qt::LeftButton) {
-        QPoint pos = event->pos();
+        QPoint pos = ToPx(event->pos());
 
         this->grabMouse();
         CPoint pointClicked(pos.x(), pos.y());
@@ -898,7 +905,7 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
             return;
         }
 
-        QPoint pos = event->pos();
+        QPoint pos = ToPx(event->pos());
         StartDragging(pos.x(), pos.y(), false);
     }
     else if (event->button() == Qt::BackButton || event->button() == Qt::ForwardButton) {
@@ -921,8 +928,8 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
 }
 
 void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
-    m_nMouseX = event->pos().x();
-    m_nMouseY = event->pos().y();
+    m_nMouseX = ToPx(event->pos()).x();
+    m_nMouseY = ToPx(event->pos()).y();
 
     if (event->button() == Qt::LeftButton) {
         if (m_bZoomMode) {
@@ -949,8 +956,8 @@ void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
-    m_nMouseX = event->pos().x();
-    m_nMouseY = event->pos().y();
+    m_nMouseX = ToPx(event->pos()).x();
+    m_nMouseY = ToPx(event->pos()).y();
 
     if (event->button() == Qt::LeftButton) {
         if (m_pCurrentImage != NULL) {
@@ -972,15 +979,15 @@ void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
 
 void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
     // Turn mouse pointer on when mouse has moved some distance
-    m_nMouseX = event->pos().x();
-    m_nMouseY = event->pos().y();
+    m_nMouseX = ToPx(event->pos()).x();
+    m_nMouseY = ToPx(event->pos()).y();
 
     if (!m_bDragging) {
         if (m_startMouse.x() == -1 && m_startMouse.y() == -1) {
             m_startMouse.setX(m_nMouseX);
             m_startMouse.setY(m_nMouseY);
         } else {
-            if (abs(m_nMouseX - m_startMouse.x()) + abs(m_nMouseY - m_startMouse.y()) > 50) {
+            if (abs(m_nMouseX - m_startMouse.x()) + abs(m_nMouseY - m_startMouse.y()) > ScaleToPx(50)) {
                 MouseOn();
             }
         }
@@ -988,7 +995,7 @@ void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
 
     // Do dragging when needed, else pass event to panel manager and zoom navigator
     if (m_bZoomMode) {
-        int nDX = m_nMouseX - m_nCapturedX;
+        int nDX = qRound((m_nMouseX - m_nCapturedX) / devicePixelRatioF()); // zoom speed by the logical distance
         double dFactor = 1 + pow(nDX * nDX, 0.8) / 1500;
         if (nDX < 0) dFactor = 1.0/dFactor;
         PerformZoom(m_dStartZoom * dFactor, false, true);
@@ -1015,7 +1022,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
             if (m_pCurrentImage != NULL) {
                 if (nDelta < 0) {
                     if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
-                        if (PerformPan(0, -PAN_STEP, false) == true) {
+                        if (PerformPan(0, -ScaleToPx(PAN_STEP), false) == true) {
                             this->update();
                         }
                     } else {
@@ -1023,7 +1030,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                         unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
                         if (iRealHeight > m_clientRect.height()) {
-                            if (PerformPan(0, -PAN_STEP, false) == true) {
+                            if (PerformPan(0, -ScaleToPx(PAN_STEP), false) == true) {
                                 this->update();
                             }
                         } else {
@@ -1033,7 +1040,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                 }
                 else if (nDelta > 0) {
                     if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
-                        if (PerformPan(0, PAN_STEP, false) == true) {
+                        if (PerformPan(0, ScaleToPx(PAN_STEP), false) == true) {
                             this->update();
                         }
                     } else {
@@ -1041,7 +1048,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                         unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
                         if (iRealHeight > m_clientRect.height()) {
-                            if (PerformPan(0, PAN_STEP, false) == true) {
+                            if (PerformPan(0, ScaleToPx(PAN_STEP), false) == true) {
                                 this->update();
                             }
                         } else {
@@ -1069,11 +1076,11 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
         } else if (bShift) { // Pan horizontally
             if (m_pCurrentImage != NULL) {
                 if (nDelta < 0) {
-                    if (PerformPan(-PAN_STEP, 0, false) == true) {
+                    if (PerformPan(-ScaleToPx(PAN_STEP), 0, false) == true) {
                         this->update();
                     }
                 } else if (nDelta > 0) {
-                    if (PerformPan(PAN_STEP, 0, false) == true) {
+                    if (PerformPan(ScaleToPx(PAN_STEP), 0, false) == true) {
                         this->update();
                     }
                 }
@@ -1081,11 +1088,11 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
         } else if (bCtrl) { // Pan vertically
             if (m_pCurrentImage != NULL) {
                 if (nDelta < 0) {
-                    if (PerformPan(0, -PAN_STEP, false) == true) {
+                    if (PerformPan(0, -ScaleToPx(PAN_STEP), false) == true) {
                         this->update();
                     }
                 } else if (nDelta > 0) {
-                    if (PerformPan(0, PAN_STEP, false) == true) {
+                    if (PerformPan(0, ScaleToPx(PAN_STEP), false) == true) {
                         this->update();
                     }
                 }
@@ -1299,17 +1306,18 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
             int iRealHeight = int(m_dZoom * (m_pCurrentImage->OrigHeight()));
             int iRealWidth = int(m_dZoom * (m_pCurrentImage->OrigWidth()));
 
+            const int nStep = ScaleToPx(10);    // 10 logical pixels per timer tick, in device pixels
             if (GetAutoZoomMode() == Helpers::ZM_BookMode && iRealHeight > m_clientRect.height() && iRealWidth <= m_clientRect.width()) {
-                if ((m_bPanKeyLeft && !m_bPanKeyRight) || (m_bPanKeyUp && !m_bPanKeyDown)) PanYbase = 10;
-                else if ((!m_bPanKeyLeft && m_bPanKeyRight) || (!m_bPanKeyUp && m_bPanKeyDown)) PanYbase = -10;
+                if ((m_bPanKeyLeft && !m_bPanKeyRight) || (m_bPanKeyUp && !m_bPanKeyDown)) PanYbase = nStep;
+                else if ((!m_bPanKeyLeft && m_bPanKeyRight) || (!m_bPanKeyUp && m_bPanKeyDown)) PanYbase = -nStep;
                 else PanYbase = 0;
             } else {
-                if (m_bPanKeyUp && !m_bPanKeyDown) PanYbase = 10;
-                else if (!m_bPanKeyUp && m_bPanKeyDown) PanYbase = -10;
+                if (m_bPanKeyUp && !m_bPanKeyDown) PanYbase = nStep;
+                else if (!m_bPanKeyUp && m_bPanKeyDown) PanYbase = -nStep;
                 else PanYbase = 0;
 
-                if (m_bPanKeyLeft && !m_bPanKeyRight) PanXbase = 10;
-                else if (!m_bPanKeyLeft && m_bPanKeyRight) PanXbase = -10;
+                if (m_bPanKeyLeft && !m_bPanKeyRight) PanXbase = nStep;
+                else if (!m_bPanKeyLeft && m_bPanKeyRight) PanXbase = -nStep;
                 else PanXbase = 0;
             }
 
@@ -2050,16 +2058,16 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                                 m_panTimerId = startTimer(17);
                             }
                         } else {
-                            PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
-                                (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
+                            PerformPan((inv.id == Command::PanLeft) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanRight) ? -ScaleToPx(PAN_STEP) : 0,
+                                (inv.id == Command::PanUp) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanDown) ? -ScaleToPx(PAN_STEP) : 0, false);
                         }
                     } else {
-                        PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
-                            (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
+                        PerformPan((inv.id == Command::PanLeft) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanRight) ? -ScaleToPx(PAN_STEP) : 0,
+                            (inv.id == Command::PanUp) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanDown) ? -ScaleToPx(PAN_STEP) : 0, false);
                     }
                 } else {
-                    PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
-                        (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
+                    PerformPan((inv.id == Command::PanLeft) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanRight) ? -ScaleToPx(PAN_STEP) : 0,
+                        (inv.id == Command::PanUp) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanDown) ? -ScaleToPx(PAN_STEP) : 0, false);
                 }
             } else {
                 if (m_pCurrentImage != NULL) {
@@ -2075,8 +2083,8 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                                 m_panTimerId = startTimer(17);
                             }
                         } else {
-                            PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
-                                (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
+                            PerformPan((inv.id == Command::PanLeft) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanRight) ? -ScaleToPx(PAN_STEP) : 0,
+                                (inv.id == Command::PanUp) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanDown) ? -ScaleToPx(PAN_STEP) : 0, false);
                         }
                     } else {
                         if (GetAutoZoomMode() != Helpers::ZM_BookMode) {
@@ -2097,7 +2105,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                                             if (m_panTimerId != 0) killTimer(m_panTimerId);
                                             m_panTimerId = startTimer(17);
                                         } else {
-                                            PerformPan(0, ((inv.id == Command::PanUp) || (inv.id == Command::PanLeft)) ? PAN_STEP : ((inv.id == Command::PanDown) || (inv.id == Command::PanRight)) ? -PAN_STEP : 0, false);
+                                            PerformPan(0, ((inv.id == Command::PanUp) || (inv.id == Command::PanLeft)) ? ScaleToPx(PAN_STEP) : ((inv.id == Command::PanDown) || (inv.id == Command::PanRight)) ? -ScaleToPx(PAN_STEP) : 0, false);
                                         }
                                     }
                                 }
@@ -2870,9 +2878,9 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
     int nClientHeight = m_clientRect.height();
 
     if (nClientWidth == 0 && nClientHeight == 0) {
-        QRect rect = CMultiMonitorSupport::GetMonitorRect(this);
-        nClientWidth = rect.width();
-        nClientHeight = rect.height();
+        const QSize monitorPx = CMultiMonitorSupport::GetMonitorRect(this).size() * devicePixelRatioF();
+        nClientWidth = monitorPx.width();
+        nClientHeight = monitorPx.height();
     }
 
     qDebug() << "CMainDlg::CreateProcessParams() nClientWidth:" << nClientWidth << "nClientHeight:" << nClientHeight;
@@ -2995,7 +3003,7 @@ void CMainDlg::MouseOff() {
             return;
         }
 
-        if (m_nMouseY < this->rect().bottom()) {
+        if (m_nMouseY < m_clientRect.bottom()) {
             if (m_bFullScreenMode) {
                 // Cursor nur im Vollbildmodus verstecken (Qt plattformübergreifend)
                 this->setCursor(Qt::BlankCursor);
@@ -3080,19 +3088,35 @@ QString CMainDlg::CurrentDisplayPath() {
     return QDir::toNativeSeparators(sPath);
 }
 
+QSize CMainDlg::ClientSizePx() const {
+    // Same rounding as Qt uses for the window buffer (measured: qRound(logical * factor) at 125 % and 150 %).
+    // The factor of the window, not of the screen: on Wayland QScreen reports 2 for 125 % and 150 %.
+    const qreal dpr = devicePixelRatioF();
+    return QSize(qRound(width() * dpr), qRound(height() * dpr));
+}
+
+QPoint CMainDlg::ToPx(const QPoint& logical) const {
+    const qreal dpr = devicePixelRatioF();
+    return QPoint(qRound(logical.x() * dpr), qRound(logical.y() * dpr));
+}
+
+int CMainDlg::ScaleToPx(int nLogical) const {
+    return qRound(nLogical * devicePixelRatioF());
+}
+
 QRect CMainDlg::GetZoomTextRect() {
-    int nEndX = m_clientRect.right() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
+    int nEndX = rect().right() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
     int nStartX = nEndX - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_WIDTH);
 
-    int nEndY = m_clientRect.bottom() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_Y);
+    int nEndY = rect().bottom() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_Y);
     int nStartY = nEndY - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_HEIGHT);
 
     return QRect(nStartX, nStartY, nEndX - nStartX, nEndY - nStartY);
 }
 
 QRect CMainDlg::GetToastTextRect() {
-    int nEndX = m_clientRect.right() - Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
-    int nStartX = m_clientRect.right() / 2;
+    int nEndX = rect().right() - Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
+    int nStartX = rect().right() / 2;
 
     int nStartY = Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_Y);
     int nEndY = nStartY + Helpers::ScaleWithDPI(TOAST_TEXT_RECT_HEIGHT);
@@ -3994,6 +4018,11 @@ void CMainDlg::focusOutEvent(QFocusEvent* event) {
 }
 
 bool CMainDlg::event(QEvent* e) {
+    if (e->type() == QEvent::DevicePixelRatioChange) {
+        // Scaling changed or the window moved to a monitor with another factor: same logical size, other pixel count
+        m_clientRect = QRect(QPoint(0, 0), ClientSizePx());
+        update();
+    }
     if (m_bDropInput) {
         switch (e->type()) {
         case QEvent::KeyPress:

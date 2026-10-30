@@ -161,6 +161,10 @@ private:
     qint64 m_nExpectedNextAnimationTickCount;
     int m_nMonitor;
     QRect m_monitorRect;
+    // Client area in DEVICE pixels, i.e. the pixels of the window buffer (logical size * devicePixelRatioF(), rounded
+    // like Qt does). All image geometry (zoom, offsets, DIB size) and the mouse coordinates m_nMouseX/Y and
+    // m_nCapturedX/Y are in device pixels, so the DIB is shown 1:1 also with scaling (e.g. 125 % or 150 %).
+    // Overlays and texts are drawn in logical coordinates (rect()).
     QRect m_clientRect;
     QRect m_windowRectOnClose;
     CKeyMap* m_pKeyMap;
@@ -197,6 +201,10 @@ private:
     void OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath);
 
     QRect GetZoomTextRect();
+    // HiDPI helpers: size of the client area in device pixels, logical point -> device pixels, logical length -> device pixels
+    QSize ClientSizePx() const;
+    QPoint ToPx(const QPoint& logical) const;
+    int ScaleToPx(int nLogical) const;
     QRect GetToastTextRect();
     // Boxes actually drawn behind the zoom factor and the toast (they depend on the text and can be larger than
     // GetZoomTextRect() / GetToastTextRect()). Hiding repaints exactly these areas.
