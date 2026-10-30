@@ -69,6 +69,7 @@ qt_add_executable(mkImageViewer
     src/HistogramCorr.h src/HistogramCorr.cpp
     src/ICCProfileTransform.h src/ICCProfileTransform.cpp
     src/ImageLoadThread.h src/ImageLoadThread.cpp
+    src/ImageLoadResult.h
     src/BaseImage.h src/BaseImage.cpp
     src/ImageProvider.h src/ImageProvider.cpp
     src/KeyMap.h src/KeyMap.cpp
@@ -183,28 +184,3 @@ if(LINUX)
         COMMENT "Copying mkFolderWidget to ~/.local/bin/"
     )
 endif()
-
-# --- 4. BENCHMARK-/TESTPROGRAMM FUER DIE RESAMPLING-PIPELINE (ohne GUI) ---
-# Siehe PERF_PLAN.md, Phase 1. Linkt die Processing-Dateien direkt, mit denselben Compiler-Flags.
-find_package(Qt6 REQUIRED COMPONENTS Gui)
-
-add_executable(resample_bench
-    tools/resample_bench/main.cpp
-    src/BasicProcessing.cpp
-    src/ResizeFilter.cpp
-    src/XMMImage.cpp
-    src/ProcessingThreadPool.cpp
-    src/WorkThread.cpp
-)
-
-target_compile_definitions(resample_bench PRIVATE
-    $<$<CONFIG:Debug>:_DEBUG>
-    $<$<CONFIG:Release>:NDEBUG>
-)
-
-target_include_directories(resample_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(resample_bench PRIVATE Qt6::Core Qt6::Gui)
-
-set_target_properties(resample_bench PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)

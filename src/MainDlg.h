@@ -152,6 +152,7 @@ private:
     QSize m_virtualImageSize;
     bool m_bInZooming;
     bool m_bTemporaryLowQ;
+    bool m_bStartupPreview; // first image after startup is painted in low quality, high quality follows right after
     bool m_bShowZoomFactor;
     bool m_bSpanVirtualDesktop;
     bool m_bMouseOn;
@@ -197,8 +198,11 @@ private:
 
     QRect GetZoomTextRect();
     QRect GetToastTextRect();
+    // Boxes actually drawn behind the zoom factor and the toast (they depend on the text and can be larger than
+    // GetZoomTextRect() / GetToastTextRect()). Hiding repaints exactly these areas.
+    QRect m_zoomBoxRect;
+    QRect m_toastBoxRect;
     int GetLoadErrorAfterOpenFile();
-    void PrefetchDIB(const QRect& clientRect);
     bool HandleMouseButtonByKeymap(int nMouseButton, bool bExecuteCommand = true);
     bool UseSlideShowTransitionEffect();
     //void PaintToDC(QPainter& painter);

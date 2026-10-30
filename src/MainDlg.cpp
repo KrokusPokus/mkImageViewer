@@ -32,6 +32,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QProcess>
+#include <QTimer>
 #include <QPushButton>
 #include <QRect>
 #include <QRegularExpression>
@@ -56,7 +57,7 @@ namespace {
     const int ZOOM_TEXT_TIMEOUT = 1000; // zoom label disappears after this many milliseconds
 
     const int ZOOM_TEXT_RECT_WIDTH = 70; // zoom label width
-    const int ZOOM_TEXT_RECT_HEIGHT = 25; // zoom label height
+    const int ZOOM_TEXT_RECT_HEIGHT = 40; // zoom label height
     const int ZOOM_TEXT_RECT_OFFSET_X = 30; // zoom label offset from right border
     const int ZOOM_TEXT_RECT_OFFSET_Y = 20; // zoom label offset from bottom border
 
@@ -356,7 +357,8 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_startMouse = QPoint(-1, -1);
     m_virtualImageSize = QSize(-1, -1);
     m_bInZooming = false;
-    m_bTemporaryLowQ = false;
+    m_bTemporaryLowQ = true;    // start out in low quality scaling to get something on the screen asap
+    m_bStartupPreview = true;   // paintEvent() requests the high quality version after the first image is shown
     m_bShowZoomFactor = false;
     m_nMonitor = 0;
     m_monitorRect = QRect(0, 0, 0, 0);
@@ -384,7 +386,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_bAllowSmoothPanning = sp.AllowSmoothPanning();
     m_offsets_custom = CPoint(0, 0);
     m_customAnimationFrameTime = 1000;
-    
+
     m_eSortModeBeforeRandom = Helpers::FS_FileName;
 
     //setMinimumSize(0, 0);
@@ -467,14 +469,14 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
 
     int nReadAheadBuffers = (CSettingsProvider::This().CacheRange() * 2) + 1;    // The +1 is the current image
 
-    // create JPEG provider and request first image - do no processing yet if not in fullscreen mode (as we do not know the size yet)
+    // create JPEG provider and request first image - no processing yet, the first paintEvent() creates a low quality preview
     m_pImageProvider = new CImageProvider(this, nReadAheadBuffers);
 
     TakeLoadResult(m_pImageProvider->RequestImage(m_pFileList,
                                                   CImageProvider::FORWARD,
                                                   m_pFileList->Current(),
                                                   nFrameIndex,
-                                                  CreateProcessParams(!m_bFullScreenMode)));
+                                                  CreateProcessParams(true)));
 
     if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
@@ -491,14 +493,11 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
             this->showMaximized();
         }
     } else {
-        PrefetchDIB(m_monitorRect);
         this->showFullScreen();
         this->setGeometry(m_monitorRect);
     }
 
     m_bLockPaint = false;
-
-    StartLowQTimer(ZOOM_TIMEOUT);    // Start out in low quality scaling to get something on the screen asap. Feels more responsive with huge images.
 
     this->update();
 
@@ -644,8 +643,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             // QPainter Konfiguration für Text
             painter.setFont(QFont("Consolas", 10));
 
-            // Verfügbares Rechteck definieren (mit 10px Abstand zum Rand)
-            QRect textRect = m_clientRect.adjusted(10, 10, -10, -10);
+            QRect textRect = m_clientRect.adjusted(20, 20, -20, -20);
 
             // 1. Exakte Ausdehnung des Textes (inkl. Wortumbruch) im Vorfeld berechnen
             QRect boundingRect = painter.boundingRect(
@@ -654,10 +652,12 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
                 infoText
                 );
 
-            // 2. Hintergrund-Rechteck (z.B. halbtransparent schwarz oder deckend schwarz) zeichnen
-            // Für echtes OPAQUE (vollständig deckendes Schwarz): QColor(0, 0, 0)
-            // Für ein schöneres, leicht transparentes Overlay (z.B. RGBA 150): QColor(0, 0, 0, 150)
-            painter.fillRect(boundingRect.adjusted(-4, -4, 4, 4), QColor(0, 0, 0, 180));
+            painter.save();
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setPen(Qt::NoPen);                              // kein Rand
+            painter.setBrush(QColor(0, 0, 0, 180));
+            painter.drawRoundedRect(boundingRect.adjusted(-8, -8, 8, 8), 8, 8);   // Eckradius 8 px
+            painter.restore();
 
             // 3. Text in Weiß darüberzeichnen
             painter.setPen(Qt::white);
@@ -669,13 +669,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     // 2. Zoom-Faktor-Anzeige
     // -------------------------------------------------------------------------
     if (m_bInZooming || m_bShowZoomFactor) {
-        /*
-        painter.setFont(QFont("Arial", 12, QFont::Bold));
-        painter.drawText(GetZoomTextRect(), Qt::AlignRight | Qt::AlignVCenter, formatOutputZoomFactor(m_dZoom));
-        */
         QString zoomText = formatOutputZoomFactor(m_dZoom);
-
-        QRect zoomRect = GetZoomTextRect();
 
         QFont font = QApplication::font();
         font.setBold(true);
@@ -683,71 +677,73 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         painter.setFont(font);
         painter.setRenderHint(QPainter::Antialiasing, true);
 
-        QPainterPath textPath;
-        QFontMetrics fm(font);
-        int textWidth = fm.horizontalAdvance(zoomText);
+        QRect zoomRect = GetZoomTextRect();
 
-        int x = zoomRect.right() - textWidth;
-        int y = zoomRect.center().y() + (fm.ascent() - fm.descent()) / 2;
+        // 1. Exakte Ausdehnung des Textes (inkl. Wortumbruch) im Vorfeld berechnen
+        QRect boundingRect = painter.boundingRect(
+            zoomRect,
+            Qt::AlignRight | Qt::AlignTop | Qt::TextWordWrap,
+            zoomText
+            );
 
-        textPath.addText(x, y, font, zoomText);
+        m_zoomBoxRect = boundingRect.adjusted(-18, -8, 18, 8);  // 18 px left/right, 8 px top/bottom; remembered: hiding repaints this area
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);                              // kein Rand
+        painter.setBrush(QColor(0, 0, 0, 180));
+        painter.drawRoundedRect(m_zoomBoxRect, 8, 8);   // Eckradius 8 px
+        painter.restore();
 
-        // 1. Outline-Pfad (Stroker) erzeugen – dieser wächst sauber nach außen
-        QPainterPathStroker stroker;
-        stroker.setWidth(3); // Dicke der Umrandung (z.B. 2 oder 3 Pixel)
-        QPainterPath outlinePath = stroker.createStroke(textPath);
-
-        // 2. Zuerst die schwarze Umrandung zeichnen
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(Qt::black);
-        painter.drawPath(outlinePath);
-
-        // 3. Danach den weißen Text exakt darüberlegen
-        painter.setBrush(Qt::white);
-        painter.drawPath(textPath);
+        // 3. Text in Weiß darüberzeichnen
+        painter.setPen(Qt::white);
+        painter.drawText(zoomRect, Qt::AlignRight | Qt::AlignTop, formatOutputZoomFactor(m_dZoom));
     }
 
     // -------------------------------------------------------------------------
     // 3. Toast-Nachrichten
     // -------------------------------------------------------------------------
     if (!m_strToast.isEmpty()) {
-        /*
-        painter.setFont(QFont("Arial", 12, QFont::Bold));
-        painter.drawText(GetToastTextRect(), Qt::AlignRight | Qt::AlignVCenter, m_strToast);
-        */
-        QRect toastRect = GetToastTextRect();
-
         QFont font = QApplication::font();
         font.setBold(true);
         font.setPointSize(14);
         painter.setFont(font);
         painter.setRenderHint(QPainter::Antialiasing, true);
 
-        QPainterPath textPath;
-        QFontMetrics fm(font);
-        int textWidth = fm.horizontalAdvance(m_strToast);
+        QRect toastRect = GetToastTextRect();
 
-        int x = toastRect.right() - textWidth;
-        int y = toastRect.center().y() + (fm.ascent() - fm.descent()) / 2;
+        // 1. Exakte Ausdehnung des Textes (inkl. Wortumbruch) im Vorfeld berechnen
+        QRect boundingRect = painter.boundingRect(
+            toastRect,
+            Qt::AlignRight | Qt::AlignTop | Qt::TextWordWrap,
+            m_strToast
+            );
 
-        textPath.addText(x, y, font, m_strToast);
+        m_toastBoxRect = boundingRect.adjusted(-18, -8, 18, 8);  // 18 px left/right, 8 px top/bottom; remembered: hiding repaints this area
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);                              // kein Rand
+        painter.setBrush(QColor(0, 0, 0, 180));
+        painter.drawRoundedRect(m_toastBoxRect, 8, 8);   // Eckradius 8 px
+        painter.restore();
 
-        // 1. Outline-Pfad (Stroker) erzeugen – dieser wächst sauber nach außen
-        QPainterPathStroker stroker;
-        stroker.setWidth(3); // Dicke der Umrandung (z.B. 2 oder 3 Pixel)
-        QPainterPath outlinePath = stroker.createStroke(textPath);
-
-        // 2. Zuerst die schwarze Umrandung zeichnen
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(Qt::black);
-        painter.drawPath(outlinePath);
-
-        // 3. Danach den weißen Text exakt darüberlegen
-        painter.setBrush(Qt::white);
-        painter.drawPath(textPath);
+        // 3. Text in Weiß darüberzeichnen
+        painter.setPen(Qt::white);
+        painter.drawText(toastRect, Qt::AlignRight | Qt::AlignTop, m_strToast);
     }
 
     DisplayErrors(m_pCurrentImage, m_clientRect, painter);
+
+    // Startup: the low quality preview is on the screen now, request the high quality version right away.
+    // Queued, so the preview is handed to the compositor before the high quality resampling starts.
+    if (m_bStartupPreview && m_pCurrentImage != nullptr) {
+        m_bStartupPreview = false;
+        QTimer::singleShot(0, this, [this]() {
+            if (m_bTemporaryLowQ && m_zoomTimerId == 0) {   // not if the user already started zooming
+                m_bTemporaryLowQ = false;
+                this->update();
+            }
+        });
+    }
 }
 
 /*
@@ -1282,15 +1278,16 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
         killTimer(m_zoomTextTimerId);
         m_zoomTextTimerId = 0;
 
-        // InvalidateRect wird in Qt durch update(QRect) ersetzt
-        this->update(GetZoomTextRect());
+        // Repaint the box that was drawn (1 pixel more for the antialiased edge), not only GetZoomTextRect()
+        this->update(m_zoomBoxRect.adjusted(-1, -1, 1, 1));
     }
     else if (timerId == m_toastTimerId) {
         killTimer(m_toastTimerId);
         m_toastTimerId = 0;
         m_strToast = "";
 
-        this->update(GetToastTextRect());
+        // Repaint the box that was drawn (1 pixel more for the antialiased edge), not only GetToastTextRect()
+        this->update(m_toastBoxRect.adjusted(-1, -1, 1, 1));
     }
     else if (timerId == m_panTimerId) {
         if (m_pCurrentImage != nullptr) {
@@ -1760,7 +1757,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             {
                 Helpers::ESorting nSortMode = m_pFileList->GetSorting();
                 bool bSortedAscending = m_pFileList->IsSortedAscending();
-                
+
                 if (inv.arg != static_cast<int>(Cmd::SortModeArg::Random)) {
                     m_eSortModeBeforeRandom = nSortMode;
                 }
@@ -1768,7 +1765,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                 nSortMode = (inv.arg == static_cast<int>(Cmd::SortModeArg::ModificationDate)) ? Helpers::FS_LastModTime :
                             (inv.arg == static_cast<int>(Cmd::SortModeArg::Random)) ? Helpers::FS_Random :
                             (inv.arg == static_cast<int>(Cmd::SortModeArg::Size)) ? Helpers::FS_FileSize : Helpers::FS_FileName;
-                
+
                 ToastSortingMode(nSortMode, bSortedAscending);
                 m_pFileList->SetSorting(nSortMode, bSortedAscending);
             }
@@ -2067,7 +2064,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                         } else {
                             PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
                                 (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
-                        }                    
+                        }
                     } else {
                         PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
                             (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
@@ -2092,7 +2089,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                         } else {
                             PerformPan((inv.id == Command::PanLeft) ? PAN_STEP : (inv.id == Command::PanRight) ? -PAN_STEP : 0,
                                 (inv.id == Command::PanUp) ? PAN_STEP : (inv.id == Command::PanDown) ? -PAN_STEP : 0, false);
-                        }                    
+                        }
                     } else {
                         if (GetAutoZoomMode() != Helpers::ZM_BookMode) {
                             if (inv.id == Command::PanRight)
@@ -2156,7 +2153,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             if (m_pFileList != NULL) {
                 Helpers::ESorting nSortMode = m_pFileList->GetSorting();
                 bool bSortedAscending = m_pFileList->IsSortedAscending();
-                
+
                 if (nSortMode != Helpers::FS_Random) {
                     m_eSortModeBeforeRandom = nSortMode;
                     nSortMode = Helpers::FS_Random;
@@ -2364,7 +2361,7 @@ void CMainDlg::OpenFile(const QString& fileName) {
 
     // [GF] Save Bookmark of currently open file
     SaveBookmark();
-    
+
     // recreate file list based on image opened
     Helpers::ESorting eOldSorting = m_pFileList->GetSorting();
     bool bOldAscending = m_pFileList->IsSortedAscending();
@@ -2567,7 +2564,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                 if (position.IsMultiPageArchive()) {
                     SaveBookmark();
                 }
-                
+
                 m_pFileList = m_pFileList->Prev();
                 eDirection = CImageProvider::BACKWARD;
 
@@ -2844,7 +2841,7 @@ bool CMainDlg::PerformPan(int dx, int dy, bool bAbsolute) {
 double CMainDlg::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge) {
     if (m_pCurrentImage != NULL) {
         double dZoom;
-        Helpers::GetImageRect(m_pCurrentImage->OrigWidth(), m_pCurrentImage->OrigHeight(), 
+        Helpers::GetImageRect(m_pCurrentImage->OrigWidth(), m_pCurrentImage->OrigHeight(),
             m_clientRect.width(), m_clientRect.height(), bAllowEnlarge, bFillWithCrop, false, GetAutoZoomMode(), dZoom);
         double dZoomMax = bAllowEnlarge ? Helpers::ZoomMax : std::max(1.0, m_dZoomAtResizeStart);
         return std::max(0.0001, std::min(dZoomMax, dZoom));
@@ -2883,23 +2880,23 @@ void CMainDlg::ResetZoomTo100Percents(bool bZoomToMouse) {
 CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
     int nClientWidth = m_clientRect.width();
     int nClientHeight = m_clientRect.height();
-    
+
     if (nClientWidth == 0 && nClientHeight == 0) {
         QRect rect = CMultiMonitorSupport::GetMonitorRect(this);
         nClientWidth = rect.width();
         nClientHeight = rect.height();
     }
-    
+
     qDebug() << "CMainDlg::CreateProcessParams() nClientWidth:" << nClientWidth << "nClientHeight:" << nClientHeight;
 
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
-    
+
     if (m_bKeepParams) {
         *m_pImageProcParamsKept = *m_pImageProcParams;
         m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, m_bKeepParams);
         m_dZoomKept = m_bUserZoom ? m_dZoom : -1;
         m_offsetKept = m_bUserPan ? m_offsets : QPoint(0, 0);
-        
+
         if (m_isUserFitToScreen) {
             eAutoZoomMode = m_autoZoomFitToScreen;
         }
@@ -2912,12 +2909,12 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
             eAutoZoomMode,
             m_offsetKept,
             m_eTransparencyMode,
-            *m_pImageProcParamsKept, 
+            *m_pImageProcParamsKept,
             SetProcessingFlag(m_eProcessingFlagsKept, PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
     } else {
         m_isUserFitToScreen = false;
         CSettingsProvider& sp = CSettingsProvider::This();
-        return CProcessParams(nClientWidth, nClientHeight, 
+        return CProcessParams(nClientWidth, nClientHeight,
             CMultiMonitorSupport::GetMonitorRect(this).size(),
             CRotationParams(0), 0, -1, eAutoZoomMode, CPoint(0, 0), m_eTransparencyMode,
             GetDefaultProcessingParams(),
@@ -3068,7 +3065,7 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
                     m_offsets = CPoint(-65000,65000);    // Book page RTL manga mode: focus top right (RTL). TODO: implement LTR option. (Not really needed - in BookMode, the page is never wider than window.)
                 else
                     m_offsets = CPoint(65000,-65000);    // Book page RTL mode: focus bottom left (RTL). TODO: implement LTR option. (Not really needed - in BookMode, the page is never wider than window.)
-    
+
                 m_offsets_custom = m_offsets;
             }
         }
@@ -3108,10 +3105,10 @@ QRect CMainDlg::GetZoomTextRect() {
 QRect CMainDlg::GetToastTextRect() {
     int nEndX = m_clientRect.right() - Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
     int nStartX = m_clientRect.right() / 2;
-    
+
     int nStartY = Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_Y);
     int nEndY = nStartY + Helpers::ScaleWithDPI(TOAST_TEXT_RECT_HEIGHT);
-    
+
     return QRect(nStartX, nStartY,  nEndX - nStartX, nEndY - nStartY);
 }
 
@@ -3205,15 +3202,6 @@ int CMainDlg::GetLoadErrorAfterOpenFile() {
         return FileLoad_LoadError;
     }
     return FileLoad_Ok;
-}
-
-void CMainDlg::PrefetchDIB(const QRect& clientRect) {
-    if (m_pCurrentImage == NULL) return;
-
-    QSize newSize = GetVirtualImageSize(m_pCurrentImage->OrigSize(), clientRect.size(), GetAutoZoomMode(), m_dZoom);
-    QSize clippedSize(std::min<long>(clientRect.width(), newSize.width()), std::min<long>(clientRect.height(), newSize.height()));
-    CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, LimitOffsets(m_offsets, clientRect.size(), newSize));
-    m_pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage, GetEffectiveProcessingParams(), CreateDefaultProcessingFlags());
 }
 
 CImageProcessingParams CMainDlg::GetEffectiveProcessingParams() const {
@@ -3446,7 +3434,7 @@ void CMainDlg::CleanupAndTerminate() {
 
     close();
 }
-    
+
 void CMainDlg::StartAnimation() {
     if (m_bIsAnimationPlaying) {
         return;
@@ -3455,7 +3443,7 @@ void CMainDlg::StartAnimation() {
     UpdateKeepParams();
 
     m_nLastAnimationOffset = 0;
-    
+
     /*
     int usedFrameTime;
     if (m_customAnimationFrameTime < 250) {
@@ -3464,7 +3452,7 @@ void CMainDlg::StartAnimation() {
         usedFrameTime = m_pCurrentImage->FrameTimeMs();
     }
     */
-    
+
     int nTimerDelay = std::max(10, m_pCurrentImage->FrameTimeMs());
     m_nExpectedNextAnimationTickCount = QDateTime::currentMSecsSinceEpoch() + nTimerDelay;
     if (m_animationTimerId != 0) killTimer(m_animationTimerId);
@@ -3477,14 +3465,14 @@ void CMainDlg::AdjustAnimationFrameTime() {
         killTimer(m_animationTimerId);
         m_animationTimerId = 0;
     }
-    
+
     int usedFrameTime;
     if (m_customAnimationFrameTime < 250) {
         usedFrameTime = m_customAnimationFrameTime;
     } else {
         usedFrameTime = m_pCurrentImage->FrameTimeMs();
     }
-    
+
 
     m_nLastAnimationOffset = static_cast<int>(QDateTime::currentMSecsSinceEpoch() - m_nExpectedNextAnimationTickCount);
     int nTimerDelay = std::max(10, usedFrameTime - m_nLastAnimationOffset);
@@ -3798,7 +3786,7 @@ QString CMainDlg::GetMultiframeIndex(const CImagePosition& position) {
             .arg(position.FrameIndex + 1)
             .arg(position.FrameCount);
     }
-    
+
     return QString();
 }
 
