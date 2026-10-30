@@ -10,8 +10,97 @@
 #include <QStringDecoder>
 #include <QtEndian>
 #include <QDir>
+#include <QFile>
+#include <cstring>
 
 namespace Helpers {
+
+    namespace {
+        // Reads the first number of a small text file (e.g. a cgroup value), -1 if missing or not a number ("max")
+        qint64 ReadNumberFile(const QString& sPath) {
+            QFile f(sPath);
+            if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return -1;
+            bool bOk = false;
+            const qint64 nValue = f.readLine().trimmed().toLongLong(&bOk);
+            return bOk ? nValue : -1;
+        }
+
+        // Value of a line of /proc/meminfo (e.g. "MemAvailable:") in bytes, -1 if missing.
+        // Files in /proc report the size 0, so QFile::atEnd() is true right away: read everything, then split.
+        qint64 ReadMeminfoBytes(const char* pKey) {
+            QFile meminfo(QStringLiteral("/proc/meminfo"));
+            if (!meminfo.open(QIODevice::ReadOnly | QIODevice::Text)) return -1;
+            const int nKeyLength = static_cast<int>(strlen(pKey));
+            for (const QByteArray& line : meminfo.readAll().split('\n')) {
+                if (line.startsWith(pKey)) {
+                    return line.mid(nKeyLength).trimmed().split(' ').first().toLongLong() * 1024;  // given in kB
+                }
+            }
+            return -1;
+        }
+
+        // cgroup v2: the line "0::/path" of /proc/self/cgroup. Every level up to the root can have a memory limit
+        // (memory.max, "max" = none). Calls fn(nMax, nCurrent) for each level that has one.
+        template <class Fn>
+        void ForEachCgroupMemoryLimit(Fn fn) {
+            QFile cgroup(QStringLiteral("/proc/self/cgroup"));
+            if (!cgroup.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+            for (QByteArray line : cgroup.readAll().split('\n')) {
+                line = line.trimmed();
+                if (!line.startsWith("0::")) continue;
+                QString sPath = QString::fromUtf8(line.mid(3));
+                while (!sPath.isEmpty()) {
+                    const QString sDir = QStringLiteral("/sys/fs/cgroup") + sPath;
+                    const qint64 nMax = ReadNumberFile(sDir + QStringLiteral("/memory.max"));
+                    const qint64 nCurrent = ReadNumberFile(sDir + QStringLiteral("/memory.current"));
+                    if (nMax >= 0 && nCurrent >= 0) {
+                        fn(nMax, nCurrent);
+                    }
+                    if (sPath == QStringLiteral("/")) break;
+                    sPath = sPath.left(sPath.lastIndexOf(QLatin1Char('/')));
+                    if (sPath.isEmpty()) sPath = QStringLiteral("/");
+                }
+                break;
+            }
+        }
+    }
+
+    qint64 AvailableMemoryBytes() {
+        qint64 nAvailable = ReadMeminfoBytes("MemAvailable:");
+        if (nAvailable < 0) {
+            return -1;
+        }
+        // the smallest remaining amount of all cgroup limits (limit - current usage) counts
+        ForEachCgroupMemoryLimit([&nAvailable](qint64 nMax, qint64 nCurrent) {
+            nAvailable = std::min(nAvailable, std::max<qint64>(0, nMax - nCurrent));
+        });
+        return nAvailable;
+    }
+
+    qint64 TotalMemoryBytes() {
+        // Read once (on the first call, i.e. at the first read ahead): the total does not change while the app runs.
+        // The initialization of a local static is thread safe.
+        static const qint64 nTotal = [] {
+            qint64 n = ReadMeminfoBytes("MemTotal:");
+            if (n < 0) {
+                return qint64(-1);
+            }
+            ForEachCgroupMemoryLimit([&n](qint64 nMax, qint64) {
+                n = std::min(n, nMax);
+            });
+            return n;
+        }();
+        return nTotal;
+    }
+
+    bool StillEnoughFree() {
+        const qint64 nAvailable = AvailableMemoryBytes();
+        const qint64 nTotal = TotalMemoryBytes();
+        if (nAvailable < 0 || nTotal <= 0) {
+            return true;    // not known (no Linux): no limit, as before
+        }
+        return nAvailable * 100 >= nTotal * READ_AHEAD_MIN_FREE_PERCENT;
+    }
     
     int ScaleWithDPI(int value)
     {

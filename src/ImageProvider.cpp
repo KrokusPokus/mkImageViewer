@@ -302,9 +302,9 @@ void CImageProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirec
                 if (GetProcessingFlag(PFLAG_NoProcessingAfterLoad, processParams.ProcFlags)) {
                     CProcessParams paramsCopied = processParams;
                     paramsCopied.ProcFlags = SetProcessingFlag(paramsCopied.ProcFlags, PFLAG_NoProcessingAfterLoad, false);
-                    StartNewRequest(sFileName, nFrameIndex, paramsCopied);
+                    StartNewRequest(sFileName, nFrameIndex, paramsCopied, true);
                 } else {
-                    StartNewRequest(sFileName, nFrameIndex, processParams);
+                    StartNewRequest(sFileName, nFrameIndex, processParams, true);
                 }
             } else {
                 pRequest->IsActive = true;
@@ -314,7 +314,8 @@ void CImageProvider::StartNewRequestBundle(CFileList* pFileList, EReadAheadDirec
     }
 }
 
-CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams) {
+CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams,
+                                                          bool bReadAhead) {
     //qDebug() << "StartNewRequest() sFileName:" << sFileName << "nFrameIndex:" << nFrameIndex;
     auto pRequest = std::make_shared<CImageRequest>(sFileName, nFrameIndex);
     m_requestList.push_back(pRequest);
@@ -324,6 +325,7 @@ CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileN
         pRequest->FileName,
         nFrameIndex,
         processParams,
+        bReadAhead,
         [pRequest, pLoadThread](int handle) {
             QMutexLocker l(&pRequest->Mutex);
             CImageData d = pLoadThread->GetLoadedImage(handle);

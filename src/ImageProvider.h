@@ -101,7 +101,8 @@ private:
 
     void RemoveUnusedImages(bool bRemoveAlsoReadAhead);
     RequestPtr StartRequestAndWaitUntilReady(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams);
-    RequestPtr StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams);
+    // bReadAhead: pre-caching of a neighbour (skipped by the load thread while memory is short)
+    RequestPtr StartNewRequest(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams, bool bReadAhead = false);
     void StartNewRequestBundle(CFileList* pFileList, EReadAheadDirection eDirection, const CProcessParams & processParams, int nNumRequests, RequestPtr pLastReadyRequest);
     RequestPtr FindRequest(const QString& sFileName, int nFrameIndex);
     std::list<RequestPtr>::iterator DeleteElementAt(std::list<RequestPtr>::iterator iteratorAt);

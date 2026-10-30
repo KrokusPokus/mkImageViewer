@@ -61,7 +61,10 @@ public:
     // received or the event has been signaled.
     // The file to load is given by its filename (with path) and the frame index (for multiframe images). The
     // frame index needs to be zero when the image only has one frame.
-    int AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, std::function<void(int)> onCompleted);
+    // bReadAhead: pre-caching of a neighbour image. It is skipped (ELoadError::ReadAheadSkipped) while less than
+    // Helpers::READ_AHEAD_MIN_FREE_PERCENT of the memory is available.
+    int AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, bool bReadAhead,
+                  std::function<void(int)> onCompleted);
 
     // Get loaded image, CImageData::Image is null if not (yet) available - use handle returned by AsyncLoad().
     // Marks the request for deletion - only call once with the same handle
@@ -85,8 +88,9 @@ private:
     // Request for loading an image
     class CRequest : public CRequestBase {
     public:
-        CRequest(const QString& strFileName, int nFrameIndex, const CProcessParams& processParams, std::function<void(int)> callback)
-            : CRequestBase(nullptr), ProcessParams(processParams) {
+        CRequest(const QString& strFileName, int nFrameIndex, const CProcessParams& processParams, bool bReadAhead,
+                 std::function<void(int)> callback)
+            : CRequestBase(nullptr), ReadAhead(bReadAhead), ProcessParams(processParams) {
             FileName = strFileName;
             FrameIndex = nFrameIndex;
             CompletedCallback = callback;
@@ -98,6 +102,7 @@ private:
         int FrameIndex;
         std::function<void(int)> CompletedCallback;
         int RequestHandle;
+        bool ReadAhead;                       // pre-caching of a neighbour, not the image the user waits for
         CBaseImage* Image;
         CProcessParams ProcessParams;
         ELoadError Error = ELoadError::None;  // why Image is nullptr

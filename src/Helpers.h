@@ -102,6 +102,23 @@ namespace Helpers {
     // Scales a pixel value given in 96 DPI to screen pixels, taking the screen DPI into account
     int ScaleWithDPI(int value);
 
+    // Memory that new allocations can get without swapping or the OOM killer: MemAvailable from /proc/meminfo
+    // (free memory plus reclaimable file cache - not MemFree, which ignores the cache), in bytes.
+    // Limited by the memory limit of the cgroup of the process (memory.max), if there is one.
+    // A snapshot only: other processes may take the memory a moment later. Returns -1 if not available (no Linux).
+    qint64 AvailableMemoryBytes();
+
+    // Total memory the process can use: MemTotal, or the memory limit of its cgroup if that is smaller. -1 if unknown.
+    // Read only once, on the first call (a cgroup limit changed while the app runs is not noticed).
+    qint64 TotalMemoryBytes();
+
+    // Read ahead (pre-caching of neighbour images) stops while less than this share of the memory is available
+    constexpr int READ_AHEAD_MIN_FREE_PERCENT = 25;
+
+    // True if at least READ_AHEAD_MIN_FREE_PERCENT of TotalMemoryBytes() is available. Also true if the memory
+    // cannot be determined (then there is no limit, as before).
+    bool StillEnoughFree();
+
     // Based on: https://github.com/sdneon/jpegview.git
     // QRgb is 0x00rrggbb. 0xFF00000 signals we don't use an override color
     void BlendAlpha(uint32* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode TransparencyMode);

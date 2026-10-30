@@ -16,7 +16,9 @@ enum class ELoadError {
     TooLarge,           // file size or image dimensions above the limits
     OutOfMemory,        // memory could not be allocated
     Exception,          // unexpected exception in a decoder
-    Aborted             // read ahead stopped by the owner before processing (internal, never shown)
+    Aborted,            // read ahead stopped by the owner before processing (internal, never shown)
+    ReadAheadSkipped    // read ahead not started: less than Helpers::READ_AHEAD_MIN_FREE_PERCENT of the memory is
+                        // available (internal, never shown; the image is loaded when the user goes to it)
 };
 
 // Where an image is: file and frame (page of an archive, frame of an animation or multi page file).

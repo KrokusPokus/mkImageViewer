@@ -745,8 +745,9 @@ CImageLoadThread::~CImageLoadThread(void) {
     DeleteCachedZip();
 }
 
-int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, std::function<void(int)> onCompleted) {
-    auto pRequest = std::make_shared<CRequest>(strFileName, nFrameIndex, processParams, onCompleted);
+int CImageLoadThread::AsyncLoad(const QString& strFileName, int nFrameIndex, const CProcessParams & processParams, bool bReadAhead,
+                                std::function<void(int)> onCompleted) {
+    auto pRequest = std::make_shared<CRequest>(strFileName, nFrameIndex, processParams, bReadAhead, onCompleted);
     const int nHandle = pRequest->RequestHandle; // Read the handle before handing the request over: the worker thread may process it right away
     ProcessAsync(std::move(pRequest));
     return nHandle;
@@ -846,6 +847,13 @@ void CImageLoadThread::ProcessRequest(CRequestBase& request) {
     };
 
     CRequest& rq = static_cast<CRequest&>(request);
+
+    // Pre-caching stops while memory is short; the image is loaded anyway when the user goes to it
+    if (rq.ReadAhead && !Helpers::StillEnoughFree()) {
+        rq.Error = ELoadError::ReadAheadSkipped;
+        return;
+    }
+
     const uint64_t startTimeMs = Helpers::GetTimeMs();
 
     // Fills the position, also if the image could not be read. Outside of an archive a failed load has frame 0 of 1
