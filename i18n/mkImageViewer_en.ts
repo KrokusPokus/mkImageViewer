@@ -425,683 +425,628 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="233"/>
-        <source>Fenster</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="212"/>
-        <source>Einstellungen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="231"/>
-        <source>Bild</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="232"/>
-        <source>Qualität &amp; Farbe</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/SettingsProvider.cpp" line="234"/>
         <source>Navigation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="249"/>
-        <source>Setzt alle Optionen auf die Standardwerte zurück; gespeichert wird erst mit OK</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="337"/>
-        <source>Einpassen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="337"/>
-        <source>Einpassen, nicht vergrößern</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="338"/>
-        <source>Füllen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="338"/>
-        <source>Füllen, nicht vergrößern</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="339"/>
-        <source>Buchmodus</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="339"/>
-        <source>Keiner (100 %)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="342"/>
-        <source>Zoom beim Öffnen eines Bildes im Fenster (AutoZoomMode)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="344"/>
-        <source>Zoom beim Öffnen eines Bildes im Vollbild (AutoZoomModeFullscreen)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="345"/>
-        <source>Auto-Zoom (Fenster):</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="346"/>
-        <source>Auto-Zoom (Vollbild):</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="351"/>
-        <source>Kontinuierliches Zoomen hält bei diesem Wert kurz an, 0 = nie (ZoomPausePercent)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="357"/>
+        <location filename="../src/SettingsProvider.cpp" line="323"/>
         <source>BookModePageHeight</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="358"/>
-        <source>Buchmodus-Seitenhöhe:</source>
+        <location filename="../src/SettingsProvider.cpp" line="326"/>
+        <source>Auto rotate according to EXIF</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="360"/>
-        <source>Nach EXIF-Angabe drehen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="361"/>
+        <location filename="../src/SettingsProvider.cpp" line="327"/>
         <source>AutoRotateEXIF</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="362"/>
-        <source>Ausrichtung:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="365"/>
+        <location filename="../src/SettingsProvider.cpp" line="331"/>
         <source>BackgroundColor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="369"/>
-        <source>Schachbrettmuster</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="370"/>
-        <source>Transparenzfarbe</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="371"/>
-        <source>Transparenzfarbe, umgekehrt</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="372"/>
-        <source>Was hinter durchsichtigen Bildteilen erscheint (TransparencyMode)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="374"/>
+        <location filename="../src/SettingsProvider.cpp" line="340"/>
         <source>TransparencyColor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="391"/>
-        <source>Transparenz:</source>
+        <location filename="../src/SettingsProvider.cpp" line="369"/>
+        <source>Use resampling</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="403"/>
-        <source>Hohe Qualität</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="404"/>
+        <location filename="../src/SettingsProvider.cpp" line="370"/>
         <source>HighQualityResampling</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="405"/>
-        <source>Keiner (schnell)</source>
+        <location filename="../src/SettingsProvider.cpp" line="212"/>
+        <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="405"/>
+        <location filename="../src/SettingsProvider.cpp" line="231"/>
+        <source>Image</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="232"/>
+        <source>Quality &amp; Color</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="233"/>
+        <source>Window</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="249"/>
+        <source>Resets all options to their defaults; nothing is saved until OK</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="303"/>
+        <source>Fit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="303"/>
+        <source>Fit, don&apos;t enlarge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="304"/>
+        <source>Fill</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="304"/>
+        <source>Fill, don&apos;t enlarge</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="305"/>
+        <source>Book mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="305"/>
+        <source>None (100 %)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="308"/>
+        <source>Zoom when an image is opened in the window (AutoZoomMode)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="310"/>
+        <source>Zoom when an image is opened in fullscreen (AutoZoomModeFullscreen)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="311"/>
+        <source>Auto zoom (window):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="312"/>
+        <source>Auto zoom (fullscreen):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="317"/>
+        <source>Continuous zooming pauses briefly at this value, 0 = never (ZoomPausePercent)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="318"/>
+        <source>Zoom pause at:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="324"/>
+        <source>Book mode page height:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="333"/>
+        <source>Background color:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="335"/>
+        <source>Checkerboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="336"/>
+        <source>Transparency color</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="337"/>
+        <source>Transparency color, inverted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="338"/>
+        <source>What is shown behind transparent parts of the image (TransparencyMode)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="357"/>
+        <source>Transparency:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="371"/>
         <source>Hermite</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="406"/>
+        <location filename="../src/SettingsProvider.cpp" line="371"/>
+        <source>None (fast)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="372"/>
         <source>Mitchell</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="406"/>
+        <location filename="../src/SettingsProvider.cpp" line="372"/>
         <source>Catmull-Rom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="407"/>
+        <location filename="../src/SettingsProvider.cpp" line="373"/>
         <source>Lanczos-2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="408"/>
-        <source>Filter beim Verkleinern (DownSamplingFilter)</source>
+        <location filename="../src/SettingsProvider.cpp" line="374"/>
+        <source>Filter used for downscaling (DownSamplingFilter)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="409"/>
-        <source>Resampling:</source>
+        <location filename="../src/SettingsProvider.cpp" line="378"/>
+        <source>Apply embedded ICC profiles</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="410"/>
-        <source>Verkleinerungsfilter</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="412"/>
-        <source>Eingebettete ICC-Profile anwenden</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="413"/>
-        <source>UseEmbeddedColorProfiles</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="414"/>
-        <source>Farbprofile:</source>
+        <location filename="../src/SettingsProvider.cpp" line="415"/>
+        <source>-1 = highest resolution, 0 = primary monitor, 1… = monitor number (DisplayMonitor)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="416"/>
-        <source>Automatisch anwenden</source>
+        <source>Startup monitor:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="417"/>
-        <source>AutoContrastCorrection</source>
+        <location filename="../src/SettingsProvider.cpp" line="418"/>
+        <source>Show full file path</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="420"/>
+        <source>Show application name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="421"/>
-        <source>AutoContrastCorrectionAmount</source>
+        <source>&quot; - mkImageViewer&quot; at the end of the title (ShowAppNameInTitle)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="425"/>
-        <source>AutoBrightnessCorrectionAmount</source>
+        <location filename="../src/SettingsProvider.cpp" line="424"/>
+        <source>Title bar:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="426"/>
-        <source>Auto-Kontrast:</source>
+        <location filename="../src/SettingsProvider.cpp" line="438"/>
+        <source>File name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="427"/>
-        <source>Stärke Kontrast</source>
+        <location filename="../src/SettingsProvider.cpp" line="438"/>
+        <source>Modification date</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="428"/>
-        <source>Stärke Helligkeit</source>
+        <location filename="../src/SettingsProvider.cpp" line="439"/>
+        <source>File size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="440"/>
-        <source>Im Vollbild starten</source>
+        <location filename="../src/SettingsProvider.cpp" line="439"/>
+        <source>Random</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="441"/>
-        <source>ShowFullScreen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="442"/>
-        <source>Comics/Manga im Vollbild starten</source>
+        <source>Ascending</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="443"/>
-        <source>BookModeLaunchFullscreen</source>
+        <source>Sorting:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="444"/>
-        <source>Start:</source>
+        <location filename="../src/SettingsProvider.cpp" line="446"/>
+        <source>This folder only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="447"/>
+        <source>Folders on the same level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="448"/>
-        <source>-1 = größte Auflösung, 0 = primärer Monitor, 1… = Monitor-Nummer (DisplayMonitor)</source>
+        <source>Including subfolders</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="449"/>
-        <source>Start-Monitor:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="451"/>
-        <source>Vollständigen Dateipfad anzeigen</source>
+        <location filename="../src/SettingsProvider.cpp" line="450"/>
+        <source>Wrap around at the end of the folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="452"/>
-        <source>ShowFilePathInTitle</source>
+        <source>Folder:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="453"/>
-        <source>Programmnamen anzeigen</source>
+        <location filename="../src/SettingsProvider.cpp" line="464"/>
+        <source>Smooth scrolling</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="454"/>
-        <source>&quot; - mkImageViewer&quot; am Ende des Titels (ShowAppNameInTitle)</source>
+        <location filename="../src/SettingsProvider.cpp" line="466"/>
+        <source>Arrow keys switch images when there is nothing to scroll</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="455"/>
-        <source>Dateityp-Symbol anzeigen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="456"/>
-        <source>TitleBarUseFileIcon</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="457"/>
-        <source>Titelleiste:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="469"/>
-        <source>Dateiname</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="469"/>
-        <source>Änderungsdatum</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="470"/>
-        <source>Dateigröße</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="470"/>
-        <source>Zufällig</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="471"/>
-        <source>FileDisplayOrder</source>
+        <location filename="../src/SettingsProvider.cpp" line="468"/>
+        <source>Keyboard:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="472"/>
-        <source>Aufsteigend</source>
+        <source>None</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="473"/>
-        <source>FileSortAscending</source>
+        <source>Slide from right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="473"/>
+        <source>Slide from left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="474"/>
-        <source>Sortierung:</source>
+        <source>Slide from top</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="474"/>
+        <source>Slide from bottom</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="475"/>
+        <source>Roll from right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="475"/>
+        <source>Roll from left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="476"/>
-        <source>Nur dieser Ordner</source>
+        <source>Roll from top</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="476"/>
+        <source>Roll from bottom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="477"/>
-        <source>Ordner derselben Ebene</source>
+        <source>Scroll from right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="477"/>
+        <source>Scroll from left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="478"/>
-        <source>Mit Unterordnern</source>
+        <source>Scroll from top</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="479"/>
+        <location filename="../src/SettingsProvider.cpp" line="478"/>
+        <source>Scroll from bottom</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="497"/>
+        <source>Never</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="497"/>
+        <source>Per folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="497"/>
+        <source>Always</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="498"/>
+        <source>An already open window takes over newly opened images (SingleInstance)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="499"/>
+        <source>Only one fullscreen instance</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="502"/>
+        <source>Single instance:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="505"/>
+        <source>Reload the image when it has changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="511"/>
+        <source>Number of images preloaded forward and backward (CacheRange)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="514"/>
+        <source>Automatic</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="514"/>
+        <source>Generic</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="516"/>
+        <source>Instruction set used for resampling (CPUType)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="519"/>
+        <source>0 = automatic, then at most 8 (CPUCoresUsed)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="523"/>
+        <source>Read all formats with Qt (QImageReader)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="531"/>
+        <source>Select color</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="376"/>
+        <source>Downsampling filter:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="379"/>
+        <source>UseEmbeddedColorProfiles</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="382"/>
+        <source>Enable auto contrast correction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="383"/>
+        <source>AutoContrastCorrection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="387"/>
+        <source>AutoContrastCorrectionAmount</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="391"/>
+        <source>AutoBrightnessCorrectionAmount</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="393"/>
+        <source>Contrast correction strength</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="394"/>
+        <source>Brightness correction strength</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="406"/>
+        <source>Launch images fullscreen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="407"/>
+        <source>ShowFullScreen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="408"/>
+        <source>Launch comics/manga fullscreen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="409"/>
+        <source>BookModeLaunchFullscreen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="419"/>
+        <source>ShowFilePathInTitle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="422"/>
+        <source>Use specific file type icon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="423"/>
+        <source>TitleBarUseFileIcon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="440"/>
+        <source>FileDisplayOrder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="442"/>
+        <source>FileSortAscending</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="449"/>
         <source>FolderNavigation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="480"/>
-        <source>Am Ordnerende zum Anfang springen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="481"/>
+        <location filename="../src/SettingsProvider.cpp" line="451"/>
         <source>WrapAroundFolder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="482"/>
-        <source>Ordner:</source>
+        <location filename="../src/SettingsProvider.cpp" line="455"/>
+        <source>Use mouse wheel to switch images</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="484"/>
-        <source>Zum Blättern verwenden</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="485"/>
+        <location filename="../src/SettingsProvider.cpp" line="456"/>
         <source>NavigateWithMouseWheel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="489"/>
+        <location filename="../src/SettingsProvider.cpp" line="460"/>
         <source>MouseWheelZoomSpeed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="490"/>
-        <source>Mausrad:</source>
+        <location filename="../src/SettingsProvider.cpp" line="462"/>
+        <source>Zoom amount:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="490"/>
-        <source>Zoom-Geschwindigkeit</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="492"/>
-        <source>Weiches Scrollen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="493"/>
+        <location filename="../src/SettingsProvider.cpp" line="465"/>
         <source>SmoothPanning</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="494"/>
-        <source>Pfeiltasten blättern, wenn nicht gescrollt werden kann</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="495"/>
+        <location filename="../src/SettingsProvider.cpp" line="467"/>
         <source>SmartPanningKeys</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="496"/>
-        <source>Tastatur:</source>
+        <location filename="../src/SettingsProvider.cpp" line="472"/>
+        <source>Blend</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="499"/>
-        <source>Keiner</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="499"/>
-        <source>Überblenden</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="500"/>
-        <source>Schieben von rechts</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="500"/>
-        <source>Schieben von links</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="501"/>
-        <source>Schieben von oben</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="501"/>
-        <source>Schieben von unten</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="502"/>
-        <source>Aufrollen von rechts</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="502"/>
-        <source>Aufrollen von links</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="503"/>
-        <source>Aufrollen von oben</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="503"/>
-        <source>Aufrollen von unten</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="504"/>
-        <source>Scrollen von rechts</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="504"/>
-        <source>Scrollen von links</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="505"/>
-        <source>Scrollen von oben</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="505"/>
-        <source>Scrollen von unten</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="506"/>
+        <location filename="../src/SettingsProvider.cpp" line="479"/>
         <source>SlideShowTransitionEffect</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="510"/>
+        <location filename="../src/SettingsProvider.cpp" line="483"/>
         <source>SlideShowEffectTime</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="511"/>
-        <source>Diashow:</source>
+        <location filename="../src/SettingsProvider.cpp" line="484"/>
+        <source>Slideshow transition effect:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="511"/>
-        <source>Übergangseffekt</source>
+        <location filename="../src/SettingsProvider.cpp" line="485"/>
+        <source>Slideshow transition duration:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="512"/>
-        <source>Effektdauer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="524"/>
-        <source>Nie</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="524"/>
-        <source>Pro Ordner</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="524"/>
-        <source>Immer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="525"/>
-        <source>Ein schon offenes Fenster übernimmt neu geöffnete Bilder (SingleInstance)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="526"/>
-        <source>Nur eine Vollbild-Instanz</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="527"/>
+        <location filename="../src/SettingsProvider.cpp" line="500"/>
         <source>SingleFullScreenInstance</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="529"/>
-        <source>Einzelne Instanz:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="532"/>
-        <source>Bild neu laden, wenn es geändert wurde</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="533"/>
+        <location filename="../src/SettingsProvider.cpp" line="506"/>
         <source>ReloadWhenDisplayedImageChanged</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="534"/>
-        <source>Dateiüberwachung:</source>
+        <location filename="../src/SettingsProvider.cpp" line="512"/>
+        <source>Preloading range:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="538"/>
-        <source>Anzahl der Bilder, die vor und zurück im Voraus geladen werden (CacheRange)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="539"/>
-        <source>Vorladen:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="539"/>
-        <source>Bilder vor/zurück</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="541"/>
-        <source>Automatisch</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="541"/>
-        <source>Generisch</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="542"/>
+        <location filename="../src/SettingsProvider.cpp" line="515"/>
         <source>MMX</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="542"/>
+        <location filename="../src/SettingsProvider.cpp" line="515"/>
         <source>SSE2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="542"/>
+        <location filename="../src/SettingsProvider.cpp" line="515"/>
         <source>AVX2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="543"/>
-        <source>Befehlssatz für das Resampling (CPUType)</source>
+        <location filename="../src/SettingsProvider.cpp" line="520"/>
+        <source>CPU instruction set:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="546"/>
-        <source>0 = automatisch, dann höchstens 8 (CPUCoresUsed)</source>
+        <location filename="../src/SettingsProvider.cpp" line="521"/>
+        <source>CPU threads:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="547"/>
-        <source>Prozessor:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="547"/>
-        <source>Befehlssatz</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="547"/>
-        <source>Threads</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="549"/>
-        <source>Alle Formate mit Qt (QImageReader) lesen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="550"/>
+        <location filename="../src/SettingsProvider.cpp" line="524"/>
         <source>ForceQImageReader</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="551"/>
-        <source>Decoder:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="367"/>
-        <source>Hintergrundfarbe:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="352"/>
-        <source>Zoom-Pause bei:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="557"/>
-        <source>Farbe auswählen</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

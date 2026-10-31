@@ -290,40 +290,6 @@ namespace {
         return combo->currentData().toString();
     }
 
-    // A field with its own small label in front, for rows below a group label ("Mausrad:" -> "Zoom-Geschwindigkeit [1,0]")
-    QWidget* labeledField(const QString& sLabel, QWidget* field) {
-        QWidget* container = new QWidget();
-        QHBoxLayout* layout = new QHBoxLayout(container);
-        layout->setContentsMargins(0, 0, 0, 0);
-        QLabel* label = new QLabel(sLabel);
-        label->setObjectName(QStringLiteral("fieldLabel"));   // addGroup() gives the labels of a group the same width
-        layout->addWidget(label);
-        layout->addWidget(field);
-        layout->addStretch();
-        return container;
-    }
-
-    // Rows of a group: the group label in the first row only, the following rows indented below it
-    void addGroup(QFormLayout* layout, const QString& sLabel, std::initializer_list<QWidget*> fields) {
-        // The small labels of labeledField() get the width of the widest one, so the fields line up
-        QList<QLabel*> labels;
-        int nWidth = 0;
-        for (QWidget* field : fields) {
-            if (QLabel* label = field->findChild<QLabel*>(QStringLiteral("fieldLabel"), Qt::FindDirectChildrenOnly)) {
-                labels.append(label);
-                nWidth = std::max(nWidth, label->sizeHint().width());
-            }
-        }
-        for (QLabel* label : labels) {
-            label->setMinimumWidth(nWidth);
-        }
-
-        bool bFirst = true;
-        for (QWidget* field : fields) {
-            layout->addRow(bFirst ? sLabel : QString(), field);
-            bFirst = false;
-        }
-    }
 }
 
 // ----------------------------------------------------------------------------
@@ -357,9 +323,9 @@ QWidget* SettingsDialog::createImagePage() {
     m_spinBookModePageHeight->setToolTip(tr("BookModePageHeight"));
     layout->addRow(tr("Book mode page height:"), m_spinBookModePageHeight);
 
-    m_checkAutoRotateExif = new QCheckBox(tr("Rotate according to EXIF"));
+    m_checkAutoRotateExif = new QCheckBox(tr("Auto rotate according to EXIF"));
     m_checkAutoRotateExif->setToolTip(tr("AutoRotateEXIF"));
-    layout->addRow(tr("Orientation:"), m_checkAutoRotateExif);
+    layout->addRow("", m_checkAutoRotateExif);
 
     m_btnBgColor = new QPushButton();
     m_btnBgColor->setToolTip(tr("BackgroundColor"));
@@ -400,20 +366,20 @@ QWidget* SettingsDialog::createQualityPage() {
     QWidget* panel = new QWidget();
     QFormLayout* layout = createFormLayout(panel);
 
-    m_checkHighQualityResampling = new QCheckBox(tr("High quality"));
+    m_checkHighQualityResampling = new QCheckBox(tr("Use resampling"));
     m_checkHighQualityResampling->setToolTip(tr("HighQualityResampling"));
     m_comboDownSamplingFilter = createChoiceBox({ { tr("None (fast)"), "None" }, { tr("Hermite"), "Hermite" },
                                                   { tr("Mitchell"), "Mitchell" }, { tr("Catmull-Rom"), "Catrom" },
                                                   { tr("Lanczos-2"), "Lanczos2" } });
     m_comboDownSamplingFilter->setToolTip(tr("Filter used for downscaling (DownSamplingFilter)"));
-    addGroup(layout, tr("Resampling:"), { m_checkHighQualityResampling,
-                                          labeledField(tr("Downscaling filter"), m_comboDownSamplingFilter) });
+    layout->addRow("", m_checkHighQualityResampling);
+    layout->addRow(tr("Downsampling filter:"), m_comboDownSamplingFilter);
 
     m_checkUseEmbeddedColorProfiles = new QCheckBox(tr("Apply embedded ICC profiles"));
     m_checkUseEmbeddedColorProfiles->setToolTip(tr("UseEmbeddedColorProfiles"));
-    layout->addRow(tr("Color profiles:"), m_checkUseEmbeddedColorProfiles);
+    layout->addRow("", m_checkUseEmbeddedColorProfiles);
 
-    m_checkAutoContrastCorrection = new QCheckBox(tr("Apply automatically"));
+    m_checkAutoContrastCorrection = new QCheckBox(tr("Enable auto contrast correction"));
     m_checkAutoContrastCorrection->setToolTip(tr("AutoContrastCorrection"));
     m_spinAutoContrastAmount = new QDoubleSpinBox();
     m_spinAutoContrastAmount->setRange(0.0, 1.0);
@@ -423,9 +389,9 @@ QWidget* SettingsDialog::createQualityPage() {
     m_spinAutoBrightnessAmount->setRange(0.0, 1.0);
     m_spinAutoBrightnessAmount->setSingleStep(0.05);
     m_spinAutoBrightnessAmount->setToolTip(tr("AutoBrightnessCorrectionAmount"));
-    addGroup(layout, tr("Auto contrast:"), { m_checkAutoContrastCorrection,
-                                             labeledField(tr("Contrast strength"), m_spinAutoContrastAmount),
-                                             labeledField(tr("Brightness strength"), m_spinAutoBrightnessAmount) });
+    layout->addRow("", m_checkAutoContrastCorrection);
+    layout->addRow(tr("Contrast correction strength"), m_spinAutoContrastAmount);
+    layout->addRow(tr("Brightness correction strength"), m_spinAutoBrightnessAmount);
 
     return makeScrollable(panel);
 }
@@ -437,11 +403,12 @@ QWidget* SettingsDialog::createWindowPage() {
     QWidget* panel = new QWidget();
     QFormLayout* layout = createFormLayout(panel);
 
-    m_checkShowFullScreen = new QCheckBox(tr("Start in fullscreen"));
+    m_checkShowFullScreen = new QCheckBox(tr("Launch images fullscreen"));
     m_checkShowFullScreen->setToolTip(tr("ShowFullScreen"));
-    m_checkBookModeLaunchFullscreen = new QCheckBox(tr("Start comics/manga in fullscreen"));
+    m_checkBookModeLaunchFullscreen = new QCheckBox(tr("Launch comics/manga fullscreen"));
     m_checkBookModeLaunchFullscreen->setToolTip(tr("BookModeLaunchFullscreen"));
-    addGroup(layout, tr("Startup:"), { m_checkShowFullScreen, m_checkBookModeLaunchFullscreen });
+    layout->addRow("", m_checkShowFullScreen);
+    layout->addRow("", m_checkBookModeLaunchFullscreen);
 
     m_spinDisplayMonitor = new QSpinBox();
     m_spinDisplayMonitor->setRange(-1, 16);
@@ -452,9 +419,11 @@ QWidget* SettingsDialog::createWindowPage() {
     m_checkShowFilePathInTitle->setToolTip(tr("ShowFilePathInTitle"));
     m_checkShowAppNameInTitle = new QCheckBox(tr("Show application name"));
     m_checkShowAppNameInTitle->setToolTip(tr("\" - mkImageViewer\" at the end of the title (ShowAppNameInTitle)"));
-    m_checkTitleBarUseFileIcon = new QCheckBox(tr("Show file type icon"));
+    m_checkTitleBarUseFileIcon = new QCheckBox(tr("Use specific file type icon"));
     m_checkTitleBarUseFileIcon->setToolTip(tr("TitleBarUseFileIcon"));
-    addGroup(layout, tr("Title bar:"), { m_checkShowFilePathInTitle, m_checkShowAppNameInTitle, m_checkTitleBarUseFileIcon });
+    layout->addRow(tr("Title bar:"), m_checkShowFilePathInTitle);
+    layout->addRow("", m_checkShowAppNameInTitle);
+    layout->addRow("", m_checkTitleBarUseFileIcon);
 
     return makeScrollable(panel);
 }
@@ -471,7 +440,8 @@ QWidget* SettingsDialog::createNavigationPage() {
     m_comboFileDisplayOrder->setToolTip(tr("FileDisplayOrder"));
     m_checkFileSortAscending = new QCheckBox(tr("Ascending"));
     m_checkFileSortAscending->setToolTip(tr("FileSortAscending"));
-    addGroup(layout, tr("Sorting:"), { m_comboFileDisplayOrder, m_checkFileSortAscending });
+    layout->addRow(tr("Sorting:"), m_comboFileDisplayOrder);
+    layout->addRow("", m_checkFileSortAscending);
 
     m_comboFolderNavigation = createChoiceBox({ { tr("This folder only"), "LoopFolder" },
                                                 { tr("Folders on the same level"), "LoopSameFolderLevel" },
@@ -479,21 +449,24 @@ QWidget* SettingsDialog::createNavigationPage() {
     m_comboFolderNavigation->setToolTip(tr("FolderNavigation"));
     m_checkWrapAroundFolder = new QCheckBox(tr("Wrap around at the end of the folder"));
     m_checkWrapAroundFolder->setToolTip(tr("WrapAroundFolder"));
-    addGroup(layout, tr("Folder:"), { m_comboFolderNavigation, m_checkWrapAroundFolder });
+    layout->addRow(tr("Folder:"), m_comboFolderNavigation);
+    layout->addRow("", m_checkWrapAroundFolder);
 
-    m_checkNavigateMouseWheel = new QCheckBox(tr("Use to switch images"));
+    m_checkNavigateMouseWheel = new QCheckBox(tr("Use mouse wheel to switch images"));
     m_checkNavigateMouseWheel->setToolTip(tr("NavigateWithMouseWheel"));
     m_spinMouseWheelZoomSpeed = new QDoubleSpinBox();
     m_spinMouseWheelZoomSpeed->setRange(0.1, 10.0);
     m_spinMouseWheelZoomSpeed->setSingleStep(0.1);
     m_spinMouseWheelZoomSpeed->setToolTip(tr("MouseWheelZoomSpeed"));
-    addGroup(layout, tr("Mouse wheel:"), { m_checkNavigateMouseWheel, labeledField(tr("Zoom speed"), m_spinMouseWheelZoomSpeed) });
+    layout->addRow("Mouse wheel", m_checkNavigateMouseWheel);
+    layout->addRow(tr("Zoom amount:"), m_spinMouseWheelZoomSpeed);
 
     m_checkSmoothPanning = new QCheckBox(tr("Smooth scrolling"));
     m_checkSmoothPanning->setToolTip(tr("SmoothPanning"));
     m_checkSmartPanningKeys = new QCheckBox(tr("Arrow keys switch images when there is nothing to scroll"));
     m_checkSmartPanningKeys->setToolTip(tr("SmartPanningKeys"));
-    addGroup(layout, tr("Keyboard:"), { m_checkSmoothPanning, m_checkSmartPanningKeys });
+    layout->addRow(tr("Keyboard:"), m_checkSmoothPanning);
+    layout->addRow("", m_checkSmartPanningKeys);
 
     m_comboSlideShowTransitionEffect = createChoiceBox({
         { tr("None"), "None" }, { tr("Blend"), "Blend" },
@@ -508,8 +481,8 @@ QWidget* SettingsDialog::createNavigationPage() {
     m_spinSlideShowEffectTimeMs->setRange(100, 5000);
     m_spinSlideShowEffectTimeMs->setSuffix(" ms");
     m_spinSlideShowEffectTimeMs->setToolTip(tr("SlideShowEffectTime"));
-    addGroup(layout, tr("Slideshow:"), { labeledField(tr("Transition effect"), m_comboSlideShowTransitionEffect),
-                                       labeledField(tr("Effect duration"), m_spinSlideShowEffectTimeMs) });
+    layout->addRow(tr("Slideshow transition effect:"), m_comboSlideShowTransitionEffect);
+    layout->addRow(tr("Slideshow transition duration:"), m_spinSlideShowEffectTimeMs);
 
     return makeScrollable(panel);
 }
@@ -531,12 +504,12 @@ QWidget* SettingsDialog::createSystemPage() {
 
     m_checkReloadWhenImageChanged = new QCheckBox(tr("Reload the image when it has changed"));
     m_checkReloadWhenImageChanged->setToolTip(tr("ReloadWhenDisplayedImageChanged"));
-    layout->addRow(tr("File monitoring:"), m_checkReloadWhenImageChanged);
+    layout->addRow("", m_checkReloadWhenImageChanged);
 
     m_spinCacheRange = new QSpinBox();
     m_spinCacheRange->setRange(0, 8);
     m_spinCacheRange->setToolTip(tr("Number of images preloaded forward and backward (CacheRange)"));
-    layout->addRow(tr("Preloading:"), labeledField(tr("Images forward/backward"), m_spinCacheRange));
+    layout->addRow(tr("Preloading range:"), m_spinCacheRange);
 
     m_comboCpuType = createChoiceBox({ { tr("Automatic"), "AutoDetect" }, { tr("Generic"), "Generic" },
                                        { tr("MMX"), "MMX" }, { tr("SSE2"), "SSE" }, { tr("AVX2"), "AVX2" } });
@@ -544,11 +517,12 @@ QWidget* SettingsDialog::createSystemPage() {
     m_spinCpuCores = new QSpinBox();
     m_spinCpuCores->setRange(0, 128);
     m_spinCpuCores->setToolTip(tr("0 = automatic, then at most 8 (CPUCoresUsed)"));
-    addGroup(layout, tr("Processor:"), { labeledField(tr("Instruction set"), m_comboCpuType), labeledField(tr("Threads"), m_spinCpuCores) });
+    layout->addRow(tr("CPU instruction set:"), m_comboCpuType);
+    layout->addRow(tr("CPU threads:"), m_spinCpuCores);
 
     m_checkForceQImageReader = new QCheckBox(tr("Read all formats with Qt (QImageReader)"));
     m_checkForceQImageReader->setToolTip(tr("ForceQImageReader"));
-    layout->addRow(tr("Decoder:"), m_checkForceQImageReader);
+    layout->addRow("", m_checkForceQImageReader);
 
     return makeScrollable(panel);
 }
