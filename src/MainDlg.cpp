@@ -2710,21 +2710,6 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
         }
     }
 
-    // only pause on some percent if enabled
-    double pauseAtZoom = CSettingsProvider::This().ZoomPauseFactor();
-    if (pauseAtZoom != 0) {
-        // snap to zoom factor... aka if within 1% of the set zoom factor, snap exactly to it
-        // skip it if the zoom factor is 100% since it's already checked above - save one expensive calculation of abs()
-        if (pauseAtZoom != 1 && (MaxRatio(m_dZoom, pauseAtZoom) < 1.01)) {
-            m_dZoom = pauseAtZoom;
-        }
-
-        if ((dOldZoom - pauseAtZoom) * (m_dZoom - pauseAtZoom) <= 0 && m_bInZooming && !m_bZoomMode) {
-            // make a stop at 100 % (or whatever % is configured)
-            m_dZoom = pauseAtZoom;
-        }
-    }
-
     // Never create images more than 65535 pixels wide or high - the basic processing cannot handle it
     int nOldXSize = (int)(m_pCurrentImage->OrigWidth() * dOldZoom + 0.5);
     int nOldYSize = (int)(m_pCurrentImage->OrigHeight() * dOldZoom + 0.5);
@@ -2749,7 +2734,6 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
         // the zoom ratio has changed, but the size is still the same, due to rounding errors
         if (bExponent && dValue < 0) {
             // zooming out
-            // NOTE: this gets triggered on pauseAtZoom
             m_dZoom = dOldZoom;  // restore previous zoom value
         }
         // zooming in does not require restoring the previous zoom value

@@ -311,12 +311,6 @@ QWidget* SettingsDialog::createImagePage() {
     layout->addRow(tr("Auto zoom (window):"), m_comboAutoZoomMode);
     layout->addRow(tr("Auto zoom (fullscreen):"), m_comboAutoZoomModeFullscreen);
 
-    m_spinZoomPausePercent = new QSpinBox();
-    m_spinZoomPausePercent->setRange(0, 10000);
-    m_spinZoomPausePercent->setSuffix(" %");
-    m_spinZoomPausePercent->setToolTip(tr("Continuous zooming pauses briefly at this value, 0 = never (ZoomPausePercent)"));
-    layout->addRow(tr("Zoom pause at:"), m_spinZoomPausePercent);
-
     m_spinBookModePageHeight = new QSpinBox();
     m_spinBookModePageHeight->setRange(100, 1000);
     m_spinBookModePageHeight->setSuffix(" %");
@@ -557,7 +551,6 @@ void SettingsDialog::loadFrom(const CSettingsProvider& settings) {
     selectChoice(m_comboCpuType, settings.GetString("CPUType", "AutoDetect"), "AutoDetect");
 
     // Image
-    m_spinZoomPausePercent->setValue(static_cast<int>(settings.m_zoomPauseFactor * 100));
     m_spinBookModePageHeight->setValue(settings.m_nBookModePageHeight);
     m_checkAutoRotateExif->setChecked(settings.m_bAutoRotateEXIF);
     m_colorBg = settings.m_colorBackground;
@@ -625,7 +618,6 @@ void SettingsDialog::saveToSettings() {
     settings.WriteInt("CacheRange", m_spinCacheRange->value());
     settings.WriteInt("DisplayMonitor", m_spinDisplayMonitor->value());
     settings.WriteInt("SlideShowEffectTime", m_spinSlideShowEffectTimeMs->value());
-    settings.WriteInt("ZoomPausePercent", m_spinZoomPausePercent->value());
     settings.WriteString("AutoZoomMode", chosenIniValue(m_comboAutoZoomMode));
     settings.WriteString("AutoZoomModeFullscreen", chosenIniValue(m_comboAutoZoomModeFullscreen));
     settings.WriteString("BackgroundColor", QString("%1 %2 %3").arg(m_colorBg.red()).arg(m_colorBg.green()).arg(m_colorBg.blue()));
@@ -781,7 +773,6 @@ void CSettingsProvider::ReadAllINISettings() {
     m_nSlideShowEffectTimeMs = GetInt("SlideShowEffectTime", 200, 100, 5000);
     m_bSingleFullScreenInstance = GetBool("SingleFullScreenInstance", true);
     m_bWrapAroundFolder = GetBool("WrapAroundFolder", true);
-    m_zoomPauseFactor = GetInt("ZoomPausePercent", 100, 0, 6553500) / 100.0;  // can't have a % larger than the MAX_IMAGE_DIMENSION %, and convert to a scale factor (double/double division) only once
     m_bAutoRotateEXIF = GetBool("AutoRotateEXIF", true);
     m_bUseEmbeddedColorProfiles = GetBool("UseEmbeddedColorProfiles", true); // This can drastically slow down image loading/decoding.
     m_bForceQImageReader = GetBool("ForceQImageReader", false);

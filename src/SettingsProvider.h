@@ -45,7 +45,6 @@ private:
     // Bild
     class QComboBox* m_comboAutoZoomMode;
     class QComboBox* m_comboAutoZoomModeFullscreen;
-    class QSpinBox*  m_spinZoomPausePercent;
     class QSpinBox*  m_spinBookModePageHeight;
     class QCheckBox* m_checkAutoRotateExif;
     class QPushButton* m_btnBgColor;
@@ -138,7 +137,6 @@ public:
     double AutoBrightnessAmount() const { return m_dAutoBrightnessAmount; }
     double AutoContrastAmount() const { return m_dAutoContrastAmount; }
     double MouseWheelZoomSpeed() const { return m_dMouseWheelZoomSpeed; }
-    double ZoomPauseFactor() const { return m_zoomPauseFactor; }  // while internally this is represented in doubles, using a whole number percent simplifies it for the user... configuring doubles is not user friendly at all
 
     EFilterType DownsamplingFilter() const { return m_eDownsamplingFilter; }
     Helpers::CPUType AlgorithmImplementation() const { return m_eCPUAlgorithm; }
@@ -217,8 +215,6 @@ private:
     QColor m_colorBackground;
     QColor m_colorTransparency;
     bool m_bReloadWhenDisplayedImageChanged{true};
-
-    double m_zoomPauseFactor{1.0};
 
     int m_nBookModePageHeight{122};
     bool m_bBookModeLaunchFullscreen{true};
