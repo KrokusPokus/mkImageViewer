@@ -10,7 +10,9 @@
 #include <QMainWindow>
 #include <QCoreApplication>
 #include <QFileIconProvider>
+#include <QElapsedTimer>
 #include <QHash>
+#include <QImage>
 #include <QString>
 
 class CFileList;
@@ -213,8 +215,14 @@ private:
     int GetLoadErrorAfterOpenFile();
     bool HandleMouseButtonByKeymap(int nMouseButton, bool bExecuteCommand = true);
     bool UseSlideShowTransitionEffect();
-    //void PaintToDC(QPainter& painter);
-    //void AnimateTransition();
+    // Slide show transition effect: the window content before and after the image change is captured with grab()
+    // (the same paintEvent() code paints both), then paintEvent() composes the two snapshots until the transition
+    // time is over. Time based and driven by m_transitionTimerId, so the event loop keeps running meanwhile.
+    void StartTransition(QImage oldFrame);
+    // Ends a running transition (no-op otherwise); bRepaint: repaint the window with the current image
+    void StopTransition(bool bRepaint = true);
+    bool IsTransitionRunning() const { return m_transitionTimerId != 0; }
+    void PaintTransitionFrame(QPainter& painter);
     void CleanupAndTerminate();
     
     // this is for animated GIFs
@@ -259,6 +267,12 @@ private:
     int m_zoomTextTimerId = 0;
     int m_toastTimerId = 0;
     int m_panTimerId = 0;
+    int m_transitionTimerId = 0;
+
+    // Slide show transition (see StartTransition()): snapshots in device pixels (device pixel ratio 1)
+    QImage m_transitionOld;
+    QImage m_transitionNew;
+    QElapsedTimer m_transitionClock;
 
     bool m_bPanKeyUp = false;
     bool m_bPanKeyDown = false;

@@ -36,6 +36,7 @@
 #include <QPushButton>
 #include <QRect>
 #include <QRegularExpression>
+#include <QScreen>
 #include <QStandardPaths>
 #include <QString>
 #include <QThread>
@@ -43,6 +44,7 @@
 #include <QtGlobal>
 #include <QLibrary>
 #include <QVariant>
+#include <algorithm>
 #include <optional>
 
 // Damit CommandInvocation als QVariant an QActions haengen kann (Kontextmenue).
@@ -520,6 +522,15 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         return;
     }
 
+    if (IsTransitionRunning()) {
+        if (m_transitionNew.size() == ClientSizePx()) {
+            QPainter transitionPainter(this);
+            PaintTransitionFrame(transitionPainter);
+            return;
+        }
+        StopTransition(false);   // window size changed: the snapshots do not fit anymore, paint the current image
+    }
+
     QPainter painter(this);
     m_dRealizedZoom = 1.0;
 
@@ -748,56 +759,6 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     }
 }
 
-/*
-void CMainDlg::PaintToDC(QPainter& painter) {
-    QColor backColor = CSettingsProvider::This().ColorBackground();
-    if (backColor.rgb() == 0) {
-        backColor = QColor(0, 0, 1); // nVidia Bug-Workaround für reines Schwarz
-    }
-
-    m_dRealizedZoom = 1.0;
-
-    QRect qClient(m_clientRect.left, m_clientRect.top, m_clientRect.Width(), m_clientRect.Height());
-
-    CBaseImage* pCurrentImage = GetCurrentImage();
-    if (pCurrentImage == NULL) {
-        painter.fillRect(qClient, backColor);
-    } else {
-        // Rotation verifizieren
-        pCurrentImage->VerifyRotation(CRotationParams(pCurrentImage->GetRotationParams(), GetRotation()));
-
-        // Virtuelle Bildgröße und Zoom berechnen
-        double dZoom = m_dZoom;
-        QSize newSize = GetVirtualImageSize(pCurrentImage->OrigSize(), qClient.size(), GetAutoZoomMode(), dZoom);
-        CPoint offsets = LimitOffsets(GetOffsets(), qClient.size(), newSize);
-        m_dRealizedZoom = (double)newSize.cx / m_pCurrentImage->OrigSize().cx;
-
-        // Auf Client-Rechteck clippen und DIB anfordern
-        CSize clippedSize(std::min<long>(qClient.width(), newSize.cx), std::min<long>(qClient.height(), newSize.cy));
-        CPoint offsetsInImage = pCurrentImage->ConvertOffset(newSize, clippedSize, offsets);
-
-        void* pDIBData = pCurrentImage->GetDIB(newSize, clippedSize, offsetsInImage,
-                *GetImageProcessingParams(),
-                CreateDefaultProcessingFlags());
-
-        // Hintergrund füllen und Bild hochperformant via QImage / QPainter zeichnen
-        painter.fillRect(qClient, backColor);
-
-        if (pDIBData != NULL) {
-            QImage dibImage(static_cast<uchar*>(pDIBData), clippedSize.width(), clippedSize.height(), QImage::Format_RGB32);
-
-            int xDest = (qClient.width() - clippedSize.width()) / 2;
-            int yDest = (qClient.height() - clippedSize.height()) / 2;
-
-            painter.drawImage(xDest, yDest, dibImage);
-        }
-
-        // Fehler- und Warnungsanzeige mit dem neuen QPainter übergeben
-        DisplayErrors(pCurrentImage, qClient, painter);
-    }
-}
-*/
-
 void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect, QPainter& painter)
 {
     // Einheitliche Schriftart für Fehlermeldungen setzen (z. B. Arial oder Standard-GUI-Font)
@@ -867,6 +828,7 @@ void CMainDlg::closeEvent(QCloseEvent* event) {
 }
 
 void CMainDlg::mousePressEvent(QMouseEvent* event) {
+    StopTransition();
     m_nMouseX = ToPx(event->pos()).x();
     m_nMouseY = ToPx(event->pos()).y();
 
@@ -1006,6 +968,7 @@ void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void CMainDlg::wheelEvent(QWheelEvent* event) {
+    StopTransition();
     bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
     bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
 
@@ -1111,6 +1074,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
 }
 
 void CMainDlg::keyPressEvent(QKeyEvent* event) {
+    StopTransition();
     bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
     bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
     bool bAlt = event->modifiers().testFlag(Qt::AltModifier);
@@ -1244,14 +1208,30 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
         // so a slide show never got past an animated image.
         const bool bAnimationFrame = (timerId == m_animationTimerId);
 
+        // Transition: capture the window with the old image before GotoImage() replaces it. GotoImage() then does not
+        // paint the new image, StartTransition() takes over.
+        const bool bTransition = !bAnimationFrame && UseSlideShowTransitionEffect();
+        QImage oldFrame;
+        if (bTransition) {
+            StopTransition(false);
+            oldFrame = grab().toImage();
+        }
+
         GotoImage(bAnimationFrame ? POS_NextFrame : POS_NextSlideShow, NO_REMOVE_KEY_MSG);
 
-        if (!bAnimationFrame && UseSlideShowTransitionEffect()) {
-            //AnimateTransition();
+        if (bTransition) {
+            StartTransition(std::move(oldFrame));
         }
 
         if (!bAnimationFrame) {
             m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
+        }
+    }
+    else if (timerId == m_transitionTimerId) {
+        if (m_transitionClock.elapsed() >= m_nTransitionTime) {
+            StopTransition();   // last frame: the current image, painted the regular way
+        } else {
+            update();
         }
     }
     else if (timerId == m_zoomTimerId) {
@@ -1629,6 +1609,8 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
 
 void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
     using Cmd::Command;
+
+    StopTransition();   // the result of a command must be visible right away
 
     CSettingsProvider& sp = CSettingsProvider::This();
     switch (inv.id) {
@@ -2465,6 +2447,11 @@ void CMainDlg::GotoImage(EImagePosition ePos) {
 }
 
 void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
+    // A new image ends a running transition. Not the frames of an animation: they continue behind the transition.
+    if (ePos != POS_NextFrame) {
+        StopTransition();
+    }
+
 /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos1";
 
     // Timer handling for slideshows
@@ -3266,147 +3253,90 @@ bool CMainDlg::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteComm
 bool CMainDlg::UseSlideShowTransitionEffect() {
     return m_nCurrentTimeout >= 1000 && m_eTransitionEffect != Helpers::TE_None;
 }
-/*
-void CMainDlg::AnimateTransition() {
-    if (m_eTransitionEffect == Helpers::TE_None) {
+void CMainDlg::StartTransition(QImage oldFrame) {
+    StopTransition(false);
+
+    if (m_eTransitionEffect == Helpers::TE_None || m_nTransitionTime <= 0 || oldFrame.isNull() || !isVisible() || isMinimized()) {
         update();
         return;
     }
 
-    int nW = width();
-    int nH = height();
-    if (nW <= 0 || nH <= 0) return;
-
-    int nFrameTimeMs = (m_eTransitionEffect >= Helpers::TE_RollLR || m_eTransitionEffect <= Helpers::TE_ScrollBT) ? 10 : 20;
-
-    // 1. Aktuelles Bild (Vorher-Zustand) als Screenshot sichern
-    QImage oldImage = this->grab().toImage();
-
-    // 2. Neues Bild (Nachher-Zustand) in ein Offscreen-Image rendern
-    QImage memImage(nW, nH, QImage::Format_ARGB32_Premultiplied);
-    memImage.fill(Qt::black);
-    {
-        QPainter memPainter(&memImage);
-        memPainter.setRenderHint(QPainter::Antialiasing, true);
-        PaintToPainter(memPainter);
+    // The new image, rendered by paintEvent() exactly as it is shown afterwards (background, overlays, HiDPI)
+    m_transitionNew = grab().toImage();
+    if (m_transitionNew.isNull() || m_transitionNew.size() != oldFrame.size()) {
+        m_transitionNew = QImage();
+        update();
+        return;
     }
 
-    int nSteps = std::max(1, (m_nTransitionTime + 20) / nFrameTimeMs);
-    qint64 lastTime = QDateTime::currentMSecsSinceEpoch();
+    // Both snapshots are composed in device pixels (see PaintTransitionFrame())
+    m_transitionOld = std::move(oldFrame);
+    m_transitionOld.setDevicePixelRatio(1.0);
+    m_transitionNew.setDevicePixelRatio(1.0);
 
-    for (int i = 0; i <= nSteps; i++) {
-        QImage frameImage(nW, nH, QImage::Format_ARGB32_Premultiplied);
-        QPainter painter(&frameImage);
-
-        switch (m_eTransitionEffect) {
-        case Helpers::TE_Blend:
-            {
-                painter.drawImage(0, 0, oldImage);
-                if (i == nSteps) {
-                    painter.drawImage(0, 0, memImage);
-                } else {
-                    float fFactor = (float)i / nSteps;
-                    float fCurve = fFactor * fFactor * i; // Behält die originale Beschleunigungskurve bei
-                    int alpha = std::min(255, (int)((fCurve + 1) * (255.0f / nSteps) + 0.5f));
-                    painter.setOpacity(alpha / 255.0;
-                    painter.drawImage(0, 0, memImage);
-                }
-                break;
-            }
-        case Helpers::TE_SlideLR:
-        case Helpers::TE_SlideRL:
-        case Helpers::TE_SlideBT:
-        case Helpers::TE_SlideTB:
-            {
-                painter.drawImage(0, 0, oldImage);
-                float fFactor = (float)(i + 1) / (nSteps + 1);
-                int nFracHeight = (int)(nH * fFactor + 0.5f);
-                int nFracWidth = (int)(nW * fFactor + 0.5f);
-                int nStartX = (m_eTransitionEffect == Helpers::TE_SlideLR) ? nFracWidth - nW : (m_eTransitionEffect == Helpers::TE_SlideRL) ? nW - nFracWidth : 0;
-                int nStartY = (m_eTransitionEffect == Helpers::TE_SlideTB) ? nFracHeight - nH : (m_eTransitionEffect == Helpers::TE_SlideBT) ? nH - nFracHeight : 0;
-
-                painter.drawImage(nStartX, nStartY, memImage);
-                break;
-            }
-        case Helpers::TE_RollLR:
-        case Helpers::TE_RollRL:
-        case Helpers::TE_RollBT:
-        case Helpers::TE_RollTB:
-            {
-                painter.drawImage(0, 0, oldImage);
-                float fFactor = (float)(i + 1) / (nSteps + 1);
-                int nFracHeight = (int)(nH * fFactor + 0.5f);
-                int nClipH = (m_eTransitionEffect == Helpers::TE_RollLR || m_eTransitionEffect == Helpers::TE_RollRL) ? nH : 1 + nH / (nSteps + 1);
-                int nFracWidth = (int)(nW * fFactor + 0.5f);
-                int nClipW = (m_eTransitionEffect == Helpers::TE_RollTB || m_eTransitionEffect == Helpers::TE_RollBT) ? nW : 1 + nW / (nSteps + 1);
-                int nClipX = (m_eTransitionEffect == Helpers::TE_RollLR) ? nFracWidth - nClipW : (m_eTransitionEffect == Helpers::TE_RollRL) ? nW - nFracWidth : 0;
-                int nClipY = (m_eTransitionEffect == Helpers::TE_RollTB) ? nFracHeight - nClipH : (m_eTransitionEffect == Helpers::TE_RollBT) ? nH - nFracHeight : 0;
-
-                painter.setClipRect(nClipX, nClipY, nClipW, nClipH);
-                painter.drawImage(0, 0, memImage);
-                break;
-            }
-        case Helpers::TE_ScrollLR:
-        case Helpers::TE_ScrollRL:
-        case Helpers::TE_ScrollBT:
-        case Helpers::TE_ScrollTB:
-            {
-                float fFactorLast = (float)i / (nSteps + 1);
-                float fFactor = (float)(i + 1) / (nSteps + 1);
-                int nScrollW = 0, nScrollH = 0;
-                int nStartX = 0, nStartY = 0;
-                QRect clipRect;
-
-                if (m_eTransitionEffect == Helpers::TE_ScrollLR) {
-                    nScrollW = (int)(nW * fFactor + 0.5f) - (int)(nW * fFactorLast + 0.5f);
-                    nStartX = (int)(nW * fFactor + 0.5f) - nW;
-                    clipRect = QRect(0, 0, nScrollW, nH);
-                } else if (m_eTransitionEffect == Helpers::TE_ScrollRL) {
-                    nScrollW = -((int)(nW * fFactor + 0.5f) - (int)(nW * fFactorLast + 0.5f));
-                    nStartX = nW - (int)(nW * fFactor + 0.5f);
-                    clipRect = QRect(nW + nScrollW, 0, -nScrollW, nH);
-                } else if (m_eTransitionEffect == Helpers::TE_ScrollTB) {
-                    nScrollH = (int)(nH * fFactor + 0.5f) - (int)(nH * fFactorLast + 0.5f);
-                    nStartY = (int)(nH * fFactor + 0.5f) - nH;
-                    clipRect = QRect(0, 0, nW, nScrollH);
-                } else {
-                    nScrollH = -((int)(nH * fFactor + 0.5f) - (int)(nH * fFactorLast + 0.5f));
-                    nStartY = nH - (int)(nH * fFactor + 0.5f);
-                    clipRect = QRect(0, nH + nScrollH, nW, -nScrollH);
-                }
-
-                // Alten Inhalt verschoben zeichnen + neuen Teil einblenden
-                painter.drawImage(nScrollW, nScrollH, oldImage);
-                painter.setClipRect(clipRect);
-                painter.drawImage(nStartX, nStartY, memImage);
-                break;
-            }
-        default:
-            painter.drawImage(0, 0, memImage);
-            break;
-        }
-
-        // Frame direkt auf das Widget zeichnen
-        {
-            QPainter widgetPainter(this);
-            widgetPainter.drawImage(0, 0, frameImage);
-        }
-
-        // Timing & Event-Loop Verarbeiten (damit das UI während der Animation nicht einfriert)
-        qint64 time = QDateTime::currentMSecsSinceEpoch();
-        qint64 elapsed = time - lastTime;
-        if (elapsed < nFrameTimeMs) {
-            QThread::msleep(nFrameTimeMs - elapsed);
-        }
-        lastTime = QDateTime::currentMSecsSinceEpoch();
-
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
-    }
-
-    // Am Ende einmal regulär aktualisieren
+    // One frame per display refresh; on Wayland update() is throttled to the frame callbacks anyway
+    const qreal dRefreshRate = (screen() != nullptr && screen()->refreshRate() > 1.0) ? screen()->refreshRate() : 60.0;
+    m_transitionTimerId = startTimer(std::max(1, qRound(1000.0 / dRefreshRate)), Qt::PreciseTimer);
+    m_transitionClock.start();
     update();
 }
-*/
+
+void CMainDlg::StopTransition(bool bRepaint) {
+    if (m_transitionTimerId == 0) {
+        return;
+    }
+    killTimer(m_transitionTimerId);
+    m_transitionTimerId = 0;
+    m_transitionOld = QImage();
+    m_transitionNew = QImage();
+    if (bRepaint) {
+        update();
+    }
+}
+
+void CMainDlg::PaintTransitionFrame(QPainter& painter) {
+    const int nW = m_transitionNew.width();
+    const int nH = m_transitionNew.height();
+    const double dT = std::clamp(static_cast<double>(m_transitionClock.elapsed()) / std::max(1, m_nTransitionTime), 0.0, 1.0);
+    const int nFracW = qRound(nW * dT);
+    const int nFracH = qRound(nH * dT);
+
+    // Where the old and the new image are drawn, and which part of the new image is visible
+    QPoint oldPos(0, 0);
+    QPoint newPos(0, 0);
+    QRect newPart(0, 0, nW, nH);
+    double dOpacity = 1.0;
+
+    switch (m_eTransitionEffect) {
+        case Helpers::TE_Blend:
+            dOpacity = dT * dT * (3.0 - 2.0 * dT);   // smoothstep: soft start and end
+            break;
+        // Slide: the new image moves in and covers the old one
+        case Helpers::TE_SlideRL: newPos = QPoint(nW - nFracW, 0); break;
+        case Helpers::TE_SlideLR: newPos = QPoint(nFracW - nW, 0); break;
+        case Helpers::TE_SlideTB: newPos = QPoint(0, nFracH - nH); break;
+        case Helpers::TE_SlideBT: newPos = QPoint(0, nH - nFracH); break;
+        // Roll: the new image stays in place and is uncovered from one side
+        case Helpers::TE_RollRL: newPart = QRect(nW - nFracW, 0, nFracW, nH); break;
+        case Helpers::TE_RollLR: newPart = QRect(0, 0, nFracW, nH); break;
+        case Helpers::TE_RollTB: newPart = QRect(0, 0, nW, nFracH); break;
+        case Helpers::TE_RollBT: newPart = QRect(0, nH - nFracH, nW, nFracH); break;
+        // Scroll: the new image pushes the old one out
+        case Helpers::TE_ScrollRL: oldPos = QPoint(-nFracW, 0); newPos = QPoint(nW - nFracW, 0); break;
+        case Helpers::TE_ScrollLR: oldPos = QPoint(nFracW, 0);  newPos = QPoint(nFracW - nW, 0); break;
+        case Helpers::TE_ScrollTB: oldPos = QPoint(0, nFracH);  newPos = QPoint(0, nFracH - nH); break;
+        case Helpers::TE_ScrollBT: oldPos = QPoint(0, -nFracH); newPos = QPoint(0, nH - nFracH); break;
+        default:
+            break;
+    }
+
+    // Draw in device pixels, like the DIB in paintEvent(): the snapshots are copied 1:1, without filtering
+    const qreal dpr = devicePixelRatioF();
+    painter.scale(1.0 / dpr, 1.0 / dpr);
+    painter.drawImage(oldPos, m_transitionOld);
+    painter.setOpacity(dOpacity);
+    painter.drawImage(newPos + newPart.topLeft(), m_transitionNew, newPart);
+}
 void CMainDlg::CleanupAndTerminate() {
     if (m_bTerminated == true) {
         return;
