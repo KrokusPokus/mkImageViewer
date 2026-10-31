@@ -13,8 +13,10 @@
 
 #include <memory>
 
-class QTabWidget;
+class QListWidget;
+class QStackedWidget;
 class QWidget;
+class CSettingsProvider;
 
 // Qt6 Einstellungen-Dialog
 class SettingsDialog : public QDialog {
@@ -29,71 +31,72 @@ public:
     void saveToSettings();
 
 private:
-    QTabWidget* m_tabWidget;
+    // Sections: list with icons on the left, the page of the selected section on the right
+    QListWidget* m_categoryList;
+    QStackedWidget* m_pages;
+    void addPage(const QString& sIconName, const QString& sTitle, QWidget* page);
+
+    // Shows the values of the given provider in the controls
+    void loadFrom(const CSettingsProvider& settings);
+    // Button "Restore Defaults": shows the defaults of all options (saved only on OK)
+    void restoreDefaults();
 
     // UI-Controls (Member für den Zugriff beim Speichern/Laden)
-    // Programm & System
-    class QComboBox* m_comboLanguage;
-    class QComboBox* m_comboSingleInstance;
-    class QComboBox* m_comboCpuType;
-    class QSpinBox*  m_spinCpuCores;
-    class QSpinBox*  m_spinCacheRange;
-
-    // Fenster & Verhalten
-    class QCheckBox* m_checkShowFullScreen;
-    class QCheckBox* m_checkBookModeLaunchFullscreen;
-    class QCheckBox* m_checkSingleFullScreenInstance;
-    class QCheckBox* m_checkShowFilePathInTitle;
-    class QCheckBox* m_checkShowAppNameInTitle;
-    class QCheckBox* m_checkTitleBarUseFileIcon;
-    class QSpinBox*  m_spinDisplayMonitor;
-
-    // Erscheinungsbild & GUI
+    // Bild
+    class QComboBox* m_comboAutoZoomMode;
+    class QComboBox* m_comboAutoZoomModeFullscreen;
+    class QSpinBox*  m_spinZoomPausePercent;
+    class QSpinBox*  m_spinBookModePageHeight;
+    class QCheckBox* m_checkAutoRotateExif;
     class QPushButton* m_btnBgColor;
-    class QPushButton* m_btnTransColor;
     class QComboBox* m_comboTransparencyMode;
+    class QPushButton* m_btnTransColor;
     QColor m_colorBg;
     QColor m_colorTrans;
 
-    // Navigation
+    // Qualität & Farbe
+    class QCheckBox* m_checkHighQualityResampling;
+    class QComboBox* m_comboDownSamplingFilter;
+    class QCheckBox* m_checkUseEmbeddedColorProfiles;
+    class QCheckBox* m_checkAutoContrastCorrection;
+    class QDoubleSpinBox* m_spinAutoContrastAmount;
+    class QDoubleSpinBox* m_spinAutoBrightnessAmount;
+
+    // Fenster
+    class QCheckBox* m_checkShowFullScreen;
+    class QCheckBox* m_checkBookModeLaunchFullscreen;
+    class QSpinBox*  m_spinDisplayMonitor;
+    class QCheckBox* m_checkShowFilePathInTitle;
+    class QCheckBox* m_checkShowAppNameInTitle;
+    class QCheckBox* m_checkTitleBarUseFileIcon;
+
+    // Navigation (mit Diashow)
     class QComboBox* m_comboFileDisplayOrder;
     class QCheckBox* m_checkFileSortAscending;
     class QComboBox* m_comboFolderNavigation;
     class QCheckBox* m_checkWrapAroundFolder;
     class QCheckBox* m_checkNavigateMouseWheel;
     class QDoubleSpinBox* m_spinMouseWheelZoomSpeed;
-
-    // Bildanzeige & Zoom
-    class QCheckBox* m_checkReloadWhenImageChanged;
-    class QCheckBox* m_checkHighQualityResampling;
-    class QComboBox* m_comboDownSamplingFilter;
-    class QCheckBox* m_checkAutoRotateExif;
-    class QCheckBox* m_checkUseEmbeddedColorProfiles;
-    class QCheckBox* m_checkForceQImageReader;
-    class QComboBox* m_comboAutoZoomMode;
-    class QComboBox* m_comboAutoZoomModeFullscreen;
-    class QSpinBox*  m_spinZoomPausePercent;
-    class QSpinBox*  m_spinBookModePageHeight;
     class QCheckBox* m_checkSmoothPanning;
     class QCheckBox* m_checkSmartPanningKeys;
-
-    // Bildkorrektur
-    class QCheckBox* m_checkAutoContrastCorrection;
-    class QDoubleSpinBox* m_spinAutoContrastAmount;
-    class QDoubleSpinBox* m_spinAutoBrightnessAmount;
-
-    // Diashow
     class QComboBox* m_comboSlideShowTransitionEffect;
     class QSpinBox*  m_spinSlideShowEffectTimeMs;
 
-    // Hilfsmethoden zum Erstellen der Tabs
-    QWidget* createProgramTab();
-    QWidget* createWindowTab();
-    QWidget* createGuiTab();
-    QWidget* createNavigationTab();
-    QWidget* createDisplayTab();
-    QWidget* createCorrectionTab();
-    QWidget* createSlideshowTab();
+    // System
+    class QComboBox* m_comboSingleInstance;
+    class QCheckBox* m_checkSingleFullScreenInstance;
+    class QCheckBox* m_checkReloadWhenImageChanged;
+    class QSpinBox*  m_spinCacheRange;
+    class QComboBox* m_comboCpuType;
+    class QSpinBox*  m_spinCpuCores;
+    class QCheckBox* m_checkForceQImageReader;
+
+    // Hilfsmethoden zum Erstellen der Seiten
+    QWidget* createImagePage();
+    QWidget* createQualityPage();
+    QWidget* createWindowPage();
+    QWidget* createNavigationPage();
+    QWidget* createSystemPage();
 
     void pickColor(QColor& target, QPushButton* button);
 };
@@ -155,6 +158,9 @@ public:
 
     void SaveCustomSettings();
     void SaveStickyWindowRect(QRect rect);
+    // Section of the settings dialog that was shown last (state.ini)
+    int LastSettingsPage() const;
+    void SaveLastSettingsPage(int nPage);
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
     void SetUseEmbeddedColorProfiles(int bUseEmbeddedColorProfiles) { m_bUseEmbeddedColorProfiles = (bUseEmbeddedColorProfiles != 0); }
 
@@ -222,6 +228,7 @@ private:
     int m_nCacheRange{2};
     Helpers::ETransparencyMode m_eTransparencyMode;
 
+    void ReadAllINISettings();
     void ReadWriteableINISettings();
     void ReadStickyWindowRect();
 
@@ -240,6 +247,10 @@ private:
     void WriteInt(const QString& sKey, int nValue);
 
     CSettingsProvider();
+
+    // Provider without settings file, holds the defaults of all settings (for the settings dialog)
+    struct DefaultsOnly {};
+    explicit CSettingsProvider(DefaultsOnly);
 };
 
 #endif // SETTINGSPROVIDER_H

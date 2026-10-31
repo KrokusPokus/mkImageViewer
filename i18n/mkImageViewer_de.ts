@@ -4,305 +4,314 @@
 <context>
     <name>CMainDlg</name>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1336"/>
+        <location filename="../src/MainDlg.cpp" line="1398"/>
         <source>Next image</source>
         <translation>Nächstes Bild</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1337"/>
+        <location filename="../src/MainDlg.cpp" line="1399"/>
         <source>Previous image</source>
         <translation>Voriges Bild</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1342"/>
+        <location filename="../src/MainDlg.cpp" line="1404"/>
         <source>Current View</source>
         <translation>Anzeigeweise</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1343"/>
+        <location filename="../src/MainDlg.cpp" line="1405"/>
         <source>Rotate +90</source>
         <translation>Drehen +90</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1344"/>
+        <location filename="../src/MainDlg.cpp" line="1406"/>
         <source>Rotate -90</source>
         <translation>Drehen -90</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1346"/>
+        <location filename="../src/MainDlg.cpp" line="1408"/>
         <source>Mirror horizontally</source>
         <translation>Horizontal spiegeln</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1347"/>
+        <location filename="../src/MainDlg.cpp" line="1409"/>
         <source>Mirror vertically</source>
         <translation>Vertikal spiegeln</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1349"/>
-        <location filename="../src/MainDlg.cpp" line="1533"/>
+        <location filename="../src/MainDlg.cpp" line="1411"/>
+        <source>Black and white</source>
+        <translation>Schwarzweiß</translation>
+    </message>
+    <message>
+        <location filename="../src/MainDlg.cpp" line="1415"/>
+        <location filename="../src/MainDlg.cpp" line="1594"/>
         <source>Fit to window</source>
         <translation>An Fenster anpassen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1350"/>
-        <location filename="../src/MainDlg.cpp" line="1533"/>
+        <location filename="../src/MainDlg.cpp" line="1416"/>
+        <location filename="../src/MainDlg.cpp" line="1594"/>
         <source>Fill with crop</source>
         <translation>Fenster ausfüllen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1360"/>
+        <location filename="../src/MainDlg.cpp" line="1426"/>
         <source>Full screen mode</source>
         <translation>Vollbildmodus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1372"/>
+        <location filename="../src/MainDlg.cpp" line="1437"/>
         <source>Play folder as slideshow/animation</source>
         <translation>Ordner als Diaschau/Animation abspielen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1374"/>
         <source>Pause slideshow/animation	0xff</source>
-        <translation>Diaschau/Animation pausieren	0xff</translation>
+        <translation type="vanished">Diaschau/Animation pausieren	0xff</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1380"/>
+        <location filename="../src/MainDlg.cpp" line="1441"/>
+        <source>Pause slideshow/animation</source>
+        <translation>Diaschau/Animation pausieren</translation>
+    </message>
+    <message>
+        <location filename="../src/MainDlg.cpp" line="1447"/>
         <source>Slideshow</source>
         <translation>Diaschau</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1388"/>
+        <location filename="../src/MainDlg.cpp" line="1453"/>
         <source>Waiting time	%1 sec</source>
         <translation>Wartezeit %1 Sekunden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1392"/>
+        <location filename="../src/MainDlg.cpp" line="1457"/>
         <source>Transition Effect</source>
         <translation>Übergangseffekt</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1403"/>
-        <location filename="../src/MainDlg.cpp" line="1533"/>
+        <location filename="../src/MainDlg.cpp" line="1468"/>
+        <location filename="../src/MainDlg.cpp" line="1594"/>
         <source>None</source>
         <translation>Keiner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1405"/>
+        <location filename="../src/MainDlg.cpp" line="1470"/>
         <source>Blend</source>
         <translation>Überblenden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1407"/>
+        <location filename="../src/MainDlg.cpp" line="1472"/>
         <source>Slide from right</source>
         <translation>Gleiten von rechts</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1408"/>
+        <location filename="../src/MainDlg.cpp" line="1473"/>
         <source>Slide from left</source>
         <translation>Gleiten von links</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1409"/>
+        <location filename="../src/MainDlg.cpp" line="1474"/>
         <source>Slide from top</source>
         <translation>Gleiten von oben</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1410"/>
+        <location filename="../src/MainDlg.cpp" line="1475"/>
         <source>Slide from bottom</source>
         <translation>Gleiten von unten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1412"/>
+        <location filename="../src/MainDlg.cpp" line="1477"/>
         <source>Roll from right</source>
         <translation>Rollen von rechts</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1413"/>
+        <location filename="../src/MainDlg.cpp" line="1478"/>
         <source>Roll from left</source>
         <translation>Rollen von links</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1414"/>
+        <location filename="../src/MainDlg.cpp" line="1479"/>
         <source>Roll from top</source>
         <translation>Rollen von oben</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1415"/>
+        <location filename="../src/MainDlg.cpp" line="1480"/>
         <source>Roll from bottom</source>
         <translation>Rollen von unten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1417"/>
+        <location filename="../src/MainDlg.cpp" line="1482"/>
         <source>Scroll from right</source>
         <translation>Scrollen von rechts</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1418"/>
+        <location filename="../src/MainDlg.cpp" line="1483"/>
         <source>Scroll from left</source>
         <translation>Scrollen von links</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1419"/>
+        <location filename="../src/MainDlg.cpp" line="1484"/>
         <source>Scroll from top</source>
         <translation>Scrollen von oben</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1420"/>
+        <location filename="../src/MainDlg.cpp" line="1485"/>
         <source>Scroll from bottom</source>
         <translation>Scrollen von unten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1423"/>
+        <location filename="../src/MainDlg.cpp" line="1488"/>
         <source>Transition Speed</source>
         <translation>Übergangsgeschwindigkeit</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1428"/>
+        <location filename="../src/MainDlg.cpp" line="1495"/>
         <source>Very fast</source>
         <translation>Sehr schnell</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1428"/>
+        <location filename="../src/MainDlg.cpp" line="1495"/>
         <source>Fast</source>
         <translation>Schnell</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1428"/>
+        <location filename="../src/MainDlg.cpp" line="1495"/>
         <source>Normal</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1428"/>
+        <location filename="../src/MainDlg.cpp" line="1495"/>
         <source>Slow</source>
         <translation>Langsam</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1428"/>
+        <location filename="../src/MainDlg.cpp" line="1495"/>
         <source>Very slow</source>
         <translation>Sehr langsam</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1440"/>
+        <location filename="../src/MainDlg.cpp" line="1508"/>
         <source>Movie</source>
         <translation>Animation</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1447"/>
+        <location filename="../src/MainDlg.cpp" line="1513"/>
         <source>Playback speed	%1 fps</source>
         <translation>Wiedergabe-Geschwindigkeit	%1 fps</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1453"/>
+        <location filename="../src/MainDlg.cpp" line="1519"/>
         <source>Reload image</source>
         <translation>Bild neu laden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1457"/>
+        <location filename="../src/MainDlg.cpp" line="1522"/>
         <source>Edit image in default editor</source>
         <translation>Bild in Standard-Anwendung bearbeiten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1459"/>
+        <location filename="../src/MainDlg.cpp" line="1524"/>
         <source>Copy original image content to clipboard</source>
         <translation>Bildinhalt in Zwischenablagge kopieren</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1463"/>
+        <location filename="../src/MainDlg.cpp" line="1527"/>
         <source>Copy file path to clipboard</source>
         <translation>Datei-Pfad in Zwischenablage kopieren</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1467"/>
+        <location filename="../src/MainDlg.cpp" line="1530"/>
         <source>Cut file to clipboard</source>
         <translation>Datei ausschneiden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1468"/>
+        <location filename="../src/MainDlg.cpp" line="1531"/>
         <source>Show in folder</source>
         <translation>In Ordner anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1473"/>
+        <location filename="../src/MainDlg.cpp" line="1536"/>
         <source>Folder Mode</source>
         <translation>Ordner Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1478"/>
+        <location filename="../src/MainDlg.cpp" line="1541"/>
         <source>Loop folder</source>
         <translation>Nur dieser Ordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1478"/>
+        <location filename="../src/MainDlg.cpp" line="1541"/>
         <source>Loop recursively</source>
         <translation>Dieser Ordner und alle Unterordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1478"/>
+        <location filename="../src/MainDlg.cpp" line="1541"/>
         <source>Loop siblings</source>
         <translation>Dieser Ordner und Geschwister-Ordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1491"/>
+        <location filename="../src/MainDlg.cpp" line="1554"/>
         <source>Sort Order</source>
         <translation>Sortieren nach</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1507"/>
+        <location filename="../src/MainDlg.cpp" line="1568"/>
         <source>File name</source>
         <translation>Dateiname</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1508"/>
+        <location filename="../src/MainDlg.cpp" line="1569"/>
         <source>Modification date</source>
         <translation>Änderungsdatum</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1509"/>
+        <location filename="../src/MainDlg.cpp" line="1570"/>
         <source>File size</source>
         <translation>Dateigröße</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1510"/>
+        <location filename="../src/MainDlg.cpp" line="1571"/>
         <source>Random</source>
         <translation>Zufällig</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1515"/>
+        <location filename="../src/MainDlg.cpp" line="1576"/>
         <source>Ascending</source>
         <translation>A-Z</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1521"/>
+        <location filename="../src/MainDlg.cpp" line="1581"/>
         <source>Descending</source>
         <translation>Z-A</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1528"/>
+        <location filename="../src/MainDlg.cpp" line="1587"/>
         <source>Auto Zoom Mode</source>
         <translation>Auto-Zoom Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1533"/>
+        <location filename="../src/MainDlg.cpp" line="1594"/>
         <source>Fit to window (never upsize)</source>
         <translation>An Fenster anpassen (nie vergrößern)</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1533"/>
+        <location filename="../src/MainDlg.cpp" line="1594"/>
         <source>Fill with crop (never upsize)</source>
         <translation>Fenster ausfüllen (nie vergrößern)</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1533"/>
+        <location filename="../src/MainDlg.cpp" line="1594"/>
         <source>Book Mode</source>
         <translation>Buch-Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1546"/>
+        <location filename="../src/MainDlg.cpp" line="1606"/>
         <source>Auto Contrast</source>
         <translation>Auto-Kontrastkorrektur</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1554"/>
+        <location filename="../src/MainDlg.cpp" line="1613"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
@@ -311,382 +320,795 @@
         <translation type="vanished">Einstellungen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1558"/>
+        <location filename="../src/MainDlg.cpp" line="1617"/>
         <source>Exit</source>
         <translation>Beenden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3709"/>
-        <location filename="../src/MainDlg.cpp" line="3719"/>
+        <location filename="../src/MainDlg.cpp" line="3835"/>
+        <location filename="../src/MainDlg.cpp" line="3845"/>
         <source>Delete File</source>
         <translation>Datei löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3710"/>
+        <location filename="../src/MainDlg.cpp" line="3836"/>
         <source>Do you really want to move this file into the recycle bin?</source>
         <translation>Möchtest du diese Datei wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3712"/>
-        <location filename="../src/MainDlg.cpp" line="3722"/>
+        <location filename="../src/MainDlg.cpp" line="3838"/>
+        <location filename="../src/MainDlg.cpp" line="3848"/>
         <source>Delete multiple elements</source>
         <translation>Mehrere Dateien löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3713"/>
+        <location filename="../src/MainDlg.cpp" line="3839"/>
         <source>Do you really want to move these %1 files into the recycle bin?</source>
         <translation>Möchtest du diese %1 Dateien wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3717"/>
+        <location filename="../src/MainDlg.cpp" line="3843"/>
         <source>This process cannot be undone.</source>
         <translation>Dieser Vorgang kann nicht rückgängig gemacht werden.</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3720"/>
+        <location filename="../src/MainDlg.cpp" line="3846"/>
         <source>Are you sure you want to delete this file permanently?</source>
         <translation>Möchtest du diese Datei wirklich unwiderruflich löschen?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3723"/>
+        <location filename="../src/MainDlg.cpp" line="3849"/>
         <source>Are you sure you want to delete these %1 files permanently?</source>
         <translation>Möchtest du diese %1 Dateien wirklich unwiderruflich löschen?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3781"/>
+        <location filename="../src/MainDlg.cpp" line="3907"/>
         <source>Name:</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3783"/>
+        <location filename="../src/MainDlg.cpp" line="3909"/>
         <source>Size:</source>
         <translation>Größe:</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3785"/>
+        <location filename="../src/MainDlg.cpp" line="3911"/>
         <source>Date:</source>
         <translation>Datum:</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3794"/>
+        <location filename="../src/MainDlg.cpp" line="3920"/>
         <source>Delete</source>
         <translation>Löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3795"/>
+        <location filename="../src/MainDlg.cpp" line="3921"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
 </context>
 <context>
-    <name>SettingsDialog</name>
+    <name>RenameDialog</name>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="201"/>
-        <source>mkImageViewer - Einstellungen</source>
-        <translation type="unfinished"></translation>
+        <location filename="../src/RenameDialog.cpp" line="72"/>
+        <source>Rename file</source>
+        <translation>Datei umbenennen</translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="207"/>
+        <location filename="../src/RenameDialog.cpp" line="189"/>
+        <source>The name must not be empty.</source>
+        <translation>Der Name darf nicht leer sein.</translation>
+    </message>
+    <message>
+        <location filename="../src/RenameDialog.cpp" line="194"/>
+        <source>The name must not contain &apos;/&apos;.</source>
+        <translation>Der Name darf kein &apos;/&apos; enthalten.</translation>
+    </message>
+    <message>
+        <location filename="../src/RenameDialog.cpp" line="199"/>
+        <source>This name is reserved.</source>
+        <translation>Dieser Name ist reserviert.</translation>
+    </message>
+    <message>
+        <location filename="../src/RenameDialog.cpp" line="202"/>
+        <source>The name is too long.</source>
+        <translation>Dieser Name ist zu lang.</translation>
+    </message>
+    <message>
+        <location filename="../src/RenameDialog.cpp" line="209"/>
+        <source>A file with this name already exists.</source>
+        <translation>Eine Datei mit diesem Namen existiert bereits.</translation>
+    </message>
+    <message>
+        <location filename="../src/RenameDialog.cpp" line="247"/>
+        <source>Rename failed</source>
+        <translation>Umbenennung fehlgeschlagen</translation>
+    </message>
+</context>
+<context>
+    <name>SettingsDialog</name>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="235"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="208"/>
+        <location filename="../src/SettingsProvider.cpp" line="233"/>
         <source>Fenster</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="209"/>
-        <source>Navigation</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="210"/>
-        <source>Anzeige</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="211"/>
-        <source>Farb-Korrektur</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../src/SettingsProvider.cpp" line="212"/>
-        <source>Diashow</source>
+        <source>Einstellungen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="231"/>
+        <source>Bild</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="232"/>
-        <source>Rückfrage beim Löschen von Dateien.</source>
+        <source>Qualität &amp; Farbe</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="233"/>
-        <source>Lösch-Bestätigung:</source>
+        <location filename="../src/SettingsProvider.cpp" line="234"/>
+        <source>Navigation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="237"/>
-        <source>Verhindert, dass mehrere App-Fenster geöffnet werden können.</source>
+        <location filename="../src/SettingsProvider.cpp" line="249"/>
+        <source>Setzt alle Optionen auf die Standardwerte zurück; gespeichert wird erst mit OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="238"/>
-        <source>Einzelne Instanz erzwingen:</source>
+        <location filename="../src/SettingsProvider.cpp" line="337"/>
+        <source>Einpassen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="242"/>
-        <source>CPU Befehlssatz-Erweiterung.</source>
+        <location filename="../src/SettingsProvider.cpp" line="337"/>
+        <source>Einpassen, nicht vergrößern</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="243"/>
-        <source>CPU-Typ:</source>
+        <location filename="../src/SettingsProvider.cpp" line="338"/>
+        <source>Füllen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="247"/>
-        <source>Anzahl zu nutzender CPU-Threads (0 = Auto-Erkennung, max 8).</source>
+        <location filename="../src/SettingsProvider.cpp" line="338"/>
+        <source>Füllen, nicht vergrößern</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="248"/>
-        <source>CPU-Kerne (0 = Auto):</source>
+        <location filename="../src/SettingsProvider.cpp" line="339"/>
+        <source>Buchmodus</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="252"/>
-        <source>Cache-Reichweite in der Dateiliste (Seiten vor/zurück).</source>
+        <location filename="../src/SettingsProvider.cpp" line="339"/>
+        <source>Keiner (100 %)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="253"/>
-        <source>Cache-Reichweite:</source>
+        <location filename="../src/SettingsProvider.cpp" line="342"/>
+        <source>Zoom beim Öffnen eines Bildes im Fenster (AutoZoomMode)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="255"/>
-        <source>Alle Bildformate mit QImageReader decodieren</source>
+        <location filename="../src/SettingsProvider.cpp" line="344"/>
+        <source>Zoom beim Öffnen eines Bildes im Vollbild (AutoZoomModeFullscreen)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="268"/>
-        <source>Vollbildmodus</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="271"/>
-        <source>Comics/Manga im Vollbildmodus starten</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="274"/>
-        <source>Nur eine Vollbild-Instanz erlauben</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="282"/>
-        <source>Breite:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="284"/>
-        <source>Höhe:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="286"/>
-        <source>Minimale Fenstergröße:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="288"/>
-        <source>Vollständigen Dateipfad in Titelleiste anzeigen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="291"/>
-        <source>Dateityp-Icon in der Titelleiste nutzen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="296"/>
-        <source>-1 = Größte Auflösung, 0 = Primär, 1..n = Monitor Index</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="297"/>
-        <source>Start-Monitor Index:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="301"/>
-        <source>Hintergrundfarbe:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="305"/>
-        <source>Transparenzfarbe:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="309"/>
-        <source>Transparenzmodus:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="323"/>
-        <source>Sortierung der Dateien:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="325"/>
-        <source>Aufsteigend sortieren (FileSortAscending)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="330"/>
-        <source>Ordner-Navigation:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="332"/>
-        <source>Am Ordnerende zum Anfang springen (WrapAroundFolder)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="335"/>
-        <source>Mausrad zur Ordner-Navigation nutzen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="341"/>
-        <source>Mausrad-Zoom-Geschwindigkeit:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../src/SettingsProvider.cpp" line="343"/>
-        <source>Weiches Scrolling</source>
+        <location filename="../src/SettingsProvider.cpp" line="345"/>
+        <source>Auto-Zoom (Fenster):</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="346"/>
-        <source>Pfeiltasten navigieren, sobald Scrolling nicht möglich</source>
+        <source>Auto-Zoom (Vollbild):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="351"/>
+        <source>Kontinuierliches Zoomen hält bei diesem Wert kurz an, 0 = nie (ZoomPausePercent)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="357"/>
+        <source>BookModePageHeight</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="358"/>
+        <source>Buchmodus-Seitenhöhe:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="360"/>
-        <source>Bild neu laden wenn es extern verändert wurde</source>
+        <source>Nach EXIF-Angabe drehen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="363"/>
-        <source>Hohe Qualität beim Resampling (HQRS)</source>
+        <location filename="../src/SettingsProvider.cpp" line="361"/>
+        <source>AutoRotateEXIF</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="368"/>
-        <source>Downsampling-Filter:</source>
+        <location filename="../src/SettingsProvider.cpp" line="362"/>
+        <source>Ausrichtung:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="365"/>
+        <source>BackgroundColor</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="369"/>
+        <source>Schachbrettmuster</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="370"/>
-        <source>Bilder automatisch gemäß EXIF drehen</source>
+        <source>Transparenzfarbe</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="373"/>
-        <source>Eingebettete ICC-Farbprofile anwenden</source>
+        <location filename="../src/SettingsProvider.cpp" line="371"/>
+        <source>Transparenzfarbe, umgekehrt</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="378"/>
-        <source>Auto-Zoom (Fenstermodus):</source>
+        <location filename="../src/SettingsProvider.cpp" line="372"/>
+        <source>Was hinter durchsichtigen Bildteilen erscheint (TransparencyMode)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="382"/>
-        <source>Auto-Zoom (Vollbildmodus):</source>
+        <location filename="../src/SettingsProvider.cpp" line="374"/>
+        <source>TransparencyColor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="387"/>
-        <source>Pause beim kontinuierlichen Zoomen bei diesem Prozentwert (0 = Deaktivieren).</source>
+        <location filename="../src/SettingsProvider.cpp" line="391"/>
+        <source>Transparenz:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="388"/>
-        <source>Zoom-Pause bei:</source>
+        <location filename="../src/SettingsProvider.cpp" line="403"/>
+        <source>Hohe Qualität</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="393"/>
-        <source>Buchmodus Seitenhöhe:</source>
+        <location filename="../src/SettingsProvider.cpp" line="404"/>
+        <source>HighQualityResampling</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="405"/>
+        <source>Keiner (schnell)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="405"/>
+        <source>Hermite</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="406"/>
+        <source>Mitchell</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="406"/>
+        <source>Catmull-Rom</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="407"/>
+        <source>Lanczos-2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="408"/>
-        <source>Kontrast (-0.5 .. 0.5):</source>
+        <source>Filter beim Verkleinern (DownSamplingFilter)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="409"/>
+        <source>Resampling:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="410"/>
+        <source>Verkleinerungsfilter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="412"/>
+        <source>Eingebettete ICC-Profile anwenden</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="413"/>
-        <source>Gamma (0.1 .. 10.0):</source>
+        <source>UseEmbeddedColorProfiles</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="418"/>
-        <source>Sättigung (0.0 .. 2.0):</source>
+        <location filename="../src/SettingsProvider.cpp" line="414"/>
+        <source>Farbprofile:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="420"/>
-        <source>Automatische Kontrastkorrektur aktivieren</source>
+        <location filename="../src/SettingsProvider.cpp" line="416"/>
+        <source>Automatisch anwenden</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="417"/>
+        <source>AutoContrastCorrection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="421"/>
+        <source>AutoContrastCorrectionAmount</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="425"/>
+        <source>AutoBrightnessCorrectionAmount</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="426"/>
-        <source>Auto-Kontrast Stärke:</source>
+        <source>Auto-Kontrast:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="431"/>
-        <source>Auto-Helligkeit Stärke:</source>
+        <location filename="../src/SettingsProvider.cpp" line="427"/>
+        <source>Stärke Kontrast</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="434"/>
-        <source>Format: R: 0.2 G: 0.1 B: 0.35 C: 0.1 M: 0.3 Y: 0.15</source>
+        <location filename="../src/SettingsProvider.cpp" line="428"/>
+        <source>Stärke Helligkeit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="435"/>
-        <source>Farbkanalkorrektur:</source>
+        <location filename="../src/SettingsProvider.cpp" line="440"/>
+        <source>Im Vollbild starten</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="450"/>
-        <source>Max. Dateilistengröße:</source>
+        <location filename="../src/SettingsProvider.cpp" line="441"/>
+        <source>ShowFullScreen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="442"/>
+        <source>Comics/Manga im Vollbild starten</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="443"/>
+        <source>BookModeLaunchFullscreen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="444"/>
+        <source>Start:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="448"/>
+        <source>-1 = größte Auflösung, 0 = primärer Monitor, 1… = Monitor-Nummer (DisplayMonitor)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="449"/>
+        <source>Start-Monitor:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="451"/>
+        <source>Vollständigen Dateipfad anzeigen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="452"/>
+        <source>ShowFilePathInTitle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="453"/>
+        <source>Programmnamen anzeigen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="454"/>
+        <source>&quot; - mkImageViewer&quot; am Ende des Titels (ShowAppNameInTitle)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="455"/>
+        <source>Dateityp-Symbol anzeigen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="456"/>
+        <source>TitleBarUseFileIcon</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="457"/>
-        <source>Übergangseffekt:</source>
+        <source>Titelleiste:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="462"/>
-        <source>Effektdauer:</source>
+        <location filename="../src/SettingsProvider.cpp" line="469"/>
+        <source>Dateiname</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/SettingsProvider.cpp" line="464"/>
-        <source>Parameter beim Bildwechsel beibehalten (KeepParameters)</source>
+        <location filename="../src/SettingsProvider.cpp" line="469"/>
+        <source>Änderungsdatum</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="470"/>
+        <source>Dateigröße</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="470"/>
+        <source>Zufällig</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="471"/>
+        <source>FileDisplayOrder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="472"/>
+        <source>Aufsteigend</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="473"/>
+        <source>FileSortAscending</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="474"/>
+        <source>Sortierung:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="476"/>
+        <source>Nur dieser Ordner</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="477"/>
+        <source>Ordner derselben Ebene</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="478"/>
+        <source>Mit Unterordnern</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="479"/>
+        <source>FolderNavigation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="480"/>
+        <source>Am Ordnerende zum Anfang springen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="481"/>
+        <source>WrapAroundFolder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="482"/>
+        <source>Ordner:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="484"/>
+        <source>Zum Blättern verwenden</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="485"/>
+        <source>NavigateWithMouseWheel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="489"/>
+        <source>MouseWheelZoomSpeed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="490"/>
+        <source>Mausrad:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="490"/>
+        <source>Zoom-Geschwindigkeit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="492"/>
+        <source>Weiches Scrollen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="493"/>
+        <source>SmoothPanning</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="494"/>
+        <source>Pfeiltasten blättern, wenn nicht gescrollt werden kann</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="495"/>
+        <source>SmartPanningKeys</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="496"/>
+        <source>Tastatur:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="499"/>
+        <source>Keiner</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="499"/>
+        <source>Überblenden</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="500"/>
+        <source>Schieben von rechts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="500"/>
+        <source>Schieben von links</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="501"/>
+        <source>Schieben von oben</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="501"/>
+        <source>Schieben von unten</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="502"/>
+        <source>Aufrollen von rechts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="502"/>
+        <source>Aufrollen von links</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="503"/>
+        <source>Aufrollen von oben</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="503"/>
+        <source>Aufrollen von unten</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="504"/>
+        <source>Scrollen von rechts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="504"/>
+        <source>Scrollen von links</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="505"/>
+        <source>Scrollen von oben</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="505"/>
+        <source>Scrollen von unten</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="506"/>
+        <source>SlideShowTransitionEffect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="510"/>
+        <source>SlideShowEffectTime</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="511"/>
+        <source>Diashow:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="511"/>
+        <source>Übergangseffekt</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="512"/>
+        <source>Effektdauer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="524"/>
+        <source>Nie</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="524"/>
+        <source>Pro Ordner</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="524"/>
+        <source>Immer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="525"/>
+        <source>Ein schon offenes Fenster übernimmt neu geöffnete Bilder (SingleInstance)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="526"/>
+        <source>Nur eine Vollbild-Instanz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="527"/>
+        <source>SingleFullScreenInstance</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="529"/>
+        <source>Einzelne Instanz:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="532"/>
+        <source>Bild neu laden, wenn es geändert wurde</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="533"/>
+        <source>ReloadWhenDisplayedImageChanged</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="534"/>
+        <source>Dateiüberwachung:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="538"/>
+        <source>Anzahl der Bilder, die vor und zurück im Voraus geladen werden (CacheRange)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="539"/>
+        <source>Vorladen:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="539"/>
+        <source>Bilder vor/zurück</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="541"/>
+        <source>Automatisch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="541"/>
+        <source>Generisch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="542"/>
+        <source>MMX</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="542"/>
+        <source>SSE2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="542"/>
+        <source>AVX2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="543"/>
+        <source>Befehlssatz für das Resampling (CPUType)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="546"/>
+        <source>0 = automatisch, dann höchstens 8 (CPUCoresUsed)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="547"/>
+        <source>Prozessor:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="547"/>
+        <source>Befehlssatz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="547"/>
+        <source>Threads</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="549"/>
+        <source>Alle Formate mit Qt (QImageReader) lesen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="550"/>
+        <source>ForceQImageReader</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="551"/>
+        <source>Decoder:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="367"/>
+        <source>Hintergrundfarbe:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="352"/>
+        <source>Zoom-Pause bei:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsProvider.cpp" line="557"/>
         <source>Farbe auswählen</source>
         <translation type="unfinished"></translation>
     </message>
