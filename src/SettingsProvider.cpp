@@ -546,7 +546,7 @@ void SettingsDialog::loadFrom(const CSettingsProvider& settings) {
     selectChoice(m_comboDownSamplingFilter, settings.GetString("DownSamplingFilter", "Catrom"), "Catrom");
     selectChoice(m_comboFileDisplayOrder, settings.GetString("FileDisplayOrder", "FileName"), "FileName");
     selectChoice(m_comboFolderNavigation, settings.GetString("FolderNavigation", "LoopFolder"), "LoopFolder");
-    selectChoice(m_comboSlideShowTransitionEffect, ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect), "None");
+    selectChoice(m_comboSlideShowTransitionEffect, ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect), "Blend");
     selectChoice(m_comboSingleInstance, settings.GetString("SingleInstance", "PerFolder"), "PerFolder");
     selectChoice(m_comboCpuType, settings.GetString("CPUType", "AutoDetect"), "AutoDetect");
 
