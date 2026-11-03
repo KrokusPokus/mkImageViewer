@@ -443,7 +443,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     // in device pixels (the factor of the window is only exact after it is shown; resizeEvent()/paintEvent() correct it)
     m_clientRect = QRect(QPoint(0, 0), (m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultWindowRect()).size() * devicePixelRatioF());
 
-    this->setWindowIcon(QIcon(":/icons/mainframes.ico"));
+    this->setWindowIcon(QIcon(":/icons/app.ico"));
 
     // turn on/off mouse coursor
     m_bMouseOn = !m_bFullScreenMode;
@@ -3153,7 +3153,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
                 QIcon fileIcon;
                 if (cacheKey == QStringLiteral("__default__")) {
                     // Standard-App-Icon laden (z.B. aus Qt-Ressourcen)
-                    fileIcon = QIcon(QStringLiteral(":/icons/app_icon.ico"));
+                    fileIcon = QIcon(QStringLiteral(":/icons/app.ico"));
                 } else {
                     // QFileIconProvider holt das System-Dateityp-Icon komplett plattformunabhängig!
                     QFileIconProvider iconProvider;

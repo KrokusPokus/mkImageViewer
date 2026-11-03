@@ -181,6 +181,6 @@ if(LINUX)
             $<TARGET_FILE:mkImageViewer>
             $ENV{HOME}/.local/bin/mkImageViewer
 
-        COMMENT "Copying mkFolderWidget to ~/.local/bin/"
+        COMMENT "Copying mkImageViewer. to ~/.local/bin/"
     )
 endif()
