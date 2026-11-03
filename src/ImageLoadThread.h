@@ -144,20 +144,7 @@ private:
     EDecodeStatus DecodeFromBuffer(CRequest*, EImageFormat, std::unique_ptr<char[]>&, size_t, const CDecodeTarget&);
     QString* CachedFileNameFor(EImageFormat);
     void DeleteCachedDecoder(EImageFormat);
-/*
-    void ProcessReadAVIFRequest(CRequest* request);
-    void ProcessReadBMPRequest(CRequest * request);
-    void ProcessReadHEIFRequest(CRequest * request);
-    void ProcessReadJPEGRequest(CRequest * request);
-    void ProcessReadJXLRequest(CRequest* request);
-    void ProcessReadPNGRequest(CRequest * request);
-    void ProcessReadPSDRequest(CRequest * request);
-    void ProcessReadQOIRequest(CRequest * request);
-    void ProcessReadTGARequest(CRequest * request);
-    void ProcessReadWEBPRequest(CRequest * request);
-*/
     void ProcessReadZipRequest(CRequest* request);
-    bool ValidateZipFrameIndex(int nInitialIndex, int &nFrameIndex);
 
     static bool ProcessImageAfterLoad(CRequest * request);
 

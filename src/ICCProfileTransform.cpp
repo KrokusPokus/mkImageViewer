@@ -117,37 +117,3 @@ void ICCProfileTransform::DeleteTransform(void* transform)
     if (transform != nullptr)
         cmsDeleteTransform(transform);
 }
-
-void* ICCProfileTransform::CreateLabTransform(PixelFormat format) {
-    cmsHTRANSFORM transform = nullptr;
-    cmsHPROFILE hLabProfile = nullptr;
-    try {
-        hLabProfile = cmsCreateLab4Profile(cmsD50_xyY());
-        if (sRGBProfile == nullptr) {
-            sRGBProfile = cmsCreate_sRGBProfile();
-        }
-    } catch (...) {}
-
-    if (hLabProfile == nullptr || sRGBProfile == nullptr)
-        return nullptr; // Could not create profile
-
-    // Create transform from CIELAB D50 (Photoshop "Lab mode") to sRGB
-    cmsUInt32Number flags = cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_COPY_ALPHA;
-    cmsUInt32Number inFormat, outFormat;
-    switch (format) {
-        case FORMAT_Lab:
-            inFormat = TYPE_Lab_8;
-            outFormat = TYPE_BGR_8;
-            break;
-        case FORMAT_LabA:
-            inFormat = TYPE_LabA_8;
-            outFormat = TYPE_BGRA_8;
-            break;
-        default:
-            cmsCloseProfile(hLabProfile);
-            return nullptr;
-    }
-    transform = cmsCreateTransform(hLabProfile, inFormat, sRGBProfile, outFormat, INTENT_RELATIVE_COLORIMETRIC, flags);
-    cmsCloseProfile(hLabProfile);
-    return transform;
-}

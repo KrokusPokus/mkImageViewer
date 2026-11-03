@@ -71,7 +71,7 @@ class CWorkThread {
 public:
     using RequestPtr = std::shared_ptr<CRequestBase>;
 
-    explicit CWorkThread(bool bCoInitialize = false);
+    explicit CWorkThread();
     virtual ~CWorkThread();
     CWorkThread(const CWorkThread&) = delete;
     CWorkThread& operator=(const CWorkThread&) = delete;
@@ -134,8 +134,6 @@ private:
     void CollectDeletedLocked(std::vector<RequestPtr>& discarded, std::vector<RequestPtr>& toFinish);
     void FinishCancelled(std::vector<RequestPtr>& toFinish);
     static void SignalFinished(CRequestBase& request);
-
-    const bool m_bCoInitialize;
 
     std::mutex m_mutex;                          // guards everything below, except where noted
     std::condition_variable_any m_cv;

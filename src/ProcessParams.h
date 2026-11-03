@@ -38,91 +38,26 @@ public:
     double ContrastCorrectionFactor; // in [0..1], 0 means no contrast correction
 };
 
-// Processing flags for free rotation
-enum ERotationFlags {
-    RFLAG_None = 0,
-    RFLAG_AutoCrop = 1,
-    RFLAG_KeepAspectRatio = 2
-};
-
-static inline ERotationFlags SetRotationFlag(ERotationFlags eFlags, ERotationFlags eFlagToSet, bool bValue) {
-    return bValue ? (ERotationFlags)(eFlags | eFlagToSet) : (ERotationFlags)(eFlags & ~eFlagToSet);
-};
-
-static inline bool GetRotationFlag(ERotationFlags eFlags, ERotationFlags eFlagToGet) {
-    return (eFlags & eFlagToGet) != 0;
-}
-
 // Parameters used for image rotation
 class CRotationParams {
 public:
-    CRotationParams() : Rotation(0), Flags(RFLAG_None) {}
+    CRotationParams() : Rotation(0) {}
 
     explicit CRotationParams(int rotation) {
         Rotation = rotation;
-        Flags = RFLAG_None;
-    }
-
-    CRotationParams(int rotation, ERotationFlags flags) {
-        Rotation = rotation;
-        Flags = flags;
     }
 
     CRotationParams(const CRotationParams& other) {
         Rotation = other.Rotation;
-        Flags = other.Flags;
     }
 
     CRotationParams(const CRotationParams& other, int rotation) {
         Rotation = rotation;
-        Flags = other.Flags;
     }
 
     int Rotation; // Main rotation in degrees, must be in [0, 90, 180, 270]
-    ERotationFlags Flags;
 };
 
-/*
-// Parameters used to process an image, including geometry
-class CProcessParams {
-public:
-    // TargetWidth,TargetHeight is the dimension of the target output window, the image is fit into this rectangle
-    // nRotation must be 0, 90, 270 degrees, nUserRotation will be added to it
-    // dZoom is the zoom factor compared to initial image size (1.0 means no zoom)
-    // offsets are relative to center of image and refer to original image size (not zoomed)
-    CProcessParams(int nTargetWidth, int nTargetHeight,
-        CSize monitorSize,
-        const CRotationParams& rotationParams,
-        int nUserRotation,
-        double dZoom,
-        Helpers::EAutoZoomMode eAutoZoomMode, CPoint offsets,
-        Helpers::ETransparencyMode nTransparencyMode,
-        const CImageProcessingParams& imageProcParams,
-        EProcessingFlags eProcFlags) : ImageProcParams(imageProcParams), RotationParams(rotationParams) {
-        UserRotation = nUserRotation;
-        TargetWidth = nTargetWidth;
-        TargetHeight = nTargetHeight;
-        MonitorSize = monitorSize;
-        Zoom = dZoom;
-        AutoZoomMode = eAutoZoomMode;
-        Offsets = offsets;
-        TransparencyMode = nTransparencyMode;
-        ProcFlags = eProcFlags;
-    }
-
-    int TargetWidth;
-    int TargetHeight;
-    CSize MonitorSize;
-    CRotationParams RotationParams;
-    int UserRotation;
-    double Zoom;
-    CPoint Offsets;
-    Helpers::ETransparencyMode TransparencyMode; //for transparent background
-    CImageProcessingParams ImageProcParams;
-    EProcessingFlags ProcFlags;
-    Helpers::EAutoZoomMode AutoZoomMode;
-};
-*/
 class CProcessParams {
 public:
     // TargetWidth, TargetHeight is the dimension of the target output window, the image is fit into this rectangle

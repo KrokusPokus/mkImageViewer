@@ -578,34 +578,6 @@ void PngReader::DeleteCache()
     g_cache.dataSize = 0;
 }
 
-bool PngReader::MustUseLibpng(const void* buffer, std::size_t size)
-{
-    const auto* p = static_cast<const unsigned char*>(buffer);
-
-    // IHDR: signature (8) + length (4) + "IHDR" (4), then width and height
-    if (p == nullptr || size < 24) {
-        return false;
-    }
-    // QImage can not hold more than INT_MAX bytes
-    const double width = ReadBE32(p + 16);
-    const double height = ReadBE32(p + 20);
-    if (4.0 * width * height > std::numeric_limits<int>::max()) {
-        return true;
-    }
-
-    // QImageReader does not support APNG
-    // Valid APNGs must have an acTL chunk before the first IDAT chunk, this lets us quickly determine if a PNG is animated
-    bool animated = false;
-    ForEachChunk(p, size, kSignatureSize, [&](const unsigned char* type, std::uint32_t, const unsigned char*) {
-        if (std::memcmp(type, "acTL", 4) == 0) {
-            animated = true;
-            return true;
-        }
-        return std::memcmp(type, "IDAT", 4) == 0;
-    });
-    return animated;
-}
-
 void* PngReader::GetEXIFBlock(const void* buffer, std::size_t size)
 {
     const auto* p = static_cast<const unsigned char*>(buffer);

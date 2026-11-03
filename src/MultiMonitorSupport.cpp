@@ -8,12 +8,6 @@
 
 static QRect defaultWindowRect = QRect(0, 0, 0, 0);
 
-// returns true if the system is a multi monitor system
-bool CMultiMonitorSupport::IsMultiMonitorSystem() {
-    // Prüft, ob mehr als ein Monitor im System registriert ist
-    return QGuiApplication::screens().size() > 1;
-}
-
 // virtual desktop (spanning all monitors)
 QRect CMultiMonitorSupport::GetVirtualDesktop() {
     if (QScreen* primaryScreen = QGuiApplication::primaryScreen()) {
@@ -87,29 +81,6 @@ QRect CMultiMonitorSupport::GetMonitorRect(const QWidget* pWidget) {
     }
     
     // Absoluter Notfall-Fallback, falls gar kein Screen greifbar ist
-    return QRect(0, 0, 1920, 1080);
-}
-
-// Gets the working rectangle (monitor rectangle excluding taskbar) of the monitor the given window is displayed on
-QRect CMultiMonitorSupport::GetWorkingRect(const QWidget* pWidget) {
-    QScreen* screen = nullptr;
-    
-    // Bildschirm über das Widget ermitteln
-    if (pWidget != nullptr) {
-        screen = pWidget->screen();
-    }
-    
-    // Fallback auf den Primärschirm, falls das Widget noch keinen Screen zugewiesen hat
-    if (screen == nullptr) {
-        screen = QGuiApplication::primaryScreen();
-    }
-    
-    if (screen != nullptr) {
-        // availableGeometry() entspricht exakt dem Win32 rcWork (ohne Taskleiste)
-        return screen->availableGeometry();
-    }
-    
-    // Absoluter Fallback
     return QRect(0, 0, 1920, 1080);
 }
 

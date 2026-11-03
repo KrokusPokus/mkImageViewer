@@ -732,7 +732,7 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
 // Public
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-CImageLoadThread::CImageLoadThread(void) : CWorkThread(true) {
+CImageLoadThread::CImageLoadThread(void) : CWorkThread() {
 }
 
 CImageLoadThread::~CImageLoadThread(void) {

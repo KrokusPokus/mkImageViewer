@@ -37,7 +37,6 @@ public:
 
 private:
     bool m_suspended = false;
-    QString m_sCurrentDirectory;
     QString m_sCurrentFile;
 
     bool m_bModificationTimeValid{false};

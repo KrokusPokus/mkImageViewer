@@ -124,7 +124,6 @@ void* WebpReaderWriter::ReadImage(int& width,
         cache.transform = transform;
     }
     WebPAnimDecoder* decoder = cache.decoder;
-    WebPData webp_data = cache.data;
     width = cache.width;
     height = cache.height;
 

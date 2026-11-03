@@ -86,7 +86,6 @@ public:
     void StartDragging(int nX, int nY, bool bDragWithZoomNavigator);
     void DoDragging();
     void EndDragging();
-    void SetCursorForMoveSection();
     void ExecuteCommand(const Cmd::CommandInvocation& inv);
     bool ShouldAcceptFile(const QString& filePath);
 
@@ -137,7 +136,6 @@ private:
     EProcessingFlags m_eProcessingFlagsKept;
     double m_dZoomKept;
     QPoint m_offsetKept;
-    bool m_bCurrentImageIsSpecialProcessing;
 
     bool m_bDragging;
     bool m_bDoDragging;
@@ -156,7 +154,6 @@ private:
     bool m_bTemporaryLowQ;
     bool m_bStartupPreview; // first image after startup is painted in low quality, high quality follows right after
     bool m_bShowZoomFactor;
-    bool m_bSpanVirtualDesktop;
     bool m_bMouseOn;
     bool m_bIsAnimationPlaying;
     int m_nLastAnimationOffset;
@@ -175,7 +172,6 @@ private:
     qint64 m_nLastSlideShowImageTickCount;
     Helpers::ETransparencyMode m_eTransparencyMode; //for transparent background
     bool m_bUseEmbeddedColorProfiles;
-    bool m_bSelectZoom;  // keeps track of select-to-zoom mode when CTRL+SHIFT+LMouse
 
     void ExploreFile();
     void OpenFile(const QString& fileName);
@@ -229,8 +225,6 @@ private:
     void StartAnimation();
     void AdjustAnimationFrameTime();
     void StopAnimation();
-
-    bool m_bIsRunningInWine;
 
     bool m_bShowInfo;
     bool m_bPanTimerActive;

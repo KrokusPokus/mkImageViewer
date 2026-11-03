@@ -15,15 +15,6 @@
 // Static helpers
 ///////////////////////////////////////////////////////////////////////////////////
 
-static void RotateInplace(const CSize& imageSize, double& dX, double& dY, double dAngle) {
-    dX -= (imageSize.cx - 1) * 0.5;
-    dY -= (imageSize.cy - 1) * 0.5;
-    double dXr = cos(dAngle) * dX - sin(dAngle) * dY;
-    double dYr = sin(dAngle) * dX + cos(dAngle) * dY;
-    dX = dXr;
-    dY = dYr;
-}
-
 static bool SupportsSIMD(Helpers::CPUType cpuType) {
     switch (cpuType)
     {
@@ -575,21 +566,6 @@ CBaseImage::EResizeType CBaseImage::GetResizeType(CSize targetSize, CSize source
 
 int CBaseImage::GetRotationFromEXIF(int nOrigRotation) {
     if (m_pEXIFReader != NULL && m_pEXIFReader->ImageOrientationPresent() && CSettingsProvider::This().AutoRotateEXIF()) {
-
-        // Some tools rotate the pixel data but do not reset the EXIF orientation flag.
-        // In this case the EXIF thumbnail is normally also not rotated.
-        // So check if the thumbnail orientation is the same as the image orientation.
-        // If not, it can be assumed that someone touched the pixels and we ignore the EXIF
-        // orientation.
-/* [GF] Do not rely on aspect ratio comparison to assume Exif roation flag wrong.
-        if (m_pEXIFReader->GetThumbnailWidth() > 0 && m_pEXIFReader->GetThumbnailHeight() > 0) {
-            bool bWHOrig = m_nInitOrigWidth > m_nInitOrigHeight;
-            bool bWHThumb = m_pEXIFReader->GetThumbnailWidth() > m_pEXIFReader->GetThumbnailHeight();
-            if (bWHOrig != bWHThumb) {
-                return nOrigRotation;
-            }
-        }
-*/
         switch (m_pEXIFReader->GetImageOrientation()) {
             case 1:
                 m_bRotationByEXIF = true;
@@ -611,7 +587,6 @@ int CBaseImage::GetRotationFromEXIF(int nOrigRotation) {
 
 void CBaseImage::MarkAsDestructivelyProcessed() {
     m_bIsDestructivelyProcessed = true;
-    m_rotationParams.Flags = RFLAG_None;
 }
 
 void CBaseImage::InvalidateAllCachedPixelData() {

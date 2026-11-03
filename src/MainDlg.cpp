@@ -137,11 +137,6 @@ namespace {
             0.5); // ContrastCorrectionFactor
     }
 
-    // Gets hardcoded processing parameters, turning off all processing
-    CImageProcessingParams GetNoProcessingParams() {
-        return CImageProcessingParams(1.0, 0.5);
-    }
-
     // Gets default image processing flags as set in INI file
     EProcessingFlags GetDefaultProcessingFlags() {
         CSettingsProvider& sp = CSettingsProvider::This();
@@ -368,7 +363,6 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_nExpectedNextAnimationTickCount = 0;
     m_isUserFitToScreen = false;
     m_autoZoomFitToScreen = Helpers::ZM_FillScreen;
-    m_bSelectZoom = false;  // this value is set when LButtonDown happens, to be read by LButtonUp
 
     m_pKeyMap = new CKeyMap(); // routine to load the keymap, it's not as simple as just loading one file anymore, but all logic handled by CKeyMap
 
@@ -769,7 +763,7 @@ void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect,
 
     if (m_sStartupFile.isEmpty() && m_pCurrentImage == NULL) {
         QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), Helpers::ScaleWithDPI(80));
-        QString message = QStringLiteral("No image loaded!\nPress ESC to exit...");
+        QString message = tr("No image loaded!\nPress ESC to exit...");
         painter.drawText(rectText, Qt::AlignCenter | Qt::TextWordWrap, message);
     }
     else if (pCurrentImage == NULL) {
@@ -1281,7 +1275,6 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
 
             int PanXbase = 0;
             int PanYbase = 0;
-            int BorderDistanceY = 0;
             int PanX = 0;
             int PanY = 0;
             int iRealHeight = int(m_dZoom * (m_pCurrentImage->OrigHeight()));
@@ -2901,7 +2894,6 @@ void CMainDlg::SetKeepParams(bool bKeep) {
 }
 
 void CMainDlg::ResetParamsToDefault() {
-    CSettingsProvider& sp = CSettingsProvider::This();
     m_nRotation = 0;
     m_nUserRotation = 0;
     m_dZoom = m_dZoomMult = -1.0;

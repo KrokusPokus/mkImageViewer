@@ -30,9 +30,6 @@ public:
 
     static void DeleteCache();
 
-    // Returns true if the PNG can not be decoded by QImageReader/QImage (APNG, or 32 bit size above INT_MAX)
-    static bool MustUseLibpng(const void* buffer, std::size_t sizebytes);
-
     // Get EXIF block as JPEG APP1 segment (malloc(), must be freed by the caller), nullptr if there is none
     static void* GetEXIFBlock(const void* buffer, std::size_t sizebytes);
 };

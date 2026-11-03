@@ -75,16 +75,6 @@ void CHistogram::Init(const int* pChannelB, const int* pChannelG, const int* pCh
     memcpy(m_ChannelGrey, pChannelGrey, sizeof(int)*256);
 }
 
-// Gets relative area of a part of the histogram, 1.0 is full histogram area
-static float GetHistogramArea(const int* pHistogram, int nTotalValues, float fStart, float fEnd) {
-    int nStart = (int)(fStart*255 + 0.5f);
-    int nEnd = (int)(fEnd*255 + 0.5f);
-    int nSum = 0;
-    for (int i = nStart; i <= nEnd; i++) {
-        nSum += pHistogram[i];
-    }
-    return (float)nSum/nTotalValues;
-}
 
 ///////////////////////////////////////////////////////////////////////////////////
 // CHistogramCorr class - helpers

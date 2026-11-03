@@ -9,8 +9,7 @@
 // Public
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-CWorkThread::CWorkThread(bool bCoInitialize)
-    : m_bCoInitialize(bCoInitialize) {
+CWorkThread::CWorkThread() {
 }
 
 CWorkThread::~CWorkThread() {

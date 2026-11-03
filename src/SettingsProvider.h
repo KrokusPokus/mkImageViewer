@@ -232,7 +232,6 @@ private:
     int GetInt(const QString& sKey, int nDefault, int nMin, int nMax) const;
     double GetDouble(const QString& sKey, double dDefault, double dMin, double dMax) const;
     bool GetBool(const QString& sKey, bool bDefault) const;
-    QRect GetRect(const QString& sKey, const QRect& defaultRect) const;
     QSize GetSize(const QString& sKey, const QSize& defaultSize) const;
     QColor GetColor(const QString& sKey, const QColor& defaultColor) const;
     Helpers::EAutoZoomMode GetAutoZoomMode(const QString& sKey, Helpers::EAutoZoomMode defaultZoomMode) const;

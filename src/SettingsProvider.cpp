@@ -970,27 +970,6 @@ bool CSettingsProvider::GetBool(const QString& sKey, bool bDefault) const {
     return bDefault;
 }
 
-QRect CSettingsProvider::GetRect(const QString& sKey, const QRect& defaultRect) const {
-    QString s = GetString(sKey, "");
-    if (s.isEmpty()) {
-        return defaultRect;
-    }
-
-    // Liest z.B. "302 93 1412 950" sauber ein
-    const auto tokens = s.split(' ', Qt::SkipEmptyParts);
-    if (tokens.size() == 4) {
-        bool ok1, ok2, ok3, ok4;
-        int left = tokens[0].toInt(&ok1);
-        int top = tokens[1].toInt(&ok2);
-        int right = tokens[2].toInt(&ok3);
-        int bottom = tokens[3].toInt(&ok4);
-        if (ok1 && ok2 && ok3 && ok4) {
-            return QRect(QPoint(left, top), QPoint(right, bottom)).normalized();
-        }
-    }
-    return defaultRect;
-}
-
 QSize CSettingsProvider::GetSize(const QString& sKey, const QSize& defaultSize) const {
     QString s = GetString(sKey, "");
     if (s.isEmpty()) {
