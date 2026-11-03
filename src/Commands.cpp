@@ -103,68 +103,66 @@ constexpr ArgChoice kTransitionSpeedChoices[] = {
 // Neuen Befehl hinzufuegen = 1. enum-Eintrag, 2. Zeile hier an gleicher Position, 3. case im switch.
 // ---------------------------------------------------------------------------------------------
 constexpr std::array<CommandInfo, kCommandCount> kTable = {{
-    make(Command::DoNothing, "DoNothing", Category::Window, CMD_TR("Do nothing")).legacy("IDM_DONOTHING"),
+    make(Command::DoNothing, "DoNothing", Category::Window, CMD_TR("Do nothing")),
 
     // Navigation
-    make(Command::NextImage,     "NextImage",     Category::Navigation, CMD_TR("Next image")).legacy("IDM_NEXT"),
-    make(Command::PrevImage,     "PrevImage",     Category::Navigation, CMD_TR("Previous image")).legacy("IDM_PREV"),
-    make(Command::FirstImage,    "FirstImage",    Category::Navigation, CMD_TR("First image")).legacy("IDM_FIRST"),
-    make(Command::LastImage,     "LastImage",     Category::Navigation, CMD_TR("Last image")).legacy("IDM_LAST"),
-    make(Command::NextFile,      "NextFile",      Category::Navigation, CMD_TR("Next file (leave multi-frame container)")).legacy("IDM_NEXTFILE"),
-    make(Command::PrevFile,      "PrevFile",      Category::Navigation, CMD_TR("Previous file (leave multi-frame container)")).legacy("IDM_PREVFILE"),
-    make(Command::NextFrame,     "NextFrame",     Category::Navigation, CMD_TR("Next frame")).legacy("IDM_NEXTFRAME"),
-    make(Command::PlayPause,     "PlayPause",     Category::Navigation, CMD_TR("Play/pause animation")).legacy("IDM_PLAYPAUSE"),
-    make(Command::PlayPauseNext, "PlayPauseNext", Category::Navigation, CMD_TR("Play/pause animation, otherwise next image")).legacy("IDM_PLAYPAUSENEXT"),
+    make(Command::NextImage,     "NextImage",     Category::Navigation, CMD_TR("Next image")),
+    make(Command::PrevImage,     "PrevImage",     Category::Navigation, CMD_TR("Previous image")),
+    make(Command::FirstImage,    "FirstImage",    Category::Navigation, CMD_TR("First image")),
+    make(Command::LastImage,     "LastImage",     Category::Navigation, CMD_TR("Last image")),
+    make(Command::NextFile,      "NextFile",      Category::Navigation, CMD_TR("Next file (leave multi-frame container)")),
+    make(Command::PrevFile,      "PrevFile",      Category::Navigation, CMD_TR("Previous file (leave multi-frame container)")),
+    make(Command::NextFrame,     "NextFrame",     Category::Navigation, CMD_TR("Next frame")),
+    make(Command::PlayPause,     "PlayPause",     Category::Navigation, CMD_TR("Play/pause animation")),
+    make(Command::PlayPauseNext, "PlayPauseNext", Category::Navigation, CMD_TR("Play/pause animation, otherwise next image")),
 
     // Datei
-    make(Command::Reload,            "Reload",            Category::File, CMD_TR("Reload image")).legacy("IDM_RELOAD"),
-    make(Command::ReloadFull,        "ReloadFull",        Category::File, CMD_TR("Reload image and file list")).legacy("IDM_RELOAD_FULL"),
-    make(Command::CopyScreen,        "CopyScreen",        Category::File, CMD_TR("Copy image to clipboard (screen size)")).legacy("IDM_COPY"),
-    make(Command::CopyFull,          "CopyFull",          Category::File, CMD_TR("Copy original image content to clipboard")).legacy("IDM_COPY_FULL"),
-    make(Command::CopyPath,          "CopyPath",          Category::File, CMD_TR("Copy file path to clipboard")).legacy("IDM_COPY_PATH"),
-    make(Command::CutFile,           "CutFile",           Category::File, CMD_TR("Cut file to clipboard")).legacy("IDM_CUT_FILE"),
-    make(Command::DeleteFile,        "DeleteFile",        Category::File, CMD_TR("Delete file")).legacy("IDM_DELETE_FILE"),
-    make(Command::RenameFile,        "RenameFile",        Category::File, CMD_TR("Rename file")).legacy("IDM_RENAME"),
-    make(Command::ExploreFile,       "ExploreFile",       Category::File, CMD_TR("Show in folder")).legacy("IDM_EXPLORE"),
-    make(Command::OpenDefaultEditor, "OpenDefaultEditor", Category::File, CMD_TR("Edit image in default editor")).legacy("IDM_OPEN_DEFAULT_EDITOR"),
+    make(Command::Reload,            "Reload",            Category::File, CMD_TR("Reload image")),
+    make(Command::ReloadFull,        "ReloadFull",        Category::File, CMD_TR("Reload image and file list")),
+    make(Command::CopyScreen,        "CopyScreen",        Category::File, CMD_TR("Copy image to clipboard (screen size)")),
+    make(Command::CopyFull,          "CopyFull",          Category::File, CMD_TR("Copy original image content to clipboard")),
+    make(Command::CopyPath,          "CopyPath",          Category::File, CMD_TR("Copy file path to clipboard")),
+    make(Command::CutFile,           "CutFile",           Category::File, CMD_TR("Cut file to clipboard")),
+    make(Command::DeleteFile,        "DeleteFile",        Category::File, CMD_TR("Delete file")),
+    make(Command::RenameFile,        "RenameFile",        Category::File, CMD_TR("Rename file")),
+    make(Command::ExploreFile,       "ExploreFile",       Category::File, CMD_TR("Show in folder")),
+    make(Command::OpenDefaultEditor, "OpenDefaultEditor", Category::File, CMD_TR("Edit image in default editor")),
 
     // Zoom / Ansicht
-    make(Command::ZoomIn,  "ZoomIn",  Category::Zoom, CMD_TR("Zoom in")).legacy("IDM_ZOOM_INC"),
-    make(Command::ZoomOut, "ZoomOut", Category::Zoom, CMD_TR("Zoom out")).legacy("IDM_ZOOM_DEC"),
-    // Ersetzt IDM_ZOOM_400/200/100/50/25 (siehe kLegacyAliases). 100 = "echte Groesse" wie bisher.
+    make(Command::ZoomIn,  "ZoomIn",  Category::Zoom, CMD_TR("Zoom in")),
+    make(Command::ZoomOut, "ZoomOut", Category::Zoom, CMD_TR("Zoom out")),
     make(Command::ZoomTo, "ZoomTo", Category::Zoom, CMD_TR("Zoom to (percent)")).intArg(1, 6400, 100),
-    make(Command::FitToScreen,          "FitToScreen",          Category::Zoom, CMD_TR("Fit to window")).legacy("IDM_FIT_TO_SCREEN"),
-    make(Command::FitToScreenNoEnlarge, "FitToScreenNoEnlarge", Category::Zoom, CMD_TR("Fit to window (never upsize)")).legacy("IDM_FIT_TO_SCREEN_NO_ENLARGE"),
-    make(Command::FillWithCrop,         "FillWithCrop",         Category::Zoom, CMD_TR("Fill with crop")).legacy("IDM_FILL_WITH_CROP"),
-    make(Command::ToggleFitTo100,       "ToggleFitTo100",       Category::Zoom, CMD_TR("Toggle fit to window / 100 %")).legacy("IDM_TOGGLE_FIT_TO_SCREEN_100_PERCENTS"),
-    make(Command::ToggleFillWithCropTo100, "ToggleFillWithCropTo100", Category::Zoom, CMD_TR("Toggle fill with crop / 100 %")).legacy("IDM_TOGGLE_FILL_WITH_CROP_100_PERCENTS"),
-    make(Command::ToggleAutoZoomFit,    "ToggleAutoZoomFit",    Category::Zoom, CMD_TR("Toggle auto zoom mode (fit / none / book)")).legacy("IDM_TOGGLE_AUTO_ZOOM_FIT"),
+    make(Command::FitToScreen,          "FitToScreen",          Category::Zoom, CMD_TR("Fit to window")),
+    make(Command::FitToScreenNoEnlarge, "FitToScreenNoEnlarge", Category::Zoom, CMD_TR("Fit to window (never upsize)")),
+    make(Command::FillWithCrop,         "FillWithCrop",         Category::Zoom, CMD_TR("Fill with crop")),
+    make(Command::ToggleFitTo100,       "ToggleFitTo100",       Category::Zoom, CMD_TR("Toggle fit to window / 100 %")),
+    make(Command::ToggleFillWithCropTo100, "ToggleFillWithCropTo100", Category::Zoom, CMD_TR("Toggle fill with crop / 100 %")),
+    make(Command::ToggleAutoZoomFit,    "ToggleAutoZoomFit",    Category::Zoom, CMD_TR("Toggle auto zoom mode (fit / none / book)")),
     make(Command::SetAutoZoom,          "SetAutoZoom",          Category::Zoom, CMD_TR("Auto zoom mode")).choiceArg(kAutoZoomChoices, V(AutoZoomArg::Fit)),
-    make(Command::ZoomMode,             "ZoomMode",             Category::Zoom, CMD_TR("Toggle zoom mode on left mouse button")).legacy("IDM_ZOOM_MODE").menuOnly(),
-    make(Command::PanUp,    "PanUp",    Category::View, CMD_TR("Pan up")).legacy("IDM_PAN_UP"),
-    make(Command::PanDown,  "PanDown",  Category::View, CMD_TR("Pan down")).legacy("IDM_PAN_DOWN"),
-    make(Command::PanLeft,  "PanLeft",  Category::View, CMD_TR("Pan left")).legacy("IDM_PAN_LEFT"),
-    make(Command::PanRight, "PanRight", Category::View, CMD_TR("Pan right")).legacy("IDM_PAN_RIGHT"),
-    make(Command::Rotate90,  "Rotate90",  Category::View, CMD_TR("Rotate +90")).legacy("IDM_ROTATE_90"),
-    make(Command::Rotate270, "Rotate270", Category::View, CMD_TR("Rotate -90")).legacy("IDM_ROTATE_270"),
-    make(Command::MirrorH,   "MirrorH",   Category::View, CMD_TR("Mirror horizontally")).legacy("IDM_MIRROR_H"),
-    make(Command::MirrorV,   "MirrorV",   Category::View, CMD_TR("Mirror vertically")).legacy("IDM_MIRROR_V"),
+    make(Command::ZoomMode,             "ZoomMode",             Category::Zoom, CMD_TR("Toggle zoom mode on left mouse button")).menuOnly(),
+    make(Command::PanUp,    "PanUp",    Category::View, CMD_TR("Pan up")),
+    make(Command::PanDown,  "PanDown",  Category::View, CMD_TR("Pan down")),
+    make(Command::PanLeft,  "PanLeft",  Category::View, CMD_TR("Pan left")),
+    make(Command::PanRight, "PanRight", Category::View, CMD_TR("Pan right")),
+    make(Command::Rotate90,  "Rotate90",  Category::View, CMD_TR("Rotate +90")),
+    make(Command::Rotate270, "Rotate270", Category::View, CMD_TR("Rotate -90")),
+    make(Command::MirrorH,   "MirrorH",   Category::View, CMD_TR("Mirror horizontally")),
+    make(Command::MirrorV,   "MirrorV",   Category::View, CMD_TR("Mirror vertically")),
 
     // Bildverarbeitung / Anzeige-Schalter
-    make(Command::ToggleAutoCorrection,  "ToggleAutoCorrection",  Category::View, CMD_TR("Auto contrast")).legacy("IDM_AUTO_CORRECTION"),
-    make(Command::ContrastCorrectionInc, "ContrastCorrectionInc", Category::View, CMD_TR("Increase contrast correction")).legacy("IDM_CONTRAST_CORRECTION_INC"),
-    make(Command::ContrastCorrectionDec, "ContrastCorrectionDec", Category::View, CMD_TR("Decrease contrast correction")).legacy("IDM_CONTRAST_CORRECTION_DEC"),
+    make(Command::ToggleAutoCorrection,  "ToggleAutoCorrection",  Category::View, CMD_TR("Auto contrast")),
+    make(Command::ContrastCorrectionInc, "ContrastCorrectionInc", Category::View, CMD_TR("Increase contrast correction")),
+    make(Command::ContrastCorrectionDec, "ContrastCorrectionDec", Category::View, CMD_TR("Decrease contrast correction")),
     make(Command::ToggleBWMode,          "ToggleBWMode",          Category::View, CMD_TR("Toggle black and white mode")),
-    make(Command::ToggleTransparency,    "ToggleTransparency",    Category::View, CMD_TR("Toggle transparency mode")).legacy("IDM_TOGGLE_TRANSPARENCY"),
-    make(Command::ToggleEmbeddedColorProfiles, "ToggleEmbeddedColorProfiles", Category::View, CMD_TR("Toggle embedded color profiles")).legacy("IDM_TOGGLE_USE_EMBEDDED_COLOR_PROFILES"),
-    make(Command::ToggleResamplingQuality,     "ToggleResamplingQuality",     Category::View, CMD_TR("Toggle resampling quality")).legacy("IDM_TOGGLE_RESAMPLING_QUALITY"),
-    make(Command::ToggleInfoOverlay,     "ToggleInfoOverlay",     Category::View, CMD_TR("Toggle info overlay")).legacy("IDM_TOGGLE_INFO_OVERLAY"),
+    make(Command::ToggleTransparency,    "ToggleTransparency",    Category::View, CMD_TR("Toggle transparency mode")),
+    make(Command::ToggleEmbeddedColorProfiles, "ToggleEmbeddedColorProfiles", Category::View, CMD_TR("Toggle embedded color profiles")),
+    make(Command::ToggleResamplingQuality,     "ToggleResamplingQuality",     Category::View, CMD_TR("Toggle resampling quality")),
+    make(Command::ToggleInfoOverlay,     "ToggleInfoOverlay",     Category::View, CMD_TR("Toggle info overlay")),
 
     // Slideshow / Animation
-    // StartSlideshow ersetzt IDM_SLIDESHOW_1..20, PlayMovie ersetzt IDM_MOVIE_5_FPS..100_FPS.
     make(Command::StartSlideshow,  "StartSlideshow",  Category::Slideshow, CMD_TR("Start slideshow (seconds per image)")).intArg(1, 3600, 5),
-    make(Command::ResumeSlideshow, "ResumeSlideshow", Category::Slideshow, CMD_TR("Resume slideshow")).legacy("IDM_SLIDESHOW_RESUME"),
-    make(Command::StopMovie,       "StopMovie",       Category::Slideshow, CMD_TR("Pause slideshow/animation")).legacy("IDM_STOP_MOVIE").menuOnly(),
+    make(Command::ResumeSlideshow, "ResumeSlideshow", Category::Slideshow, CMD_TR("Resume slideshow")),
+    make(Command::StopMovie,       "StopMovie",       Category::Slideshow, CMD_TR("Pause slideshow/animation")).menuOnly(),
     make(Command::PlayMovie,       "PlayMovie",       Category::Slideshow, CMD_TR("Play folder as animation (frames per second)")).intArg(1, 200, 25),
     make(Command::SetTransitionEffect, "SetTransitionEffect", Category::Slideshow, CMD_TR("Transition effect")).choiceArg(kTransitionEffectChoices, V(TransitionEffectArg::None)).menuOnly(),
     make(Command::SetTransitionSpeed,  "SetTransitionSpeed",  Category::Slideshow, CMD_TR("Transition speed")).choiceArg(kTransitionSpeedChoices, V(TransitionSpeedArg::Normal)).menuOnly(),
@@ -173,82 +171,22 @@ constexpr std::array<CommandInfo, kCommandCount> kTable = {{
     make(Command::SetLoopMode,  "SetLoopMode",  Category::Sorting, CMD_TR("Folder mode")).choiceArg(kLoopModeChoices, V(LoopModeArg::Folder)),
     make(Command::SetSortMode,  "SetSortMode",  Category::Sorting, CMD_TR("Sort order")).choiceArg(kSortModeChoices, V(SortModeArg::Name)),
     make(Command::SetSortOrder, "SetSortOrder", Category::Sorting, CMD_TR("Sort direction")).choiceArg(kSortOrderChoices, V(SortOrderArg::Ascending)),
-    make(Command::ToggleSortRandom,    "ToggleSortRandom",    Category::Sorting, CMD_TR("Toggle between random and previous sort order")).legacy("IDM_TOGGLE_SORT_RANDOM"),
-    make(Command::ChangeFolderLanguage,"ChangeFolderLanguage",Category::Sorting, CMD_TR("Jump to folder of another language")).legacy("IDM_CHANGE_FOLDER_LANGUAGE"),
+    make(Command::ToggleSortRandom,    "ToggleSortRandom",    Category::Sorting, CMD_TR("Toggle between random and previous sort order")),
+    make(Command::ChangeFolderLanguage,"ChangeFolderLanguage",Category::Sorting, CMD_TR("Jump to folder of another language")),
 
     // Fenster / Anwendung
-    make(Command::FullScreenMode, "FullScreenMode", Category::Window, CMD_TR("Full screen mode")).legacy("IDM_FULL_SCREEN_MODE"),
-    make(Command::Minimize,       "Minimize",       Category::Window, CMD_TR("Minimize window")).legacy("IDM_MINIMIZE"),
-    make(Command::ContextMenu,    "ContextMenu",    Category::Window, CMD_TR("Show context menu")).legacy("IDM_CONTEXT_MENU"),
-    make(Command::SettingsDialog, "SettingsDialog", Category::Window, CMD_TR("Settings")).legacy("IDM_SETTINGS_DIALOG"),
-    make(Command::Help,           "Help",           Category::Window, CMD_TR("Help")).legacy("IDM_HELP"),
-    make(Command::DefaultEscape,  "DefaultEscape",  Category::Window, CMD_TR("Escape (stop slideshow, close overlay, leave full screen, exit)")).legacy("IDM_DEFAULT_ESC"),
-    make(Command::Exit,           "Exit",           Category::Window, CMD_TR("Exit")).legacy("IDM_EXIT"),
+    make(Command::FullScreenMode, "FullScreenMode", Category::Window, CMD_TR("Full screen mode")),
+    make(Command::Minimize,       "Minimize",       Category::Window, CMD_TR("Minimize window")),
+    make(Command::ContextMenu,    "ContextMenu",    Category::Window, CMD_TR("Show context menu")),
+    make(Command::SettingsDialog, "SettingsDialog", Category::Window, CMD_TR("Settings")),
+    make(Command::Help,           "Help",           Category::Window, CMD_TR("Help")),
+    make(Command::DefaultEscape,  "DefaultEscape",  Category::Window, CMD_TR("Escape (stop slideshow, close overlay, leave full screen, exit)")),
+    make(Command::Exit,           "Exit",           Category::Window, CMD_TR("Exit")),
 }};
 
 // ---------------------------------------------------------------------------------------------
-// Alte Namen parametrisierter Befehle. Damit funktioniert eine vorhandene keymap.txt unveraendert
-// weiter, ohne dass symbols.km oder die alten IDs noch gebraucht werden.
-// ---------------------------------------------------------------------------------------------
-struct LegacyAlias {
-    std::string_view name;
-    Command cmd;
-    int arg;
-};
-
-constexpr LegacyAlias kLegacyAliases[] = {
-    { "IDM_SLIDESHOW_1",  Command::StartSlideshow, 1 },
-    { "IDM_SLIDESHOW_2",  Command::StartSlideshow, 2 },
-    { "IDM_SLIDESHOW_3",  Command::StartSlideshow, 3 },
-    { "IDM_SLIDESHOW_4",  Command::StartSlideshow, 4 },
-    { "IDM_SLIDESHOW_5",  Command::StartSlideshow, 5 },
-    { "IDM_SLIDESHOW_6",  Command::StartSlideshow, 6 },
-    { "IDM_SLIDESHOW_7",  Command::StartSlideshow, 7 },
-    { "IDM_SLIDESHOW_8",  Command::StartSlideshow, 8 },
-    { "IDM_SLIDESHOW_9",  Command::StartSlideshow, 9 },
-    { "IDM_SLIDESHOW_10", Command::StartSlideshow, 10 },
-    { "IDM_SLIDESHOW_20", Command::StartSlideshow, 20 },
-
-    { "IDM_MOVIE_5_FPS",   Command::PlayMovie, 5 },
-    { "IDM_MOVIE_10_FPS",  Command::PlayMovie, 10 },
-    { "IDM_MOVIE_15_FPS",  Command::PlayMovie, 15 },
-    { "IDM_MOVIE_20_FPS",  Command::PlayMovie, 20 },
-    { "IDM_MOVIE_25_FPS",  Command::PlayMovie, 25 },
-    { "IDM_MOVIE_30_FPS",  Command::PlayMovie, 30 },
-    { "IDM_MOVIE_50_FPS",  Command::PlayMovie, 50 },
-    { "IDM_MOVIE_60_FPS",  Command::PlayMovie, 60 },
-    { "IDM_MOVIE_100_FPS", Command::PlayMovie, 100 },
-
-    { "IDM_ZOOM_400", Command::ZoomTo, 400 },
-    { "IDM_ZOOM_200", Command::ZoomTo, 200 },
-    { "IDM_ZOOM_100", Command::ZoomTo, 100 },
-    { "IDM_ZOOM_50",  Command::ZoomTo, 50 },
-    { "IDM_ZOOM_25",  Command::ZoomTo, 25 },
-
-    { "IDM_AUTO_ZOOM_NONE",           Command::SetAutoZoom, V(AutoZoomArg::None) },
-    { "IDM_AUTO_ZOOM_FIT_NO_ZOOM",    Command::SetAutoZoom, V(AutoZoomArg::FitNoZoom) },
-    { "IDM_AUTO_ZOOM_FILL_NO_ZOOM",   Command::SetAutoZoom, V(AutoZoomArg::FillNoZoom) },
-    { "IDM_AUTO_ZOOM_FIT",            Command::SetAutoZoom, V(AutoZoomArg::Fit) },
-    { "IDM_AUTO_ZOOM_FILL",           Command::SetAutoZoom, V(AutoZoomArg::Fill) },
-    { "IDM_AUTO_ZOOM_BOOK_MODE",      Command::SetAutoZoom, V(AutoZoomArg::BookMode) },
-
-    { "IDM_LOOP_FOLDER",      Command::SetLoopMode, V(LoopModeArg::Folder) },
-    { "IDM_LOOP_RECURSIVELY", Command::SetLoopMode, V(LoopModeArg::Recursively) },
-    { "IDM_LOOP_SIBLINGS",    Command::SetLoopMode, V(LoopModeArg::Siblings) },
-
-    { "IDM_SORT_NAME",     Command::SetSortMode, V(SortModeArg::Name) },
-    { "IDM_SORT_MOD_DATE", Command::SetSortMode, V(SortModeArg::ModificationDate) },
-    { "IDM_SORT_SIZE",     Command::SetSortMode, V(SortModeArg::Size) },
-    { "IDM_SORT_RANDOM",   Command::SetSortMode, V(SortModeArg::Random) },
-
-    { "IDM_SORT_ASCENDING",  Command::SetSortOrder, V(SortOrderArg::Ascending) },
-    { "IDM_SORT_DESCENDING", Command::SetSortOrder, V(SortOrderArg::Descending) },
-};
-
-// ---------------------------------------------------------------------------------------------
-// Standardbelegung (== bisherige keymap.txt, ohne die zwei toten Zeilen IDM_MARK_FOR_TOGGLE und
-// IDM_TOGGLE). Zusaetzlich Esc und F1, die bisher fest im Code verdrahtet
-// waren (AddDefaultEscapeHandling bzw. keyPressEvent).
+// Standardbelegung. Enthaelt auch Esc und F1, die bisher fest im Code verdrahtet waren
+// (AddDefaultEscapeHandling bzw. keyPressEvent).
 // ---------------------------------------------------------------------------------------------
 constexpr DefaultBinding kDefaultBindings[] = {
     { "PgUp",  Command::PrevFile, 0 },
@@ -283,7 +221,7 @@ constexpr DefaultBinding kDefaultBindings[] = {
     { "Ctrl+C",       Command::CopyFull,          0 },
     { "Ctrl+Shift+C", Command::CopyPath,          0 },
     { "Ctrl+E",       Command::OpenDefaultEditor, 0 },
-    { "Ctrl+O",       Command::SettingsDialog,    0 },
+    { "Ctrl+Shift+Comma", Command::SettingsDialog,    0 },
     { "Ctrl+L",       Command::ExploreFile,       0 },
     { "Ctrl+M",       Command::ContextMenu,       0 },
     { "Ctrl+X",       Command::CutFile,           0 },
@@ -352,10 +290,6 @@ constexpr std::size_t nameOccurrences(std::string_view n) {
     std::size_t count = 0;
     for (const auto& ci : kTable) {
         if (equalsIgnoreCase(ci.name, n)) ++count;
-        if (!ci.legacyName.empty() && equalsIgnoreCase(ci.legacyName, n)) ++count;
-    }
-    for (const auto& a : kLegacyAliases) {
-        if (equalsIgnoreCase(a.name, n)) ++count;
     }
     return count;
 }
@@ -365,10 +299,6 @@ constexpr bool namesAreUnique() {
     for (const auto& ci : kTable) {
         if (ci.name.empty()) return false;
         if (nameOccurrences(ci.name) != 1) return false;
-        if (!ci.legacyName.empty() && nameOccurrences(ci.legacyName) != 1) return false;
-    }
-    for (const auto& a : kLegacyAliases) {
-        if (nameOccurrences(a.name) != 1) return false;
     }
     return true;
 }
@@ -396,14 +326,6 @@ constexpr bool argSpecsAreValid() {
     return true;
 }
 
-constexpr bool aliasesAreValid() {
-    for (const auto& a : kLegacyAliases) {
-        if (static_cast<std::size_t>(a.cmd) >= kCommandCount) return false;
-        if (!argValid(kTable[static_cast<std::size_t>(a.cmd)], a.arg)) return false;
-    }
-    return true;
-}
-
 constexpr bool defaultBindingsAreValid() {
     for (const auto& b : kDefaultBindings) {
         if (b.keys.empty()) return false;
@@ -419,11 +341,9 @@ static_assert(kCommandCount > 0, "Command::Count must be the last enumerator");
 static_assert(indexMatchesEnum(),
               "kTable is out of sync with enum Command: same order, one entry per enumerator");
 static_assert(namesAreUnique(),
-              "duplicate or empty command name in kTable / kLegacyAliases (names are case-insensitive)");
+              "duplicate or empty command name in kTable (names are case-insensitive)");
 static_assert(argSpecsAreValid(),
               "invalid argument spec in kTable (default outside range / not in choices / duplicate choice)");
-static_assert(aliasesAreValid(),
-              "kLegacyAliases contains an argument outside the range of its command");
 static_assert(defaultBindingsAreValid(),
               "kDefaultBindings references a non-bindable command or an invalid argument");
 
@@ -463,7 +383,6 @@ bool isValidArg(const CommandInfo& ci, int arg) {
 const CommandInfo* findByName(std::string_view name) {
     for (const auto& ci : kTable) {
         if (equalsIgnoreCase(ci.name, name)) return &ci;
-        if (!ci.legacyName.empty() && equalsIgnoreCase(ci.legacyName, name)) return &ci;
     }
     return nullptr;
 }
@@ -486,15 +405,6 @@ std::optional<CommandInvocation> parseInvocation(std::string_view text, std::str
         rest = trim(rest.substr(1, rest.size() - 2));
     }
 
-    // 1. Alte Namen parametrisierter Befehle
-    for (const auto& a : kLegacyAliases) {
-        if (equalsIgnoreCase(a.name, name)) {
-            if (!rest.empty()) return fail("legacy name '" + std::string(name) + "' takes no argument");
-            return CommandInvocation{ a.cmd, a.arg };
-        }
-    }
-
-    // 2. Kanonischer oder alter Name
     const CommandInfo* ci = findByName(name);
     if (!ci) return fail("unknown command '" + std::string(name) + "'");
 
@@ -564,7 +474,6 @@ std::string defaultKeyMapFileText() {
         "//               Mouse: MouseL, MouseR, MouseM, MouseX1, MouseX2, MouseDblClk\n"
         "//   <command>   Name from the list at the end of this file, optionally with an argument:\n"
         "//                 PlayMovie 25      SetSortMode Size      StartSlideshow 5\n"
-        "//               Old names (IDM_NEXT, IDM_MOVIE_25_FPS, ...) are still understood.\n"
         "//\n"
         "// This file replaces the built-in defaults completely. To switch off a key, map it to DoNothing.\n"
         "// Lines that cannot be understood are skipped and reported in the log.\n"

@@ -41,7 +41,7 @@ add_compile_options(
 
 
 # --- 2. QT & STANDARD SETUP ---
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools Network DBus)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools Network DBus GuiPrivate)
 
 # --- 3. DRITTANBIETER (ZLIB) GLOBAL BEREITSTELLEN ---
 find_package(ZLIB REQUIRED)
@@ -130,6 +130,7 @@ target_link_libraries(mkImageViewer PRIVATE
     Qt6::Widgets
     Qt6::Concurrent
     Qt6::DBus
+    Qt6::GuiPrivate   # QKeyMapper::possibleKeys() (layoutabhaengige Tastenaufloesung, siehe keyPressEvent)
     Qt6::Network
 #static
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libbit7z/lib64/libbit7z64.a

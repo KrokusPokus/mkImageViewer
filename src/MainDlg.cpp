@@ -43,6 +43,9 @@
 #include <QUrl>
 #include <QtGlobal>
 #include <QLibrary>
+
+// Private Qt-API: Liefert dieselben Tasten-Kandidaten, mit denen Qt QShortcut/QAction aufloest.
+#include <QtGui/private/qkeymapper_p.h>
 #include <QVariant>
 #include <algorithm>
 #include <optional>
@@ -378,7 +381,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_nBookModePageHeight = sp.BookModePageHeight();
     m_bAllowSmoothPanning = sp.AllowSmoothPanning();
     m_offsets_custom = CPoint(0, 0);
-    m_customAnimationFrameTime = 1000;
+    m_customAnimationFrameTime = 0;
 
     m_eSortModeBeforeRandom = Helpers::FS_FileName;
 
@@ -1104,7 +1107,25 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
     // Nicht-Keypad-Belegung zurueck, wenn fuer die Numpad-Taste keine eigene existiert.
     const bool bKeypad = event->modifiers().testFlag(Qt::KeypadModifier);
 
-    const std::optional<Cmd::CommandInvocation> inv = m_pKeyMap->GetCommandForKey(vkCode, bAlt, bCtrl, bShift, bKeypad);
+    std::optional<Cmd::CommandInvocation> inv = m_pKeyMap->GetCommandForKey(vkCode, bAlt, bCtrl, bShift, bKeypad);
+
+    // Layoutabhaengige Aufloesung: event->key() ist das ERZEUGTE Zeichen (DE: Shift+',' -> Key_Semicolon),
+    // keymap.txt beschreibt aber die Taste ("Ctrl+Shift+Comma"). QKeyMapper::possibleKeys() liefert ueber
+    // xkbcommon dieselben Kandidaten wie fuer QShortcut, zuerst die Grundebene der Taste mit allen Modifiern
+    // (Ctrl+Shift+Key_Comma), danach Varianten mit "verbrauchten" Modifiern (Ctrl+Key_Semicolon).
+    // Der exakte Treffer oben hat Vorrang, damit bestehende Belegungen unveraendert greifen.
+    if (!inv) {
+        const QList<QKeyCombination> candidates = QKeyMapper::possibleKeys(event);
+        for (const QKeyCombination& kc : candidates) {
+            const Qt::KeyboardModifiers mods = kc.keyboardModifiers();
+            inv = m_pKeyMap->GetCommandForKey(int(kc.key()),
+                                              mods.testFlag(Qt::AltModifier),
+                                              mods.testFlag(Qt::ControlModifier),
+                                              mods.testFlag(Qt::ShiftModifier),
+                                              bKeypad);
+            if (inv) break;
+        }
+    }
     // DoNothing wird wie bisher verbraucht (Taste belegt, aber ohne Funktion) und nicht an Qt weitergereicht.
     if (inv) {
         const Cmd::Command cmd = inv->id;
@@ -1477,11 +1498,10 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
 
     menuMovie->addSeparator();
 
-    // Ueberschrift ohne Funktion (frueher IDM_MOVIE_START_FPS als Pseudo-ID)
-    QAction* actMovieStartFps = menuMovie->addAction(tr("Movie"));
+    QAction* actMovieStartFps = menuMovie->addAction(tr("Movie"));  // Ueberschrift ohne Funktion
     actMovieStartFps->setEnabled(false);
 
-    const int fpsValues[] = {5, 10, 15, 20, 25, 30, 50, 60, 100};
+    const int fpsValues[] = {1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 50, 60};
     for (int nFps : fpsValues) {
         AddCmd(menuMovie, QString(tr("Playback speed\t%1 fps")).arg(nFps), Cmd::Command::PlayMovie, nFps, false);
     }
@@ -1780,7 +1800,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                     const int targetFrameTime = 1000 / nValue;
 
                     if (m_customAnimationFrameTime == targetFrameTime) {
-                        m_customAnimationFrameTime = 1000;
+                        m_customAnimationFrameTime = 0;
                         if (m_pCurrentImage->FrameTimeMs() != 0) {
                             const int defaultFps = 1000 / m_pCurrentImage->FrameTimeMs();
                             toastText = QStringLiteral("Default Playback Speed: %1 fps").arg(defaultFps);
@@ -2453,14 +2473,14 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
             StartSlideShowTimer(m_nCurrentTimeout);
         }
         StopAnimation();
-        m_customAnimationFrameTime = 1000;
+        m_customAnimationFrameTime = 0;
 
 /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos1a (ePos == POS_Next || ePos == POS_NextSlideShow)";
 
     } else if (ePos != POS_NextFrame) {
         StopMovieMode();
         StopAnimation();
-        m_customAnimationFrameTime = 1000;
+        m_customAnimationFrameTime = 0;
 
 /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos1b (ePos != POS_NextFrame)";
     }
@@ -3362,7 +3382,7 @@ void CMainDlg::StartAnimation() {
 
     /*
     int usedFrameTime;
-    if (m_customAnimationFrameTime < 250) {
+    if (m_customAnimationFrameTime > 0) {
         usedFrameTime = m_customAnimationFrameTime;
     } else {
         usedFrameTime = m_pCurrentImage->FrameTimeMs();
@@ -3383,7 +3403,7 @@ void CMainDlg::AdjustAnimationFrameTime() {
     }
 
     int usedFrameTime;
-    if (m_customAnimationFrameTime < 250) {
+    if (m_customAnimationFrameTime > 0) {
         usedFrameTime = m_customAnimationFrameTime;
     } else {
         usedFrameTime = m_pCurrentImage->FrameTimeMs();

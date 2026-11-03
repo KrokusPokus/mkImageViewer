@@ -36,7 +36,7 @@ namespace Cmd {
 // uebereinstimmen (wird per static_assert geprueft). Count bleibt immer der letzte Eintrag.
 // ---------------------------------------------------------------------------------------------
 enum class Command : std::uint16_t {
-    DoNothing = 0,            // "Taste belegt, tut aber nichts" (ersetzt IDM_DONOTHING, siehe KeyMap)
+    DoNothing = 0,            // "Taste belegt, tut aber nichts" (siehe KeyMap)
 
     // Navigation
     NextImage,
@@ -186,7 +186,6 @@ struct CommandInvocation {
 struct CommandInfo {
     Command id = Command::DoNothing;
     std::string_view name;            // kanonischer Name in keymap.txt, z.B. "NextImage" (Klein/Gross egal)
-    std::string_view legacyName;      // alter Name (z.B. "IDM_NEXT"), wird beim Laden weiter akzeptiert; "" = keiner
     Category category = Category::Window;
     const char* displayText = "";     // Uebersetzungs-Schluessel (englischer Text), Kontext "Command"
     bool bindable = true;             // false = nur ueber Menue/intern erreichbar, nicht per Hotkey belegbar
@@ -199,9 +198,6 @@ struct CommandInfo {
     std::size_t choiceCount = 0;
 
     // --- Builder (alle liefern eine veraenderte Kopie) ---
-    constexpr CommandInfo legacy(std::string_view n) const {
-        CommandInfo c = *this; c.legacyName = n; return c;
-    }
     constexpr CommandInfo menuOnly() const {
         CommandInfo c = *this; c.bindable = false; return c;
     }
@@ -245,15 +241,13 @@ const CommandInfo& info(Command id);
 // Standardbelegung (Grundlage fuer "keymap.txt einmalig ausschreiben" und "Standard wiederherstellen").
 ArrayView<DefaultBinding> defaultBindings();
 
-// Sucht nach kanonischem Namen ODER altem IDM_-Namen (Klein/Gross egal). nullptr, wenn unbekannt.
-// Kennt NICHT die alten Namen parametrisierter Befehle (IDM_MOVIE_5_FPS, ...): dafuer parseInvocation.
+// Sucht nach kanonischem Namen (Klein/Gross egal). nullptr, wenn unbekannt.
 const CommandInfo* findByName(std::string_view name);
 
 // Parst die rechte Spalte einer keymap.txt-Zeile. Akzeptiert:
 //     "NextImage"            kanonisch, ohne Argument
 //     "PlayMovie 25"         mit Argument  (auch "PlayMovie(25)")
 //     "SetSortMode Size"     benanntes Argument
-//     "IDM_MOVIE_25_FPS"     alter Name -> wird auf {PlayMovie, 25} abgebildet
 // Bei Fehler: std::nullopt, und *error (falls != nullptr) enthaelt eine lesbare Begruendung.
 std::optional<CommandInvocation> parseInvocation(std::string_view text, std::string* error = nullptr);
 

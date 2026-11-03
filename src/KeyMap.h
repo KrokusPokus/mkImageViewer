@@ -31,8 +31,9 @@ public:
     // Qt::KeypadModifier. Fuer Key-Events event->modifiers().testFlag(Qt::KeypadModifier)
     // uebergeben, fuer Maustasten false (Default).
     //
-    // Lookup-Reihenfolge (siehe .cpp): exakter Treffer, dann Rueckfaelle fuer Keypad- und
-    // Shift-Symboltasten, damit z.B. das Numpad-'+' weiter eine "Plus"-Belegung ausloest.
+    // Lookup-Reihenfolge (siehe .cpp): exakter Treffer, dann Rueckfall fuer Keypad-Tasten,
+    // damit z.B. das Numpad-'+' weiter eine "Plus"-Belegung ausloest. Layoutabhaengige
+    // Shift-Zeichen loest der Aufrufer ueber QKeyMapper::possibleKeys() auf.
     std::optional<Cmd::CommandInvocation> GetCommandForKey(int nVirtualKeyCode, bool bAlt, bool bCtrl, bool bShift, bool bKeypad = false) const;
 
     // Text der Kuerzel fuer einen Befehl (z.B. fuer Menues), mehrere mit '/' getrennt, leer wenn keins.

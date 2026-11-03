@@ -230,13 +230,6 @@ static QString _GetKeyShortcutName(int nShortcut) {
     return QString();
 }
 
-// Tasten, die auf gaengigen Layouts nur MIT Shift erreichbar sind. Qt liefert dann den Code
-// des erzeugten Zeichens (z.B. Key_Plus) und setzt zusaetzlich ShiftModifier.
-// US-Layout: '+' = Shift+'='   |   DE-Layout: '*' = Shift+'+', '/' = Shift+'7'
-static bool _IsShiftedSymbolKey(int nKey) {
-    return nKey == Qt::Key_Plus || nKey == Qt::Key_Asterisk || nKey == Qt::Key_Slash;
-}
-
 // Sucht die Datei nacheinander in den angegebenen Verzeichnissen. Leerer String = nicht gefunden.
 static QString _FindFirstExisting(const QStringList& dirs, const QString& sFileName) {
     for (const QString& dir : dirs) {
@@ -262,9 +255,6 @@ static QString _FindFirstExisting(const QStringList& dirs, const QString& sFileN
 // Die Datei ersetzt die Defaults vollstaendig (wie bisher). Neue Befehle in einer spaeteren
 // Programmversion tauchen in einer bereits geschriebenen Datei daher nicht automatisch auf -
 // das loest erst das Dialog-/Command-zentrierte Format.
-//
-// Entfallen ist symbols.km: Die Befehlsnamen kommen direkt aus Cmd::parseInvocation, inklusive der
-// alten IDM_-Namen, eine vorhandene keymap.txt laeuft also unveraendert weiter.
 CKeyMap::CKeyMap() {
     const QString exePath = QCoreApplication::applicationDirPath();
     const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
@@ -330,9 +320,6 @@ void CKeyMap::LoadFromText(const QString& sText, const QString& sSourceName) {
         const QString line = lines[i].trimmed();   // trimmed() entfernt auch ein '\r' (CRLF-Dateien)
         if (line.isEmpty() || line.startsWith(QStringLiteral("//"))) {
             continue;
-        }
-        if (line.startsWith(QStringLiteral("#define"))) {
-            continue; // Veraltete Definitionen in KeyMap ignorieren
         }
 
         // Spalte 1 (links) sind die Tasten (z.B. "PgUp" oder "Ctrl+C")
@@ -405,10 +392,10 @@ void CKeyMap::AddDefaultEscapeHandling() {
 //    Nummernblock-'+' vorher funktioniert (gleicher Qt-Code), und mit NumLock aus senden die
 //    Numpad-Pfeile Key_Up usw. mit KeypadModifier. Wer eine Numpad-Taste explizit belegt
 //    ("Numpad1"), bekommt weiterhin Vorrang vor der normalen Ziffer.
-// 3. Nur bei Symboltasten, die ueber Shift erzeugt werden (+, *, /): ohne Shift suchen.
-//    Grund: Auf dem US-Layout liefert '+' den Code Key_Plus MIT ShiftModifier; die Belegung
-//    "Plus" (ohne Shift) haette sonst nie gegriffen. Eine explizite Belegung "Shift+Plus" hat
-//    wegen Schritt 1 Vorrang.
+//
+// Zeichen, die nur ueber Shift erreichbar sind (DE: '*' = Shift+'+', US: '+' = Shift+'='),
+// loest CMainDlg::keyPressEvent() ueber QKeyMapper::possibleKeys() auf: Es ruft diese Funktion
+// fuer jeden Kandidaten erneut auf (Grundebene der Taste mit Shift, dann das Zeichen ohne Shift).
 //
 // Rueckgabe std::nullopt = Taste nicht belegt. Ein belegtes DoNothing ist ein gueltiger Treffer
 // (Taste wird verbraucht, tut aber nichts) - das war frueher "ID 1 > 0".
@@ -423,14 +410,6 @@ std::optional<Cmd::CommandInvocation> CKeyMap::GetCommandForKey(int nVirtualKeyC
 
     if (bKeypad) {
         if (auto cmd = lookup(GetCombinedKeyCode(nVirtualKeyCode, bAlt, bCtrl, bShift, false))) return cmd;
-    }
-
-    if (bShift && _IsShiftedSymbolKey(nVirtualKeyCode)) {
-        if (auto cmd = lookup(GetCombinedKeyCode(nVirtualKeyCode, bAlt, bCtrl, false, bKeypad))) return cmd;
-
-        if (bKeypad) {
-            if (auto cmd = lookup(GetCombinedKeyCode(nVirtualKeyCode, bAlt, bCtrl, false, false))) return cmd;
-        }
     }
 
     return std::nullopt;

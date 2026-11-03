@@ -249,7 +249,7 @@ private:
     void SetToast(const QString& strToast, int nDurationMs = 3000);
     void ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting);
     
-    int m_customAnimationFrameTime;
+    int m_customAnimationFrameTime;   // eigene Bildzeit in ms (PlayMovie bei Animationen), 0 = Standard der Animation
     bool m_bTerminated{false};
 
     QFileIconProvider m_iconProvider;
