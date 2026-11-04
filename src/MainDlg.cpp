@@ -2304,7 +2304,12 @@ void CMainDlg::OpenDefaultEditor() {
         StartLowQTimer(ZOOM_TIMEOUT);
     }
 
-    QDesktopServices::openUrl(QUrl::fromLocalFile(sCurrentFileName));
+    // Editor aus den Einstellungen (DefaultImageEditor), sonst das Standardprogramm des Systems
+    const QString sEditor = CSettingsProvider::This().DefaultImageEditor();
+    if (sEditor.isEmpty())
+        QDesktopServices::openUrl(QUrl::fromLocalFile(sCurrentFileName));
+    else
+        Helpers::openFileListWithHandler(sEditor, { sCurrentFileName });
 }
 
 void CMainDlg::ExploreFile() {

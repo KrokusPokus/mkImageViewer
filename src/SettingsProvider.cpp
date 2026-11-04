@@ -22,6 +22,7 @@
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
 #include <QScrollArea>
@@ -518,6 +519,12 @@ QWidget* SettingsDialog::createSystemPage() {
     m_checkForceQImageReader->setToolTip(tr("ForceQImageReader"));
     layout->addRow("", m_checkForceQImageReader);
 
+    m_editDefaultImageEditor = new QLineEdit();
+    m_editDefaultImageEditor->setPlaceholderText(tr("System default"));
+    m_editDefaultImageEditor->setToolTip(tr("Program for \"Edit image in default editor\" (Ctrl+E): .desktop ID "
+                                            "(e.g. org.kde.krita.desktop), program name or path. Empty = system default (DefaultImageEditor)"));
+    layout->addRow(tr("Image editor:"), m_editDefaultImageEditor);
+
     return makeScrollable(panel);
 }
 
@@ -588,6 +595,7 @@ void SettingsDialog::loadFrom(const CSettingsProvider& settings) {
     m_spinCacheRange->setValue(settings.m_nCacheRange);
     m_spinCpuCores->setValue(settings.m_nNumCoresIni);
     m_checkForceQImageReader->setChecked(settings.m_bForceQImageReader);
+    m_editDefaultImageEditor->setText(settings.m_sDefaultImageEditor);
 }
 
 void SettingsDialog::saveToSettings() {
@@ -599,6 +607,7 @@ void SettingsDialog::saveToSettings() {
     settings.WriteBool("BookModeLaunchFullscreen", m_checkBookModeLaunchFullscreen->isChecked());
     settings.WriteBool("FileSortAscending", m_checkFileSortAscending->isChecked());
     settings.WriteBool("ForceQImageReader", m_checkForceQImageReader->isChecked());
+    settings.WriteString("DefaultImageEditor", m_editDefaultImageEditor->text().trimmed());
     settings.WriteBool("HighQualityResampling", m_checkHighQualityResampling->isChecked());
     settings.WriteBool("NavigateWithMouseWheel", m_checkNavigateMouseWheel->isChecked());
     settings.WriteBool("ReloadWhenDisplayedImageChanged", m_checkReloadWhenImageChanged->isChecked());
@@ -776,6 +785,7 @@ void CSettingsProvider::ReadAllINISettings() {
     m_bAutoRotateEXIF = GetBool("AutoRotateEXIF", true);
     m_bUseEmbeddedColorProfiles = GetBool("UseEmbeddedColorProfiles", true); // This can drastically slow down image loading/decoding.
     m_bForceQImageReader = GetBool("ForceQImageReader", false);
+    m_sDefaultImageEditor = GetString("DefaultImageEditor", QString()).trimmed();
     m_nDisplayMonitor = GetInt("DisplayMonitor", -1, -1, 16);
     m_dAutoContrastAmount = GetDouble("AutoContrastCorrectionAmount", 0.5, 0.0, 1.0);
     m_dAutoBrightnessAmount = GetDouble("AutoBrightnessCorrectionAmount", 0.2, 0.0, 1.0);

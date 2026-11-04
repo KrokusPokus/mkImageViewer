@@ -5,13 +5,235 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
+#include <functional>
 
 #include <QString>
 #include <QStringDecoder>
 #include <QtEndian>
+#include <QCoreApplication>
+#include <QDebug>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
-#include <cstring>
+#include <QFileInfo>
+#include <QLocale>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QStandardPaths>
+#include <QTextStream>
+#include <QUrl>
+
+namespace {
+
+    constexpr int kMaxInputLength = 8192;
+
+    // Entfernt unsichtbare/steuernde Unicode-Zeichen, die präparierte Webseiten in
+    // kopierten Text einschleusen können (Zero-Width-Chars, Bidi-Override wie bei
+    // "Trojan Source"-Angriffen, BOM). Echte RTL-Schrift (Arabisch/Hebräisch) ist
+    // davon NICHT betroffen - das sind normale Buchstaben, keine Steuerzeichen.
+    QString stripInvisibleAndControlChars(const QString &input) {
+        QString out;
+        out.reserve(input.size());
+        for (QChar c : input) {
+            const ushort u = c.unicode();
+            if (c == '\n' || c == '\r' || c == '\t') { out += c; continue; }
+            if (u < 0x20 || (u >= 0x7F && u <= 0x9F)) continue;
+            if (u == 0x200B || u == 0x200C || u == 0x200D || u == 0xFEFF ||
+                (u >= 0x202A && u <= 0x202E) || (u >= 0x2066 && u <= 0x2069))
+                continue;
+            out += c;
+        }
+        return out;
+    }
+
+    // Ein einziger Durchlauf über 'input': ersetzte Werte werden NICHT erneut gescannt,
+    // daher ist eine Verkettung ($FOO expandiert zu einem String, der wieder ${...} enthält
+    // und erneut aufgelöst wird) strukturell unmöglich, nicht nur begrenzt.
+    QString expandVariablesOnce(const QString &input,
+                                const QRegularExpression &regex,
+                                const std::function<QString(const QRegularExpressionMatch&)> &resolve) {
+
+        auto it = regex.globalMatch(input);
+
+        if (!it.hasNext()) {
+            return input;
+        }
+
+        QString result;
+        result.reserve(input.size());
+        qsizetype lastEnd = 0;
+        while (it.hasNext()) {
+            const QRegularExpressionMatch m = it.next();
+            result += input.sliced(lastEnd, m.capturedStart() - lastEnd);
+            result += resolve(m);
+            lastEnd = m.capturedEnd();
+        }
+        result += input.sliced(lastEnd);
+        return result;
+    }
+
+    // Expandiert eine einzelne Zeile rein im Speicher
+    QString expandSingleLine(QString line) {
+        line = line.trimmed();
+        if (line.isEmpty()) return QString();
+
+        // 1. Anführungszeichen entfernen
+        if (line.length() >= 2 &&
+            ((line.startsWith('"') && line.endsWith('"')) ||
+             (line.startsWith('\'') && line.endsWith('\''))))
+        {
+            line = line.mid(1, line.length() - 2).trimmed();
+            if (line.isEmpty()) return QString();
+        }
+
+        // 2. file:// URLs in lokale Pfade umwandeln
+        QUrl url(line);
+        if (url.isLocalFile()) {
+            line = url.toLocalFile();
+        }
+
+#ifdef Q_OS_WIN
+        static const QRegularExpression winEnvRegex(R"(%([A-Za-z0-9_()]+)%)");
+        line = expandVariablesOnce(line, winEnvRegex, [](const QRegularExpressionMatch &m) {
+            const QByteArray name = m.captured(1).toUtf8();
+            if (!qEnvironmentVariableIsSet(name.constData())) return m.captured(0);
+            return qEnvironmentVariable(name.constData());
+        });
+#else
+        // Gilt für Linux UND macOS (POSIX-Semantik ist identisch)
+        if (line == "~") {
+            line = QDir::homePath();
+        } else if (line.startsWith("~/") || line.startsWith("~\\")) {
+            line = QDir::homePath() + line.mid(1);
+        }
+
+        static const QRegularExpression posixEnvRegex(R"(\$\{([A-Za-z0-9_]+)\}|\$([A-Za-z0-9_]+))");
+        line = expandVariablesOnce(line, posixEnvRegex, [](const QRegularExpressionMatch &m) {
+            const QString varName = m.captured(1).isEmpty() ? m.captured(2) : m.captured(1);
+            if (varName == "HOME") return QDir::homePath();
+            const QByteArray name = varName.toUtf8();
+            if (!qEnvironmentVariableIsSet(name.constData())) return m.captured(0);
+            return qEnvironmentVariable(name.constData());
+        });
+#endif
+
+        return QDir::cleanPath(line);
+    }
+
+
+} // namespace
+
+namespace {
+// ---------------------------------------------------------------------------------------------
+// Exec-Zeile nach der Desktop Entry Specification zerlegen und Feldcodes ersetzen
+// https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html
+// ---------------------------------------------------------------------------------------------
+
+struct ExecToken {
+    QString text;
+    bool quoted = false; // Argument stand (ganz oder teilweise) in "..."
+};
+
+// Stufe 1: String-Escapes, die für jeden Wert vom Typ "string" gelten (\s \n \t \r \\)
+QString unescapeDesktopString(const QString &in) {
+    QString out;
+    out.reserve(in.size());
+    for (qsizetype i = 0; i < in.size(); ++i) {
+        const QChar c = in.at(i);
+        if (c == '\\' && i + 1 < in.size()) {
+            const QChar n = in.at(i + 1);
+            if (n == 's')  { out += ' ';  ++i; continue; }
+            if (n == 'n')  { out += '\n'; ++i; continue; }
+            if (n == 't')  { out += '\t'; ++i; continue; }
+            if (n == 'r')  { out += '\r'; ++i; continue; }
+            if (n == '\\') { out += '\\'; ++i; continue; }
+        }
+        out += c;
+    }
+    return out;
+}
+
+// Stufe 2: In Argumente zerlegen. Trenner sind Leerzeichen; in "..." sind \" \` \$ \\ Escapes.
+// Unbekannte Escapes bleiben aus Kulanz wörtlich stehen.
+QList<ExecToken> splitDesktopExec(const QString &exec) {
+    QList<ExecToken> tokens;
+    ExecToken current;
+    bool inQuotes = false;
+    bool hasToken = false;
+
+    for (qsizetype i = 0; i < exec.size(); ++i) {
+        const QChar c = exec.at(i);
+        if (inQuotes) {
+            if (c == '\\' && i + 1 < exec.size() && QStringLiteral("\"`$\\").contains(exec.at(i + 1))) {
+                current.text += exec.at(++i);
+            } else if (c == '"') {
+                inQuotes = false;
+            } else {
+                current.text += c;
+            }
+        } else if (c == ' ' || c == '\t' || c == '\n') {
+            if (hasToken) {
+                tokens << current;
+                current = ExecToken();
+                hasToken = false;
+            }
+        } else if (c == '"') {
+            inQuotes = true;
+            current.quoted = true;
+            hasToken = true;
+        } else {
+            current.text += c;
+            hasToken = true;
+        }
+    }
+    if (hasToken) tokens << current;
+    return tokens;
+}
+
+// Enthält das Argument einen der Feldcodes aus 'codes' (z.B. "fu")? %% wird korrekt übersprungen.
+bool containsFieldCode(const QString &token, const QString &codes) {
+    for (qsizetype i = 0; i + 1 < token.size(); ++i) {
+        if (token.at(i) != '%') continue;
+        if (codes.contains(token.at(i + 1))) return true;
+        ++i; // "%%" oder anderer Code -> nächstes Zeichen überspringen
+    }
+    return false;
+}
+
+// Ersetzt die Feldcodes innerhalb eines Arguments. Rückgabe false = Argument entfällt
+// (%f/%u ohne Datei, sowie %F/%U/%i, die nur als eigenständiges Argument gültig sind).
+bool expandFieldCodes(const QString &token, const QString *file, const DesktopEntry &entry, QString &out) {
+    out.clear();
+    for (qsizetype i = 0; i < token.size(); ++i) {
+        const QChar c = token.at(i);
+        if (c != '%' || i + 1 >= token.size()) {
+            out += c;
+            continue;
+        }
+        const QChar code = token.at(++i);
+        switch (code.unicode()) {
+        case '%': out += '%'; break;
+        case 'f':
+        case 'u':
+            if (!file) return false;
+            out += *file;
+            break;
+        case 'c': out += entry.name; break;
+        case 'k': out += QFileInfo(entry.path).absoluteFilePath(); break;
+        case 'd': case 'D': case 'n': case 'N': case 'v': case 'm':
+            break; // veraltet -> entfernen
+        case 'F': case 'U': case 'i':
+            return false;
+        default:
+            out += '%';
+            out += code;
+            break;
+        }
+    }
+    return true;
+}
+} // namespace
 
 namespace Helpers {
 
@@ -365,6 +587,272 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
     uint64_t GetTimeMs() {
         using namespace std::chrono;
         return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+    }
+
+
+    DesktopEntry getDesktopEntryById(const QString &id) {
+        static const QStringList appDirs = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+        for (const QString &dirPath : appDirs) {
+            QFileInfo fileInfo(QDir(dirPath).filePath(id));
+            DesktopEntry entry = getDesktopEntry(fileInfo);
+            if (entry.isValid) {
+                return entry;
+            }
+        }
+        return DesktopEntry();
+    }
+
+    DesktopEntry getDesktopEntry(const QFileInfo &fileInfo) {
+
+        static const QString localeName = QLocale::system().name().left(2); // "de", "fr", ...
+        static const QString localKey = QString("Name[%1]=").arg(localeName);
+
+        DesktopEntry currentEntry;
+
+        QFile file(fileInfo.filePath());
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            in.setEncoding(QStringConverter::Utf8);
+
+            QString iniName, iniNameLocalised;
+            bool bInMainSection = false;
+
+            while (!in.atEnd()) {
+                QString line = in.readLine().trimmed();
+
+                if (line.startsWith('[') && line.endsWith(']')) {
+                    if (bInMainSection) break;
+                    bInMainSection = (line == "[Desktop Entry]");
+                    continue;
+                }
+
+                if (!bInMainSection || line.startsWith('#')) continue;
+
+                if (line.startsWith("Name=")) iniName = line.mid(5);
+                else if (line.startsWith(localKey)) iniNameLocalised = line.mid(localKey.size());
+                else if (line.startsWith("Type=")) currentEntry.type = line.mid(5);
+                // URL (fängt sowohl "URL=" als auch "URL[$e]=" ab)
+                else if (line.startsWith("URL=") || line.startsWith("URL[")) {
+                    int idx = line.indexOf('=');
+                    if (idx != -1) currentEntry.url = line.mid(idx + 1).trimmed();
+                }
+                else if (line.startsWith("Icon=")) currentEntry.icon = line.mid(5);
+                else if (line.startsWith("Exec=")) currentEntry.exec = line.mid(5);
+                else if (line.startsWith("Path=")) currentEntry.workDir = line.mid(5);
+                else if (line.startsWith("Terminal=true")) currentEntry.useTerminal = true;
+                else if (line.startsWith("Hidden=true")) {
+                    return DesktopEntry();
+                }
+            }
+
+            currentEntry.name = iniNameLocalised.isEmpty() ? iniName : iniNameLocalised;
+            currentEntry.isValid = !currentEntry.name.isEmpty();
+            currentEntry.id = fileInfo.fileName();
+            currentEntry.path = fileInfo.filePath();
+
+            if (currentEntry.isValid) {
+                return currentEntry;
+            }
+        }
+
+        return DesktopEntry();
+    }
+
+    void openFileListWithHandler(const QString &handlerApp, const QStringList &fileList) {
+        if (handlerApp.endsWith(".desktop", Qt::CaseInsensitive)) {
+            launchDesktopFile(getDesktopEntryById(handlerApp), fileList);
+            return;
+        }
+
+        if (!handlerApp.contains('/') && !handlerApp.contains('\\')) {
+            QString localAppPath = QDir(QCoreApplication::applicationDirPath()).filePath(handlerApp);
+            if (QFile::exists(localAppPath)) {
+                QProcess::startDetached(QDir::toNativeSeparators(localAppPath), fileList);
+                return;
+            }
+
+            QString absolutePath = QStandardPaths::findExecutable(handlerApp);
+            if (!absolutePath.isEmpty()) {
+                // bool QProcess::startDetached(const QString &program, const QStringList &arguments = {}, const QString &workingDirectory = QString(), qint64 *pid = nullptr)
+                QProcess::startDetached(QDir::toNativeSeparators(absolutePath), fileList);
+                return;
+            }
+        } else if (QFile::exists(handlerApp)) {
+            QProcess::startDetached(QDir::toNativeSeparators(handlerApp), fileList);
+            return;
+        }
+    }
+
+    // Wandelt die Exec-Zeile in eine Liste von Aufrufen (Programm + Argumente) um.
+    // Mehrere Aufrufe gibt es nur bei %f/%u mit mehreren Dateien (laut Spezifikation einmal pro Datei).
+    QList<QStringList> expandDesktopExec(const DesktopEntry &entry, const QStringList &files) {
+        const QList<ExecToken> tokens = splitDesktopExec(unescapeDesktopString(entry.exec));
+        if (tokens.isEmpty()) return {};
+
+        bool hasListCode = false;   // %F / %U
+        bool hasSingleCode = false; // %f / %u
+        for (qsizetype t = 1; t < tokens.size(); ++t) {
+            const ExecToken &tok = tokens.at(t);
+            if (!tok.quoted && (tok.text == "%F" || tok.text == "%U")) {
+                hasListCode = true;
+            } else if (containsFieldCode(tok.text, QStringLiteral("fu"))) {
+                hasSingleCode = true;
+            }
+        }
+
+        auto buildInvocation = [&](const QString *file) {
+            QStringList args;
+            args << tokens.first().text; // Programm: keine Feldcodes
+            for (qsizetype t = 1; t < tokens.size(); ++t) {
+                const ExecToken &tok = tokens.at(t);
+                if (!tok.quoted && (tok.text == "%F" || tok.text == "%U")) {
+                    args << files;
+                    continue;
+                }
+                if (!tok.quoted && tok.text == "%i") {
+                    if (!entry.icon.isEmpty()) args << QStringLiteral("--icon") << entry.icon;
+                    continue;
+                }
+                QString expanded;
+                if (!expandFieldCodes(tok.text, file, entry, expanded)) continue;
+                if (expanded.isEmpty() && !tok.text.isEmpty() && !tok.quoted) continue; // z.B. nur "%d"
+                args << expanded;
+            }
+            return args;
+        };
+
+        QList<QStringList> invocations;
+        if (hasListCode) {
+            invocations << buildInvocation(files.isEmpty() ? nullptr : &files.first());
+        } else if (hasSingleCode) {
+            if (files.isEmpty()) {
+                invocations << buildInvocation(nullptr);
+            } else {
+                for (const QString &file : files) invocations << buildInvocation(&file);
+            }
+        } else {
+            // Kein Datei-Feldcode: Dateien anhängen (bisheriges Verhalten, ähnlich wie KDE)
+            QStringList args = buildInvocation(nullptr);
+            args << files;
+            invocations << args;
+        }
+        return invocations;
+    }
+
+    void launchDesktopFile(const DesktopEntry &info, const QStringList &fileList) {
+        if (!info.isValid) return;
+
+        // ==========================================
+        // 1. Handhabung von Type=Link oder verknüpften URLs
+        // ==========================================
+        if (info.type.compare(QLatin1String("Link"), Qt::CaseInsensitive) == 0 || !info.url.isEmpty()) {
+            QString rawUrl = info.url.trimmed();
+            if (rawUrl.isEmpty()) return;
+
+            // 1. Direkt testen, ob es bereits eine valide Netzwerk-URL mit Schema ist (http, https, ftp, etc.)
+            QUrl url(rawUrl);
+            if (!url.scheme().isEmpty() && url.isValid()) {
+                QDesktopServices::openUrl(url);
+                return;
+            }
+
+            // 2. Erst wenn kein Schema vorliegt, Pfade auflösen (~/, $HOME, relative Pfade)
+            QString urlStr = Helpers::expandPath(rawUrl);
+
+            QFileInfo fileInfo(urlStr);
+            if (fileInfo.isRelative()) {
+                QDir desktopFileDir = QFileInfo(info.path).absoluteDir();
+                urlStr = desktopFileDir.absoluteFilePath(urlStr);
+            }
+
+            // Lokale Pfade explizit als File-URL konvertieren
+            url = QUrl::fromLocalFile(urlStr);
+            if (!url.isValid()) {
+                url = QUrl::fromUserInput(urlStr);
+            }
+
+            if (url.isValid()) {
+                QDesktopServices::openUrl(url);
+            } else {
+                qWarning() << "launchDesktopFile(): Ungültige URL:" << urlStr;
+            }
+            return;
+        }
+
+        // ==========================================
+        // 2. Handhabung von Type=Application (Normaler Exec-Start)
+        // ==========================================
+        if (info.exec.isEmpty()) return;
+
+        for (QStringList args : expandDesktopExec(info, fileList)) {
+            if (args.isEmpty()) continue;
+            const QStringList invocation = args;
+            QString program = args.takeFirst();
+
+            program = Helpers::expandPath(program);
+            if (!QFileInfo(program).isAbsolute()) {
+                program = QStandardPaths::findExecutable(program);
+                if (program.isEmpty()) {
+                    qWarning() << "launchDesktopFile(): Programm nicht gefunden:" << invocation.first();
+                    continue;
+                }
+            }
+
+            // ==========================================
+            // Terminal-Handling
+            // ==========================================
+            if (info.useTerminal) {
+                QString terminal;
+                // Priorisierte Liste bekannter Linux-Terminals (Konsole zuerst wegen KDE)
+                const QStringList terminalCandidates = {
+                    "konsole", "gnome-terminal", "xfce4-terminal", "alacritty", "kitty", "xterm"
+                };
+
+                for (const QString &candidate : terminalCandidates) {
+                    terminal = QStandardPaths::findExecutable(candidate);
+                    if (!terminal.isEmpty()) {
+                        break;
+                    }
+                }
+
+                if (!terminal.isEmpty()) {
+                    QStringList terminalArgs;
+
+                    // Ältere/Schlanke Terminals wie xterm/alacritty brauchen meist '-e'
+                    // Moderne Desktoptop-Terminals (konsole, gnome-terminal) bevorzugen '--'
+                    if (terminal.endsWith("gnome-terminal")) {
+                        terminalArgs << "--" << program << args;
+                    } else {
+                        terminalArgs << "-e" << program << args;
+                    }
+
+                    // Das Terminal wird zum Hauptprogramm, die App wandert in die Argumente
+                    program = terminal;
+                    args = terminalArgs;
+                } else {
+                    // Fallback: Wenn absolut kein Terminal gefunden wurde,
+                    // loggen wir eine Warnung und starten es normal im Hintergrund.
+                    qWarning("Konnte keinen Terminal-Emulator finden. Starte App normal.");
+                }
+            }
+            // ==========================================
+
+            QString workDir = Helpers::expandPath(info.workDir.trimmed());
+            if (workDir.startsWith('"') && workDir.endsWith('"'))
+                workDir = workDir.mid(1, workDir.length() - 2);
+            if (workDir.isEmpty() || !QDir(workDir).exists())
+                workDir = QFileInfo(program).absolutePath();
+            qDebug() << "launchDesktopFile() program:" << program << "args:" << args;
+            QProcess::startDetached(program, args, workDir);
+        }
+    }
+
+    QString expandPath(QString path) {
+        if (path.size() > kMaxInputLength) {
+            path.truncate(kMaxInputLength);
+        }
+        path = stripInvisibleAndControlChars(path);
+        return expandSingleLine(path);
     }
 
 } // namespace Helpers

@@ -89,6 +89,7 @@ private:
     class QComboBox* m_comboCpuType;
     class QSpinBox*  m_spinCpuCores;
     class QCheckBox* m_checkForceQImageReader;
+    class QLineEdit* m_editDefaultImageEditor;
 
     // Hilfsmethoden zum Erstellen der Seiten
     QWidget* createImagePage();
@@ -127,6 +128,8 @@ public:
     bool TitleBarUseFileIcon() const { return m_bTitleBarUseFileIcon; }
     bool UseEmbeddedColorProfiles() const { return m_bUseEmbeddedColorProfiles; }
     bool ForceQImageReader() const { return m_bForceQImageReader; }
+    // .desktop-ID (z.B. "org.kde.krita.desktop"), Programmname oder Pfad; leer = Standardprogramm des Systems
+    QString DefaultImageEditor() const { return m_sDefaultImageEditor; }
     bool WrapAroundFolder() const { return m_bWrapAroundFolder && m_eNavigation == Helpers::NM_LoopDirectory; }
 
     // Ursprüngliche Rückgabetypen für vollständige Drop-in Compatibility
@@ -212,6 +215,7 @@ private:
     bool m_bStickyWindowSize{true};
     bool m_bExplicitWindowRect{false};
     bool m_bForceQImageReader{false};
+    QString m_sDefaultImageEditor;
     QColor m_colorBackground;
     QColor m_colorTransparency;
     bool m_bReloadWhenDisplayedImageChanged{true};

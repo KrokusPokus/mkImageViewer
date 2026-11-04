@@ -7,11 +7,29 @@
 
 #include <cfloat>
 
+#include <QFileInfo>
+#include <QList>
 #include <QString>
+#include <QStringList>
 #include <QRgb>
 
 class CBaseImage;
 class CFileList;
+
+// Übernommen aus mkTools/shared/src/helpers.h (nur die Teile zum Starten von Programmen/.desktop-Dateien).
+
+struct DesktopEntry {
+    QString id;
+    QString name;
+    QString icon;
+    QString exec;
+    QString path;
+    QString workDir;
+    QString type; // "Application", "Link", etc.
+    QString url;  // Für Type=Link
+    bool isValid = false;
+    bool useTerminal = false;
+};
 
 namespace Helpers {
 
@@ -214,6 +232,13 @@ namespace Helpers {
     int GetFrameIndex(const CImagePosition& position, bool bImageLoaded, int iOffset, bool bSwitchFrame, bool & switchImage);
 
     uint64_t GetTimeMs();
+
+    DesktopEntry getDesktopEntryById(const QString &id);
+    DesktopEntry getDesktopEntry(const QFileInfo &fileInfo);
+    void openFileListWithHandler(const QString &handler, const QStringList &fileList);
+    void launchDesktopFile(const DesktopEntry &info, const QStringList &fileList = {});
+    QList<QStringList> expandDesktopExec(const DesktopEntry &entry, const QStringList &files);
+    QString expandPath(QString path);
 
 } // namespace Helpers
 
