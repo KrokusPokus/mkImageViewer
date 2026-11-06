@@ -10,179 +10,161 @@
 #include <vector>
 
 namespace {
-// We cannot enlarge to a factor above the number of kernels without artifacts
-constexpr int NUM_KERNELS_RESIZE = 128;
-constexpr int NUM_KERNELS_RESIZE_LOG2 = 7;
+    // We cannot enlarge to a factor above the number of kernels without artifacts
+    constexpr int NUM_KERNELS_RESIZE = 128;
+    constexpr int NUM_KERNELS_RESIZE_LOG2 = 7;
 
-constexpr double kPi = std::numbers::pi;
-constexpr double kPiDiv2 = kPi / 2;
-constexpr double kPiSqr = kPi * kPi;
+    constexpr double kPi = std::numbers::pi;
+    constexpr double kPiDiv2 = kPi / 2;
+    constexpr double kPiSqr = kPi * kPi;
 
-//////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-//////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////
+    // Helpers
+    //////////////////////////////////////////////////////////////////////////////////////
 
-inline int16 roundToInt16(double d) {
-    return static_cast<int16>((d < 0) ? (d - 0.5) : (d + 0.5));
-}
-
-// Normalization means: sum of filter elements equals CResizeFilter::FP_ONE
-void NormalizeFilter(int16* pFilter, int nLen) {
-    int nSum = 0;
-    for (int i = 0; i < nLen; i++) {
-        nSum += pFilter[i];
+    inline int16 roundToInt16(double d) {
+        return static_cast<int16>((d < 0) ? (d - 0.5) : (d + 0.5));
     }
-    if (nSum > 0) {
-        int nTotal = 0;
+
+    // Normalization means: sum of filter elements equals CResizeFilter::FP_ONE
+    void NormalizeFilter(int16* pFilter, int nLen) {
+        int nSum = 0;
         for (int i = 0; i < nLen; i++) {
-            pFilter[i] = static_cast<int16>((pFilter[i] * CResizeFilter::FP_ONE) / nSum);
-            nTotal += pFilter[i];
+            nSum += pFilter[i];
         }
-        pFilter[0] += static_cast<int16>(CResizeFilter::FP_ONE - nTotal);
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////
-// Filter kernel evaluation
-//////////////////////////////////////////////////////////////////////////////////////
-
-// Cubic Filter Family: Mitchell-Netravali filters (BC-splines)
-
-// Hermite (B=0, C=0)
-inline double EvaluateCore_Hermite(double dX) {
-    const double ParamB = 0.0;
-    const double ParamC = 0.0;
-
-    if (std::abs(dX) < 1) {
-        return (((12 - 9*ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((-18 + 12*ParamB + 6*ParamC) * (dX*dX)) + (6 - 2*ParamB)) / 6.0;
-    }
-    // GF: Not needed. Hermite' has the smallest support ('1.0') of all the BC Cubic filters, and does not contain a negative lobe.
-    //    else if (abs(dX) < 2)
-    //        return (((-ParamB - 6*ParamC) * abs(dX*dX*dX)) + ((6*ParamB + 30*ParamC) * (dX*dX)) + (((-12 * ParamB) - (48 * ParamC)) * abs(dX)) + (8*ParamB + 24*ParamC)) / 6.0;
-    return 0.0;
-}
-
-// Mitchell (B=1/3, C=1/3)
-inline double EvaluateCore_Mitchell(double dX) {
-    const double ParamB = 1.0/3.0;
-    const double ParamC = 1.0/3.0;
-
-    if (std::abs(dX) < 1) {
-        return (((12 - 9*ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((-18 + 12*ParamB + 6*ParamC) * (dX*dX)) + (6 - 2*ParamB)) / 6.0;
-    } else if (std::abs(dX) < 2) {
-        return (((-ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((6*ParamB + 30*ParamC) * (dX*dX)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dX)) + (8*ParamB + 24*ParamC)) / 6.0;
-    }
-    return 0.0;
-}
-
-// Catrom (B=0, C=0.5)
-inline double EvaluateCore_Catrom(double dX) {
-    const double ParamB = 0.0;
-    const double ParamC = 0.5;
-
-    if (std::abs(dX) < 1) {
-        return (((12 - 9*ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((-18 + 12*ParamB + 6*ParamC) * (dX*dX)) + (6 - 2*ParamB)) / 6.0;
-    } else if (std::abs(dX) < 2) {
-        return (((-ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((6*ParamB + 30*ParamC) * (dX*dX)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dX)) + (8*ParamB + 24*ParamC)) / 6.0;
-    }
-    return 0.0;
-}
-
-// 2-lobe Lanczos filter (Equivalent to IM Lanczos2, support is [-2.0, 2.0]
-inline double EvaluateCore_Lanczos2(double dX) {
-    if (std::abs(dX) < 1e-6) {
-        return 1.0;
-    } else if (std::abs(dX) < 2) {
-        return (2 * std::sin(kPi*dX) * std::sin(kPiDiv2*dX)) / (kPiSqr*dX*dX);
-    }
-    return 0.0;
-}
-
-// Evaluate a filter kernel at position dX. The filter kernel is assumed to have zero solutions at
-// integer values and is centered around zero.
-inline double EvaluateKernel(double dX, EFilterType eFilter) {
-    switch (eFilter) {
-    case Filter_Downsampling_Hermite:
-        return EvaluateCore_Hermite(dX);
-    case Filter_Downsampling_Mitchell:
-        return EvaluateCore_Mitchell(dX);
-    case Filter_Downsampling_Catrom:
-        return EvaluateCore_Catrom(dX);
-    case Filter_Downsampling_Lanczos2:
-        return EvaluateCore_Lanczos2(dX);
-    default:
-        break;
-    }
-    return 0.0;
-}
-
-// Evaluation of filter kernel using an integration over the source pixel width.
-// This implements a convolution of a box filter with the filter kernel.
-// Note that dX is given in the source pixel space
-double EvaluateKernelIntegrated(double dX, EFilterType eFilter, double dMultX) {
-    double dXScaled = dX*dMultX;
-
-    // take integral of target function from [dX - 0.5, dX + 0.5]
-    constexpr int NUM_STEPS = 32;
-    double dStartX = dXScaled - dMultX*0.5;
-    double dStepX = dMultX*(1.0 / (NUM_STEPS - 1));
-    double dSum = 0.0;
-    for (int i = 0; i < NUM_STEPS; i++) {
-        dSum += EvaluateKernel(dStartX, eFilter);
-        dStartX += dStepX;
-    }
-    return dSum;
-}
-
-double EvaluateCubicFilterKernel(double dFrac, int nKernelElement) {
-    // [GF] The original version was using the equivalent of Catrom for upscaling,
-    //      but calculated it with a cdFactorA=-0.5 instead of separate ParamB/ParamC.
-
-    // Cubic Spline (emulates gaussian, but is faster)
-    //const double ParamB = 1.0;
-    //const double ParamC = 0.0;
-
-    // Catrom
-    const double ParamB = 0.0;
-    const double ParamC = 0.5;
-
-    double dAbsDiff;
-    switch (nKernelElement) {
-    case 0:
-        dAbsDiff = 1.0 + dFrac;
-        return (((-ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((6*ParamB + 30*ParamC) * (dAbsDiff*dAbsDiff)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dAbsDiff)) + (8*ParamB + 24*ParamC)) / 6.0;
-    case 1:
-        dAbsDiff = dFrac;
-        return (((12 - 9*ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((-18 + 12*ParamB + 6*ParamC) * (dAbsDiff*dAbsDiff)) + (6 - 2*ParamB)) / 6.0;
-    case 2:
-        dAbsDiff = (1.0 - dFrac);
-        return (((12 - 9*ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((-18 + 12*ParamB + 6*ParamC) * (dAbsDiff*dAbsDiff)) + (6 - 2*ParamB)) / 6.0;
-    case 3:
-        dAbsDiff = 1.0 + (1.0 - dFrac);
-        return (((-ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((6*ParamB + 30*ParamC) * (dAbsDiff*dAbsDiff)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dAbsDiff)) + (8*ParamB + 24*ParamC)) / 6.0;
-    }
-    return -1;
-}
-
-// Filter is normalized in fixed point format, sum of elements is FP_ONE
-// nFrac is fractional part (sub-pixel offset), coded in [0..65535] --> [0...1]
-// Returned filter in pFilterOut has length BICUBIC_FILTER_LEN
-void GetBicubicFilter(uint16 nFrac, int16* pFilterOut) {
-    constexpr int BICUBIC_FILTER_LEN = 4;
-    double dFrac = nFrac*(1.0/65535.0);
-    double dFilter[BICUBIC_FILTER_LEN];
-    double dSum = 0.0;
-    for (int i = 0; i < BICUBIC_FILTER_LEN; i++) {
-        dFilter[i] = EvaluateCubicFilterKernel(dFrac, i);
-        dSum += dFilter[i];
-    }
-    for (int i = 0; i < BICUBIC_FILTER_LEN; i++) {
-        pFilterOut[i] = roundToInt16(CResizeFilter::FP_ONE * dFilter[i] / dSum);
+        if (nSum > 0) {
+            int nTotal = 0;
+            for (int i = 0; i < nLen; i++) {
+                pFilter[i] = static_cast<int16>((pFilter[i] * CResizeFilter::FP_ONE) / nSum);
+                nTotal += pFilter[i];
+            }
+            pFilter[0] += static_cast<int16>(CResizeFilter::FP_ONE - nTotal);
+        }
     }
 
-    NormalizeFilter(pFilterOut, BICUBIC_FILTER_LEN);
-}
-}
+    //////////////////////////////////////////////////////////////////////////////////////
+    // Filter kernel evaluation
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    // Cubic Filter Family: Mitchell-Netravali filters (BC-splines)
+
+    // Hermite (B=0, C=0)
+    inline double EvaluateCore_Hermite(double dX) {
+        const double ParamB = 0.0;
+        const double ParamC = 0.0;
+
+        if (std::abs(dX) < 1) {
+            return (((12 - 9*ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((-18 + 12*ParamB + 6*ParamC) * (dX*dX)) + (6 - 2*ParamB)) / 6.0;
+        }
+        // GF: Not needed. Hermite' has the smallest support ('1.0') of all the BC Cubic filters, and does not contain a negative lobe.
+        //    else if (abs(dX) < 2)
+        //        return (((-ParamB - 6*ParamC) * abs(dX*dX*dX)) + ((6*ParamB + 30*ParamC) * (dX*dX)) + (((-12 * ParamB) - (48 * ParamC)) * abs(dX)) + (8*ParamB + 24*ParamC)) / 6.0;
+        return 0.0;
+    }
+
+    // Mitchell (B=1/3, C=1/3)
+    inline double EvaluateCore_Mitchell(double dX) {
+        const double ParamB = 1.0/3.0;
+        const double ParamC = 1.0/3.0;
+
+        if (std::abs(dX) < 1) {
+            return (((12 - 9*ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((-18 + 12*ParamB + 6*ParamC) * (dX*dX)) + (6 - 2*ParamB)) / 6.0;
+        } else if (std::abs(dX) < 2) {
+            return (((-ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((6*ParamB + 30*ParamC) * (dX*dX)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dX)) + (8*ParamB + 24*ParamC)) / 6.0;
+        }
+        return 0.0;
+    }
+
+    // Catrom (B=0, C=0.5)
+    inline double EvaluateCore_Catrom(double dX) {
+        const double ParamB = 0.0;
+        const double ParamC = 0.5;
+
+        if (std::abs(dX) < 1) {
+            return (((12 - 9*ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((-18 + 12*ParamB + 6*ParamC) * (dX*dX)) + (6 - 2*ParamB)) / 6.0;
+        } else if (std::abs(dX) < 2) {
+            return (((-ParamB - 6*ParamC) * std::abs(dX*dX*dX)) + ((6*ParamB + 30*ParamC) * (dX*dX)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dX)) + (8*ParamB + 24*ParamC)) / 6.0;
+        }
+        return 0.0;
+    }
+
+    // 2-lobe Lanczos filter (Equivalent to IM Lanczos2, support is [-2.0, 2.0]
+    inline double EvaluateCore_Lanczos2(double dX) {
+        if (std::abs(dX) < 1e-6) {
+            return 1.0;
+        } else if (std::abs(dX) < 2) {
+            return (2 * std::sin(kPi*dX) * std::sin(kPiDiv2*dX)) / (kPiSqr*dX*dX);
+        }
+        return 0.0;
+    }
+
+    // Evaluate a filter kernel at position dX. The filter kernel is assumed to have zero solutions at
+    // integer values and is centered around zero.
+    inline double EvaluateKernel(double dX, EFilterType eFilter) {
+        switch (eFilter) {
+        case Filter_Downsampling_Hermite:
+            return EvaluateCore_Hermite(dX);
+        case Filter_Downsampling_Mitchell:
+            return EvaluateCore_Mitchell(dX);
+        case Filter_Downsampling_Catrom:
+            return EvaluateCore_Catrom(dX);
+        case Filter_Downsampling_Lanczos2:
+            return EvaluateCore_Lanczos2(dX);
+        default:
+            break;
+        }
+        return 0.0;
+    }
+
+    // Evaluation of filter kernel using an integration over the source pixel width.
+    // This implements a convolution of a box filter with the filter kernel.
+    // Note that dX is given in the source pixel space
+    double EvaluateKernelIntegrated(double dX, EFilterType eFilter, double dMultX) {
+        double dXScaled = dX*dMultX;
+
+        // take integral of target function from [dX - 0.5, dX + 0.5]
+        constexpr int NUM_STEPS = 32;
+        double dStartX = dXScaled - dMultX*0.5;
+        double dStepX = dMultX*(1.0 / (NUM_STEPS - 1));
+        double dSum = 0.0;
+        for (int i = 0; i < NUM_STEPS; i++) {
+            dSum += EvaluateKernel(dStartX, eFilter);
+            dStartX += dStepX;
+        }
+        return dSum;
+    }
+
+    double EvaluateCubicFilterKernel(double dFrac, int nKernelElement) {
+        // [GF] The original version was using the equivalent of Catrom for upscaling,
+        //      but calculated it with a cdFactorA=-0.5 instead of separate ParamB/ParamC.
+
+        // Cubic Spline (emulates gaussian, but is faster)
+        //const double ParamB = 1.0;
+        //const double ParamC = 0.0;
+
+        // Catrom
+        const double ParamB = 0.0;
+        const double ParamC = 0.5;
+
+        double dAbsDiff;
+        switch (nKernelElement) {
+        case 0:
+            dAbsDiff = 1.0 + dFrac;
+            return (((-ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((6*ParamB + 30*ParamC) * (dAbsDiff*dAbsDiff)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dAbsDiff)) + (8*ParamB + 24*ParamC)) / 6.0;
+        case 1:
+            dAbsDiff = dFrac;
+            return (((12 - 9*ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((-18 + 12*ParamB + 6*ParamC) * (dAbsDiff*dAbsDiff)) + (6 - 2*ParamB)) / 6.0;
+        case 2:
+            dAbsDiff = (1.0 - dFrac);
+            return (((12 - 9*ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((-18 + 12*ParamB + 6*ParamC) * (dAbsDiff*dAbsDiff)) + (6 - 2*ParamB)) / 6.0;
+        case 3:
+            dAbsDiff = 1.0 + (1.0 - dFrac);
+            return (((-ParamB - 6*ParamC) * std::abs(dAbsDiff*dAbsDiff*dAbsDiff)) + ((6*ParamB + 30*ParamC) * (dAbsDiff*dAbsDiff)) + (((-12 * ParamB) - (48 * ParamC)) * std::abs(dAbsDiff)) + (8*ParamB + 24*ParamC)) / 6.0;
+        }
+        return -1;
+    }
+
+} // namespace
 
 //////////////////////////////////////////////////////////////////////////////////////
 // Public
@@ -219,16 +201,6 @@ CResizeFilter::~CResizeFilter() {
 
 bool CResizeFilter::ParametersMatch(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType) {
     return nSourceSize == m_nSourceSize && nTargetSize == m_nTargetSize && eFilter == m_eFilter && m_filterSIMDType == filterSIMDType;
-}
-
-void CResizeFilter::GetBicubicFilterKernels(int nNumKernels, int16* pKernels) {
-    std::uint32_t nIncFrac = 65535/(nNumKernels - 1);
-    std::uint32_t nKFrac = 0;
-    for (int i = 0; i < nNumKernels; i++) {
-        int16* pThisKernel = &(pKernels[i * 4]);
-        GetBicubicFilter(static_cast<uint16>(nKFrac), pThisKernel);
-        nKFrac += nIncFrac;
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
