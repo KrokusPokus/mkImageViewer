@@ -348,11 +348,11 @@ void CImageProvider::RemoveUnusedImages(bool bRemoveAlsoActiveRequests) {
         std::list<RequestPtr>::iterator iter;
         for (iter = m_requestList.begin(); iter != m_requestList.end(); iter++) {
             const auto& pRequest = *iter;
-            if (pRequest->InUse == false && pRequest->Ready && (pRequest->IsActive == false || bRemoveAlsoActiveRequests || IsDestructivelyProcessed(pRequest->Image))) {
+            if (pRequest->InUse == false && pRequest->Ready && (pRequest->IsActive == false || bRemoveAlsoActiveRequests)) {
                 if (pRequest->AccessTimeStamp < nSmallestTimeStamp) {
                     nSmallestTimeStamp = pRequest->AccessTimeStamp;
                 }
-                if (pRequest->AccessTimeStamp == nTimeStampToRemove || IsDestructivelyProcessed(pRequest->Image)) {
+                if (pRequest->AccessTimeStamp == nTimeStampToRemove) {
                     iter = DeleteElementAt(iter);
                     bRemoved = true;
                     break;
@@ -441,6 +441,3 @@ void CImageProvider::CancelPendingReadAhead(const RequestPtr& pKeep, CFileList* 
     }
 }
 
-bool CImageProvider::IsDestructivelyProcessed(CBaseImage* pImage) {
-    return pImage != nullptr && pImage->IsDestructivelyProcessed();
-}

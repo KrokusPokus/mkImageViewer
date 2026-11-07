@@ -39,29 +39,32 @@ public:
 };
 
 // Parameters used for image rotation
+// Mirroring and rotating can not be swapped, so the state has a fixed order: the image is first mirrored horizontally
+// (if Mirrored) and then rotated clockwise. A vertical mirroring is a horizontal one plus a rotation by 180 degrees.
 class CRotationParams {
 public:
-    CRotationParams() : Rotation(0) {}
+    CRotationParams() : Rotation(0), Mirrored(false) {}
 
-    explicit CRotationParams(int rotation) {
-        Rotation = rotation;
+    explicit CRotationParams(int rotation, bool mirrored = false) : Rotation(rotation), Mirrored(mirrored) {}
+
+    // Rotation of the image after mirroring, if the user changes an image already rotated by nBaseRotation (EXIF)
+    static int CombineRotation(int nBaseRotation, int nUserRotation, bool bMirrored) {
+        return (((bMirrored ? nUserRotation - nBaseRotation : nUserRotation + nBaseRotation) % 360) + 360) % 360;
     }
 
-    CRotationParams(const CRotationParams& other) {
-        Rotation = other.Rotation;
-    }
-
-    CRotationParams(const CRotationParams& other, int rotation) {
-        Rotation = rotation;
+    // Rotation after mirroring an image with the given rotation in the current direction of view
+    static int RotationAfterMirror(int nRotation, bool bHorizontally) {
+        return (((bHorizontally ? -nRotation : 180 - nRotation) % 360) + 360) % 360;
     }
 
     int Rotation; // Main rotation in degrees, must be in [0, 90, 180, 270]
+    bool Mirrored; // Mirrored horizontally before the rotation
 };
 
 class CProcessParams {
 public:
     // TargetWidth, TargetHeight is the dimension of the target output window, the image is fit into this rectangle
-    // rotationParams specifies base rotation; nUserRotation will be added to it
+    // rotationParams specifies base rotation and the mirroring by the user; nUserRotation will be combined with it
     // dZoom is the zoom factor compared to initial image size (1.0 means no zoom)
     // offsets are relative to center of image and refer to original image size (not zoomed)
     CProcessParams(int nTargetWidth,

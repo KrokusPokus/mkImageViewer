@@ -91,9 +91,6 @@ public:
     // Returns if this image has been cropped or not
     bool IsCropped() { return m_bCropped; }
 
-    // Returns if this image's original pixels have been processed destructively (e.g. cropped or rotated by non-90 degrees steps)
-    bool IsDestructivelyProcessed() { return m_bIsDestructivelyProcessed; }
-
     // raw access to original pixels - do not delete or store the returned pointer
     void* OriginalPixels() { return  m_pOrigPixels; }
     const void* OriginalPixels() const { return m_pOrigPixels; }
@@ -231,8 +228,7 @@ private:
     CPoint m_initialOffsets;
 
     bool m_bCropped; // Image has been cropped
-    bool m_bIsDestructivelyProcessed; // Original image pixels destructively processed (i.e. cropped or size changed)
-    CRotationParams m_rotationParams; // current rotation
+    CRotationParams m_rotationParams; // current rotation and mirroring of the original pixels
     bool m_bRotationByEXIF; // is the rotation given by EXIF
 
     // This is the geometry that was requested during last GetDIB() call
@@ -286,9 +282,6 @@ private:
 
     // Gets the rotation from EXIF if available
     int GetRotationFromEXIF(int nOrigRotation);
-
-    // Sets the m_bIsDestructivelyProcessed flag to true and resets rotation
-    void MarkAsDestructivelyProcessed();
 
     // Called when the original pixels have changed (rotate, crop), all cached pixel data gets invalid
     void InvalidateAllCachedPixelData();

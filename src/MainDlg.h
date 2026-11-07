@@ -110,6 +110,7 @@ private:
     // Current parameter set
     int m_nRotation; // this can only be 0, 90, 180 or 270
     int m_nUserRotation; // Rotation delta from user, can only be 0, 90, 180 or 270
+    bool m_bUserMirrored; // Mirrored by the user, see CRotationParams for the order of mirroring and rotation
     bool m_bUserZoom;
     bool m_bUserPan; // user has zoomed and panned away from default values
     bool m_bResizeForNewImage;

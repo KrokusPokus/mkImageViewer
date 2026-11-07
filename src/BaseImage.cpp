@@ -103,7 +103,6 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_initialOffsets = CPoint(0, 0);
 
     m_bCropped = false;
-    m_bIsDestructivelyProcessed = false;
     m_bRotationByEXIF = false;
     m_bFirstReprocessing = true;
     m_dibLoadDelayMs = 0;
@@ -300,6 +299,9 @@ CPoint CBaseImage::ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoin
 }
 
 bool CBaseImage::VerifyRotation(const CRotationParams& rotationParams) {
+    if (rotationParams.Mirrored != m_rotationParams.Mirrored && !Mirror(true)) {
+        return false;
+    }
     int nDiff = ((rotationParams.Rotation - m_rotationParams.Rotation) + 360) % 360;
     if (nDiff != 0) {
         if (!Rotate(nDiff)) return false;
@@ -333,7 +335,8 @@ bool CBaseImage::Mirror(bool bHorizontally) {
     if (pNewOriginalPixels == NULL) return false;
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
     m_pOrigPixels = pNewOriginalPixels;
-    MarkAsDestructivelyProcessed();
+    m_rotationParams.Rotation = CRotationParams::RotationAfterMirror(m_rotationParams.Rotation, bHorizontally);
+    m_rotationParams.Mirrored = !m_rotationParams.Mirrored;
     return true;
 }
 
@@ -583,10 +586,6 @@ int CBaseImage::GetRotationFromEXIF(int nOrigRotation) {
     }
 
     return nOrigRotation;
-}
-
-void CBaseImage::MarkAsDestructivelyProcessed() {
-    m_bIsDestructivelyProcessed = true;
 }
 
 void CBaseImage::InvalidateAllCachedPixelData() {

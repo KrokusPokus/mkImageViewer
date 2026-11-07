@@ -107,16 +107,17 @@ namespace {
 
     // Line of the info overlay: the arrow points to where the bottom of the unrotated image is on the screen. All
     // rotations in degrees clockwise (0, 90, 180, 270). Without any resulting rotation there is nothing to explain.
-    QString FormatRotationLine(int nTotalRotation, int nExifRotation, int nUserRotation) {
+    QString FormatRotationLine(int nTotalRotation, int nExifRotation, int nUserRotation, bool bMirrored) {
         const auto formatDelta = [](int nRotation) {
             return nRotation == 270 ? QStringLiteral("-90") : QStringLiteral("+%1").arg(nRotation);
         };
         const QChar arrow = nTotalRotation == 90 ? QChar(0x2190) : nTotalRotation == 180 ? QChar(0x2191) : nTotalRotation == 270 ? QChar(0x2192) : QChar(0x2193);
         QString sLine = QStringLiteral("Down:        ") + arrow;
-        if (nTotalRotation != 0) {
+        if (nTotalRotation != 0 || bMirrored) {
             QStringList sources;
             if (nExifRotation != 0) sources << QStringLiteral("EXIF-rotated ") + formatDelta(nExifRotation);
             if (nUserRotation != 0) sources << QStringLiteral("User-rotated ") + formatDelta(nUserRotation);
+            if (bMirrored) sources << QStringLiteral("Mirrored");
             sLine += QStringLiteral(" (") + sources.join(QStringLiteral(", ")) + QLatin1Char(')');
         }
         return sLine;
@@ -348,6 +349,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
 
     m_nRotation = 0;
     m_nUserRotation = 0;
+    m_bUserMirrored = false;
     m_dZoomAtResizeStart = 1.0;
     m_bZoomMode = false;
     m_bZoomModeOnLeftMouse = false;
@@ -557,7 +559,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     if (m_pCurrentImage != NULL) {
         qint64 startTime = QDateTime::currentMSecsSinceEpoch();
 
-        m_pCurrentImage->VerifyRotation(CRotationParams(m_pCurrentImage->GetRotationParams(), m_nRotation));
+        m_pCurrentImage->VerifyRotation(CRotationParams(m_nRotation, m_bUserMirrored));
 
         if (m_dZoomMult < 0.0) {
             m_dZoomMult = GetZoomMultiplier(m_pCurrentImage, m_clientRect);
@@ -630,10 +632,10 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             unsigned int iRealWidth = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigWidth()));
             unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
-            // The rotation of the shown image is made up of the EXIF rotation and the rotation by the user
+            // The state of the shown image is made up of the EXIF rotation and the rotation and mirroring by the user
             const int nTotalRotation = (m_nRotation % 360 + 360) % 360;
             const int nExifRotation = m_pCurrentImage->IsRotationByEXIF() ? m_pCurrentImage->GetInitialRotation() % 360 : 0;
-            const QString sRotationLine = FormatRotationLine(nTotalRotation, nExifRotation, (nTotalRotation - nExifRotation + 360) % 360);
+            const QString sRotationLine = FormatRotationLine(nTotalRotation, nExifRotation, m_nUserRotation, m_bUserMirrored);
 
             QString infoText;
             QString sFullPath = CurrentFileName(false);
@@ -1884,8 +1886,10 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::MirrorH:
         case Command::MirrorV:
-            if (m_pCurrentImage != NULL) {
-                m_pCurrentImage->Mirror(inv.id == Command::MirrorH);
+            if (m_pCurrentImage != NULL && m_pCurrentImage->Mirror(inv.id == Command::MirrorH)) {
+                m_nRotation = CRotationParams::RotationAfterMirror(m_nRotation, inv.id == Command::MirrorH);
+                m_nUserRotation = CRotationParams::RotationAfterMirror(m_nUserRotation, inv.id == Command::MirrorH);
+                m_bUserMirrored = !m_bUserMirrored;
                 this->update();
             }
             break;
@@ -2939,7 +2943,7 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
 
         return CProcessParams(nClientWidth, nClientHeight,
             CMultiMonitorSupport::GetMonitorRect(this).size(),
-            CRotationParams(0),
+            CRotationParams(0, m_bUserMirrored),
             m_nUserRotation,
             m_dZoomKept,
             eAutoZoomMode,
@@ -2971,6 +2975,7 @@ void CMainDlg::SetKeepParams(bool bKeep) {
 void CMainDlg::ResetParamsToDefault() {
     m_nRotation = 0;
     m_nUserRotation = 0;
+    m_bUserMirrored = false;
     m_dZoom = m_dZoomMult = -1.0;
     m_offsets = CPoint(0, 0);
     m_bUserZoom = false;
@@ -3091,7 +3096,7 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
             }
 
             if (m_bKeepParams) {
-                m_nRotation = m_pCurrentImage->GetInitialRotation() + m_nUserRotation;
+                m_nRotation = CRotationParams::CombineRotation(m_pCurrentImage->GetInitialRotation(), m_nUserRotation, m_bUserMirrored);
             }
 
             // [GF] Adjust m_offsets for BookMode

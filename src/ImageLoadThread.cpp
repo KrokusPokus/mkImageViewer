@@ -1282,7 +1282,9 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
     request->Image->SetInitialProcessParams(&(request->ProcessParams));
 
     // First do rotation, this maybe modifies the width and height
-    if (!request->Image->VerifyRotation(CRotationParams(request->ProcessParams.RotationParams, request->ProcessParams.RotationParams.Rotation + request->ProcessParams.UserRotation))) {
+    const CRotationParams& rotationParams = request->ProcessParams.RotationParams;
+    const int nRotation = CRotationParams::CombineRotation(rotationParams.Rotation, request->ProcessParams.UserRotation, rotationParams.Mirrored);
+    if (!request->Image->VerifyRotation(CRotationParams(nRotation, rotationParams.Mirrored))) {
         return false;
     }
 

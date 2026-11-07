@@ -107,7 +107,6 @@ private:
     RequestPtr FindRequest(const QString& sFileName, int nFrameIndex);
     std::list<RequestPtr>::iterator DeleteElementAt(std::list<RequestPtr>::iterator iteratorAt);
     void DeleteElement(RequestPtr pRequest);
-    bool IsDestructivelyProcessed(CBaseImage* pImage);
     void SetAllRequestsInactive();
 
     // Called before waiting for pKeep, so that it does not wait behind images nobody needs now:
