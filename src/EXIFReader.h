@@ -58,6 +58,12 @@ public:
     // Parse date string in the EXIF date/time format
     static bool ParseDateString(QDateTime & date, const QString& str);
 
+    // Rotates a JPEG file by changing only its EXIF orientation tag, the pixel data is not touched. The tag and, if
+    // needed, the EXIF block are created. The modification time of the file is kept.
+    // nRotationDelta is 90, 180 or 270 degrees clockwise. Returns false if nothing was changed: not a JPEG, damaged EXIF
+    // data, a mirrored orientation (2, 4, 5, 7), no write access or no room for the tag in the EXIF block.
+    static bool RotateOrientationInFile(const QString& sFileName, int nRotationDelta);
+
 public:
     QString GetCameraModel() const { return m_sModel; }
     QString GetUserComment() const { return m_sUserComment; }

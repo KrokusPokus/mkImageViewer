@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <cstring>
 #include <QByteArray>
+#include <QDebug>
+#include <QFile>
+#include <QSaveFile>
 
 double CEXIFReader::UNKNOWN_DOUBLE_VALUE = 283740261.192864;
 
@@ -63,6 +66,52 @@ uint8* FindTag(uint8* ptr, uint8* ptrLast, uint16 nTag, bool bLittleEndian) {
         ptr += 12;
     }
     return nullptr;
+}
+
+// Walks the segments in front of the JPEG pixel data. Returns false if these are damaged or the stream is no JPEG.
+// Otherwise pExifSegment is the first Exif APP1 segment (nullptr if there is none) and nInsertPos the position
+// for a new one: at the start of the file, but behind a JFIF APP0 segment, which must stay the first one.
+bool FindExifSegment(uint8* pData, qint64 nSize, uint8*& pExifSegment, qint64& nInsertPos) {
+    pExifSegment = nullptr;
+    nInsertPos = 2;
+    if (nSize < 4 || pData[0] != 0xFF || pData[1] != 0xD8) {
+        return false;
+    }
+    qint64 nPos = 2;
+    while (nPos + 4 <= nSize && pData[nPos] == 0xFF) {
+        const uint8 nMarker = pData[nPos + 1];
+        if (nMarker == 0xFF) {
+            nPos++; // padding
+            continue;
+        }
+        if (nMarker == 0xDA) {
+            return true; // start of the pixel data
+        }
+        const qint64 nSegmentSize = 2 + pData[nPos + 2] * 256 + pData[nPos + 3];
+        if (nSegmentSize < 4 || nSegmentSize > nSize - nPos) {
+            return false;
+        }
+        if (nMarker == 0xE1 && pExifSegment == nullptr && nSegmentSize >= 18 && memcmp(pData + nPos + 4, "Exif\0\0", 6) == 0) {
+            pExifSegment = pData + nPos;
+        } else if (nMarker == 0xE0 && nPos == 2) {
+            nInsertPos = nPos + nSegmentSize;
+        }
+        nPos += nSegmentSize;
+    }
+    return false;
+}
+
+// Orientation tag value after a clockwise rotation by nSteps * 90 degrees, 0 if nOrientation is not a pure rotation.
+// The value 0 is invalid but common, it is treated like 1 (normal), just as CBaseImage ignores it when displaying.
+uint16 RotatedOrientation(uint16 nOrientation, int nSteps) {
+    static const uint16 aRotations[4] = { 1, 6, 3, 8 };
+    const uint16 nCurrent = std::max<uint16>(nOrientation, 1);
+    for (int i = 0; i < 4; i++) {
+        if (aRotations[i] == nCurrent) {
+            return aRotations[(i + nSteps) % 4];
+        }
+    }
+    return 0;
 }
 
 void ReadStringTag(QString & strOut, uint8* ptr, const TiffData& tiff, bool bLittleEndian, bool bTryReadAsUTF8 = false, uint32 maxLength = 65536) {
@@ -252,6 +301,123 @@ bool CEXIFReader::ParseDateString(QDateTime & date, const QString& str) {
     // EXIF Format: "YYYY:MM:DD HH:MM:SS"
     date = QDateTime::fromString(str.trimmed(), "yyyy:MM:dd hh:mm:ss");
     return date.isValid();
+}
+
+bool CEXIFReader::RotateOrientationInFile(const QString& sFileName, int nRotationDelta) {
+    const int nSteps = nRotationDelta / 90;
+    if (nSteps < 1 || nSteps > 3 || nRotationDelta % 90 != 0) {
+        return false;
+    }
+
+    // Also if the file is replaced below: without write access to the file it stays unchanged
+    QFile file(sFileName);
+    if (!file.open(QIODevice::ReadWrite)) {
+        return false;
+    }
+    const QDateTime modificationTime = file.fileTime(QFileDevice::FileModificationTime);
+    QByteArray data = file.readAll();
+    if (data.size() != file.size()) {
+        return false;
+    }
+
+    uint8* pData = reinterpret_cast<uint8*>(data.data());
+    uint8* pSegment;
+    qint64 nInsertPos;
+    if (!FindExifSegment(pData, data.size(), pSegment, nInsertPos)) {
+        return false;
+    }
+
+    if (pSegment == nullptr) {
+        // No Exif at all: insert a new block with just the tag
+        static const uint8 aNewSegment[36] = { 0xFF, 0xE1, 0, 34, 'E', 'x', 'i', 'f', 0, 0,  // marker, length, identifier
+            'M', 'M', 0, 42, 0, 0, 0, 8,                                                     // TIFF header
+            0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0,                                  // IFD0 with one tag
+            0, 0, 0, 0 };                                                                    // no next IFD
+        QByteArray newSegment(reinterpret_cast<const char*>(aNewSegment), sizeof(aNewSegment));
+        WriteUShort(newSegment.data() + 28, RotatedOrientation(1, nSteps), false);
+        data.insert(nInsertPos, newSegment);
+    } else {
+        // The segment length counts itself (2 bytes) and "Exif\0\0" (6 bytes), these are not part of the TIFF data
+        const int nSegmentLength = pSegment[2] * 256 + pSegment[3];
+        const TiffData tiff{ pSegment + 10, static_cast<uint32>(nSegmentLength - 8) };
+        if (memcmp(tiff.p, "II", 2) != 0 && memcmp(tiff.p, "MM", 2) != 0) {
+            return false;
+        }
+        const bool bLittleEndian = tiff.p[0] == 'I';
+        const uint32 nOffsetIFD0 = ReadUInt(tiff.p + 4, bLittleEndian);
+        if (!tiff.Contains(nOffsetIFD0, 2)) {
+            return false;
+        }
+        const uint32 nNumTags = ReadUShort(tiff.p + nOffsetIFD0, bLittleEndian);
+        if (!tiff.Contains(static_cast<uint64_t>(nOffsetIFD0) + 2, static_cast<uint64_t>(nNumTags) * 12 + 4)) {
+            return false;
+        }
+        uint8* pFirstTag = tiff.p + nOffsetIFD0 + 2;
+        uint8* pLastTag = pFirstTag + nNumTags * 12;
+
+        uint8* pTag = FindTag(pFirstTag, pLastTag, 0x112, bLittleEndian);
+        if (pTag != nullptr) {
+            // The tag exists: change its 2 bytes in place, nothing else in the file is written
+            if (ReadUShort(pTag + 2, bLittleEndian) != 3 || ReadUInt(pTag + 4, bLittleEndian) != 1) {
+                return false;
+            }
+            const uint16 nOrientation = RotatedOrientation(ReadUShort(pTag + 8, bLittleEndian), nSteps);
+            if (nOrientation == 0) {
+                return false;
+            }
+            WriteUShort(pTag + 8, nOrientation, bLittleEndian);
+            if (!file.seek(pTag + 8 - pData) || file.write(reinterpret_cast<const char*>(pTag + 8), 2) != 2 || !file.flush()) {
+                return false;
+            }
+            if (!file.setFileTime(modificationTime, QFileDevice::FileModificationTime)) {
+                qWarning() << "EXIF: cannot restore the modification time of" << sFileName;
+            }
+            return true;
+        }
+
+        // Exif without the tag: append an enlarged copy of IFD0 to the block and let the TIFF header point to it. Offsets
+        // in EXIF data are relative to the TIFF header, so all of them stay valid. The old IFD0 remains as unused bytes.
+        const uint32 nNewOffset = (tiff.size + 1) & ~1u;  // an IFD starts on a word boundary
+        const int nPadding = nNewOffset - tiff.size;
+        const int nNewIFDSize = nPadding + 2 + (nNumTags + 1) * 12 + 4;
+        if (nNumTags == 0xFFFF || nSegmentLength + nNewIFDSize > 0xFFFF) {
+            return false;
+        }
+        uint8* pInsertTag = pFirstTag;  // tags are sorted (not always, but then the position doesn't matter)
+        while (pInsertTag < pLastTag && ReadUShort(pInsertTag, bLittleEndian) < 0x112) {
+            pInsertTag += 12;
+        }
+        const int nTagsBefore = static_cast<int>(pInsertTag - pFirstTag);
+
+        QByteArray newIFD(nNewIFDSize, '\0');
+        uint8* pIFD = reinterpret_cast<uint8*>(newIFD.data()) + nPadding;
+        WriteUShort(pIFD, nNumTags + 1, bLittleEndian);
+        memcpy(pIFD + 2, pFirstTag, nTagsBefore);
+        uint8* pNewTag = pIFD + 2 + nTagsBefore;
+        WriteUShort(pNewTag, 0x112, bLittleEndian);
+        WriteUShort(pNewTag + 2, 3, bLittleEndian);
+        WriteUInt(pNewTag + 4, 1, bLittleEndian);
+        WriteUShort(pNewTag + 8, RotatedOrientation(1, nSteps), bLittleEndian);
+        memcpy(pNewTag + 12, pInsertTag, pLastTag + 4 - pInsertTag);  // the rest and the offset of the next IFD
+
+        WriteUInt(tiff.p + 4, nNewOffset, bLittleEndian);
+        const int nNewSegmentLength = nSegmentLength + nNewIFDSize;
+        pSegment[2] = static_cast<uint8>(nNewSegmentLength >> 8);
+        pSegment[3] = static_cast<uint8>(nNewSegmentLength & 0xFF);
+        data.insert(pSegment + 2 + nSegmentLength - pData, newIFD);  // invalidates all pointers into data
+    }
+
+    // The file grows: replace it as a whole, a crash or a full disk leaves the original file intact
+    file.close();
+    QSaveFile saveFile(sFileName);
+    if (!saveFile.open(QIODevice::WriteOnly) || saveFile.write(data) != data.size() || !saveFile.commit()) {
+        return false;
+    }
+    QFile newFile(sFileName);
+    if (!newFile.open(QIODevice::ReadWrite) || !newFile.setFileTime(modificationTime, QFileDevice::FileModificationTime)) {
+        qWarning() << "EXIF: cannot restore the modification time of" << sFileName;
+    }
+    return true;
 }
 
 CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFormat)

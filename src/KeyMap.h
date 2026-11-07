@@ -43,6 +43,9 @@ public:
         return GetKeyStringForCommand(Cmd::CommandInvocation{ cmd, arg });
     }
 
+    // Pfad der verwendeten keymap.txt, leer wenn keine existiert (nur die eingebauten Defaults gelten)
+    const QString& GetFilePath() const { return m_sFilePath; }
+
     // gets a combined key code
     static int GetCombinedKeyCode(int keyCode, bool alt, bool control, bool shift, bool keypad = false);
 
@@ -50,6 +53,7 @@ private:
 
     // key is the combined key code, value the command incl. argument
     std::unordered_map<int, Cmd::CommandInvocation> m_keyMap;
+    QString m_sFilePath;
 
     void LoadFromText(const QString& sText, const QString& sSourceName);
     void AddDefaultEscapeHandling();

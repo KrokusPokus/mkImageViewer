@@ -45,13 +45,13 @@
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="1410"/>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainDlg.cpp" line="1593"/>
         <source>Fit to window</source>
         <translation>An Fenster anpassen</translation>
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="1411"/>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainDlg.cpp" line="1593"/>
         <source>Fill with crop</source>
         <translation>Fenster ausfüllen</translation>
     </message>
@@ -73,7 +73,7 @@
         <location filename="../src/MainDlg.cpp" line="770"/>
         <source>No image loaded!
 Press ESC to exit...</source>
-        <translation type="unfinished"></translation>
+        <translation>Kein Bild geladen! Drücke ESC zum beenden...</translation>
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="1436"/>
@@ -97,7 +97,7 @@ Press ESC to exit...</source>
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="1463"/>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainDlg.cpp" line="1593"/>
         <source>None</source>
         <translation>Keiner</translation>
     </message>
@@ -237,87 +237,115 @@ Press ESC to exit...</source>
         <translation>In Ordner anzeigen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1530"/>
+        <source>Rotate +90 and save to the file (EXIF)</source>
+        <translation type="vanished">Drehen +90 und in der Datei speichern (EXIF)</translation>
+    </message>
+    <message>
+        <source>Rotate -90 and save to the file (EXIF)</source>
+        <translation type="vanished">Drehen -90 und in der Datei speichern (EXIF)</translation>
+    </message>
+    <message>
+        <location filename="../src/MainDlg.cpp" line="1853"/>
+        <source>Could not write the EXIF orientation</source>
+        <translation>EXIF-Ausrichtung konnte nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <location filename="../src/MainDlg.cpp" line="1648"/>
+        <source>Could not open keymap.txt</source>
+        <translation>keymap.txt konnte nicht geöffnet werden</translation>
+    </message>
+    <message>
+        <location filename="../src/MainDlg.cpp" line="1535"/>
         <source>Folder Mode</source>
         <translation>Ordner Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1535"/>
+        <location filename="../src/MainDlg.cpp" line="1527"/>
+        <source>EXIF Rotate +90</source>
+        <translation>EXIF Rotation +90</translation>
+    </message>
+    <message>
+        <location filename="../src/MainDlg.cpp" line="1529"/>
+        <source>EXIF Rotate -90</source>
+        <translation>EXIF Rotation -90</translation>
+    </message>
+    <message>
+        <location filename="../src/MainDlg.cpp" line="1540"/>
         <source>Loop folder</source>
         <translation>Nur dieser Ordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1535"/>
+        <location filename="../src/MainDlg.cpp" line="1540"/>
         <source>Loop recursively</source>
         <translation>Dieser Ordner und alle Unterordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1535"/>
+        <location filename="../src/MainDlg.cpp" line="1540"/>
         <source>Loop siblings</source>
         <translation>Dieser Ordner und Geschwister-Ordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1548"/>
+        <location filename="../src/MainDlg.cpp" line="1553"/>
         <source>Sort Order</source>
         <translation>Sortieren nach</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1562"/>
+        <location filename="../src/MainDlg.cpp" line="1567"/>
         <source>File name</source>
         <translation>Dateiname</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1563"/>
+        <location filename="../src/MainDlg.cpp" line="1568"/>
         <source>Modification date</source>
         <translation>Änderungsdatum</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1564"/>
+        <location filename="../src/MainDlg.cpp" line="1569"/>
         <source>File size</source>
         <translation>Dateigröße</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1565"/>
+        <location filename="../src/MainDlg.cpp" line="1570"/>
         <source>Random</source>
         <translation>Zufällig</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1570"/>
+        <location filename="../src/MainDlg.cpp" line="1575"/>
         <source>Ascending</source>
         <translation>A-Z</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1575"/>
+        <location filename="../src/MainDlg.cpp" line="1580"/>
         <source>Descending</source>
         <translation>Z-A</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1581"/>
+        <location filename="../src/MainDlg.cpp" line="1586"/>
         <source>Auto Zoom Mode</source>
         <translation>Auto-Zoom Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainDlg.cpp" line="1593"/>
         <source>Fit to window (never upsize)</source>
         <translation>An Fenster anpassen (nie vergrößern)</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainDlg.cpp" line="1593"/>
         <source>Fill with crop (never upsize)</source>
         <translation>Fenster ausfüllen (nie vergrößern)</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainDlg.cpp" line="1593"/>
         <source>Book Mode</source>
         <translation>Buch-Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1600"/>
+        <location filename="../src/MainDlg.cpp" line="1605"/>
         <source>Auto Contrast</source>
         <translation>Auto-Kontrastkorrektur</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1607"/>
+        <location filename="../src/MainDlg.cpp" line="1612"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
@@ -326,69 +354,69 @@ Press ESC to exit...</source>
         <translation type="vanished">Einstellungen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1611"/>
+        <location filename="../src/MainDlg.cpp" line="1616"/>
         <source>Exit</source>
         <translation>Beenden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3767"/>
-        <location filename="../src/MainDlg.cpp" line="3777"/>
+        <location filename="../src/MainDlg.cpp" line="3788"/>
+        <location filename="../src/MainDlg.cpp" line="3798"/>
         <source>Delete File</source>
         <translation>Datei löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3768"/>
+        <location filename="../src/MainDlg.cpp" line="3789"/>
         <source>Do you really want to move this file into the recycle bin?</source>
         <translation>Möchtest du diese Datei wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3770"/>
-        <location filename="../src/MainDlg.cpp" line="3780"/>
+        <location filename="../src/MainDlg.cpp" line="3791"/>
+        <location filename="../src/MainDlg.cpp" line="3801"/>
         <source>Delete multiple elements</source>
         <translation>Mehrere Dateien löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3771"/>
+        <location filename="../src/MainDlg.cpp" line="3792"/>
         <source>Do you really want to move these %1 files into the recycle bin?</source>
         <translation>Möchtest du diese %1 Dateien wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3775"/>
+        <location filename="../src/MainDlg.cpp" line="3796"/>
         <source>This process cannot be undone.</source>
         <translation>Dieser Vorgang kann nicht rückgängig gemacht werden.</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3778"/>
+        <location filename="../src/MainDlg.cpp" line="3799"/>
         <source>Are you sure you want to delete this file permanently?</source>
         <translation>Möchtest du diese Datei wirklich unwiderruflich löschen?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3781"/>
+        <location filename="../src/MainDlg.cpp" line="3802"/>
         <source>Are you sure you want to delete these %1 files permanently?</source>
         <translation>Möchtest du diese %1 Dateien wirklich unwiderruflich löschen?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3839"/>
+        <location filename="../src/MainDlg.cpp" line="3860"/>
         <source>Name:</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3841"/>
+        <location filename="../src/MainDlg.cpp" line="3862"/>
         <source>Size:</source>
         <translation>Größe:</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3843"/>
+        <location filename="../src/MainDlg.cpp" line="3864"/>
         <source>Date:</source>
         <translation>Datum:</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3852"/>
+        <location filename="../src/MainDlg.cpp" line="3873"/>
         <source>Delete</source>
         <translation>Löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3853"/>
+        <location filename="../src/MainDlg.cpp" line="3874"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>

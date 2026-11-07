@@ -16,6 +16,7 @@
 #include "KeyMap.h"
 #include "Commands.h"
 #include "DirectoryWatcher.h"
+#include "EXIFReader.h"
 #include "RenameDialog.h"
 
 #include <QActionGroup>
@@ -1402,10 +1403,6 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     AddCmd(menuCurrentView, tr("Mirror horizontally"), Cmd::Command::MirrorH);
     AddCmd(menuCurrentView, tr("Mirror vertically"), Cmd::Command::MirrorV);
     menuCurrentView->addSeparator();
-    QAction* actBWMode = AddCmd(menuCurrentView, tr("Black and white"), Cmd::Command::ToggleBWMode);
-    actBWMode->setCheckable(true);
-    actBWMode->setChecked(m_bBWMode);
-    menuCurrentView->addSeparator();
     AddCmd(menuCurrentView, tr("Fit to window"), Cmd::Command::FitToScreen);
     AddCmd(menuCurrentView, tr("Fill with crop"), Cmd::Command::FillWithCrop);
     menuCurrentView->addSeparator();
@@ -1523,6 +1520,11 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     AddCmd(&menu, tr("Cut file to clipboard"), Cmd::Command::CutFile);
     AddCmd(&menu, tr("Show in folder"), Cmd::Command::ExploreFile);
 
+    QAction* actExifRotate90 = AddCmd(&menu, tr("EXIF Rotate +90"), Cmd::Command::ExifRotate90);
+    actExifRotate90->setEnabled(m_pCurrentImage != nullptr);
+    QAction* actExifRotate270 = AddCmd(&menu, tr("EXIF Rotate -90"), Cmd::Command::ExifRotate270);
+    actExifRotate270->setEnabled(m_pCurrentImage != nullptr);
+
     menu.addSeparator();
 
     // 5. Folder Mode (Untermenü)
@@ -1600,6 +1602,10 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     actAutoContrast->setCheckable(true);
     actAutoContrast->setChecked(m_bAutoContrast);
 
+    QAction* actBWMode = AddCmd(&menu, tr("Black and white"), Cmd::Command::ToggleBWMode);
+    actBWMode->setCheckable(true);
+    actBWMode->setChecked(m_bBWMode);
+
     menu.addSeparator();
 
     // 8. Einstellungen & Beenden
@@ -1635,6 +1641,12 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::SettingsDialog:
             sp.ShowSettingsDialog(this);
+            break;
+        case Command::EditKeyMap:
+            // Uebergangsloesung bis zum Shortcut-Dialog. Aenderungen gelten erst nach einem Neustart.
+            if (m_pKeyMap->GetFilePath().isEmpty() || !QDesktopServices::openUrl(QUrl::fromLocalFile(m_pKeyMap->GetFilePath()))) {
+                SetToast(tr("Could not open keymap.txt"));
+            }
             break;
         case Command::Reload:
             ReloadImage(false);
@@ -1830,6 +1842,22 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                 m_bUserZoom = false;
                 m_bUserPan = false;
                 this->update();
+            }
+            break;
+        case Command::ExifRotate90:
+        case Command::ExifRotate270:
+            if (m_pCurrentImage != NULL) {
+                bool bWritten = false;
+                if (!CurrentPosition().InArchive) {
+                    // The own change is no "file changed on disk", the reload follows here
+                    CDirectoryWatcher::ScopedPause pause(*m_pDirectoryWatcher);
+                    bWritten = CEXIFReader::RotateOrientationInFile(CurrentFileName(false), inv.id == Command::ExifRotate90 ? 90 : 270);
+                }
+                if (bWritten) {
+                    ReloadImage(false);
+                } else {
+                    SetToast(tr("Could not write the EXIF orientation"));
+                }
             }
             break;
         case Command::MirrorH:

@@ -146,6 +146,8 @@ constexpr std::array<CommandInfo, kCommandCount> kTable = {{
     make(Command::PanRight, "PanRight", Category::View, CMD_TR("Pan right")),
     make(Command::Rotate90,  "Rotate90",  Category::View, CMD_TR("Rotate +90")),
     make(Command::Rotate270, "Rotate270", Category::View, CMD_TR("Rotate -90")),
+    make(Command::ExifRotate90,  "ExifRotate90",  Category::File, CMD_TR("EXIF Rotate +90")),
+    make(Command::ExifRotate270, "ExifRotate270", Category::File, CMD_TR("EXIF Rotate -90")),
     make(Command::MirrorH,   "MirrorH",   Category::View, CMD_TR("Mirror horizontally")),
     make(Command::MirrorV,   "MirrorV",   Category::View, CMD_TR("Mirror vertically")),
 
@@ -179,6 +181,7 @@ constexpr std::array<CommandInfo, kCommandCount> kTable = {{
     make(Command::Minimize,       "Minimize",       Category::Window, CMD_TR("Minimize window")),
     make(Command::ContextMenu,    "ContextMenu",    Category::Window, CMD_TR("Show context menu")),
     make(Command::SettingsDialog, "SettingsDialog", Category::Window, CMD_TR("Settings")),
+    make(Command::EditKeyMap,     "EditKeyMap",     Category::Window, CMD_TR("Edit key mapping (keymap.txt)")),
     make(Command::Help,           "Help",           Category::Window, CMD_TR("Help")),
     make(Command::DefaultEscape,  "DefaultEscape",  Category::Window, CMD_TR("Escape (stop slideshow, close overlay, leave full screen, exit)")),
     make(Command::Exit,           "Exit",           Category::Window, CMD_TR("Exit")),
@@ -219,11 +222,14 @@ constexpr DefaultBinding kDefaultBindings[] = {
     { "Esc",    Command::DefaultEscape,           0 },
 
     { "Ctrl+C",       Command::CopyFull,          0 },
+    { "Ctrl+O",       Command::ExploreFile,       0 },
     { "Ctrl+Shift+C", Command::CopyPath,          0 },
     { "Ctrl+E",       Command::OpenDefaultEditor, 0 },
     { "Ctrl+Shift+Comma", Command::SettingsDialog,    0 },
-    { "Ctrl+L",       Command::ExploreFile,       0 },
+    { "Ctrl+Shift+Period", Command::EditKeyMap,       0 },
+    { "Ctrl+L",       Command::ExifRotate270,     0 },
     { "Ctrl+M",       Command::ContextMenu,       0 },
+    { "Ctrl+R",       Command::ExifRotate90,      0 },
     { "Ctrl+X",       Command::CutFile,           0 },
 
     { "1", Command::ZoomTo, 100 },

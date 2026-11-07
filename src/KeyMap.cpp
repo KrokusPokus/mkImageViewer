@@ -265,6 +265,7 @@ CKeyMap::CKeyMap() {
     const QString keyMapFilePath = _FindFirstExisting(keyMapDirs, QStringLiteral("keymap.txt"));
 
     if (!keyMapFilePath.isEmpty()) {
+        m_sFilePath = keyMapFilePath;
         QFile kmFile(keyMapFilePath);
         if (kmFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&kmFile);
@@ -288,7 +289,9 @@ CKeyMap::CKeyMap() {
             QTextStream ts(&out);
             ts << defaultText;
             ts.flush();
-            if (!out.commit()) {
+            if (out.commit()) {
+                m_sFilePath = targetPath;
+            } else {
                 qWarning().noquote() << "KeyMap: cannot write" << targetPath << ":" << out.errorString();
             }
         } else {

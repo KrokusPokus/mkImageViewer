@@ -79,6 +79,8 @@ enum class Command : std::uint16_t {
     PanRight,
     Rotate90,
     Rotate270,
+    ExifRotate90,
+    ExifRotate270,
     MirrorH,
     MirrorV,
 
@@ -112,6 +114,7 @@ enum class Command : std::uint16_t {
     Minimize,
     ContextMenu,
     SettingsDialog,
+    EditKeyMap,               // Uebergangsloesung bis zum Shortcut-Dialog
     Help,
     DefaultEscape,            // Esc: Slideshow/Animation stoppen, Overlay schliessen, Vollbild verlassen, beenden
     Exit,
