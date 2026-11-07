@@ -44,11 +44,11 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     /* Read the header */
     amtRead += 14;
     if (bufsize < amtRead) return NULL;
-    header.type = *((uint16*)pBuf); pBuf = pBuf + sizeof(uint16);
-    header.size = *((uint32*)pBuf); pBuf += sizeof(uint32);
-    header.reserved1 = *((uint16*)pBuf); pBuf += sizeof(uint16);
-    header.reserved1 = *((uint16*)pBuf); pBuf += sizeof(uint16);
-    header.offset = *((uint32*)pBuf); pBuf += sizeof(uint32);
+    header.type = *((uint16_t*)pBuf); pBuf = pBuf + sizeof(uint16_t);
+    header.size = *((uint32_t*)pBuf); pBuf += sizeof(uint32_t);
+    header.reserved1 = *((uint16_t*)pBuf); pBuf += sizeof(uint16_t);
+    header.reserved1 = *((uint16_t*)pBuf); pBuf += sizeof(uint16_t);
+    header.offset = *((uint32_t*)pBuf); pBuf += sizeof(uint32_t);
 
     /* Read and check the information header */
     std::size_t size = sizeof(BMINFOHEADER);
@@ -72,7 +72,7 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     }
 
     // read palette for 8 bpp DIBs
-    uint8 palette[4 * 256];
+    uint8_t palette[4 * 256];
     if (infoheader.bits == 8) {
         off = (std::size_t)infoheader.size + 14;
         if (bufsize < off) return NULL;
@@ -113,12 +113,12 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
         return NULL; // the file can not contain the pixel data: do not allocate memory for it
     }
 
-    uint8* pDest = new(std::nothrow) uint8[fileSizeBytes];
+    uint8_t* pDest = new(std::nothrow) uint8_t[fileSizeBytes];
     if (pDest == NULL) {
         bOutOfMemory = true;
         return NULL;
     }
-    uint8* pStart = bFlipped ? pDest + (std::size_t)paddedWidth * (infoheader.height - 1) : pDest;
+    uint8_t* pStart = bFlipped ? pDest + (std::size_t)paddedWidth * (infoheader.height - 1) : pDest;
     for (int nLine = 0; nLine < infoheader.height; nLine++) {
         amtRead += paddedWidth;
         if (bufsize < amtRead)
@@ -133,7 +133,7 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
 
     // Convert 8 bpp DIBs
     if (infoheader.bits == 8) {
-        uint8* pTemp = (uint8*)CBasicProcessing::Convert8bppTo32bppDIB(infoheader.width, infoheader.height, pDest, palette);
+        uint8_t* pTemp = (uint8_t*)CBasicProcessing::Convert8bppTo32bppDIB(infoheader.width, infoheader.height, pDest, palette);
         delete[] pDest;
         if (pTemp == NULL) {
             bOutOfMemory = true;

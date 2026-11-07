@@ -4,6 +4,7 @@
 #include "ImageProcessingTypes.h"
 
 #include <cassert>
+#include <cstdint>
 #include <list>
 #include <mutex>
 
@@ -17,7 +18,7 @@ enum FilterSIMDType {
 };
 
 struct FilterKernel {
-    int16 Kernel[MAX_FILTER_LEN]; // elements are fixed point numbers, typically with 2.14 format
+    int16_t Kernel[MAX_FILTER_LEN]; // elements are fixed point numbers, typically with 2.14 format
     int FilterLen; // actual filter length
     int FilterOffset; // the offset is stored as a number >= 0 and must be subtracted! from the calculated position to get the start position for applying the filter
 };
@@ -31,7 +32,7 @@ struct FilterKernelBlock {
 };
 
 // Filter kernel and filter kernel block for SSE (SIMD).
-// For int16 in SSE, we need 8 repetitions of each kernel element (128 bit in total, SSE register size)
+// For int16_t in SSE, we need 8 repetitions of each kernel element (128 bit in total, SSE register size)
 // For f32 in SSE, we need 4 repetitions of each kernel element (4 x 32 = 128 bit in total, SSE register size)
 struct XMMKernelElement {
     float valueRepeated[4];
@@ -48,7 +49,7 @@ struct XMMFilterKernelBlock {
     XMMFilterKernel * Kernels;
     XMMFilterKernel** Indices; // Length equals target size
     int NumKernels; // this is NUM_KERNELS_RESIZE + border handling kernels as needed
-    uint8* UnalignedMemory; // do not use directly
+    uint8_t* UnalignedMemory; // do not use directly
 };
 
 // Filter kernel and filter kernel block for AVX (SIMD).
@@ -65,7 +66,7 @@ struct AVXFilterKernelBlock {
     AVXFilterKernel * Kernels;
     AVXFilterKernel** Indices; // Length equals target size
     int NumKernels; // this is NUM_KERNELS_RESIZE + border handling kernels as needed
-    uint8* UnalignedMemory; // do not use directly
+    uint8_t* UnalignedMemory; // do not use directly
 };
 
 
@@ -112,7 +113,7 @@ private:
     double m_dMultX;
     int m_nFilterLen;
     int m_nFilterOffset;
-    int16 m_Filter[MAX_FILTER_LEN];
+    int16_t m_Filter[MAX_FILTER_LEN];
     FilterKernelBlock m_kernels;
     XMMFilterKernelBlock m_kernelsXMM;
     AVXFilterKernelBlock m_kernelsAVX;
@@ -127,7 +128,7 @@ private:
     bool ParametersMatch(int nSourceSize, int nTargetSize, EFilterType eFilter, FilterSIMDType filterSIMDType);
 
     void CalculateFilterParams(EFilterType eFilter);
-    int16* GetFilter(uint16 nFrac, EFilterType eFilter);
+    int16_t* GetFilter(uint16_t nFrac, EFilterType eFilter);
 };
 
 // Caches the last used resize filters (LRU cache)

@@ -7,6 +7,7 @@
 #include <QDateTime>
 
 #include <cmath>
+#include <cstdint>
 
 // Signed rational number: numerator/denominator
 class SignedRational {
@@ -135,15 +136,15 @@ private:
     double m_dAltitude;
 
     bool m_bLittleEndian;
-    uint8* m_pApp1;
-    uint8* m_pTagOrientation;
-    uint8* m_pLastIFD0;
-    uint8* m_pIFD1;
-    uint8* m_pLastIFD1;
+    uint8_t* m_pApp1;
+    uint8_t* m_pTagOrientation;
+    uint8_t* m_pLastIFD0;
+    uint8_t* m_pIFD1;
+    uint8_t* m_pLastIFD1;
 
     // nTIFFSize: number of bytes of EXIF data from pTIFFHeader on (offsets in the data are checked against it)
-    void ReadGPSData(uint8* pTIFFHeader, uint32 nTIFFSize, uint8* pTagGPSIFD, bool bLittleEndian);
-    GPSCoordinate* ReadGPSCoordinate(uint8* pTIFFHeader, uint32 nTIFFSize, uint8* pTagLatOrLong, const QString& reference, bool bLittleEndian);
+    void ReadGPSData(uint8_t* pTIFFHeader, uint32_t nTIFFSize, uint8_t* pTagGPSIFD, bool bLittleEndian);
+    GPSCoordinate* ReadGPSCoordinate(uint8_t* pTIFFHeader, uint32_t nTIFFSize, uint8_t* pTagLatOrLong, const QString& reference, bool bLittleEndian);
 };
 
 #endif // EXIFREADER_H

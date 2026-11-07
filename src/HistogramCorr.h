@@ -1,7 +1,8 @@
 #ifndef HISTOGRAMCORR_H
 #define HISTOGRAMCORR_H
 
-#include "ImageProcessingTypes.h"
+#include <cstdint>
+
 
 class CBaseImage;
 
@@ -50,7 +51,7 @@ public:
     // Calculate a three channel correction LUT for contrast and brightness correction given a histogram
     // (black and white point per channel, no color cast correction)
     // The returned LUT contains 3 * 256 entries, BBBB...GGGG...RRRR... format
-    static uint8* CalculateCorrectionLUT(const CHistogram & histogram,
+    static uint8_t* CalculateCorrectionLUT(const CHistogram & histogram,
         float fBrightnessCorrectionFactor, float fContrastCorrectionFactor);
 
 private:

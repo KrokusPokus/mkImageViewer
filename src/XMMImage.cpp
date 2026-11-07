@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <immintrin.h>
 #include <new> // Für std::align_val_t
@@ -123,7 +124,7 @@ CXMMImage::CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirs
 
     if (m_pMemory != NULL) {
         int nSrcLineWidthPadded = Helpers::DoPadding(nWidth * nChannels, 4);
-        const uint8* pSrc = (uint8*)pDIB + (long long)nFirstY*(long long)nSrcLineWidthPadded + (long long)nFirstX*(long long)nChannels;
+        const uint8_t* pSrc = (uint8_t*)pDIB + (long long)nFirstY*(long long)nSrcLineWidthPadded + (long long)nFirstX*(long long)nChannels;
         for (int j = 0; j < nSectionHeight; j++) {
             ConvertLine(j, pSrc, nChannels, padding);
             pSrc += nSrcLineWidthPadded;
@@ -131,13 +132,13 @@ CXMMImage::CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirs
     }
 }
 
-void CXMMImage::ConvertLine(int nLine, const uint8* pSrc, int nChannels, int padding) {
+void CXMMImage::ConvertLine(int nLine, const uint8_t* pSrc, int nChannels, int padding) {
     float* pDst = GetLine(nLine);
     ConvertPixels(pDst, pSrc, nChannels, 0, m_nWidth);
     ZeroPaddingColumns(pDst, padding);
 }
 
-void CXMMImage::ConvertLine_AVX(int nLine, const uint8* pSrc, int nChannels, int padding) {
+void CXMMImage::ConvertLine_AVX(int nLine, const uint8_t* pSrc, int nChannels, int padding) {
     const float* pLUT = s_sRGB8_LinRGB12_Float.Values;
     float* pDst0 = GetLine(nLine);
     float* pDst1 = pDst0 + m_nPaddedWidth;
@@ -178,14 +179,14 @@ void CXMMImage::ConvertLine_AVX(int nLine, const uint8* pSrc, int nChannels, int
     ZeroPaddingColumns(pDst0, padding);
 }
 
-void CXMMImage::ConvertPixels(float* pDst, const uint8* pSrc, int nChannels, int nFirst, int nEnd) const {
+void CXMMImage::ConvertPixels(float* pDst, const uint8_t* pSrc, int nChannels, int nFirst, int nEnd) const {
     if (nChannels == 4) {
         for (int i = nFirst; i < nEnd; i++) {
-            uint32 sourcePixel = ((uint32*)pSrc)[i];
+            uint32_t sourcePixel = ((uint32_t*)pSrc)[i];
             int d = i;
-            uint32 nBlue = sourcePixel & 0xFF;
-            uint32 nGreen = (sourcePixel >> 8) & 0xFF;
-            uint32 nRed = (sourcePixel >> 16) & 0xFF;
+            uint32_t nBlue = sourcePixel & 0xFF;
+            uint32_t nGreen = (sourcePixel >> 8) & 0xFF;
+            uint32_t nRed = (sourcePixel >> 16) & 0xFF;
 
             pDst[d] = ((float)sRGB8_LinRGB12[nBlue]);
             d += m_nPaddedWidth;

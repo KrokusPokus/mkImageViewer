@@ -22,12 +22,12 @@ namespace {
     // Helpers
     //////////////////////////////////////////////////////////////////////////////////////
 
-    inline int16 roundToInt16(double d) {
-        return static_cast<int16>((d < 0) ? (d - 0.5) : (d + 0.5));
+    inline int16_t roundToInt16(double d) {
+        return static_cast<int16_t>((d < 0) ? (d - 0.5) : (d + 0.5));
     }
 
     // Normalization means: sum of filter elements equals CResizeFilter::FP_ONE
-    void NormalizeFilter(int16* pFilter, int nLen) {
+    void NormalizeFilter(int16_t* pFilter, int nLen) {
         int nSum = 0;
         for (int i = 0; i < nLen; i++) {
             nSum += pFilter[i];
@@ -35,10 +35,10 @@ namespace {
         if (nSum > 0) {
             int nTotal = 0;
             for (int i = 0; i < nLen; i++) {
-                pFilter[i] = static_cast<int16>((pFilter[i] * CResizeFilter::FP_ONE) / nSum);
+                pFilter[i] = static_cast<int16_t>((pFilter[i] * CResizeFilter::FP_ONE) / nSum);
                 nTotal += pFilter[i];
             }
-            pFilter[0] += static_cast<int16>(CResizeFilter::FP_ONE - nTotal);
+            pFilter[0] += static_cast<int16_t>(CResizeFilter::FP_ONE - nTotal);
         }
     }
 
@@ -245,8 +245,8 @@ void CResizeFilter::CalculateFilterKernels() {
         FilterKernel* pThisKernel = &(m_kernels.Kernels[i]);
         pThisKernel->FilterLen = m_nFilterLen;
         pThisKernel->FilterOffset = m_nFilterOffset;
-        int16* pKernel = GetFilter(static_cast<uint16>(nKFrac), m_eFilter);
-        std::memcpy(&(pThisKernel->Kernel), pKernel, m_nFilterLen*sizeof(int16));
+        int16_t* pKernel = GetFilter(static_cast<uint16_t>(nKFrac), m_eFilter);
+        std::memcpy(&(pThisKernel->Kernel), pKernel, m_nFilterLen*sizeof(int16_t));
         nKFrac += nIncFrac;
     }
 
@@ -256,26 +256,26 @@ void CResizeFilter::CalculateFilterKernels() {
         std::uint32_t nXFrac = nX & 0xFFFF;
         if (static_cast<int>(nXInt) < m_nFilterOffset) {
             // left border handling, the (m_nFilterOffset - nXInt) left elements are cut from the filter
-            int16* pBorderFilter = GetFilter(static_cast<uint16>(nXFrac), m_eFilter) + (m_nFilterOffset - nXInt);
+            int16_t* pBorderFilter = GetFilter(static_cast<uint16_t>(nXFrac), m_eFilter) + (m_nFilterOffset - nXInt);
             int nFilterLen = m_nFilterLen - (m_nFilterOffset - static_cast<int>(nXInt));
             nFilterLen = std::min(nFilterLen, m_nSourceSize);
             NormalizeFilter(pBorderFilter, nFilterLen);
             FilterKernel* pThisKernel = &(m_kernels.Kernels[nIdxBorderKernel]);
             pThisKernel->FilterLen = nFilterLen;
             pThisKernel->FilterOffset = static_cast<int>(nXInt);
-            std::memcpy(&(pThisKernel->Kernel), pBorderFilter, nFilterLen * sizeof(int16));
+            std::memcpy(&(pThisKernel->Kernel), pBorderFilter, nFilterLen * sizeof(int16_t));
             m_kernels.Indices[i] = pThisKernel;
             nIdxBorderKernel++;
         } else if (static_cast<int>(nXInt) - m_nFilterOffset + m_nFilterLen > m_nSourceSize) {
             // right border handling
-            int16* pBorderFilter = GetFilter(static_cast<uint16>(nXFrac), m_eFilter);
+            int16_t* pBorderFilter = GetFilter(static_cast<uint16_t>(nXFrac), m_eFilter);
             int nFilterLen = m_nSourceSize - static_cast<int>(nXInt) + m_nFilterOffset;
             nFilterLen = std::min(nFilterLen, m_nSourceSize);
             NormalizeFilter(pBorderFilter, nFilterLen);
             FilterKernel* pThisKernel = &(m_kernels.Kernels[nIdxBorderKernel]);
             pThisKernel->FilterLen = nFilterLen;
             pThisKernel->FilterOffset = m_nFilterOffset;
-            std::memcpy(&(pThisKernel->Kernel), pBorderFilter, nFilterLen * sizeof(int16));
+            std::memcpy(&(pThisKernel->Kernel), pBorderFilter, nFilterLen * sizeof(int16_t));
             m_kernels.Indices[i] = pThisKernel;
             nIdxBorderKernel++;
         } else {
@@ -288,7 +288,7 @@ void CResizeFilter::CalculateFilterKernels() {
     m_kernels.NumKernels = nIdxBorderKernel;
 }
 
-// GF version with 4 x float32 (instead of 8 x int16)
+// GF version with 4 x float32 (instead of 8 x int16_t)
 void CResizeFilter::CalculateXMMFilterKernels() {
     CalculateFilterKernels();
     if (m_nTargetSize == 0) {
@@ -305,7 +305,7 @@ void CResizeFilter::CalculateXMMFilterKernels() {
 
     m_kernelsXMM.NumKernels = m_kernels.NumKernels;
     m_kernelsXMM.Indices = new XMMFilterKernel*[m_nTargetSize];
-    m_kernelsXMM.UnalignedMemory = new uint8[nSizeOfKernels + 31];
+    m_kernelsXMM.UnalignedMemory = new uint8_t[nSizeOfKernels + 31];
     m_kernelsXMM.Kernels = reinterpret_cast<XMMFilterKernel*>((reinterpret_cast<std::uintptr_t>(m_kernelsXMM.UnalignedMemory) + 31) & ~static_cast<std::uintptr_t>(31));
     std::memset(m_kernelsXMM.Kernels, 0, nSizeOfKernels);
 
@@ -351,7 +351,7 @@ void CResizeFilter::CalculateAVXFilterKernels() {
 
     m_kernelsAVX.NumKernels = m_kernels.NumKernels;
     m_kernelsAVX.Indices = new AVXFilterKernel*[m_nTargetSize];
-    m_kernelsAVX.UnalignedMemory = new uint8[nSizeOfKernels + 63];
+    m_kernelsAVX.UnalignedMemory = new uint8_t[nSizeOfKernels + 63];
     m_kernelsAVX.Kernels = reinterpret_cast<AVXFilterKernel*>((reinterpret_cast<std::uintptr_t>(m_kernelsAVX.UnalignedMemory) + 63) & ~static_cast<std::uintptr_t>(63));
     std::memset(m_kernelsAVX.Kernels, 0, nSizeOfKernels);
 
@@ -408,7 +408,7 @@ void CResizeFilter::CalculateFilterParams(EFilterType eFilter) {
 
 // Filter is normalized in fixed point format, sum of elements is FP_ONE
 // nFrac is fractional part (sub-pixel offset), coded in [0..65535] --> [0...1]
-int16* CResizeFilter::GetFilter(uint16 nFrac, EFilterType eFilter) {
+int16_t* CResizeFilter::GetFilter(uint16_t nFrac, EFilterType eFilter) {
     double dFrac = nFrac*(1.0/65535.0);
     double dFilter[MAX_FILTER_LEN];
     double dSum = 0.0;
@@ -427,7 +427,7 @@ int16* CResizeFilter::GetFilter(uint16 nFrac, EFilterType eFilter) {
         m_Filter[i] = roundToInt16(FP_ONE * dFilter[i] / dSum);
         nSum += m_Filter[i];
     }
-    m_Filter[0] += static_cast<int16>(FP_ONE - nSum);
+    m_Filter[0] += static_cast<int16_t>(FP_ONE - nSum);
     for (int j = m_nFilterLen; j < MAX_FILTER_LEN; j++) {
         m_Filter[j] = 0;
     }

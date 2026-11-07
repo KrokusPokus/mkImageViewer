@@ -36,23 +36,23 @@ CHistogram::CHistogram(const CBaseImage & image) {
     int nWidth = image.OrigWidth();
     int nHeight = image.OrigHeight();
     int nChannels = image.OriginalChannels();
-    const uint8* pSourcePixels = (const uint8*)image.OriginalPixels();
+    const uint8_t* pSourcePixels = (const uint8_t*)image.OriginalPixels();
 
     double dFactor = (double)nWidth/nHeight;
     int nSamplesX = Helpers::DoPadding((int)(dFactor*std::sqrt(NUM_VALUES/dFactor)), 4);
     int nSamplesY = Helpers::DoPadding((int)(nSamplesX/dFactor), 4);
 
-    uint32 nY = 0;
-    uint32 nIncX = (uint32)nWidth*65536/nSamplesX;
-    uint32 nIncY = (uint32)nHeight*65536/nSamplesY;
+    uint32_t nY = 0;
+    uint32_t nIncX = (uint32_t)nWidth*65536/nSamplesX;
+    uint32_t nIncY = (uint32_t)nHeight*65536/nSamplesY;
     int nLineSize = Helpers::DoPadding(nWidth * nChannels, 4);
 
     for (int j = 0; j < nSamplesY; j++) {
-        uint32 nX = 0;
+        uint32_t nX = 0;
         // 64 bit offset: images can have more than 4 GiB of pixel data
-        const uint8* pSrcStart = pSourcePixels + (size_t)nLineSize*(nY >> 16);
+        const uint8_t* pSrcStart = pSourcePixels + (size_t)nLineSize*(nY >> 16);
         for (int i = 0; i < nSamplesX; i++) {
-            const uint8* pSrc = (nChannels == 3) ? pSrcStart + (nX >> 16)*3 : pSrcStart + (nX >> 16)*4;
+            const uint8_t* pSrc = (nChannels == 3) ? pSrcStart + (nX >> 16)*3 : pSrcStart + (nX >> 16)*4;
             channelB[pSrc[0]]++;
             channelG[pSrc[1]]++;
             channelR[pSrc[2]]++;
@@ -106,7 +106,7 @@ static void CalculateBWPoints(float& fBlackPt, float& fWhitePt, const int* pValu
 
 // Calculates the 256 entry LUT (in pTarget) from black/white points and the correction values
 // The LUT is a linear curve between black and white point, added by a quadratic correction term
-static void CalculateLUT(uint8* pTarget, float fBlackPt, float fWhitePt, float fBrightnessCorr, float fMidPt) {
+static void CalculateLUT(uint8_t* pTarget, float fBlackPt, float fWhitePt, float fBrightnessCorr, float fMidPt) {
     if (fWhitePt - fBlackPt < 0.001f) {
         fWhitePt = 1.0f;
         fBlackPt = 0.0f;
@@ -133,7 +133,7 @@ static void CalculateLUT(uint8* pTarget, float fBlackPt, float fWhitePt, float f
             }
 
             fTarget = std::max(0.0f, std::min(1.0f, fTarget));
-            pTarget[i] = (uint8)(fTarget*255 + 0.5f);
+            pTarget[i] = (uint8_t)(fTarget*255 + 0.5f);
         }
         fX += fInc;
     }
@@ -150,7 +150,7 @@ static float CalcBWColorCompensation(float fMidPt, float fBlackPt, float fWhiteP
 // CHistogramCorr class
 ///////////////////////////////////////////////////////////////////////////////////
 
-uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
+uint8_t* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
                                               float fBrightnessCorrectionFactor,
                                               float fContrastCorrectionFactor) {
 
@@ -164,7 +164,7 @@ uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
 
     int nLevel = (int) (histogram.GetTotalValues()*cCuttingLevel + 0.5f);
 
-    uint8* pLUT = new uint8[3*256];
+    uint8_t* pLUT = new uint8_t[3*256];
 
     // Calculate black point for R,G,B and Grey channel
     float fBlackPtB, fBlackPtG, fBlackPtR, fBlackPtGrey;

@@ -16,8 +16,8 @@
 double CEXIFReader::UNKNOWN_DOUBLE_VALUE = 283740261.192864;
 
 namespace {
-uint32 ReadUInt(void * ptr, bool bLittleEndian) {
-    uint32 nValue = *static_cast<uint32*>(ptr);
+uint32_t ReadUInt(void * ptr, bool bLittleEndian) {
+    uint32_t nValue = *static_cast<uint32_t*>(ptr);
     if (!bLittleEndian) {
         return __builtin_bswap32(nValue);
     } else {
@@ -25,16 +25,16 @@ uint32 ReadUInt(void * ptr, bool bLittleEndian) {
     }
 }
 
-void WriteUInt(void * ptr, uint32 nValue, bool bLittleEndian) {
-    uint32 nVal = nValue;
+void WriteUInt(void * ptr, uint32_t nValue, bool bLittleEndian) {
+    uint32_t nVal = nValue;
     if (!bLittleEndian) {
         nVal = __builtin_bswap32(nVal);
     }
-    *static_cast<uint32*>(ptr) = nVal;
+    *static_cast<uint32_t*>(ptr) = nVal;
 }
 
-uint16 ReadUShort(void * ptr, bool bLittleEndian) {
-    uint16 nValue = *static_cast<uint16*>(ptr);
+uint16_t ReadUShort(void * ptr, bool bLittleEndian) {
+    uint16_t nValue = *static_cast<uint16_t*>(ptr);
     if (!bLittleEndian) {
         return __builtin_bswap16(nValue);
     } else {
@@ -42,26 +42,26 @@ uint16 ReadUShort(void * ptr, bool bLittleEndian) {
     }
 }
 
-void WriteUShort(void * ptr, uint16 nValue, bool bLittleEndian) {
-    uint16 nVal = nValue;
+void WriteUShort(void * ptr, uint16_t nValue, bool bLittleEndian) {
+    uint16_t nVal = nValue;
     if (!bLittleEndian) {
         nVal = __builtin_bswap16(nVal);
     }
-    *static_cast<uint16*>(ptr) = nVal;
+    *static_cast<uint16_t*>(ptr) = nVal;
 }
 
 // The TIFF data of the EXIF block (behind "Exif\0\0"): all offsets in the EXIF data are relative to its start.
 // Offsets and lengths come from the file and can be corrupt or manipulated, so every access with them is checked
 // with Contains() (in 64 bit, offset + length can not overflow).
 struct TiffData {
-    uint8* p = nullptr;  // start of the TIFF header
-    uint32 size = 0;     // number of bytes from p to the end of the APP1 block
+    uint8_t* p = nullptr;  // start of the TIFF header
+    uint32_t size = 0;     // number of bytes from p to the end of the APP1 block
 
     bool Contains(uint64_t offset, uint64_t length) const { return offset <= size && length <= size - offset; }
 };
 
 // The entries (12 bytes each) between ptr and ptrLast must be inside the data, the caller checks this
-uint8* FindTag(uint8* ptr, uint8* ptrLast, uint16 nTag, bool bLittleEndian) {
+uint8_t* FindTag(uint8_t* ptr, uint8_t* ptrLast, uint16_t nTag, bool bLittleEndian) {
     while (ptr < ptrLast) {
         if (ReadUShort(ptr, bLittleEndian) == nTag) {
             return ptr;
@@ -74,7 +74,7 @@ uint8* FindTag(uint8* ptr, uint8* ptrLast, uint16 nTag, bool bLittleEndian) {
 // Walks the segments in front of the JPEG pixel data. Returns false if these are damaged or the stream is no JPEG.
 // Otherwise pExifSegment is the first Exif APP1 segment (nullptr if there is none) and nInsertPos the position
 // for a new one: at the start of the file, but behind a JFIF APP0 segment, which must stay the first one.
-bool FindExifSegment(uint8* pData, qint64 nSize, uint8*& pExifSegment, qint64& nInsertPos) {
+bool FindExifSegment(uint8_t* pData, qint64 nSize, uint8_t*& pExifSegment, qint64& nInsertPos) {
     pExifSegment = nullptr;
     nInsertPos = 2;
     if (nSize < 4 || pData[0] != 0xFF || pData[1] != 0xD8) {
@@ -82,7 +82,7 @@ bool FindExifSegment(uint8* pData, qint64 nSize, uint8*& pExifSegment, qint64& n
     }
     qint64 nPos = 2;
     while (nPos + 4 <= nSize && pData[nPos] == 0xFF) {
-        const uint8 nMarker = pData[nPos + 1];
+        const uint8_t nMarker = pData[nPos + 1];
         if (nMarker == 0xFF) {
             nPos++; // padding
             continue;
@@ -106,9 +106,9 @@ bool FindExifSegment(uint8* pData, qint64 nSize, uint8*& pExifSegment, qint64& n
 
 // Orientation tag value after a clockwise rotation by nSteps * 90 degrees, 0 if nOrientation is not a pure rotation.
 // The value 0 is invalid but common, it is treated like 1 (normal), just as CBaseImage ignores it when displaying.
-uint16 RotatedOrientation(uint16 nOrientation, int nSteps) {
-    static const uint16 aRotations[4] = { 1, 6, 3, 8 };
-    const uint16 nCurrent = std::max<uint16>(nOrientation, 1);
+uint16_t RotatedOrientation(uint16_t nOrientation, int nSteps) {
+    static const uint16_t aRotations[4] = { 1, 6, 3, 8 };
+    const uint16_t nCurrent = std::max<uint16_t>(nOrientation, 1);
     for (int i = 0; i < 4; i++) {
         if (aRotations[i] == nCurrent) {
             return aRotations[(i + nSteps) % 4];
@@ -117,10 +117,10 @@ uint16 RotatedOrientation(uint16 nOrientation, int nSteps) {
     return 0;
 }
 
-void ReadStringTag(QString & strOut, uint8* ptr, const TiffData& tiff, bool bLittleEndian, bool bTryReadAsUTF8 = false, uint32 maxLength = 65536) {
+void ReadStringTag(QString & strOut, uint8_t* ptr, const TiffData& tiff, bool bLittleEndian, bool bTryReadAsUTF8 = false, uint32_t maxLength = 65536) {
     try {
         if (ptr != nullptr && ReadUShort(ptr + 2, bLittleEndian) == 2) {
-            uint32 nSize = ReadUInt(ptr + 4, bLittleEndian);
+            uint32_t nSize = ReadUInt(ptr + 4, bLittleEndian);
             if (nSize > maxLength) {
                 strOut.clear();
                 return;
@@ -129,7 +129,7 @@ void ReadStringTag(QString & strOut, uint8* ptr, const TiffData& tiff, bool bLit
             if (nSize <= 4) {
                 pString = reinterpret_cast<const char*>(ptr + 8); // stored in the entry itself
             } else {
-                const uint32 nOffset = ReadUInt(ptr + 8, bLittleEndian);
+                const uint32_t nOffset = ReadUInt(ptr + 8, bLittleEndian);
                 if (!tiff.Contains(nOffset, nSize)) {
                     strOut.clear();
                     return;
@@ -137,7 +137,7 @@ void ReadStringTag(QString & strOut, uint8* ptr, const TiffData& tiff, bool bLit
                 pString = reinterpret_cast<const char*>(tiff.p + nOffset);
             }
 
-            int nMaxChars = static_cast<int>(std::min<uint32>(nSize, strnlen(pString, nSize)));
+            int nMaxChars = static_cast<int>(std::min<uint32_t>(nSize, strnlen(pString, nSize)));
             if (bTryReadAsUTF8) {
                 QString strUTF8 = Helpers::TryConvertFromUTF8(reinterpret_cast<const uint8_t*>(pString), nMaxChars);
                 if (!strUTF8.isEmpty()) {
@@ -154,11 +154,11 @@ void ReadStringTag(QString & strOut, uint8* ptr, const TiffData& tiff, bool bLit
     }
 }
 
-void ReadUserCommentTag(QString & strOut, uint8* ptr, const TiffData& tiff, bool bLittleEndian) {
+void ReadUserCommentTag(QString & strOut, uint8_t* ptr, const TiffData& tiff, bool bLittleEndian) {
     try {
         if (ptr != nullptr && ReadUShort(ptr + 2, bLittleEndian) == 7) {
-            uint32 nSize32 = ReadUInt(ptr + 4, bLittleEndian);
-            const uint32 nOffset = ReadUInt(ptr + 8, bLittleEndian);
+            uint32_t nSize32 = ReadUInt(ptr + 4, bLittleEndian);
+            const uint32_t nOffset = ReadUInt(ptr + 8, bLittleEndian);
             if (nSize32 > 10 && nSize32 <= 4096 && tiff.Contains(nOffset, nSize32)) {
                 int nSize = static_cast<int>(nSize32);
                 // 8 bytes character code, then the comment
@@ -197,7 +197,7 @@ void ReadUserCommentTag(QString & strOut, uint8* ptr, const TiffData& tiff, bool
     }
 }
 
-uint32 ReadLongTag(uint8* ptr, bool bLittleEndian) {
+uint32_t ReadLongTag(uint8_t* ptr, bool bLittleEndian) {
     if (ptr != nullptr && ReadUShort(ptr + 2, bLittleEndian) == 4) {
         return ReadUInt(ptr + 8, bLittleEndian);
     } else {
@@ -205,7 +205,7 @@ uint32 ReadLongTag(uint8* ptr, bool bLittleEndian) {
     }
 }
 
-uint16 ReadShortTag(uint8* ptr, bool bLittleEndian) {
+uint16_t ReadShortTag(uint8_t* ptr, bool bLittleEndian) {
     if (ptr != nullptr && ReadUShort(ptr + 2, bLittleEndian) == 3) {
         return ReadUShort(ptr + 8, bLittleEndian);
     } else {
@@ -213,9 +213,9 @@ uint16 ReadShortTag(uint8* ptr, bool bLittleEndian) {
     }
 }
 
-uint32 ReadShortOrLongTag(uint8* ptr, bool bLittleEndian) {
+uint32_t ReadShortOrLongTag(uint8_t* ptr, bool bLittleEndian) {
     if (ptr != nullptr) {
-        uint16 nType = ReadUShort(ptr + 2, bLittleEndian);
+        uint16_t nType = ReadUShort(ptr + 2, bLittleEndian);
         if (nType == 3) {
             return ReadUShort(ptr + 8, bLittleEndian);
         } else if (nType == 4) {
@@ -226,17 +226,17 @@ uint32 ReadShortOrLongTag(uint8* ptr, bool bLittleEndian) {
 }
 
 // Absolute value of a signed 32 bit value as unsigned (also for INT_MIN, where abs() is undefined)
-uint32 AbsSigned(uint32 nValue) {
+uint32_t AbsSigned(uint32_t nValue) {
     const int64_t n = static_cast<int32_t>(nValue);
-    return static_cast<uint32>(n < 0 ? -n : n);
+    return static_cast<uint32_t>(n < 0 ? -n : n);
 }
 
-int ReadRationalTag(Rational & rational, uint8* ptr, const TiffData& tiff, int index, bool bLittleEndian) {
+int ReadRationalTag(Rational & rational, uint8_t* ptr, const TiffData& tiff, int index, bool bLittleEndian) {
     rational.Numerator = 0;
     rational.Denominator = 0;
     if (ptr != nullptr) {
-        uint16 nType = ReadUShort(ptr + 2, bLittleEndian);
-        uint16 nCount = ReadUInt(ptr + 4, bLittleEndian);
+        uint16_t nType = ReadUShort(ptr + 2, bLittleEndian);
+        uint16_t nCount = ReadUInt(ptr + 4, bLittleEndian);
         if (index < nCount) {
             if (nType == 5 || nType == 10) {
                 const uint64_t nOffset = static_cast<uint64_t>(ReadUInt(ptr + 8, bLittleEndian)) + static_cast<uint64_t>(index) * 8;
@@ -246,9 +246,9 @@ int ReadRationalTag(Rational & rational, uint8* ptr, const TiffData& tiff, int i
                 rational.Numerator = ReadUInt(tiff.p + nOffset, bLittleEndian);
                 rational.Denominator = ReadUInt(tiff.p + nOffset + 4, bLittleEndian);
                 if (rational.Numerator != 0 && rational.Denominator != 0) {
-                    uint32 nModulo;
-                    uint32 nA = (nType == 10) ? AbsSigned(rational.Numerator) : rational.Numerator;
-                    uint32 nB = (nType == 10) ? AbsSigned(rational.Denominator) : rational.Denominator;
+                    uint32_t nModulo;
+                    uint32_t nA = (nType == 10) ? AbsSigned(rational.Numerator) : rational.Numerator;
+                    uint32_t nB = (nType == 10) ? AbsSigned(rational.Denominator) : rational.Denominator;
                     do {
                         nModulo = nA % nB;
                         nA = nB;
@@ -257,8 +257,8 @@ int ReadRationalTag(Rational & rational, uint8* ptr, const TiffData& tiff, int i
 
                     if (nType == 10) {
                         // in 64 bit: INT_MIN / -1 would overflow in 32 bit
-                        rational.Numerator = static_cast<uint32>(static_cast<int64_t>(static_cast<int32_t>(rational.Numerator)) / static_cast<int64_t>(nA));
-                        rational.Denominator = static_cast<uint32>(static_cast<int64_t>(static_cast<int32_t>(rational.Denominator)) / static_cast<int64_t>(nA));
+                        rational.Numerator = static_cast<uint32_t>(static_cast<int64_t>(static_cast<int32_t>(rational.Numerator)) / static_cast<int64_t>(nA));
+                        rational.Denominator = static_cast<uint32_t>(static_cast<int64_t>(static_cast<int32_t>(rational.Denominator)) / static_cast<int64_t>(nA));
                     } else {
                         rational.Numerator /= nA;
                         rational.Denominator /= nA;
@@ -271,15 +271,15 @@ int ReadRationalTag(Rational & rational, uint8* ptr, const TiffData& tiff, int i
     return 0;
 }
 
-int ReadRationalTag(Rational & rational, uint8* ptr, const TiffData& tiff, bool bLittleEndian) {
+int ReadRationalTag(Rational & rational, uint8_t* ptr, const TiffData& tiff, bool bLittleEndian) {
     return ReadRationalTag(rational, ptr, tiff, 0, bLittleEndian);
 }
 
-bool ReadSignedRationalTag(SignedRational & rational, uint8* ptr, const TiffData& tiff, bool bLittleEndian) {
+bool ReadSignedRationalTag(SignedRational & rational, uint8_t* ptr, const TiffData& tiff, bool bLittleEndian) {
     return ReadRationalTag(reinterpret_cast<Rational &>(rational), ptr, tiff, bLittleEndian);
 }
 
-double ReadDoubleTag(uint8* ptr, const TiffData& tiff, int index, bool bLittleEndian) {
+double ReadDoubleTag(uint8_t* ptr, const TiffData& tiff, int index, bool bLittleEndian) {
     Rational rational(0, 0);
     int nType = ReadRationalTag(rational, ptr, tiff, index, bLittleEndian);
     if (rational.Denominator != 0) {
@@ -294,7 +294,7 @@ double ReadDoubleTag(uint8* ptr, const TiffData& tiff, int index, bool bLittleEn
     return CEXIFReader::UNKNOWN_DOUBLE_VALUE;
 }
 
-double ReadDoubleTag(uint8* ptr, const TiffData& tiff, bool bLittleEndian) {
+double ReadDoubleTag(uint8_t* ptr, const TiffData& tiff, bool bLittleEndian) {
     return ReadDoubleTag(ptr, tiff, 0, bLittleEndian);
 }
 
@@ -323,8 +323,8 @@ bool CEXIFReader::RotateOrientationInFile(const QString& sFileName, int nRotatio
         return false;
     }
 
-    uint8* pData = reinterpret_cast<uint8*>(data.data());
-    uint8* pSegment;
+    uint8_t* pData = reinterpret_cast<uint8_t*>(data.data());
+    uint8_t* pSegment;
     qint64 nInsertPos;
     if (!FindExifSegment(pData, data.size(), pSegment, nInsertPos)) {
         return false;
@@ -332,7 +332,7 @@ bool CEXIFReader::RotateOrientationInFile(const QString& sFileName, int nRotatio
 
     if (pSegment == nullptr) {
         // No Exif at all: insert a new block with just the tag
-        static const uint8 aNewSegment[36] = { 0xFF, 0xE1, 0, 34, 'E', 'x', 'i', 'f', 0, 0,  // marker, length, identifier
+        static const uint8_t aNewSegment[36] = { 0xFF, 0xE1, 0, 34, 'E', 'x', 'i', 'f', 0, 0,  // marker, length, identifier
             'M', 'M', 0, 42, 0, 0, 0, 8,                                                     // TIFF header
             0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0,                                  // IFD0 with one tag
             0, 0, 0, 0 };                                                                    // no next IFD
@@ -342,29 +342,29 @@ bool CEXIFReader::RotateOrientationInFile(const QString& sFileName, int nRotatio
     } else {
         // The segment length counts itself (2 bytes) and "Exif\0\0" (6 bytes), these are not part of the TIFF data
         const int nSegmentLength = pSegment[2] * 256 + pSegment[3];
-        const TiffData tiff{ pSegment + 10, static_cast<uint32>(nSegmentLength - 8) };
+        const TiffData tiff{ pSegment + 10, static_cast<uint32_t>(nSegmentLength - 8) };
         if (memcmp(tiff.p, "II", 2) != 0 && memcmp(tiff.p, "MM", 2) != 0) {
             return false;
         }
         const bool bLittleEndian = tiff.p[0] == 'I';
-        const uint32 nOffsetIFD0 = ReadUInt(tiff.p + 4, bLittleEndian);
+        const uint32_t nOffsetIFD0 = ReadUInt(tiff.p + 4, bLittleEndian);
         if (!tiff.Contains(nOffsetIFD0, 2)) {
             return false;
         }
-        const uint32 nNumTags = ReadUShort(tiff.p + nOffsetIFD0, bLittleEndian);
+        const uint32_t nNumTags = ReadUShort(tiff.p + nOffsetIFD0, bLittleEndian);
         if (!tiff.Contains(static_cast<uint64_t>(nOffsetIFD0) + 2, static_cast<uint64_t>(nNumTags) * 12 + 4)) {
             return false;
         }
-        uint8* pFirstTag = tiff.p + nOffsetIFD0 + 2;
-        uint8* pLastTag = pFirstTag + nNumTags * 12;
+        uint8_t* pFirstTag = tiff.p + nOffsetIFD0 + 2;
+        uint8_t* pLastTag = pFirstTag + nNumTags * 12;
 
-        uint8* pTag = FindTag(pFirstTag, pLastTag, 0x112, bLittleEndian);
+        uint8_t* pTag = FindTag(pFirstTag, pLastTag, 0x112, bLittleEndian);
         if (pTag != nullptr) {
             // The tag exists: change its 2 bytes in place, nothing else in the file is written
             if (ReadUShort(pTag + 2, bLittleEndian) != 3 || ReadUInt(pTag + 4, bLittleEndian) != 1) {
                 return false;
             }
-            const uint16 nOrientation = RotatedOrientation(ReadUShort(pTag + 8, bLittleEndian), nSteps);
+            const uint16_t nOrientation = RotatedOrientation(ReadUShort(pTag + 8, bLittleEndian), nSteps);
             if (nOrientation == 0) {
                 return false;
             }
@@ -380,23 +380,23 @@ bool CEXIFReader::RotateOrientationInFile(const QString& sFileName, int nRotatio
 
         // Exif without the tag: append an enlarged copy of IFD0 to the block and let the TIFF header point to it. Offsets
         // in EXIF data are relative to the TIFF header, so all of them stay valid. The old IFD0 remains as unused bytes.
-        const uint32 nNewOffset = (tiff.size + 1) & ~1u;  // an IFD starts on a word boundary
+        const uint32_t nNewOffset = (tiff.size + 1) & ~1u;  // an IFD starts on a word boundary
         const int nPadding = nNewOffset - tiff.size;
         const int nNewIFDSize = nPadding + 2 + (nNumTags + 1) * 12 + 4;
         if (nNumTags == 0xFFFF || nSegmentLength + nNewIFDSize > 0xFFFF) {
             return false;
         }
-        uint8* pInsertTag = pFirstTag;  // tags are sorted (not always, but then the position doesn't matter)
+        uint8_t* pInsertTag = pFirstTag;  // tags are sorted (not always, but then the position doesn't matter)
         while (pInsertTag < pLastTag && ReadUShort(pInsertTag, bLittleEndian) < 0x112) {
             pInsertTag += 12;
         }
         const int nTagsBefore = static_cast<int>(pInsertTag - pFirstTag);
 
         QByteArray newIFD(nNewIFDSize, '\0');
-        uint8* pIFD = reinterpret_cast<uint8*>(newIFD.data()) + nPadding;
+        uint8_t* pIFD = reinterpret_cast<uint8_t*>(newIFD.data()) + nPadding;
         WriteUShort(pIFD, nNumTags + 1, bLittleEndian);
         memcpy(pIFD + 2, pFirstTag, nTagsBefore);
-        uint8* pNewTag = pIFD + 2 + nTagsBefore;
+        uint8_t* pNewTag = pIFD + 2 + nTagsBefore;
         WriteUShort(pNewTag, 0x112, bLittleEndian);
         WriteUShort(pNewTag + 2, 3, bLittleEndian);
         WriteUInt(pNewTag + 4, 1, bLittleEndian);
@@ -405,8 +405,8 @@ bool CEXIFReader::RotateOrientationInFile(const QString& sFileName, int nRotatio
 
         WriteUInt(tiff.p + 4, nNewOffset, bLittleEndian);
         const int nNewSegmentLength = nSegmentLength + nNewIFDSize;
-        pSegment[2] = static_cast<uint8>(nNewSegmentLength >> 8);
-        pSegment[3] = static_cast<uint8>(nNewSegmentLength & 0xFF);
+        pSegment[2] = static_cast<uint8_t>(nNewSegmentLength >> 8);
+        pSegment[3] = static_cast<uint8_t>(nNewSegmentLength & 0xFF);
         data.insert(pSegment + 2 + nSegmentLength - pData, newIFD);  // invalidates all pointers into data
     }
 
@@ -444,7 +444,7 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
     m_pLongitude = nullptr;
     m_dAltitude = UNKNOWN_DOUBLE_VALUE;
 
-    m_pApp1 = static_cast<uint8*>(pApp1Block);
+    m_pApp1 = static_cast<uint8_t*>(pApp1Block);
     // APP1 marker (2) + length (2) + "Exif\0\0" (6) + TIFF header (8)
     if (m_pApp1 == nullptr || nBlockSize < 18 || m_pApp1[0] != 0xFF || m_pApp1[1] != 0xE1) {
         return;
@@ -454,9 +454,9 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
     if (nApp1Size < 18) {
         return;
     }
-    const TiffData tiff{ m_pApp1 + 10, static_cast<uint32>(nApp1Size - 10) };
+    const TiffData tiff{ m_pApp1 + 10, static_cast<uint32_t>(nApp1Size - 10) };
 
-    uint8* pTIFFHeader = tiff.p;
+    uint8_t* pTIFFHeader = tiff.p;
     bool bLittleEndian;
     if (*reinterpret_cast<short*>(pTIFFHeader) == 0x4949) {
         bLittleEndian = true;
@@ -468,21 +468,21 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
     m_bLittleEndian = bLittleEndian;
 
     // An IFD is: number of entries (2 bytes), the entries (12 bytes each), offset of the next IFD (4 bytes)
-    const uint32 nOffsetIFD0 = ReadUInt(pTIFFHeader + 4, bLittleEndian);
+    const uint32_t nOffsetIFD0 = ReadUInt(pTIFFHeader + 4, bLittleEndian);
     if (!tiff.Contains(nOffsetIFD0, 2)) {
         return;
     }
-    uint8* pIFD0 = tiff.p + nOffsetIFD0;
-    uint16 nNumTags = ReadUShort(pIFD0, bLittleEndian);
+    uint8_t* pIFD0 = tiff.p + nOffsetIFD0;
+    uint16_t nNumTags = ReadUShort(pIFD0, bLittleEndian);
     pIFD0 += 2;
     if (!tiff.Contains(static_cast<uint64_t>(nOffsetIFD0) + 2, static_cast<uint64_t>(nNumTags) * 12 + 4)) {
         return;
     }
-    uint8* pLastIFD0 = pIFD0 + nNumTags * 12;
-    uint32 nOffsetIFD1 = ReadUInt(pLastIFD0, bLittleEndian);
+    uint8_t* pLastIFD0 = pIFD0 + nNumTags * 12;
+    uint32_t nOffsetIFD1 = ReadUInt(pLastIFD0, bLittleEndian);
     m_pLastIFD0 = pLastIFD0;
 
-    uint8* pTagOrientation = nullptr;
+    uint8_t* pTagOrientation = nullptr;
     if (eImageFormat != IF_JXL && eImageFormat != IF_HEIF && eImageFormat != IF_AVIF) {
         pTagOrientation = FindTag(pIFD0, pLastIFD0, 0x112, bLittleEndian);
     }
@@ -491,15 +491,15 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
     }
     m_pTagOrientation = pTagOrientation;
 
-    uint8* pTagModel = FindTag(pIFD0, pLastIFD0, 0x110, bLittleEndian);
+    uint8_t* pTagModel = FindTag(pIFD0, pLastIFD0, 0x110, bLittleEndian);
     ReadStringTag(m_sModel, pTagModel, tiff, bLittleEndian);
 
-    uint8* pTagImageDesc = FindTag(pIFD0, pLastIFD0, 0x10E, bLittleEndian);
+    uint8_t* pTagImageDesc = FindTag(pIFD0, pLastIFD0, 0x10E, bLittleEndian);
     ReadStringTag(m_sImageDescription, pTagImageDesc, tiff, bLittleEndian, true);
 
     if (!m_sModel.isEmpty()) {
         QString sMake;
-        uint8* pTagMake = FindTag(pIFD0, pLastIFD0, 0x10F, bLittleEndian);
+        uint8_t* pTagMake = FindTag(pIFD0, pLastIFD0, 0x10F, bLittleEndian);
         ReadStringTag(sMake, pTagMake, tiff, bLittleEndian);
         if (!sMake.isEmpty()) {
             int nSpace = sMake.indexOf(QLatin1Char(' '));
@@ -510,68 +510,68 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
         }
     }
 
-    uint8* pTagSoftware = FindTag(pIFD0, pLastIFD0, 0x0131, bLittleEndian);
+    uint8_t* pTagSoftware = FindTag(pIFD0, pLastIFD0, 0x0131, bLittleEndian);
     ReadStringTag(m_sSoftware, pTagSoftware, tiff, bLittleEndian);
 
-    uint8* pTagModDate = FindTag(pIFD0, pLastIFD0, 0x0132, bLittleEndian);
+    uint8_t* pTagModDate = FindTag(pIFD0, pLastIFD0, 0x0132, bLittleEndian);
     QString sModDate;
     ReadStringTag(sModDate, pTagModDate, tiff, bLittleEndian);
     ParseDateString(m_dateTime, sModDate);
 
-    uint8* pTagEXIFIFD = FindTag(pIFD0, pLastIFD0, 0x8769, bLittleEndian);
+    uint8_t* pTagEXIFIFD = FindTag(pIFD0, pLastIFD0, 0x8769, bLittleEndian);
     if (pTagEXIFIFD == nullptr) {
         return;
     }
 
-    uint8* pTagGPSIFD = FindTag(pIFD0, pLastIFD0, 0x8825, bLittleEndian);
+    uint8_t* pTagGPSIFD = FindTag(pIFD0, pLastIFD0, 0x8825, bLittleEndian);
     if (pTagGPSIFD != nullptr) {
         ReadGPSData(tiff.p, tiff.size, pTagGPSIFD, bLittleEndian);
     }
 
-    uint32 nOffsetEXIF = ReadLongTag(pTagEXIFIFD, bLittleEndian);
+    uint32_t nOffsetEXIF = ReadLongTag(pTagEXIFIFD, bLittleEndian);
     if (nOffsetEXIF == 0) {
         return;
     }
     if (!tiff.Contains(nOffsetEXIF, 2)) {
         return;
     }
-    uint8* pEXIFIFD = tiff.p + nOffsetEXIF;
+    uint8_t* pEXIFIFD = tiff.p + nOffsetEXIF;
     nNumTags = ReadUShort(pEXIFIFD, bLittleEndian);
     pEXIFIFD += 2;
     if (!tiff.Contains(static_cast<uint64_t>(nOffsetEXIF) + 2, static_cast<uint64_t>(nNumTags) * 12)) {
         return;
     }
-    uint8* pLastEXIF = pEXIFIFD + nNumTags * 12;
+    uint8_t* pLastEXIF = pEXIFIFD + nNumTags * 12;
 
-    uint8* pTagAcquisitionDate = FindTag(pEXIFIFD, pLastEXIF, 0x9003, bLittleEndian);
+    uint8_t* pTagAcquisitionDate = FindTag(pEXIFIFD, pLastEXIF, 0x9003, bLittleEndian);
     QString sAcqDate;
     ReadStringTag(sAcqDate, pTagAcquisitionDate, tiff, bLittleEndian);
     ParseDateString(m_acqDate, sAcqDate);
 
-    uint8* pTagExposureTime = FindTag(pEXIFIFD, pLastEXIF, 0x829A, bLittleEndian);
+    uint8_t* pTagExposureTime = FindTag(pEXIFIFD, pLastEXIF, 0x829A, bLittleEndian);
     ReadRationalTag(m_exposureTime, pTagExposureTime, tiff, bLittleEndian);
 
-    uint8* pTagExposureBias = FindTag(pEXIFIFD, pLastEXIF, 0x9204, bLittleEndian);
+    uint8_t* pTagExposureBias = FindTag(pEXIFIFD, pLastEXIF, 0x9204, bLittleEndian);
     m_dExposureBias = ReadDoubleTag(pTagExposureBias, tiff, bLittleEndian);
 
-    uint8* pTagFlash = FindTag(pEXIFIFD, pLastEXIF, 0x9209, bLittleEndian);
-    uint16 nFlash = ReadShortTag(pTagFlash, bLittleEndian);
+    uint8_t* pTagFlash = FindTag(pEXIFIFD, pLastEXIF, 0x9209, bLittleEndian);
+    uint16_t nFlash = ReadShortTag(pTagFlash, bLittleEndian);
     m_bFlashFired = (nFlash & 1) != 0;
     m_bFlashFlagPresent = pTagFlash != nullptr;
 
-    uint8* pTagFocalLength = FindTag(pEXIFIFD, pLastEXIF, 0x920A, bLittleEndian);
+    uint8_t* pTagFocalLength = FindTag(pEXIFIFD, pLastEXIF, 0x920A, bLittleEndian);
     m_dFocalLength = ReadDoubleTag(pTagFocalLength, tiff, bLittleEndian);
 
-    uint8* pTagFNumber = FindTag(pEXIFIFD, pLastEXIF, 0x829D, bLittleEndian);
+    uint8_t* pTagFNumber = FindTag(pEXIFIFD, pLastEXIF, 0x829D, bLittleEndian);
     m_dFNumber = ReadDoubleTag(pTagFNumber, tiff, bLittleEndian);
 
-    uint8* pTagISOSpeed = FindTag(pEXIFIFD, pLastEXIF, 0x8827, bLittleEndian);
-    uint8* pTagISOSpeed2 = FindTag(pEXIFIFD, pLastEXIF, 0x8833, bLittleEndian);
+    uint8_t* pTagISOSpeed = FindTag(pEXIFIFD, pLastEXIF, 0x8827, bLittleEndian);
+    uint8_t* pTagISOSpeed2 = FindTag(pEXIFIFD, pLastEXIF, 0x8833, bLittleEndian);
 
     m_nISOSpeed = (pTagISOSpeed != nullptr) ? ReadShortTag(pTagISOSpeed, bLittleEndian) :
                       ReadLongTag(pTagISOSpeed2, bLittleEndian);
 
-    uint8* pTagUserComment = FindTag(pEXIFIFD, pLastEXIF, 0x9286, bLittleEndian);
+    uint8_t* pTagUserComment = FindTag(pEXIFIFD, pLastEXIF, 0x9286, bLittleEndian);
     ReadUserCommentTag(m_sUserComment, pTagUserComment, tiff, bLittleEndian);
     if (m_sUserComment == QStringLiteral("User comments")) {
         m_sUserComment.clear();
@@ -581,30 +581,30 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
         if (!tiff.Contains(nOffsetIFD1, 2)) {
             return;
         }
-        uint8* pIFD1 = tiff.p + nOffsetIFD1;
+        uint8_t* pIFD1 = tiff.p + nOffsetIFD1;
         nNumTags = ReadUShort(pIFD1, bLittleEndian);
         pIFD1 += 2;
         if (!tiff.Contains(static_cast<uint64_t>(nOffsetIFD1) + 2, static_cast<uint64_t>(nNumTags) * 12)) {
             return;
         }
         m_pIFD1 = pIFD1;
-        uint8* pLastIFD1 = m_pIFD1 + nNumTags * 12;
+        uint8_t* pLastIFD1 = m_pIFD1 + nNumTags * 12;
         m_pLastIFD1 = pLastIFD1;
-        uint8* pTagCompression = FindTag(m_pIFD1, pLastIFD1, 0x103, bLittleEndian);
+        uint8_t* pTagCompression = FindTag(m_pIFD1, pLastIFD1, 0x103, bLittleEndian);
         if (pTagCompression == nullptr) {
             return;
         }
         if (ReadShortTag(pTagCompression, bLittleEndian) == 6) {
-            uint8* pTagOffsetSOI = FindTag(m_pIFD1, pLastIFD1, 0x0201, bLittleEndian);
-            uint8* pTagJPEGLen = FindTag(m_pIFD1, pLastIFD1, 0x0202, bLittleEndian);
+            uint8_t* pTagOffsetSOI = FindTag(m_pIFD1, pLastIFD1, 0x0201, bLittleEndian);
+            uint8_t* pTagJPEGLen = FindTag(m_pIFD1, pLastIFD1, 0x0202, bLittleEndian);
             if (pTagOffsetSOI != nullptr && pTagJPEGLen != nullptr) {
-                uint32 nOffsetSOI = ReadLongTag(pTagOffsetSOI, bLittleEndian);
-                uint32 nJPEGBytes = ReadLongTag(pTagJPEGLen, bLittleEndian);
+                uint32_t nOffsetSOI = ReadLongTag(pTagOffsetSOI, bLittleEndian);
+                uint32_t nJPEGBytes = ReadLongTag(pTagJPEGLen, bLittleEndian);
                 if (!tiff.Contains(nOffsetSOI, nJPEGBytes)) {
                     return; // the thumbnail is not (completely) inside of the EXIF data
                 }
-                uint8* pSOI = tiff.p + nOffsetSOI;
-                const uint8* pSOF = reinterpret_cast<const uint8*>(Helpers::FindJPEGMarker(pSOI, static_cast<int>(nJPEGBytes), 0xC0));
+                uint8_t* pSOI = tiff.p + nOffsetSOI;
+                const uint8_t* pSOF = reinterpret_cast<const uint8_t*>(Helpers::FindJPEGMarker(pSOI, static_cast<int>(nJPEGBytes), 0xC0));
                 // the SOF segment is read up to byte 8 (height, width)
                 if (pSOF != nullptr && pSOF + 9 <= pSOI + nJPEGBytes) {
                     m_nThumbWidth = pSOF[7] * 256 + pSOF[8];
@@ -612,8 +612,8 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
                 }
             }
         } else {
-            uint8* pTagThumbWidth = FindTag(m_pIFD1, pLastIFD1, 0x0001, bLittleEndian);
-            uint8* pTagThumbHeight = FindTag(m_pIFD1, pLastIFD1, 0x0101, bLittleEndian);
+            uint8_t* pTagThumbWidth = FindTag(m_pIFD1, pLastIFD1, 0x0001, bLittleEndian);
+            uint8_t* pTagThumbHeight = FindTag(m_pIFD1, pLastIFD1, 0x0101, bLittleEndian);
             if (pTagThumbWidth != nullptr && pTagThumbHeight != nullptr) {
                 m_nThumbWidth = ReadShortOrLongTag(pTagThumbWidth, bLittleEndian);
                 m_nThumbHeight = ReadShortOrLongTag(pTagThumbHeight, bLittleEndian);
@@ -627,49 +627,49 @@ CEXIFReader::~CEXIFReader(void) {
     delete m_pLongitude;
 }
 
-void CEXIFReader::ReadGPSData(uint8* pTIFFHeader, uint32 nTIFFSize, uint8* pTagGPSIFD, bool bLittleEndian) {
+void CEXIFReader::ReadGPSData(uint8_t* pTIFFHeader, uint32_t nTIFFSize, uint8_t* pTagGPSIFD, bool bLittleEndian) {
     const TiffData tiff{ pTIFFHeader, nTIFFSize };
-    uint32 nOffsetGPS = ReadLongTag(pTagGPSIFD, bLittleEndian);
+    uint32_t nOffsetGPS = ReadLongTag(pTagGPSIFD, bLittleEndian);
     if (nOffsetGPS == 0 || !tiff.Contains(nOffsetGPS, 2)) {
         return;
     }
-    uint8* pGPSIFD = tiff.p + nOffsetGPS;
+    uint8_t* pGPSIFD = tiff.p + nOffsetGPS;
     int nNumTags = ReadUShort(pGPSIFD, bLittleEndian);
     pGPSIFD += 2;
     if (!tiff.Contains(static_cast<uint64_t>(nOffsetGPS) + 2, static_cast<uint64_t>(nNumTags) * 12)) {
         return;
     }
-    uint8* pLastGPS = pGPSIFD + nNumTags * 12;
+    uint8_t* pLastGPS = pGPSIFD + nNumTags * 12;
 
-    uint8* pTagLatitudeRef = FindTag(pGPSIFD, pLastGPS, 0x1, bLittleEndian);
+    uint8_t* pTagLatitudeRef = FindTag(pGPSIFD, pLastGPS, 0x1, bLittleEndian);
     if (pTagLatitudeRef == nullptr)
         return;
     QString latitudeRef;
     ReadStringTag(latitudeRef, pTagLatitudeRef, tiff, bLittleEndian, false, 2);
 
-    uint8* pTagLatitude = FindTag(pGPSIFD, pLastGPS, 0x2, bLittleEndian);
+    uint8_t* pTagLatitude = FindTag(pGPSIFD, pLastGPS, 0x2, bLittleEndian);
     m_pLatitude = ReadGPSCoordinate(tiff.p, tiff.size, pTagLatitude, latitudeRef, bLittleEndian);
 
-    uint8* pTagLongitudeRef = FindTag(pGPSIFD, pLastGPS, 0x3, bLittleEndian);
+    uint8_t* pTagLongitudeRef = FindTag(pGPSIFD, pLastGPS, 0x3, bLittleEndian);
     if (pTagLongitudeRef == nullptr)
         return;
     QString longitudeRef;
     ReadStringTag(longitudeRef, pTagLongitudeRef, tiff, bLittleEndian, false, 2);
 
-    uint8* pTagLongitude = FindTag(pGPSIFD, pLastGPS, 0x4, bLittleEndian);
+    uint8_t* pTagLongitude = FindTag(pGPSIFD, pLastGPS, 0x4, bLittleEndian);
     m_pLongitude = ReadGPSCoordinate(tiff.p, tiff.size, pTagLongitude, longitudeRef, bLittleEndian);
 
-    uint8* pTagAltitude = FindTag(pGPSIFD, pLastGPS, 0x6, bLittleEndian);
+    uint8_t* pTagAltitude = FindTag(pGPSIFD, pLastGPS, 0x6, bLittleEndian);
     if (pTagAltitude != nullptr) {
         m_dAltitude = ReadDoubleTag(pTagAltitude, tiff, bLittleEndian);
-        uint8* pTagAltitudeRef = FindTag(pGPSIFD, pLastGPS, 0x5, bLittleEndian);
+        uint8_t* pTagAltitudeRef = FindTag(pGPSIFD, pLastGPS, 0x5, bLittleEndian);
         if (pTagAltitudeRef != nullptr && *(pTagAltitudeRef + 8) == 1) {
             m_dAltitude *= -1;
         }
     }
 }
 
-GPSCoordinate* CEXIFReader::ReadGPSCoordinate(uint8* pTIFFHeader, uint32 nTIFFSize, uint8* pTagLatOrLong, const QString& reference, bool bLittleEndian) {
+GPSCoordinate* CEXIFReader::ReadGPSCoordinate(uint8_t* pTIFFHeader, uint32_t nTIFFSize, uint8_t* pTagLatOrLong, const QString& reference, bool bLittleEndian) {
     if (pTagLatOrLong == nullptr)
         return nullptr;
     const TiffData tiff{ pTIFFHeader, nTIFFSize };

@@ -1,10 +1,9 @@
 #include "ProcessingThreadPool.h"
 
-#include "ImageProcessingTypes.h"
-
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -160,16 +159,16 @@ void CProcessingThread::DoProcess(CProcessingRequest* pRequest, int nOffsetY, in
 ///////////////////////////////////////////////////////////////////////////////////
 
 bool CProcessingRequest::ProcessSlice(int nOffsetY, int nSizeY) {
-    const uint32 MAX_SRC_PIXELS_PER_STRIP = 1024 * 100;
-    uint32 nNumberOfPixelsInSource = (uint32)((SourceSize.cx * (double)ClippedTargetSize.cx / FullTargetSize.cx) *
+    const uint32_t MAX_SRC_PIXELS_PER_STRIP = 1024 * 100;
+    uint32_t nNumberOfPixelsInSource = (uint32_t)((SourceSize.cx * (double)ClippedTargetSize.cx / FullTargetSize.cx) *
                                                (SourceSize.cy * (double)nSizeY / FullTargetSize.cy));
-    uint32 nStrips = 1 + nNumberOfPixelsInSource / MAX_SRC_PIXELS_PER_STRIP;
-    uint32 nStripHeight = nSizeY / nStrips;
-    uint32 minimalStripHeight = std::min(16, StripPadding);
+    uint32_t nStrips = 1 + nNumberOfPixelsInSource / MAX_SRC_PIXELS_PER_STRIP;
+    uint32_t nStripHeight = nSizeY / nStrips;
+    uint32_t minimalStripHeight = std::min(16, StripPadding);
 
     if (nStrips >  1) {
         nStripHeight = nStripHeight & ~(StripPadding - 1);
-        nStripHeight = std::min<uint32>(nSizeY, std::max(nStripHeight, minimalStripHeight));
+        nStripHeight = std::min<uint32_t>(nSizeY, std::max(nStripHeight, minimalStripHeight));
     }
     int nSizeProcessed = 0;
     int nCurrentSizeY = nStripHeight;
@@ -179,7 +178,7 @@ bool CProcessingRequest::ProcessSlice(int nOffsetY, int nSizeY) {
             return false;
         }
         nSizeProcessed += nCurrentSizeY;
-        nCurrentSizeY = std::min<uint32>(nStripHeight, nSizeY - nSizeProcessed);
+        nCurrentSizeY = std::min<uint32_t>(nStripHeight, nSizeY - nSizeProcessed);
     }
     return true;
 }

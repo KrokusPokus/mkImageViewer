@@ -1,19 +1,6 @@
 #ifndef IMAGEPROCESSINGTYPES_H
 #define IMAGEPROCESSINGTYPES_H
 
-// signed 8 bit integer value
-typedef signed char int8;
-// unsigned 8 bit integer value
-typedef unsigned char uint8;
-// signed 16 bit integer value
-typedef signed short int16;
-// unsigned 16 bit integer value
-typedef unsigned short uint16;
-// signed 32 bit integer value
-typedef signed int int32;
-// unsigned 32 bit integer value
-typedef unsigned int uint32;
-
 enum EFilterType {
     Filter_Downsampling_None,
     Filter_Downsampling_Hermite,

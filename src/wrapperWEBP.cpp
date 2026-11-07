@@ -6,7 +6,6 @@
 #include "MaxImageDef.h"
 #include "Helpers.h"
 #include "ICCProfileTransform.h"
-#include "ImageProcessingTypes.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -37,7 +36,7 @@ void* WebpReaderWriter::ReadImage(int& width,
     const void* buffer,
     int sizebytes)
 {
-    uint8* pPixelData = NULL;
+    uint8_t* pPixelData = NULL;
     WebPBitstreamFeatures features;
     width = height = 0;
     nchannels = 4;
@@ -86,7 +85,7 @@ void* WebpReaderWriter::ReadImage(int& width,
         if (!has_animation) {
             int nStride = width * nchannels;
             size_t size = (size_t)height * nStride;
-            pPixelData = new (std::nothrow) uint8[size];   // WebPDecodeBGRAInto schreibt in unseren Puffer
+            pPixelData = new (std::nothrow) uint8_t[size];   // WebPDecodeBGRAInto schreibt in unseren Puffer
             if (pPixelData == NULL) {
                 outOfMemory = true;
                 if (transform) {
@@ -186,11 +185,11 @@ void* WebpReaderWriter::Compress(const void* source,
     int quality,
     bool lossless) {
 
-    uint8* pOutput = NULL;
+    uint8_t* pOutput = NULL;
     if (lossless)
-        len = WebPEncodeLosslessBGR((uint8*)source, width, height, Helpers::DoPadding(width * 3, 4), &pOutput);
+        len = WebPEncodeLosslessBGR((uint8_t*)source, width, height, Helpers::DoPadding(width * 3, 4), &pOutput);
     else
-        len = WebPEncodeBGR((uint8*)source, width, height, Helpers::DoPadding(width * 3, 4), (float)quality, &pOutput);
+        len = WebPEncodeBGR((uint8_t*)source, width, height, Helpers::DoPadding(width * 3, 4), (float)quality, &pOutput);
     return pOutput;
 }
 

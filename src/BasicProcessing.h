@@ -4,6 +4,8 @@
 #include "GeometryTypes.h"
 #include "ImageProcessingTypes.h"
 
+#include <cstdint>
+
 // Basic image processing methods processing the image pixel data
 class CBasicProcessing
 {
@@ -30,7 +32,7 @@ public:
 
     // Convert a 8 bpp DIB with color palette to a 32 bpp BGRA DIB
     // The palette must contain 256 entries with format BGR0 (32 bits)
-    static void* Convert8bppTo32bppDIB(int nWidth, int nHeight, const void* pDIBPixels, const uint8* pPalette);
+    static void* Convert8bppTo32bppDIB(int nWidth, int nHeight, const void* pDIBPixels, const uint8_t* pPalette);
 
     // Convert a 32 bpp BGRA DIB to a 24 bpp BGR DIB, flip vertically if requested.
     // Note that in contrast to the other methods, the target memory must be preallocated by the caller.
@@ -80,18 +82,18 @@ public:
     //  0: Grayscale image
     //  1: Image unmodified
     //  2: Image strongly saturated
-    // Creates 6 * 256 int32 entries for the matrix elements of the saturation matrix. The elements are in 8.24 fixed point format.
-    static int32* CreateColorSaturationLUTs(double dSaturation);
+    // Creates 6 * 256 int32_t entries for the matrix elements of the saturation matrix. The elements are in 8.24 fixed point format.
+    static int32_t* CreateColorSaturationLUTs(double dSaturation);
 
-    // Apply a three channel LUT (memory layout: 256 uint8 values for B channel, followed by 256 uint8 values for G channel,
-    // followed by 256 uint8 values for R channel, totally 3*256 bytes) to a 32 bpp BGRA DIB.
+    // Apply a three channel LUT (memory layout: 256 uint8_t values for B channel, followed by 256 uint8_t values for G channel,
+    // followed by 256 uint8_t values for R channel, totally 3*256 bytes) to a 32 bpp BGRA DIB.
     // Notice that the A channel is not processed and set to fixed value 0xFF.
-    static void* Apply3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const uint8* pLUT);
+    static void* Apply3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const uint8_t* pLUT);
 
     // Apply the specified saturation LUTs (as returned by CreateColorSaturationLUTs() method) and then a 
     // three channel LUT (256*B, 256*G, 256*R, see above for details) to a 32 bpp BGRA DIB
     // Notice that the A channel is not processed and set to fixed value 0xFF.
-    static void* ApplySaturationAnd3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT);
+    static void* ApplySaturationAnd3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const int32_t* pSatLUTs, const uint8_t* pLUT);
 
     // The following methods take into account that the original image with size (w, h) - denoted as 'sourceSize' -
     // is zoomed by a factor x, thus resulting in a (virtual) image size of (w * x, h * x) - denoted as 'fullTargetSize'.

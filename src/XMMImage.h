@@ -1,9 +1,8 @@
 #ifndef XMMIMAGE_H
 #define XMMIMAGE_H
 
-#include "ImageProcessingTypes.h"
-
 #include <cstddef>
+#include <cstdint>
 
 // Represents an image with line interleaving, optimal for SIMD processing. Each pixel has one float per channel
 // (linear light, 0..4095), channel order is B, G, R. Lines are padded to a multiple of 'padding' pixels (4 for SSE,
@@ -35,9 +34,9 @@ public:
     // Converts GetWidth() pixels of a 24 or 32 bpp DIB line (pSrcLine points to the first pixel to convert) into
     // line nLine of this image (sRGB 8 bit -> linear 12 bit, as float). The padding columns read by the filter
     // (up to the next multiple of 'padding') are set to zero.
-    void ConvertLine(int nLine, const uint8* pSrcLine, int nChannels, int padding);
+    void ConvertLine(int nLine, const uint8_t* pSrcLine, int nChannels, int padding);
     // Same as ConvertLine(), AVX2 implementation (same results)
-    void ConvertLine_AVX(int nLine, const uint8* pSrcLine, int nChannels, int padding);
+    void ConvertLine_AVX(int nLine, const uint8_t* pSrcLine, int nChannels, int padding);
 
     // Pointer to the first channel of line nLine, the other two channels follow at GetPaddedWidth() floats distance
     float* GetLine(int nLine) const { return (float*)m_pMemory + (size_t)nLine * 3 * m_nPaddedWidth; }
@@ -53,7 +52,7 @@ private:
     int GetMemSize() const { return GetLineSize()*3*m_nPaddedHeight; }
     void Init(int nWidth, int nHeight, bool bPadHeight, int padding, bool bAvoidCacheAliasing = false);
     // Converts the pixels nFirst to nEnd - 1 of a DIB line, pDst: first channel of the target line
-    void ConvertPixels(float* pDst, const uint8* pSrc, int nChannels, int nFirst, int nEnd) const;
+    void ConvertPixels(float* pDst, const uint8_t* pSrc, int nChannels, int nFirst, int nEnd) const;
     // Zeroes the padding columns of a line read by the filter (up to the next multiple of 'padding')
     void ZeroPaddingColumns(float* pDst, int padding) const;
 

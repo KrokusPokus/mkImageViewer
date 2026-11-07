@@ -535,11 +535,11 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
 
     if (!bNoLUTsApplied) {
         // LUT --> apply correction. Without auto contrast only the saturation is changed (identity LUT).
-        uint8 identityLUT[3*256];
-        const uint8* pLUT = m_pLUTRGB;
+        uint8_t identityLUT[3*256];
+        const uint8_t* pLUT = m_pLUTRGB;
         if (pLUT == NULL) {
             for (int i = 0; i < 256; i++) {
-                identityLUT[i] = identityLUT[i + 256] = identityLUT[i + 256*2] = (uint8)i;
+                identityLUT[i] = identityLUT[i + 256] = identityLUT[i + 256*2] = (uint8_t)i;
             }
             pLUT = identityLUT;
         }

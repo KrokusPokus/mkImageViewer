@@ -247,8 +247,8 @@ private:
     uint64_t m_fileLoadDelayMs;
 
     // stuff needed to perform LUT processing
-    uint8* m_pLUTRGB; // B,G,R three channel LUT
-    int32* m_pSaturationLUTs; // Saturation LUTs
+    uint8_t* m_pLUTRGB; // B,G,R three channel LUT
+    int32_t* m_pSaturationLUTs; // Saturation LUTs
     CHistogram* m_pHistogram; // histogram of the original pixels, for the automatic correction
 
     // Internal GetDIB() implementation with (low quality) rotation with GetDIB().

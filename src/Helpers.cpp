@@ -421,13 +421,13 @@ namespace Helpers {
     }
 
     void* FindEXIFBlock(void* pJPEGStream, int nStreamLength) {
-        uint8* pEXIFBlock = (uint8*)Helpers::FindJPEGMarker(pJPEGStream, nStreamLength, 0xE1);
+        uint8_t* pEXIFBlock = (uint8_t*)Helpers::FindJPEGMarker(pJPEGStream, nStreamLength, 0xE1);
         if (pEXIFBlock == NULL) {
             return NULL;
         }
         // The segment (marker, length, "Exif\0\0", data) must be completely inside of the stream: the length comes from
         // the file, and CBaseImage copies as many bytes as it says
-        const int nAvailable = nStreamLength - static_cast<int>(pEXIFBlock - static_cast<uint8*>(pJPEGStream));
+        const int nAvailable = nStreamLength - static_cast<int>(pEXIFBlock - static_cast<uint8_t*>(pJPEGStream));
         if (nAvailable < 10) {
             return NULL;
         }
@@ -560,7 +560,7 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
     }
 
 // Based on: https://github.com/sdneon/jpegview.git
-    void BlendAlpha(uint32* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode nTransparencyMode) {
+    void BlendAlpha(uint32_t* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode nTransparencyMode) {
         QColor cT = CSettingsProvider::This().ColorTransparency();
         QRgb nTransparency = qRgb(cT.red(), cT.green(), cT.blue());
 

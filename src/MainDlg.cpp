@@ -58,6 +58,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <optional>
 #include <utility>
@@ -1828,7 +1829,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
         case Command::Rotate90:
         case Command::Rotate270:
             if (m_pCurrentImage != NULL) {
-                uint32 nRotationDelta = (inv.id == Command::Rotate90) ? 90 : 270;
+                uint32_t nRotationDelta = (inv.id == Command::Rotate90) ? 90 : 270;
                 m_nRotation = (m_nRotation + nRotationDelta) % 360;
                 m_nUserRotation = (m_nUserRotation + nRotationDelta) % 360;
                 m_pCurrentImage->Rotate(nRotationDelta);

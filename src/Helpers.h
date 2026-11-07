@@ -2,7 +2,6 @@
 #define HELPERS_H
 
 #include "ImageLoadResult.h"
-#include "ImageProcessingTypes.h" // defines int8, uint8, int16, uint16, int32, uint32, EFilterType, EImageFormat
 
 #include <QFileInfo>
 #include <QList>
@@ -140,13 +139,13 @@ namespace Helpers {
 
     // Based on: https://github.com/sdneon/jpegview.git
     // QRgb is 0x00rrggbb. 0xFF00000 signals we don't use an override color
-    void BlendAlpha(uint32* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode TransparencyMode);
+    void BlendAlpha(uint32_t* pImage32, int nWidth, int nHeight, Helpers::ETransparencyMode TransparencyMode);
 
     // pixel is ARGB, backgroundColor is QRgb. Returns ARGB
     // [GF] Note: PsdReader::ReadImage() still calls this directly for "blending the K channel in CMYK images".
     //        Anything else is going through BlendAlpha().
-    static inline uint32 AlphaBlendBackground(uint32 pixel, QRgb backgroundColor, bool bUseCheckerboard = false, int x = -1, int y = -1) {
-        uint32 alpha = pixel & 0xFF000000;
+    static inline uint32_t AlphaBlendBackground(uint32_t pixel, QRgb backgroundColor, bool bUseCheckerboard = false, int x = -1, int y = -1) {
+        uint32_t alpha = pixel & 0xFF000000;
         if (alpha == 0xFF000000)
             return pixel;
 
@@ -160,35 +159,35 @@ namespace Helpers {
             }
         }
 
-        uint8 bg_r = qRed(backgroundColor);
-        uint8 bg_g = qGreen(backgroundColor);
-        uint8 bg_b = qBlue(backgroundColor);
+        uint8_t bg_r = qRed(backgroundColor);
+        uint8_t bg_g = qGreen(backgroundColor);
+        uint8_t bg_b = qBlue(backgroundColor);
 
         if (alpha == 0) {
             return 0xFF000000 | (bg_r << 16) | (bg_g << 8) | bg_b;
         } else {
             /*
-             *          uint8 r = (pixel >> 16) & 0xFF;
-             *          uint8 g = (pixel >>  8) & 0xFF;
-             *          uint8 b = (pixel      ) & 0xFF;
-             *          uint8 a = alpha >> 24;
-             *          uint8 one_minus_a = 255 - a;
+             *          uint8_t r = (pixel >> 16) & 0xFF;
+             *          uint8_t g = (pixel >>  8) & 0xFF;
+             *          uint8_t b = (pixel      ) & 0xFF;
+             *          uint8_t a = alpha >> 24;
+             *          uint8_t one_minus_a = 255 - a;
              *
              *          return
              *              0xFF000000 +
-             *              (  (uint8)(((r * a + bg_r * one_minus_a) / 255.0) + 0.5) << 16) +
-             *              (  (uint8)(((g * a + bg_g * one_minus_a) / 255.0) + 0.5) <<  8) +
-             *              (  (uint8)(((b * a + bg_b * one_minus_a) / 255.0) + 0.5)      );
+             *              (  (uint8_t)(((r * a + bg_r * one_minus_a) / 255.0) + 0.5) << 16) +
+             *              (  (uint8_t)(((g * a + bg_g * one_minus_a) / 255.0) + 0.5) <<  8) +
+             *              (  (uint8_t)(((b * a + bg_b * one_minus_a) / 255.0) + 0.5)      );
              */
             // From https://github.com/aviscaerulea/jpegview-nt.git
             // Integer division by 255: (v + 128 + ((v + 128) >> 8)) >> 8
             // This code performs about 30% faster than the original one above and gives bit-identical results.
 
-            uint32 a = alpha >> 24;
-            uint32 one_minus_a = 255 - a;
-            uint32 vr = ((pixel >> 16) & 0xFF) * a + bg_r * one_minus_a;
-            uint32 vg = ((pixel >>  8) & 0xFF) * a + bg_g * one_minus_a;
-            uint32 vb = ((pixel      ) & 0xFF) * a + bg_b * one_minus_a;
+            uint32_t a = alpha >> 24;
+            uint32_t one_minus_a = 255 - a;
+            uint32_t vr = ((pixel >> 16) & 0xFF) * a + bg_r * one_minus_a;
+            uint32_t vg = ((pixel >>  8) & 0xFF) * a + bg_g * one_minus_a;
+            uint32_t vb = ((pixel      ) & 0xFF) * a + bg_b * one_minus_a;
 
             return
                 0xFF000000 |

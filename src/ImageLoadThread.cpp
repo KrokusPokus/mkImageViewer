@@ -428,7 +428,7 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     image = QImage(); // release the decoded image before the CBaseImage is created
 
     if (bHasAlphaChannel) {
-        Helpers::BlendAlpha(reinterpret_cast<uint32*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
+        Helpers::BlendAlpha(reinterpret_cast<uint32_t*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
     }
     CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, frame.eFormat,
                                             frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs, frame.bInArchive);
@@ -703,7 +703,7 @@ CImageFrameInfo MakeFrameInfo(EImageFormat eFormat, const CDecodeTarget& target)
 std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const CEncodedData& in,
                                         const CDecodeTarget& target, Helpers::ETransparencyMode eTransparency) {
     if (d.bBlendAlpha) {
-        Helpers::BlendAlpha(reinterpret_cast<uint32*>(d.pixels.get()), d.nWidth, d.nHeight, eTransparency);
+        Helpers::BlendAlpha(reinterpret_cast<uint32_t*>(d.pixels.get()), d.nWidth, d.nHeight, eTransparency);
     }
 
     // JPEG: the EXIF block is part of the file data (CBaseImage copies it)
