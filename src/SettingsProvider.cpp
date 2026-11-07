@@ -59,9 +59,10 @@ namespace {
 
     void updateButtonColor(QPushButton* button, const QColor& color) {
         button->setText(color.name());
+        const QString backgroundColor_forDisplay = color.name();
+        const QString textColor_forDisplay = (color.lightness() < 128) ? QStringLiteral("#FFFFFF") : QStringLiteral("#000000");
         button->setStyleSheet(QString("background-color: %1; color: %2;")
-                                  .arg(color.name())
-                                  .arg((color.lightness() < 128) ? "#FFFFFF" : "#000000"));
+                                  .arg(backgroundColor_forDisplay, textColor_forDisplay));
     }
 
 

@@ -310,8 +310,10 @@ CKeyMap::CKeyMap() {
 void CKeyMap::LoadFromText(const QString& sText, const QString& sSourceName) {
     // Einheitliche, auffindbare Meldungen (Quelle + Zeilennummer).
     auto warn = [&sSourceName](int nLine, const QString& sMsg) {
+        const QString fileName_forDisplay = QFileInfo(sSourceName).fileName();
+        const QString line_forDisplay = QString::number(nLine);
         qWarning().noquote() << QStringLiteral("KeyMap: %1:%2: %3")
-                                    .arg(QFileInfo(sSourceName).fileName()).arg(nLine).arg(sMsg);
+                                    .arg(fileName_forDisplay, line_forDisplay, sMsg);
     };
 
     // Hinweis zum "Unbelegen": Das Format ist tastenzentriert (Taste -> Befehl), eine Taste kann

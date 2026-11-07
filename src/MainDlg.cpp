@@ -250,7 +250,9 @@ namespace {
             QString sFileSize = FormatFileSize(nFileSize);
             message = QStringLiteral("File could not be read:\n\n%1\nFile size: %2").arg(failedFileName, sFileSize);
             if (position.IsMultiPageArchive()) {
-                message += QStringLiteral("\nPage %1 of %2").arg(position.FrameIndex + 1).arg(position.FrameCount);
+                const QString pageNumber_forDisplay = QString::number(position.FrameIndex + 1);
+                const QString pageCount_forDisplay = QString::number(position.FrameCount);
+                message += QStringLiteral("\nPage %1 of %2").arg(pageNumber_forDisplay, pageCount_forDisplay);
             }
             break;
             }
@@ -609,6 +611,19 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             const int nExifRotation = m_pCurrentImage->IsRotationByEXIF() ? m_pCurrentImage->GetInitialRotation() % 360 : 0;
             const QString sRotationLine = FormatRotationLine(nTotalRotation, nExifRotation, m_nUserRotation, m_bUserMirrored);
 
+            // Bereits fertige Strings, damit die Multi-Arg-Form von QString::arg() sie sicher verwenden kann
+            const QString origWidth_forDisplay = QString::number(m_pCurrentImage->OrigWidth());
+            const QString origHeight_forDisplay = QString::number(m_pCurrentImage->OrigHeight());
+            const QString realWidth_forDisplay = QString::number(iRealWidth);
+            const QString realHeight_forDisplay = QString::number(iRealHeight);
+            const QString zoom_forDisplay = QString::number(m_dZoom);
+            const QString clientWidth_forDisplay = QString::number(m_clientRect.width());
+            const QString clientHeight_forDisplay = QString::number(m_clientRect.height());
+            const QString numThreads_forDisplay = QString::number(iNumThreads);
+            const QString fileLoadDelayMs_forDisplay = QString::number(m_pCurrentImage->GetFileLoadDelayMs());
+            const QString dibLoadDelayMs_forDisplay = QString::number(m_pCurrentImage->GetDIBLoadDelayMs());
+            const QString paintTime_forDisplay = QString::number(paintTime);
+
             QString infoText;
             QString sFullPath = CurrentFileName(false);
 
@@ -621,30 +636,37 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
                 QString visiblePath = CurrentDisplayPath(); // for images in an archive "archive/file"
 
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
+                    const QString frameNumber_forDisplay = QString::number(m_pCurrentImage->FrameIndex() + 1);
+                    const QString frameCount_forDisplay = QString::number(m_pCurrentImage->NumberOfFrames());
                     if (m_bIsAnimationPlaying) {
+                        const QString frameTimeMs_forDisplay = QString::number(m_pCurrentImage->FrameTimeMs());
                         infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n%19\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms\nPainting Image:  %18 ms")
-                        .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
-                            .arg(m_pCurrentImage->FrameTimeMs()).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
-                            .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
+                            .arg(visiblePath, frameNumber_forDisplay, frameCount_forDisplay, frameTimeMs_forDisplay,
+                                 sFileSize, origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay,
+                                 realHeight_forDisplay, zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay,
+                                 numThreads_forDisplay, sCPU, sFilter, fileLoadDelayMs_forDisplay,
+                                 dibLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
                     } else {
                         infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n%18\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms\nPainting Image:  %17 ms")
-                        .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
-                            .arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
-                            .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
+                            .arg(visiblePath, frameNumber_forDisplay, frameCount_forDisplay, sFileSize,
+                                 origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay, realHeight_forDisplay,
+                                 zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay, numThreads_forDisplay,
+                                 sCPU, sFilter, fileLoadDelayMs_forDisplay, dibLoadDelayMs_forDisplay,
+                                 paintTime_forDisplay, sRotationLine);
                     }
                 } else {
                     infoText = QString("%1\nFile Size:   %2\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n%16\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms\nPainting Image:  %15 ms")
-                    .arg(visiblePath).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
-                        .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                        .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
+                        .arg(visiblePath, sFileSize, origWidth_forDisplay, origHeight_forDisplay,
+                             realWidth_forDisplay, realHeight_forDisplay, zoom_forDisplay, clientWidth_forDisplay,
+                             clientHeight_forDisplay, numThreads_forDisplay, sCPU, sFilter,
+                             fileLoadDelayMs_forDisplay, dibLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
                 }
             } else {
                 infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n%14\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms\nPainting Image:  %13 ms")
-                .arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
-                    .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                    .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
+                    .arg(origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay, realHeight_forDisplay,
+                         zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay, numThreads_forDisplay,
+                         sCPU, sFilter, fileLoadDelayMs_forDisplay, dibLoadDelayMs_forDisplay,
+                         paintTime_forDisplay, sRotationLine);
             }
 
             // QPainter Konfiguration für Text
@@ -3747,9 +3769,9 @@ void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
 // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
 QString CMainDlg::GetMultiframeIndex(const CImagePosition& position) {
     if (position.FrameCount > 1 && !position.IsAnimation) {
-        return QStringLiteral(" [%1/%2]")
-            .arg(position.FrameIndex + 1)
-            .arg(position.FrameCount);
+        const QString frameNumber_forDisplay = QString::number(position.FrameIndex + 1);
+        const QString frameCount_forDisplay = QString::number(position.FrameCount);
+        return QStringLiteral(" [%1/%2]").arg(frameNumber_forDisplay, frameCount_forDisplay);
     }
 
     return QString();
