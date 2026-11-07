@@ -22,7 +22,6 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QDebug>
-#include <QDesktopServices>
 #include <QDialog>
 #include <QDir>
 #include <QEvent>
@@ -1660,7 +1659,7 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::EditKeyMap:
             // Uebergangsloesung bis zum Shortcut-Dialog. Aenderungen gelten erst nach einem Neustart.
-            if (m_pKeyMap->GetFilePath().isEmpty() || !QDesktopServices::openUrl(QUrl::fromLocalFile(m_pKeyMap->GetFilePath()))) {
+            if (m_pKeyMap->GetFilePath().isEmpty() || !Helpers::openWithSystemDefault(QUrl::fromLocalFile(m_pKeyMap->GetFilePath()))) {
                 SetToast(tr("Could not open keymap.txt"));
             }
             break;
@@ -2330,7 +2329,7 @@ void CMainWindow::OpenDefaultEditor() {
     // Editor aus den Einstellungen (DefaultImageEditor), sonst das Standardprogramm des Systems
     const QString sEditor = CSettingsProvider::This().DefaultImageEditor();
     if (sEditor.isEmpty())
-        QDesktopServices::openUrl(QUrl::fromLocalFile(sCurrentFileName));
+        Helpers::openWithSystemDefault(QUrl::fromLocalFile(sCurrentFileName));
     else
         Helpers::openFileListWithHandler(sEditor, { sCurrentFileName });
 }

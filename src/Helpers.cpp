@@ -649,6 +649,23 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
         return DesktopEntry();
     }
 
+    // Oeffnet Datei oder URL mit dem Standardprogramm des Systems.
+    // Bewusst nicht direkt QDesktopServices: Qt geht dort auch ohne Sandbox ueber xdg-desktop-portal,
+    // und das Portal ignoriert bei lokalen Dateien den eingestellten Standard (Auswahldialog, danach
+    // die gemerkte App). xdg-open fragt dagegen die Desktop-Umgebung, also z.B. kde-open unter Plasma.
+    // Liefert true, wenn der Start angestossen wurde. Ob xdg-open die Datei wirklich oeffnen konnte,
+    // ist damit nicht gesagt.
+    bool openWithSystemDefault(const QUrl &url) {
+        if (!url.isValid()) return false;
+
+        const QString xdgOpen = QStandardPaths::findExecutable(QStringLiteral("xdg-open"));
+        if (!xdgOpen.isEmpty()) {
+            const QString target = url.isLocalFile() ? url.toLocalFile() : url.toString(QUrl::FullyEncoded);
+            if (QProcess::startDetached(xdgOpen, { target })) return true;
+        }
+        return QDesktopServices::openUrl(url);
+    }
+
     void openFileListWithHandler(const QString &handlerApp, const QStringList &fileList) {
         if (handlerApp.endsWith(".desktop", Qt::CaseInsensitive)) {
             launchDesktopFile(getDesktopEntryById(handlerApp), fileList);
@@ -743,7 +760,7 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
             // 1. Direkt testen, ob es bereits eine valide Netzwerk-URL mit Schema ist (http, https, ftp, etc.)
             QUrl url(rawUrl);
             if (!url.scheme().isEmpty() && url.isValid()) {
-                QDesktopServices::openUrl(url);
+                openWithSystemDefault(url);
                 return;
             }
 
@@ -763,7 +780,7 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
             }
 
             if (url.isValid()) {
-                QDesktopServices::openUrl(url);
+                openWithSystemDefault(url);
             } else {
                 qWarning() << "launchDesktopFile(): Ungültige URL:" << urlStr;
             }
