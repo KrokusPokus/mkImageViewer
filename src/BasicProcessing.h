@@ -1,8 +1,8 @@
 #ifndef BASICPROCESSING_H
 #define BASICPROCESSING_H
 
+#include "GeometryTypes.h"
 #include "ImageProcessingTypes.h"
-#include "WTLCompat.h"
 
 // Basic image processing methods processing the image pixel data
 class CBasicProcessing
@@ -47,8 +47,8 @@ public:
 
     // Copy rectangular pixel block from source to target 32 bpp bitmap. The target bitmap is allocated
     // if the 'pTarget' parameter is NULL. Note that size of source and target rect must match.
-    static void* CopyRect32bpp(void* pTarget, const void* pSource,  CSize targetSize, CRect targetRect,
-        CSize sourceSize, CRect sourceRect);
+    static void* CopyRect32bpp(void* pTarget, const void* pSource,  DSize targetSize, DRect targetRect,
+        DSize sourceSize, DRect sourceRect);
 
     // Clockwise rotation of a 32 bit DIB. The rotation angle must be 90, 180 or 270 degrees, in all other
     // cases the return value is NULL
@@ -72,7 +72,7 @@ public:
     static void MirrorVInplace(int nWidth, int nHeight, int nStride, void* pDIBPixels);
 
     // Crop specified 32 bpp image. Returns NULL if cropRect is not fully inside source image.
-    static void* Crop32bpp(int nWidth, int nHeight, const void* pDIBPixels, CRect cropRect);
+    static void* Crop32bpp(int nWidth, int nHeight, const void* pDIBPixels, DRect cropRect);
 
 
     // Creates lookup tables for color saturation correction.
@@ -110,8 +110,8 @@ public:
     // pPixels: Source image
     // nChannels: Number of channels (bytes) in source image, must be 3 or 4
     // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
-    static void* PointSample(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize, 
-        CSize sourceSize, const void* pPixels, int nChannels);
+    static void* PointSample(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize, 
+        DSize sourceSize, const void* pPixels, int nChannels);
 
     // High quality downsampling of 32 or 24 bpp BGR(A) image to target size, using a set of down-sampling kernels.
     // Notice that the A channel is not processed and set to fixed value 0xFF.
@@ -119,27 +119,27 @@ public:
     // eFilter: Filter to apply. Note that the filter type can only be one of the downsampling filter types.
     // See PointSample() for other parameters
     // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
-    static void* SampleDown_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter);
+    static void* SampleDown_HQ(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+        DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter);
 
     // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns NULL if memory is exhausted.
     // Notice that the A channel is not processed. The AVX2 implementation sets it to 0xFF, with SSE/MMX it is undefined.
     // Notice that the returned image is always 32 bpp!
-    static void* SampleDown_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, SIMDArchitecture simd);
+    static void* SampleDown_HQ_SIMD(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+        DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, SIMDArchitecture simd);
 
     // High quality upsampling of 32 or 24 bpp BGR(A) image using bicubic interpolation.
     // Notice that the A channel is not processed and set to fixed value 0xFF.
     // Notice that the returned image is always 32 bpp!
     // See PointSample() for parameters
-    static void* SampleUp_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        CSize sourceSize, const void* pPixels, int nChannels);
+    static void* SampleUp_HQ(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+        DSize sourceSize, const void* pPixels, int nChannels);
 
     // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns NULL if memory is exhausted.
     // Notice that the A channel is not processed. The AVX2 implementation sets it to 0xFF, with SSE/MMX it is undefined.
     // Notice that the returned image is always 32 bpp!
-    static void* SampleUp_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-        CSize sourceSize, const void* pPixels, int nChannels, SIMDArchitecture simd);
+    static void* SampleUp_HQ_SIMD(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+        DSize sourceSize, const void* pPixels, int nChannels, SIMDArchitecture simd);
 
 private:
     CBasicProcessing(void);

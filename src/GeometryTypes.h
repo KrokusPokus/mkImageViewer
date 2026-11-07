@@ -1,5 +1,5 @@
-#ifndef WTLCOMPAT_H
-#define WTLCOMPAT_H
+#ifndef GEOMETRYTYPES_H
+#define GEOMETRYTYPES_H
 
 #ifdef QT_CORE_LIB
 #include <QPoint>
@@ -67,7 +67,6 @@ struct DRect {
     constexpr DSize Size() const noexcept { return DSize(Width(), Height()); }
     constexpr DPoint TopLeft() const noexcept { return DPoint(left, top); }
 
-    // WTL / Win32 Kompatibilität
     constexpr bool IsEmpty() const noexcept { return right <= left || bottom <= top; }
 
     // --- Transformationen & Modifikatoren ---
@@ -96,10 +95,4 @@ struct DRect {
 
 };
 
-//-----------------------------------------------------------------
-
-using CSize = DSize;
-using CPoint = DPoint;
-using CRect = DRect;
-
-#endif // WTLCOMPAT_H
+#endif // GEOMETRYTYPES_H

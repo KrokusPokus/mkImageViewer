@@ -1,8 +1,8 @@
 #ifndef PROCESSPARAMS_H
 #define PROCESSPARAMS_H
 
+#include "GeometryTypes.h"
 #include "Helpers.h"
-#include "WTLCompat.h"
 
 // Processing flags for image processing
 enum EProcessingFlags {
@@ -73,7 +73,7 @@ public:
                    int nUserRotation,
                    double dZoom,
                    Helpers::EAutoZoomMode eAutoZoomMode,
-                   CPoint offsets,
+                   DPoint offsets,
                    Helpers::ETransparencyMode eTransparencyMode,
                    const CImageProcessingParams& imageProcParams,
                    EProcessingFlags eProcFlags)
@@ -94,7 +94,7 @@ public:
     int UserRotation{0};
     double Zoom{1.0};
     Helpers::EAutoZoomMode AutoZoomMode{};
-    CPoint Offsets{};
+    DPoint Offsets{};
     Helpers::ETransparencyMode TransparencyMode{}; // for transparent background
     CImageProcessingParams ImageProcParams{};
     EProcessingFlags ProcFlags{};

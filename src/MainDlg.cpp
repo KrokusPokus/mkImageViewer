@@ -6,6 +6,7 @@
 #include "DirectoryWatcher.h"
 #include "EXIFReader.h"
 #include "FileList.h"
+#include "GeometryTypes.h"
 #include "HistogramCorr.h"
 #include "ImageProcessingTypes.h"
 #include "ImageProvider.h"
@@ -16,7 +17,6 @@
 #include "RenameDialog.h"
 #include "ResizeFilter.h"
 #include "SettingsProvider.h"
-#include "WTLCompat.h"
 
 #include <QActionGroup>
 #include <QApplication>
@@ -548,7 +548,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         m_DIBOffsets = m_bZoomMode ? (unlimitedOffsets - m_offsets) : QPoint(0, 0);
 
         QSize clippedSize(std::min<long>(m_clientRect.width(), newSize.width()), std::min<long>(m_clientRect.height(), newSize.height()));
-        CPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, m_offsets);
+        DPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, m_offsets);
 
         void* pDIBData = m_pCurrentImage->GetDIB(newSize,
                                                  clippedSize,

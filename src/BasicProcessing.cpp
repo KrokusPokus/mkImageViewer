@@ -51,14 +51,14 @@ constexpr int MAX_THREADS_COPY_OPERATIONS = 4;
 // Processing images stripwise on thread pool
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-static void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pIJLPixels, int nChannels, EFilterType eFilter, bool bSSE, uint8* pTarget);
+static void* SampleDown_HQ_MMX_SSE_Core(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pIJLPixels, int nChannels, EFilterType eFilter, bool bSSE, uint8* pTarget);
 
-static bool SampleSlice_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, uint8* pTarget);
+static bool SampleSlice_HQ_AVX(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, uint8* pTarget);
 
-static void* SampleUp_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pIJLPixels, int nChannels, bool bSSE,
+static void* SampleUp_HQ_MMX_SSE_Core(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pIJLPixels, int nChannels, bool bSSE,
     uint8* pTarget);
 
 //---------------------------------------------------------------------------------------------
@@ -76,8 +76,8 @@ private:
 // Request for upsampling or downsampling
 class CRequestUpDownSampling : public CProcessingRequest {
 public:
-    CRequestUpDownSampling(const void* pSourcePixels, CSize sourceSize, void* pTargetPixels,
-        CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
+    CRequestUpDownSampling(const void* pSourcePixels, DSize sourceSize, void* pTargetPixels,
+        DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
         int nChannels, EFilterType eFilter, CBasicProcessing::SIMDArchitecture simd)
         : CProcessingRequest(pSourcePixels, sourceSize, pTargetPixels, fullTargetSize, fullTargetOffset, clippedTargetSize) {
         Channels = nChannels;
@@ -97,8 +97,8 @@ public:
         }
         CDenormalsOff denormalsOff;
         return SampleSlice_HQ_AVX(FullTargetSize,
-            CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
-            CSize(ClippedTargetSize.cx, sizeY),
+            DPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
+            DSize(ClippedTargetSize.cx, sizeY),
             SourceSize, SourcePixels,
             Channels, Filter,
             (uint8*)TargetPixels + ClippedTargetSize.cx * 4 * offsetY);
@@ -109,15 +109,15 @@ public:
         CDenormalsOff denormalsOff;
         if (Filter == Filter_Upsampling_Bicubic)
             return NULL != SampleUp_HQ_MMX_SSE_Core(FullTargetSize,
-                CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
-                CSize(ClippedTargetSize.cx, sizeY),
+                DPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
+                DSize(ClippedTargetSize.cx, sizeY),
                 SourceSize, SourcePixels,
                 Channels, SIMD == CBasicProcessing::SSE,
                 (uint8*)TargetPixels + ClippedTargetSize.cx * 4 * offsetY);
         else
             return NULL != SampleDown_HQ_MMX_SSE_Core(FullTargetSize,
-                CPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
-                CSize(ClippedTargetSize.cx, sizeY),
+                DPoint(FullTargetOffset.x, FullTargetOffset.y + offsetY),
+                DSize(ClippedTargetSize.cx, sizeY),
                 SourceSize, SourcePixels,
                 Channels,
                 Filter, SIMD == CBasicProcessing::SSE,
@@ -232,7 +232,7 @@ static void RotateBlock32bpp(const uint32* pSrc, uint32* pTgt, int nWidth, int n
 class CRequestCopyLines : public CProcessingRequest {
 public:
     CRequestCopyLines(int nWidth, int nHeight, const std::function<void(int, int)>& processLines)
-        : CProcessingRequest(NULL, CSize(nWidth, nHeight), NULL, CSize(nWidth, nHeight), CPoint(0, 0), CSize(nWidth, nHeight)),
+        : CProcessingRequest(NULL, DSize(nWidth, nHeight), NULL, DSize(nWidth, nHeight), DPoint(0, 0), DSize(nWidth, nHeight)),
           m_processLines(processLines) {
         StripPadding = 32; // block size of the rotation by 90 degrees
         MaxThreads = MAX_THREADS_COPY_OPERATIONS;
@@ -544,8 +544,8 @@ void* CBasicProcessing::Convert3To4Channels(int nWidth, int nHeight, const void*
     return pNewDIB;
 }
 
-void* CBasicProcessing::CopyRect32bpp(void* pTarget, const void* pSource,  CSize targetSize, CRect targetRect,
-                                      CSize sourceSize, CRect sourceRect) {
+void* CBasicProcessing::CopyRect32bpp(void* pTarget, const void* pSource,  DSize targetSize, DRect targetRect,
+                                      DSize sourceSize, DRect sourceRect) {
     if (pSource == NULL || sourceRect.Size() != targetRect.Size() || 
         sourceRect.left < 0 || sourceRect.right > sourceSize.cx ||
         sourceRect.top < 0 || sourceRect.bottom > sourceSize.cy ||
@@ -572,21 +572,21 @@ void* CBasicProcessing::CopyRect32bpp(void* pTarget, const void* pSource,  CSize
     return pTarget;
 }
 
-void* CBasicProcessing::Crop32bpp(int nWidth, int nHeight, const void* pDIBPixels, CRect cropRect) {
+void* CBasicProcessing::Crop32bpp(int nWidth, int nHeight, const void* pDIBPixels, DRect cropRect) {
     if (pDIBPixels == NULL || cropRect.Width() == 0 || cropRect.Height() == 0) {
         return NULL;
     }
 
-    return CopyRect32bpp(NULL, pDIBPixels, cropRect.Size(), CRect(0, 0, cropRect.Width(), cropRect.Height()),
-        CSize(nWidth, nHeight), cropRect);
+    return CopyRect32bpp(NULL, pDIBPixels, cropRect.Size(), DRect(0, 0, cropRect.Width(), cropRect.Height()),
+        DSize(nWidth, nHeight), cropRect);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Simple point sampling resize and rotation methods
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-void* CBasicProcessing::PointSample(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize, 
-    CSize sourceSize, const void* pPixels, int nChannels) {
+void* CBasicProcessing::PointSample(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize, 
+    DSize sourceSize, const void* pPixels, int nChannels) {
     if (fullTargetSize.cx < 1 || fullTargetSize.cy < 1 ||
         clippedTargetSize.cx < 1 || clippedTargetSize.cy < 1 ||
         fullTargetOffset.x < 0 || fullTargetOffset.y < 0 ||
@@ -718,8 +718,8 @@ static uint8* ApplyFilter(int nSourceWidth, int nTargetWidth, int nHeight,
 // This WILL still use a Cubic kernel.
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-void* CBasicProcessing::SampleUp_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels) {
+void* CBasicProcessing::SampleUp_HQ(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pPixels, int nChannels) {
 
     // Resizing consists of resize in x direction followed by resize in y direction.
     // To simplify implementation, the method performs a 90 degree rotation/flip while resizing,
@@ -775,8 +775,8 @@ void* CBasicProcessing::SampleUp_HQ(CSize fullTargetSize, CPoint fullTargetOffse
 // This WILL still use Hermite/Mitchell/Catrom/Lanczos2 kernel as specified.
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-void* CBasicProcessing::SampleDown_HQ(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter) {
+void* CBasicProcessing::SampleDown_HQ(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter) {
     // Resizing consists of resize in x direction followed by resize in y direction.
     // To simplify implementation, the method performs a 90 degree rotation/flip while resizing,
     // thus enabling to use the same loop on the rows for both resize directions.
@@ -1121,8 +1121,8 @@ static CXMMImage* ApplyFilter_SSE(int nSourceHeight, int nTargetHeight, int nWid
 // High quality down- and up-sampling (SIMD implementation)
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-                                 CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, bool bSSE, uint8* pTarget) {
+void* SampleDown_HQ_MMX_SSE_Core(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+                                 DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, bool bSSE, uint8* pTarget) {
 
     CAutoXMMFilter filterY(sourceSize.cy, fullTargetSize.cy, eFilter);
     const XMMFilterKernelBlock& kernelsY = filterY.Kernels();
@@ -1178,8 +1178,8 @@ void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, 
     return pTargetDIB;
 }
 
-void* SampleUp_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, bool bSSE, uint8* pTarget) {
+void* SampleUp_HQ_MMX_SSE_Core(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pPixels, int nChannels, bool bSSE, uint8* pTarget) {
     int nTargetWidth = clippedTargetSize.cx;
     int nTargetHeight = clippedTargetSize.cy;
     int nSourceWidth = sourceSize.cx;
@@ -1475,8 +1475,8 @@ static int MaxFilterLen(const AVXFilterKernelBlock& kernels, int nFirstLine, int
 // Each source line is converted to linear float only once, into a ring buffer holding the lines needed by the
 // vertical filter. The vertically filtered lines are processed in strips: rotate, then filter horizontally
 // directly into the target DIB.
-static bool SampleTile_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter,
+static bool SampleTile_HQ_AVX(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter,
     const AVXFilterKernelBlock& kernelsX, const AVXFilterKernelBlock& kernelsY, uint8* pTarget, int nTargetStride) {
 
     bool bUpsampling = (eFilter == Filter_Upsampling_Bicubic);
@@ -1577,8 +1577,8 @@ static bool SampleTile_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CSi
 // tiles narrower than MIN_L2_TILE_WIDTH, where the overlap gets expensive. Then the ring buffer gets half of the
 // L3 share of a thread instead (L3 / threads / 2), with tiles between MIN_TILE_WIDTH and MIN_L2_TILE_WIDTH.
 // Measured on i7-10700K, 40000x30591 -> 1478x1130, 8 threads: tile width 64: 867 ms, 24 (chosen): 376 ms.
-static bool SampleSlice_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, uint8* pTarget) {
+static bool SampleSlice_HQ_AVX(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, uint8* pTarget) {
 
     CAutoAVXFilter filterY(sourceSize.cy, fullTargetSize.cy, eFilter);
     const AVXFilterKernelBlock& kernelsY = filterY.Kernels();
@@ -1606,8 +1606,8 @@ static bool SampleSlice_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CS
 
     for (int nTileStart = 0; nTileStart < clippedTargetSize.cx; nTileStart += nTileWidth) {
         int nTileSize = std::min(nTileWidth, clippedTargetSize.cx - nTileStart);
-        if (!SampleTile_HQ_AVX(fullTargetSize, CPoint(fullTargetOffset.x + nTileStart, fullTargetOffset.y),
-                               CSize(nTileSize, clippedTargetSize.cy), sourceSize, pPixels, nChannels, eFilter,
+        if (!SampleTile_HQ_AVX(fullTargetSize, DPoint(fullTargetOffset.x + nTileStart, fullTargetOffset.y),
+                               DSize(nTileSize, clippedTargetSize.cy), sourceSize, pPixels, nChannels, eFilter,
                                kernelsX, kernelsY, pTarget + (size_t)nTileStart * 4, clippedTargetSize.cx)) {
             return false;
         }
@@ -1615,8 +1615,8 @@ static bool SampleSlice_HQ_AVX(CSize fullTargetSize, CPoint fullTargetOffset, CS
     return true;
 }
 
-void* CBasicProcessing::SampleDown_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-                                           CSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, SIMDArchitecture simd) {
+void* CBasicProcessing::SampleDown_HQ_SIMD(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+                                           DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter, SIMDArchitecture simd) {
 
     if (pPixels == NULL || clippedTargetSize.cx <= 0 || clippedTargetSize.cy <= 0) {
         return NULL;
@@ -1638,8 +1638,8 @@ void* CBasicProcessing::SampleDown_HQ_SIMD(CSize fullTargetSize, CPoint fullTarg
     return pTarget;
 }
 
-void* CBasicProcessing::SampleUp_HQ_SIMD(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
-    CSize sourceSize, const void* pPixels, int nChannels, SIMDArchitecture simd) {
+void* CBasicProcessing::SampleUp_HQ_SIMD(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
+    DSize sourceSize, const void* pPixels, int nChannels, SIMDArchitecture simd) {
     if (pPixels == NULL || fullTargetSize.cx < 2 || fullTargetSize.cy < 2 || clippedTargetSize.cx <= 0 || clippedTargetSize.cy <= 0) {
         return NULL;
     }

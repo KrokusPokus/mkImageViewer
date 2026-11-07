@@ -1,13 +1,13 @@
 #include "ImageLoadThread.h"
 
 #include "BaseImage.h"
+#include "GeometryTypes.h"
 #include "Helpers.h"
 #include "MainDlg.h"
 #include "MaxImageDef.h"
 #include "ReaderBMP.h"
 #include "ReaderTGA.h"
 #include "SettingsProvider.h"
-#include "WTLCompat.h"
 #include "libjpeg-turbo/include/turbojpeg.h"
 #include "libheif/heif_cxx.h"
 #include "libbit7z/include/bitarchivereader.hpp"
@@ -953,7 +953,7 @@ void CImageLoadThread::AfterFinishProcess(CRequestBase& request) {
 // Private
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-static void LimitOffsets(CPoint& offsets, QSize clippingSize, const QSize & imageSize) {
+static void LimitOffsets(DPoint& offsets, QSize clippingSize, const QSize & imageSize) {
     const int nMaxOffsetX = std::max(0, (imageSize.width() - clippingSize.width()) / 2);
     const int nMaxOffsetY = std::max(0, (imageSize.height() - clippingSize.height()) / 2);
     offsets.x = std::clamp(offsets.x, -nMaxOffsetX, +nMaxOffsetX);
@@ -1326,7 +1326,7 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
     LimitOffsets(request->ProcessParams.Offsets, QSize(request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight), newSize);
 
     // this will process the image and cache the processed DIB in the CBaseImage instance
-    const CPoint offsetInImage = request->Image->ConvertOffset(newSize, clippedSize, request->ProcessParams.Offsets);
+    const DPoint offsetInImage = request->Image->ConvertOffset(newSize, clippedSize, request->ProcessParams.Offsets);
     return nullptr != request->Image->GetDIB(newSize, clippedSize, offsetInImage,
                                              request->ProcessParams.ImageProcParams, request->ProcessParams.ProcFlags);
 }

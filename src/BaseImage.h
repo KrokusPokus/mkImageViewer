@@ -1,9 +1,9 @@
 #ifndef BASEIMAGE_H
 #define BASEIMAGE_H
 
+#include "GeometryTypes.h"
 #include "ProcessParams.h"
 #include "ImageProcessingTypes.h"
-#include "WTLCompat.h"
 
 #include <QString>
 
@@ -16,9 +16,9 @@ class CEXIFReader;
 // Represents a rectangle to dim out in the image
 struct CDimRect {
     CDimRect() {}
-    CDimRect(float fFactor, const CRect& rect) { Factor = fFactor; Rect = rect; }
+    CDimRect(float fFactor, const DRect& rect) { Factor = fFactor; Rect = rect; }
     float Factor; // between 0.0 and 1.0
-    CRect Rect;
+    DRect Rect;
 };
 
 // Class holding a decoded image (not just JPEG - any supported format) and its meta data (if available).
@@ -54,7 +54,7 @@ public:
     // Note: The method tries to satisfy consecutive requests as efficient as possible. Calling the GetDIB()
     // method multiple times with the same set of parameters will return the same image starting from the second
     // call without doing image processing anymore.
-    void* GetDIB(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
+    void* GetDIB(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
         const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
         bool bNotUsed;
         return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, bNotUsed);
@@ -73,7 +73,7 @@ public:
     // Original image size. Operations on the original pixels will change this size!
     int OrigWidth() const { return m_nOrigWidth; }
     int OrigHeight() const { return m_nOrigHeight; }
-    CSize OrigSize() const { return CSize(m_nOrigWidth, m_nOrigHeight); }
+    DSize OrigSize() const { return DSize(m_nOrigWidth, m_nOrigHeight); }
 
     // Original image size at the time the CBaseImage was constructed.
     // Operations on the original pixels will not change this size!
@@ -88,7 +88,7 @@ public:
     const CRotationParams& GetRotationParams() {return m_rotationParams; }
 
     // Declare the cached DIB as invalid - forcing it to be regenerated on next GetDIB() call
-    void SetDIBInvalid() { m_ClippingSize = CSize(0, 0); }
+    void SetDIBInvalid() { m_ClippingSize = DSize(0, 0); }
 
     // Verify that the image is currently rotated by the specified parameters and rotate the original pixels of the image if not.
     bool VerifyRotation(const CRotationParams& rotationParams);
@@ -132,11 +132,11 @@ public:
     double GetInititialZoom() const { return m_dInitialZoom; }
 
     // Gets the offsets as set as default (can vary from file to file)
-    CPoint GetInitialOffsets() const { return m_initialOffsets; }
+    DPoint GetInitialOffsets() const { return m_initialOffsets; }
 
     // Sets the initial parameters again, from the parameters of a new request. Used when an image that was read
     // ahead (with the parameters of that time) is requested. The rotation is completed by the EXIF orientation.
-    void RestoreInitialParameters(const CImageProcessingParams& imageProcParams, int nRotation, double dZoom, CPoint offsets);
+    void RestoreInitialParameters(const CImageProcessingParams& imageProcParams, int nRotation, double dZoom, DPoint offsets);
 
     // To be called after creation of the object to initialize the initial parameters from the parameters of the
     // load request. The rotation in pParams is completed by the EXIF orientation of the image.
@@ -178,7 +178,7 @@ public:
     QString GetJPEGComment() { return m_sJPEGComment; }
 
     // Converts the target offset from 'center of image' based format to pixel coordinate format 
-    static CPoint ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset);
+    static DPoint ConvertOffset(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset);
 
     // Debug: Ticks (milliseconds) of the last GetDIB
     uint64_t GetDIBLoadDelayMs() const { return m_dibLoadDelayMs; }
@@ -230,16 +230,16 @@ private:
     CImageProcessingParams m_imageProcParamsInitial;
     int m_nInitialRotation;
     double m_dInitialZoom;
-    CPoint m_initialOffsets;
+    DPoint m_initialOffsets;
 
     bool m_bCropped; // Image has been cropped
     CRotationParams m_rotationParams; // current rotation and mirroring of the original pixels
     bool m_bRotationByEXIF; // is the rotation given by EXIF
 
     // This is the geometry that was requested during last GetDIB() call
-    CSize m_FullTargetSize; 
-    CSize m_ClippingSize; // this is the size of the DIB
-    CPoint m_TargetOffset;
+    DSize m_FullTargetSize; 
+    DSize m_ClippingSize; // this is the size of the DIB
+    DPoint m_TargetOffset;
 
     bool m_bFirstReprocessing; // true if never reprocessed before, some optimizations may be not done initially
 
@@ -253,17 +253,17 @@ private:
 
     // Internal GetDIB() implementation with (low quality) rotation with GetDIB().
     // bUsingOriginalDIB is output parameter and contains if the cached DIB could be used and no processing has been done
-    void* GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
+    void* GetDIBInternal(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
                          const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
                          bool& bParametersChanged);
 
     // Resample when panning was done, using existing data in DIBs. Old clipping rectangle is given in oldClippingRect
-    void ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, CSize fullTargetSize, 
-        CSize clippingSize, CPoint targetOffset, CRect oldClippingRect,
+    void ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, DSize fullTargetSize, 
+        DSize clippingSize, DPoint targetOffset, DRect oldClippingRect,
         EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, double dRotation, EResizeType eResizeType);
 
     // Resample to given target size. Returns resampled DIB
-    void* Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType);
+    void* Resample(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType);
 
     // pCachedTargetDIB is a pointer at the caller side holding the old processed DIB.
     // Returns a pointer to DIB to be used (either pCachedTargetDIB or pSourceDIB)
@@ -271,19 +271,19 @@ private:
     // can be used (return != NULL) or not (return == NULL)
     // The out parameter bParametersChanged returns if one of the parameters relevant for image processing has been changed since the last call
     void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-        void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset,
-        void * pSourceDIB, CSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged);
+        void * & pCachedTargetDIB, DSize fullTargetSize, DPoint targetOffset,
+        void * pSourceDIB, DSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged);
 
     void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-        void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset, 
-        void * pSourceDIB, CSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB) {
+        void * & pCachedTargetDIB, DSize fullTargetSize, DPoint targetOffset, 
+        void * pSourceDIB, DSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB) {
         bool bNotUsed;
         return ApplyCorrectionLUT(imageProcParams, eProcFlags, pCachedTargetDIB, fullTargetSize, targetOffset, 
             pSourceDIB, dibSize, bOnlyCheck, bCanTakeOwnershipOfSourceDIB, bNotUsed);
     }
 
     // Get if from source to target size it is down or upsampling
-    EResizeType GetResizeType(CSize targetSize, CSize sourceSize);
+    EResizeType GetResizeType(DSize targetSize, DSize sourceSize);
 
     // Gets the rotation from EXIF if available
     int GetRotationFromEXIF(int nOrigRotation);

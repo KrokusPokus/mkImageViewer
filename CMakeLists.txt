@@ -96,7 +96,7 @@ qt_add_executable(mkImageViewer
     src/LookupTables.h
     src/MaxImageDef.h
     src/ProcessParams.h
-    src/WTLCompat.h
+    src/GeometryTypes.h
 
     res/resources.qrc
 )

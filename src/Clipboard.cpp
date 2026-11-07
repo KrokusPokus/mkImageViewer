@@ -1,8 +1,8 @@
 #include "Clipboard.h"
 
 #include "BaseImage.h"
+#include "GeometryTypes.h"
 #include "Helpers.h"
-#include "WTLCompat.h"
 
 #include <QByteArray>
 #include <QClipboard>
@@ -25,7 +25,7 @@ void CClipboard::CopyFullImageToClipboard(CBaseImage* pImage, const CImageProces
         return;
     }
 
-    void* pDIB = pImage->GetDIB(pImage->OrigSize(), pImage->OrigSize(), CPoint(0, 0), procParams, eFlags);
+    void* pDIB = pImage->GetDIB(pImage->OrigSize(), pImage->OrigSize(), DPoint(0, 0), procParams, eFlags);
     DoCopy(pImage->OrigWidth(), pImage->OrigHeight(), pDIB, fileName);
 }
 

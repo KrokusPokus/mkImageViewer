@@ -103,16 +103,16 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_eProcFlags = PFLAG_None;
     m_nInitialRotation = 0;
     m_dInitialZoom = -1;
-    m_initialOffsets = CPoint(0, 0);
+    m_initialOffsets = DPoint(0, 0);
 
     m_bCropped = false;
     m_bRotationByEXIF = false;
     m_bFirstReprocessing = true;
     m_dibLoadDelayMs = 0;
     m_fileLoadDelayMs = 0;
-    m_FullTargetSize = CSize(0, 0);
-    m_ClippingSize = CSize(0, 0);
-    m_TargetOffset = CPoint(0, 0);
+    m_FullTargetSize = DSize(0, 0);
+    m_ClippingSize = DSize(0, 0);
+    m_TargetOffset = DPoint(0, 0);
 
     // Histogram of the original pixels for the automatic correction (computed here, i.e. in the load thread)
     m_pHistogram = new CHistogram(*this);}
@@ -137,19 +137,19 @@ CBaseImage::~CBaseImage(void) {
     m_pEXIFReader = NULL;
 }
 
-void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, CSize fullTargetSize,
-                                 CSize clippingSize, CPoint targetOffset, CRect oldClippingRect,
+void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, DSize fullTargetSize,
+                                 DSize clippingSize, DPoint targetOffset, DRect oldClippingRect,
                                  EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, 
                                  double dRotation, EResizeType eResizeType) {
-    CPoint oldOffset = oldClippingRect.TopLeft();
-    CSize oldSize = oldClippingRect.Size();
-    CRect newClippingRect = CRect(targetOffset, clippingSize);
-    CRect sourceRect;
+    DPoint oldOffset = oldClippingRect.TopLeft();
+    DSize oldSize = oldClippingRect.Size();
+    DRect newClippingRect = DRect(targetOffset, clippingSize);
+    DRect sourceRect;
     if (sourceRect.IntersectRect(oldClippingRect, newClippingRect)) {
         // there is an intersection, reuse the non LUT processed DIB
         sourceRect.OffsetRect(-oldOffset.x, -oldOffset.y);
-        CRect targetRect = CRect(CPoint(std::max<long>(0, oldOffset.x - newClippingRect.left), std::max<long>(0, oldOffset.y - newClippingRect.top)),
-            CSize(sourceRect.Width(), sourceRect.Height()));
+        DRect targetRect = DRect(DPoint(std::max<long>(0, oldOffset.x - newClippingRect.left), std::max<long>(0, oldOffset.y - newClippingRect.top)),
+            DSize(sourceRect.Width(), sourceRect.Height()));
 
         bool bCanUseLUTProcDIB = ApplyCorrectionLUT(imageProcParams, eProcFlags, pDIBPixelsLUTProcessed, fullTargetSize,
             targetOffset, pDIBPixels, clippingSize, true, false) != NULL;
@@ -178,78 +178,78 @@ void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
         delete[] static_cast<uint8_t*>(pDIBPixelsLUTProcessed); pDIBPixelsLUTProcessed = NULL;
 
         if (targetRect.top > 0) {
-            CSize clipSize(clippingSize.cx, targetRect.top);
+            DSize clipSize(clippingSize.cx, targetRect.top);
             void* pTop = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pTop,
-                    clippingSize, CRect(CPoint(0, 0), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(0, 0), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pTopProc = NULL;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pTopProc, fullTargetSize, targetOffset, pTop, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pTopProc,
-                    clippingSize, CRect(CPoint(0, 0), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(0, 0), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
                 delete[] static_cast<uint8_t*>(pTopProc);
             }
 
             delete[] static_cast<uint8_t*>(pTop);
         }
         if (targetRect.bottom < clippingSize.cy) {
-            CSize clipSize(clippingSize.cx, clippingSize.cy -  targetRect.bottom);
-            CPoint offset(targetOffset.x, targetOffset.y + targetRect.bottom);
+            DSize clipSize(clippingSize.cx, clippingSize.cy -  targetRect.bottom);
+            DPoint offset(targetOffset.x, targetOffset.y + targetRect.bottom);
             void* pBottom = Resample(fullTargetSize, clipSize, offset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pBottom,
-                    clippingSize, CRect(CPoint(0, targetRect.bottom), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(0, targetRect.bottom), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pBottomProc = NULL;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pBottomProc, fullTargetSize, offset, pBottom, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pBottomProc,
-                    clippingSize, CRect(CPoint(0, targetRect.bottom), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(0, targetRect.bottom), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
                 delete[] static_cast<uint8_t*>(pBottomProc);
             }
 
             delete[] static_cast<uint8_t*>(pBottom);
         }
         if (targetRect.left > 0) {
-            CSize clipSize(targetRect.left, clippingSize.cy);
+            DSize clipSize(targetRect.left, clippingSize.cy);
             void* pLeft = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pLeft,
-                    clippingSize, CRect(CPoint(0, 0), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(0, 0), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pLeftProc = NULL;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pLeftProc, fullTargetSize, targetOffset, pLeft, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pLeftProc,
-                    clippingSize, CRect(CPoint(0, 0), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(0, 0), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
                 delete[] static_cast<uint8_t*>(pLeftProc);
             }
 
             delete[] static_cast<uint8_t*>(pLeft);
         }
         if (targetRect.right < clippingSize.cx) {
-            CSize clipSize(clippingSize.cx -  targetRect.right, clippingSize.cy);
-            CPoint offset(targetOffset.x + targetRect.right, targetOffset.y);
+            DSize clipSize(clippingSize.cx -  targetRect.right, clippingSize.cy);
+            DPoint offset(targetOffset.x + targetRect.right, targetOffset.y);
             void* pRight = Resample(fullTargetSize, clipSize, offset, eProcFlags, eResizeType);
             
             if (!bCanUseLUTProcDIB) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pRight,
-                    clippingSize, CRect(CPoint(targetRect.right, 0), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(targetRect.right, 0), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pRigthProc = NULL;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pRigthProc, fullTargetSize, offset, pRight, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pRigthProc,
-                    clippingSize, CRect(CPoint(targetRect.right, 0), clipSize),
-                    clipSize, CRect(CPoint(0, 0), clipSize));
+                    clippingSize, DRect(DPoint(targetRect.right, 0), clipSize),
+                    clipSize, DRect(DPoint(0, 0), clipSize));
                 delete[] static_cast<uint8_t*>(pRigthProc);
             }
 
@@ -264,7 +264,7 @@ void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
     delete[] static_cast<uint8_t*>(pDIBPixelsLUTProcessed); pDIBPixelsLUTProcessed = NULL;
 }
 
-void* CBaseImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType) {
+void* CBaseImage::Resample(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType) {
 
     Helpers::CPUType cpu = CSettingsProvider::This().AlgorithmImplementation();
     EFilterType filter = CSettingsProvider::This().DownsamplingFilter();
@@ -275,30 +275,30 @@ void* CBaseImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targ
         if (SupportsSIMD(cpu)) {
             if (eResizeType == UpSample) {
                 return CBasicProcessing::SampleUp_HQ_SIMD(fullTargetSize, targetOffset, clippingSize, 
-                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, ToSIMDArchitecture(cpu));
+                    DSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, ToSIMDArchitecture(cpu));
             } else {
                 return CBasicProcessing::SampleDown_HQ_SIMD(fullTargetSize, targetOffset, clippingSize,
-                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, filter, ToSIMDArchitecture(cpu));
+                    DSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, filter, ToSIMDArchitecture(cpu));
             }
         } else {
             if (eResizeType == UpSample) {
                 return CBasicProcessing::SampleUp_HQ(fullTargetSize, targetOffset, clippingSize, 
-                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels);
+                    DSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels);
             } else {
                 return CBasicProcessing::SampleDown_HQ(fullTargetSize, targetOffset, clippingSize, 
-                    CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, filter);
+                    DSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, filter);
             }
         }
     } else {
         return CBasicProcessing::PointSample(fullTargetSize, targetOffset, clippingSize,
-            CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels);
+            DSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels);
     }
 }
 
-CPoint CBaseImage::ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset) {
+DPoint CBaseImage::ConvertOffset(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset) {
     int nStartX = (fullTargetSize.cx - clippingSize.cx)/2 - targetOffset.x;
     int nStartY = (fullTargetSize.cy - clippingSize.cy)/2 - targetOffset.y;
-    return CPoint(nStartX, nStartY);
+    return DPoint(nStartX, nStartY);
 }
 
 bool CBaseImage::VerifyRotation(const CRotationParams& rotationParams) {
@@ -352,13 +352,13 @@ void* CBaseImage::DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded) {
 
 void CBaseImage::VerifyDIBPixelsCreated() {
     if (m_pDIBPixels == NULL) {
-        EResizeType eResizeType = GetResizeType(m_FullTargetSize, CSize(m_nOrigWidth, m_nOrigHeight));
+        EResizeType eResizeType = GetResizeType(m_FullTargetSize, DSize(m_nOrigWidth, m_nOrigHeight));
         m_pDIBPixels = Resample(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_eProcFlags, eResizeType);
     }
 }
 
 void CBaseImage::RestoreInitialParameters(const CImageProcessingParams& imageProcParams, int nRotation, double dZoom,
-                                          CPoint offsets) {
+                                          DPoint offsets) {
     m_dInitialZoom = dZoom;
     m_initialOffsets = offsets;
     m_nInitialRotation = GetRotationFromEXIF(nRotation);
@@ -380,7 +380,7 @@ void CBaseImage::SetInitialProcessParams(CProcessParams* pParams) {
 // Private
 ///////////////////////////////////////////////////////////////////////////////////
 
-void* CBaseImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset,
+void* CBaseImage::GetDIBInternal(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
                          const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
                          bool &bParametersChanged) {
 
@@ -400,10 +400,10 @@ void* CBaseImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
              << "old:" << m_FullTargetSize.cx << m_FullTargetSize.cy << "/" << m_ClippingSize.cx << m_ClippingSize.cy
              << "/" << m_TargetOffset.x << m_TargetOffset.y;
 
-    EResizeType eResizeType = GetResizeType(fullTargetSize, CSize(m_nOrigWidth, m_nOrigHeight));
+    EResizeType eResizeType = GetResizeType(fullTargetSize, DSize(m_nOrigWidth, m_nOrigHeight));
 
     // the geometrical parameters must be set before calling ApplyCorrectionLUT()
-    CRect oldClippingRect = CRect(m_TargetOffset, m_ClippingSize);
+    DRect oldClippingRect = DRect(m_TargetOffset, m_ClippingSize);
     m_FullTargetSize = fullTargetSize;
     m_ClippingSize = clippingSize;
     m_TargetOffset = targetOffset;
@@ -465,8 +465,8 @@ void* CBaseImage::GetDIBInternal(CSize fullTargetSize, CSize clippingSize, CPoin
 }
 
 void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-                                           void * & pCachedTargetDIB, CSize fullTargetSize, CPoint targetOffset, 
-                                           void * pSourceDIB, CSize dibSize,
+                                           void * & pCachedTargetDIB, DSize fullTargetSize, DPoint targetOffset, 
+                                           void * pSourceDIB, DSize dibSize,
                                            bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged) {
 
     bool bAutoContrast = GetProcessingFlag(eProcFlags, PFLAG_AutoContrast);
@@ -560,7 +560,7 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
     return pCachedTargetDIB;
 }
 
-CBaseImage::EResizeType CBaseImage::GetResizeType(CSize targetSize, CSize sourceSize) {
+CBaseImage::EResizeType CBaseImage::GetResizeType(DSize targetSize, DSize sourceSize) {
     if (targetSize.cx == sourceSize.cx && targetSize.cy == sourceSize.cy) {
         return NoResize;
     } else if (targetSize.cx <= sourceSize.cx && targetSize.cy <= sourceSize.cy) {
@@ -601,5 +601,5 @@ void CBaseImage::InvalidateAllCachedPixelData() {
     m_pDIBPixels = NULL;
     delete[] static_cast<uint8_t*>(m_pDIBPixelsLUTProcessed);
     m_pDIBPixelsLUTProcessed = NULL;
-    m_ClippingSize = CSize(0, 0);
+    m_ClippingSize = DSize(0, 0);
 }

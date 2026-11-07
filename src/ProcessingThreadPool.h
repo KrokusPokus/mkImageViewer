@@ -1,16 +1,16 @@
 #ifndef PROCESSINGTHREADPOOL_H
 #define PROCESSINGTHREADPOOL_H
 
+#include "GeometryTypes.h"
 #include "WorkThread.h"
-#include "WTLCompat.h"
 
 class CProcessingThread;
 
 // Request for performing an image processing operation parallel on all thread pool threads
 class CProcessingRequest : public CRequestBase {
 public:
-    CProcessingRequest(const void* pSourcePixels, CSize sourceSize, void* pTargetPixels,
-                       CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize) {
+    CProcessingRequest(const void* pSourcePixels, DSize sourceSize, void* pTargetPixels,
+                       DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize) {
         SourcePixels = pSourcePixels;
         SourceSize = sourceSize;
         TargetPixels = pTargetPixels;
@@ -30,12 +30,12 @@ public:
     // Process one strip of the image, starting at row offsetY and having the specified y-size
     virtual bool ProcessStrip(int offsetY, int sizeY) = 0;
 
-    CSize SourceSize;
+    DSize SourceSize;
     const void* SourcePixels;
     void* TargetPixels;
-    CSize FullTargetSize;
-    CPoint FullTargetOffset;
-    CSize ClippedTargetSize;
+    DSize FullTargetSize;
+    DPoint FullTargetOffset;
+    DSize ClippedTargetSize;
     int StripPadding;
     int MaxThreads; // maximal number of threads used for this request, 0: all threads of the pool
     bool Success;

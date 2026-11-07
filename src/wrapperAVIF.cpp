@@ -2,8 +2,8 @@
 
 #include "avif/avif.h"
 #include "BasicProcessing.h"
+#include "GeometryTypes.h"
 #include "ICCProfileTransform.h"
-#include "WTLCompat.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -148,9 +148,9 @@ void* AvifReader::ReadImage(int& width,
         avifDiagnostics diag;
         if (avifCropRectConvertCleanApertureBox(&crop, &g_cache.decoder->image->clap, width, height,
                 g_cache.decoder->image->yuvFormat, &diag)) {
-            const CPoint point(static_cast<int>(crop.x), static_cast<int>(crop.y));
-            const CSize cropSize(static_cast<int>(crop.width), static_cast<int>(crop.height));
-            void* pixels = CBasicProcessing::Crop32bpp(width, height, g_cache.rgb.pixels, CRect(point, cropSize));
+            const DPoint point(static_cast<int>(crop.x), static_cast<int>(crop.y));
+            const DSize cropSize(static_cast<int>(crop.width), static_cast<int>(crop.height));
+            void* pixels = CBasicProcessing::Crop32bpp(width, height, g_cache.rgb.pixels, DRect(point, cropSize));
             if (pixels != nullptr) {
                 ReplacePixels(pixels);
                 width = cropSize.cx;
