@@ -58,7 +58,7 @@ JxlReader::jxl_cache JxlReader::cache = { 0 };
 bool JxlReader::DecodeJpegXlOneShot(const uint8_t* jxl, size_t size, std::vector<uint8_t>* pixels, int& xsize,
     int& ysize, bool& have_animation, int& frame_count, int& frame_time, std::vector<uint8_t>* icc_profile, bool& outOfMemory) {
 
-    if (cache.decoder.get() == NULL) {
+    if (cache.decoder.get() == nullptr) {
         cache.runner = JxlResizableParallelRunnerMake(nullptr);
 
         cache.decoder = JxlDecoderMake(nullptr);
@@ -229,23 +229,23 @@ void* JxlReader::ReadImage(int& width,
     width = height = 0;
     nchannels = 4;
     has_animation = false;
-    unsigned char* pPixelData = NULL;
-    exif_chunk = NULL;
+    unsigned char* pPixelData = nullptr;
+    exif_chunk = nullptr;
 
 
     std::vector<uint8_t> pixels;
     std::vector<uint8_t> icc_profile;
     if (!DecodeJpegXlOneShot((const uint8_t*)buffer, sizebytes, &pixels, width, height,
         has_animation, frame_count, frame_time, &icc_profile, outOfMemory)) {
-        return NULL;
+        return nullptr;
     }
     size_t size = (size_t)width * height * nchannels;
     pPixelData = new(std::nothrow) unsigned char[size];
-    if (pPixelData == NULL) {
+    if (pPixelData == nullptr) {
         outOfMemory = true;
-        return NULL;
+        return nullptr;
     }
-    if (cache.transform == NULL)
+    if (cache.transform == nullptr)
         cache.transform = ICCProfileTransform::CreateTransform(icc_profile.data(), icc_profile.size(), ICCProfileTransform::FORMAT_RGBA);
     if (!ICCProfileTransform::DoTransform(cache.transform, pixels.data(), pPixelData, width, height)) {
         // RGBA -> BGRA conversion (with little-endian integers)
@@ -258,7 +258,7 @@ void* JxlReader::ReadImage(int& width,
     // Copy Exif data into the format understood by CEXIFReader
     if (!cache.exif.empty() && cache.exif.size() > 8 && cache.exif.size() < 65532) {
         exif_chunk = malloc(cache.exif.size() + 6);
-        if (exif_chunk != NULL) {
+        if (exif_chunk != nullptr) {
             memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
             *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(cache.exif.size() + 4);
             memcpy((uint8_t*)exif_chunk + 10, cache.exif.data() + 4, cache.exif.size() - 4);
@@ -277,6 +277,6 @@ void JxlReader::DeleteCache() {
     // CImageLoadThread is responsible for freeing it.
     
     ICCProfileTransform::DeleteTransform(cache.transform);
-    // Setting the decoder and runner to 0 (NULL) will automatically destroy them
+    // Setting the decoder and runner to 0 (nullptr) will automatically destroy them
     cache = { 0 };
 }

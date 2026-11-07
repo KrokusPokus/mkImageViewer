@@ -1,5 +1,5 @@
-#ifndef MAINDLG_H
-#define MAINDLG_H
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
 
 #define KEY_MAGIC 2978465
 
@@ -43,7 +43,7 @@ class QTimerEvent;
 
 // The main dialog is a full screen modal dialog with no border and no window title.
 // This dialog is the main window of the application.
-class CMainDlg : public QMainWindow {
+class CMainWindow : public QMainWindow {
     Q_OBJECT // Zwingend für Qt-Widgets/Klassen mit Signals & Slots
 
 private slots:
@@ -66,8 +66,8 @@ public:
         POS_PreviousFile
     };
 
-    CMainDlg(const QString& sStartupFile);
-    ~CMainDlg();
+    CMainWindow(const QString& sStartupFile);
+    ~CMainWindow();
 
     // Called by the different controller classes
     bool IsFullScreenMode() { return m_bFullScreenMode; }
@@ -104,7 +104,7 @@ private:
 
     QString m_sStartupFile; // file passed on command line
     CFileList* m_pFileList; // used for navigation
-    CDirectoryWatcher* m_pDirectoryWatcher = NULL; // notifies the main window when the current file changed or a file in the current directory was added or deleted
+    CDirectoryWatcher* m_pDirectoryWatcher = nullptr; // notifies the main window when the current file changed or a file in the current directory was added or deleted
     CImageProvider * m_pImageProvider; // reads image (of any format, not only JPEGs) files, using read ahead
     CBaseImage * m_pCurrentImage; // currently displayed image
     // Result of the last image request: position (file, frame, number of frames) and why the image could not be
@@ -154,7 +154,7 @@ private:
     bool m_bMovieMode;
     double m_dMovieFPS;
     QPoint m_offsets; // Note: These offsets are center of image based
-    QPoint m_DIBOffsets;
+    QPoint m_BitmapOffsets;
     int m_nCapturedX, m_nCapturedY;
     int m_nMouseX, m_nMouseY;
     bool m_bFullScreenMode;
@@ -173,8 +173,8 @@ private:
     int m_nMonitor;
     QRect m_monitorRect;
     // Client area in DEVICE pixels, i.e. the pixels of the window buffer (logical size * devicePixelRatioF(), rounded
-    // like Qt does). All image geometry (zoom, offsets, DIB size) and the mouse coordinates m_nMouseX/Y and
-    // m_nCapturedX/Y are in device pixels, so the DIB is shown 1:1 also with scaling (e.g. 125 % or 150 %).
+    // like Qt does). All image geometry (zoom, offsets, bitmap size) and the mouse coordinates m_nMouseX/Y and
+    // m_nCapturedX/Y are in device pixels, so the bitmap is shown 1:1 also with scaling (e.g. 125 % or 150 %).
     // Overlays and texts are drawn in logical coordinates (rect()).
     QRect m_clientRect;
     QRect m_windowRectOnClose;
@@ -193,7 +193,7 @@ private:
     CProcessParams CreateProcessParams(bool bNoProcessingAfterLoad);
     void ResetParamsToDefault();
     void StartSlideShowTimer(int nMilliSeconds);
-    void StopSlideShowTimer(void);
+    void StopSlideShowTimer();
     void StartMovieMode(double dFPS);
     void StopMovieMode();
     // Slide show with more than kMovieFps images per second ("movie"): animations are not played there
@@ -306,4 +306,4 @@ protected:
     bool event(QEvent*) override;
 };
 
-#endif // MAINDLG_H
+#endif // MAINWINDOW_H

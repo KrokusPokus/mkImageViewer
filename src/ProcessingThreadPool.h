@@ -55,7 +55,7 @@ private:
     CProcessingThread** m_threads;
     int m_nNumThreads;
 
-    CProcessingThreadPool(void);
+    CProcessingThreadPool();
 };
 
 #endif // PROCESSINGTHREADPOOL_H

@@ -26,8 +26,8 @@ void * HeifReader::ReadImage(int &width,
     width = height = 0;
     nchannels = 4;
 
-    unsigned char* pPixelData = NULL;
-    exif_chunk = NULL;
+    unsigned char* pPixelData = nullptr;
+    exif_chunk = nullptr;
 
     heif::Context context;
     context.read_from_memory_without_copy(buffer, sizebytes);
@@ -43,19 +43,19 @@ void * HeifReader::ReadImage(int &width,
     height = image.get_height(heif_channel_interleaved);
 
     if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION)
-        return NULL;
+        return nullptr;
     if (std::abs((double)width * height) > MAX_IMAGE_PIXELS) {
         outOfMemory = true;
-        return NULL;
+        return nullptr;
     }
     if (width < 1 || height < 1 || width * nchannels > stride)
-        return NULL;
+        return nullptr;
 
     size_t size = (size_t)width * nchannels * height;
     pPixelData = new(std::nothrow) unsigned char[size];
-    if (pPixelData == NULL) {
+    if (pPixelData == nullptr) {
         outOfMemory = true;
-        return NULL;
+        return nullptr;
     }
     std::vector<uint8_t> iccp = image.get_raw_color_profile();
     void* transform = ICCProfileTransform::CreateTransform(iccp.data(), iccp.size(), ICCProfileTransform::FORMAT_RGBA);
@@ -95,7 +95,7 @@ void * HeifReader::ReadImage(int &width,
         */
         if (exif.size() > 8 && exif.size() < 65538) {
             exif_chunk = malloc(exif.size());
-            if (exif_chunk != NULL) {
+            if (exif_chunk != nullptr) {
                 memcpy(exif_chunk, exif.data(), exif.size());
                 *((unsigned short*)exif_chunk) = __builtin_bswap16(0xFFE1);
                 *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(exif.size() - 2);

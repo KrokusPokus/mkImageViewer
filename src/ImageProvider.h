@@ -30,7 +30,7 @@ public:
 
     // nNumBuffers: number of images that are read ahead (besides the requested one)
     CImageProvider(QObject* pParent, int nNumBuffers);
-    ~CImageProvider(void);
+    ~CImageProvider();
 
     // Returns the image (nullptr if it could not be loaded), the reason of a failure and the position (file, frame,
     // number of frames). The position is also known if the image could not be loaded, e.g. for a page of an archive.

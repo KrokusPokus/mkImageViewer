@@ -57,7 +57,7 @@ public:
     // The class does not take ownership of the memory (no copy made), thus the APP1 block must not be deleted
     // while the EXIF reader class is deleted.
     CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFormat);
-    ~CEXIFReader(void);
+    ~CEXIFReader();
 
     // Parse date string in the EXIF date/time format
     static bool ParseDateString(QDateTime & date, const QString& str);

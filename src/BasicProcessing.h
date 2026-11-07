@@ -25,56 +25,56 @@ public:
     // Note for all methods: If there is not enough memory to allocate a new image, all methods return a null pointer
     // No exception is thrown in this case.
 
-    // Note on DIBs: The rows of DIBs are padded to the next 4 byte boundary. For 32 bpp DIBs this is
+    // Note on bitmaps: The rows of bitmaps are padded to the next 4 byte boundary. For 32 bpp bitmaps this is
     // implicitly true (no padding needed), for other types the padding must be considered.
     
-    // Note: The output format of the JPEG lib is 24 bit BGR format. Padding is to 4 byte boundaries, as DIBs.
+    // Note: The output format of the JPEG lib is 24 bit BGR format. Padding is to 4 byte boundaries, as bitmaps.
 
-    // Convert a 8 bpp DIB with color palette to a 32 bpp BGRA DIB
+    // Convert a 8 bpp bitmap with color palette to a 32 bpp BGRA bitmap
     // The palette must contain 256 entries with format BGR0 (32 bits)
-    static void* Convert8bppTo32bppDIB(int nWidth, int nHeight, const void* pDIBPixels, const uint8_t* pPalette);
+    static void* Convert8bppTo32bppBitmap(int nWidth, int nHeight, const void* pBitmapPixels, const uint8_t* pPalette);
 
-    // Convert a 32 bpp BGRA DIB to a 24 bpp BGR DIB, flip vertically if requested.
+    // Convert a 32 bpp BGRA bitmap to a 24 bpp BGR bitmap, flip vertically if requested.
     // Note that in contrast to the other methods, the target memory must be preallocated by the caller.
-    // Consider row padding of the DIB to 4 byte boundary when allocating memory for the target DIB
-    static void Convert32bppTo24bppDIB(int nWidth, int nHeight, void* pDIBTarget, const void* pDIBSource, bool bFlip);
+    // Consider row padding of the bitmap to 4 byte boundary when allocating memory for the target bitmap
+    static void Convert32bppTo24bppBitmap(int nWidth, int nHeight, void* pBitmapTarget, const void* pBitmapSource, bool bFlip);
 
-    // Convert from a single channel image (8 bpp) to a 4 channel image (32 bpp DIB, BGRA).
+    // Convert from a single channel image (8 bpp) to a 4 channel image (32 bpp bitmap, BGRA).
     // The source image is row-padded to 4 byte boundary
     // No palette is given, the resulting image is black/white.
     static void* Convert1To4Channels(int nWidth, int nHeight, const void* pPixels);
 
-    // Convert from a 3 channel image (24 bpp, BGR) to a 4 channel image (32 bpp DIB, BGRA)
+    // Convert from a 3 channel image (24 bpp, BGR) to a 4 channel image (32 bpp bitmap, BGRA)
     static void* Convert3To4Channels(int nWidth, int nHeight, const void* pIJLPixels);
 
     // Copy rectangular pixel block from source to target 32 bpp bitmap. The target bitmap is allocated
-    // if the 'pTarget' parameter is NULL. Note that size of source and target rect must match.
+    // if the 'pTarget' parameter is nullptr. Note that size of source and target rect must match.
     static void* CopyRect32bpp(void* pTarget, const void* pSource,  DSize targetSize, DRect targetRect,
         DSize sourceSize, DRect sourceRect);
 
-    // Clockwise rotation of a 32 bit DIB. The rotation angle must be 90, 180 or 270 degrees, in all other
-    // cases the return value is NULL
-    static void* Rotate32bpp(int nWidth, int nHeight, const void* pDIBPixels, int nRotationAngleCW);
+    // Clockwise rotation of a 32 bit bitmap. The rotation angle must be 90, 180 or 270 degrees, in all other
+    // cases the return value is nullptr
+    static void* Rotate32bpp(int nWidth, int nHeight, const void* pBitmapPixels, int nRotationAngleCW);
 
-    // Mirror 32 bit DIB
-    static void* Mirror32bpp(int nWidth, int nHeight, const void* pDIBPixels, bool bHorizontally);
+    // Mirror 32 bit bitmap
+    static void* Mirror32bpp(int nWidth, int nHeight, const void* pBitmapPixels, bool bHorizontally);
 
-    // Mirror 32 bit DIB horizontally
-    static void* MirrorH32bpp(int nWidth, int nHeight, const void* pDIBPixels);
+    // Mirror 32 bit bitmap horizontally
+    static void* MirrorH32bpp(int nWidth, int nHeight, const void* pBitmapPixels);
 
-    // Mirror 32 bit DIB vertically
-    static void* MirrorV32bpp(int nWidth, int nHeight, const void* pDIBPixels);
+    // Mirror 32 bit bitmap vertically
+    static void* MirrorV32bpp(int nWidth, int nHeight, const void* pBitmapPixels);
 
     // Same as Rotate32bpp() and Mirror32bpp() for 24 bit BGR images with lines padded to 4 bytes (as delivered
     // by the image readers). The padding bytes of the result are set to zero.
     static void* Rotate24bpp(int nWidth, int nHeight, const void* pPixels, int nRotationAngleCW);
     static void* Mirror24bpp(int nWidth, int nHeight, const void* pPixels, bool bHorizontally);
 
-    // Mirror 32 bit DIB vertically inplace
-    static void MirrorVInplace(int nWidth, int nHeight, int nStride, void* pDIBPixels);
+    // Mirror 32 bit bitmap vertically inplace
+    static void MirrorVInplace(int nWidth, int nHeight, int nStride, void* pBitmapPixels);
 
-    // Crop specified 32 bpp image. Returns NULL if cropRect is not fully inside source image.
-    static void* Crop32bpp(int nWidth, int nHeight, const void* pDIBPixels, DRect cropRect);
+    // Crop specified 32 bpp image. Returns nullptr if cropRect is not fully inside source image.
+    static void* Crop32bpp(int nWidth, int nHeight, const void* pBitmapPixels, DRect cropRect);
 
 
     // Creates lookup tables for color saturation correction.
@@ -86,14 +86,14 @@ public:
     static int32_t* CreateColorSaturationLUTs(double dSaturation);
 
     // Apply a three channel LUT (memory layout: 256 uint8_t values for B channel, followed by 256 uint8_t values for G channel,
-    // followed by 256 uint8_t values for R channel, totally 3*256 bytes) to a 32 bpp BGRA DIB.
+    // followed by 256 uint8_t values for R channel, totally 3*256 bytes) to a 32 bpp BGRA bitmap.
     // Notice that the A channel is not processed and set to fixed value 0xFF.
-    static void* Apply3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const uint8_t* pLUT);
+    static void* Apply3ChannelLUT32bpp(int nWidth, int nHeight, const void* pBitmapPixels, const uint8_t* pLUT);
 
     // Apply the specified saturation LUTs (as returned by CreateColorSaturationLUTs() method) and then a 
-    // three channel LUT (256*B, 256*G, 256*R, see above for details) to a 32 bpp BGRA DIB
+    // three channel LUT (256*B, 256*G, 256*R, see above for details) to a 32 bpp BGRA bitmap
     // Notice that the A channel is not processed and set to fixed value 0xFF.
-    static void* ApplySaturationAnd3ChannelLUT32bpp(int nWidth, int nHeight, const void* pDIBPixels, const int32_t* pSatLUTs, const uint8_t* pLUT);
+    static void* ApplySaturationAnd3ChannelLUT32bpp(int nWidth, int nHeight, const void* pBitmapPixels, const int32_t* pSatLUTs, const uint8_t* pLUT);
 
     // The following methods take into account that the original image with size (w, h) - denoted as 'sourceSize' -
     // is zoomed by a factor x, thus resulting in a (virtual) image size of (w * x, h * x) - denoted as 'fullTargetSize'.
@@ -107,11 +107,11 @@ public:
     // Notice that the returned image is always 32 bpp!
     // fullTargetSize: Virtual size of target image (unclipped).
     // fullTargetOffset: Offset for start of clipping window (in the region given by fullTargetSize)
-    // clippedTargetSize: Size of clipped window - returned DIB has this size
+    // clippedTargetSize: Size of clipped window - returned bitmap has this size
     // sourceSize: Size of source image
     // pPixels: Source image
     // nChannels: Number of channels (bytes) in source image, must be 3 or 4
-    // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
+    // Returns a 32 bpp BGRA bitmap of size 'clippedTargetSize'
     static void* PointSample(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize, 
         DSize sourceSize, const void* pPixels, int nChannels);
 
@@ -120,11 +120,11 @@ public:
     // Notice that the returned image is always 32 bpp!
     // eFilter: Filter to apply. Note that the filter type can only be one of the downsampling filter types.
     // See PointSample() for other parameters
-    // Returns a 32 bpp BGRA DIB of size 'clippedTargetSize'
+    // Returns a 32 bpp BGRA bitmap of size 'clippedTargetSize'
     static void* SampleDown_HQ(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
         DSize sourceSize, const void* pPixels, int nChannels, EFilterType eFilter);
 
-    // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns NULL if memory is exhausted.
+    // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns nullptr if memory is exhausted.
     // Notice that the A channel is not processed. The AVX2 implementation sets it to 0xFF, with SSE/MMX it is undefined.
     // Notice that the returned image is always 32 bpp!
     static void* SampleDown_HQ_SIMD(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
@@ -137,14 +137,14 @@ public:
     static void* SampleUp_HQ(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
         DSize sourceSize, const void* pPixels, int nChannels);
 
-    // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns NULL if memory is exhausted.
+    // Same as above, SIMD (AVX2/SSE/MMX) implementation. Returns nullptr if memory is exhausted.
     // Notice that the A channel is not processed. The AVX2 implementation sets it to 0xFF, with SSE/MMX it is undefined.
     // Notice that the returned image is always 32 bpp!
     static void* SampleUp_HQ_SIMD(DSize fullTargetSize, DPoint fullTargetOffset, DSize clippedTargetSize,
         DSize sourceSize, const void* pPixels, int nChannels, SIMDArchitecture simd);
 
 private:
-    CBasicProcessing(void);
+    CBasicProcessing();
 };
 
 #endif // BASICPROCESSING_H

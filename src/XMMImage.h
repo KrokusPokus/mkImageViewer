@@ -22,16 +22,16 @@ public:
     // As above. With bAvoidCacheAliasing, the line size is additionally chosen such that the rows read together by
     // ApplyFilter_AVX/SSE map to different cache sets (see Init()). Then GetPaddedWidth() can exceed the padded width.
     CXMMImage(int nWidth, int nHeight, bool bPadHeight, int padding, bool bAvoidCacheAliasing);
-    // convert from section of 24 or 32 bpp DIB, from first to (and including) last column and row
+    // convert from section of 24 or 32 bpp bitmap, from first to (and including) last column and row
     // padding is in pixels(not bytes), the line size avoids cache aliasing (as above)
-    CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirstY, int nLastY, const void* pDIB, int nChannels, int padding);
-    ~CXMMImage(void);
+    CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirstY, int nLastY, const void* pBitmap, int nChannels, int padding);
+    ~CXMMImage();
 
     // Pointer to the (page aligned) memory of the image
 //    void * AlignedPtr() { return m_pMemory; }
     void * AlignedPtr() const { return m_pMemory; }
 
-    // Converts GetWidth() pixels of a 24 or 32 bpp DIB line (pSrcLine points to the first pixel to convert) into
+    // Converts GetWidth() pixels of a 24 or 32 bpp bitmap line (pSrcLine points to the first pixel to convert) into
     // line nLine of this image (sRGB 8 bit -> linear 12 bit, as float). The padding columns read by the filter
     // (up to the next multiple of 'padding') are set to zero.
     void ConvertLine(int nLine, const uint8_t* pSrcLine, int nChannels, int padding);
@@ -51,7 +51,7 @@ private:
     int GetLineSize() const { return m_nPaddedWidth*4; }    // [GF] i16 -> f32
     int GetMemSize() const { return GetLineSize()*3*m_nPaddedHeight; }
     void Init(int nWidth, int nHeight, bool bPadHeight, int padding, bool bAvoidCacheAliasing = false);
-    // Converts the pixels nFirst to nEnd - 1 of a DIB line, pDst: first channel of the target line
+    // Converts the pixels nFirst to nEnd - 1 of a bitmap line, pDst: first channel of the target line
     void ConvertPixels(float* pDst, const uint8_t* pSrc, int nChannels, int nFirst, int nEnd) const;
     // Zeroes the padding columns of a line read by the filter (up to the next multiple of 'padding')
     void ZeroPaddingColumns(float* pDst, int padding) const;

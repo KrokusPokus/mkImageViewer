@@ -64,11 +64,11 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     } else {
         assert(false);
         delete[] static_cast<uint8_t*>(pPixels);
-        m_pOrigPixels = NULL;
+        m_pOrigPixels = nullptr;
         m_nOriginalChannels = 0;
     }
 
-    if (pEXIFData != NULL) {
+    if (pEXIFData != nullptr) {
         unsigned char * pEXIF = (unsigned char *)pEXIFData;
         m_nEXIFSize = pEXIF[2]*256 + pEXIF[3] + 2;
         m_pEXIFData = new char[m_nEXIFSize];
@@ -76,8 +76,8 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
         m_pEXIFReader = new CEXIFReader(m_pEXIFData, m_nEXIFSize, eImageFormat);
     } else {
         m_nEXIFSize = 0;
-        m_pEXIFData = NULL;
-        m_pEXIFReader = NULL;
+        m_pEXIFData = nullptr;
+        m_pEXIFReader = nullptr;
     }
 
     m_eImageFormat = eImageFormat;
@@ -94,12 +94,12 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
 
     m_nOrigWidth = m_nInitOrigWidth = nWidth;
     m_nOrigHeight = m_nInitOrigHeight = nHeight;
-    m_pDIBPixels = NULL;
-    m_pDIBPixelsLUTProcessed = NULL;
-    m_pLastDIB = NULL;
+    m_pBitmapPixels = nullptr;
+    m_pBitmapPixelsLUTProcessed = nullptr;
+    m_pLastBitmap = nullptr;
     
-    m_pLUTRGB = NULL;
-    m_pSaturationLUTs = NULL;
+    m_pLUTRGB = nullptr;
+    m_pSaturationLUTs = nullptr;
     m_eProcFlags = PFLAG_None;
     m_nInitialRotation = 0;
     m_dInitialZoom = -1;
@@ -108,7 +108,7 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     m_bCropped = false;
     m_bRotationByEXIF = false;
     m_bFirstReprocessing = true;
-    m_dibLoadDelayMs = 0;
+    m_bitmapLoadDelayMs = 0;
     m_fileLoadDelayMs = 0;
     m_FullTargetSize = DSize(0, 0);
     m_ClippingSize = DSize(0, 0);
@@ -117,27 +117,27 @@ CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, 
     // Histogram of the original pixels for the automatic correction (computed here, i.e. in the load thread)
     m_pHistogram = new CHistogram(*this);}
 
-CBaseImage::~CBaseImage(void) {
+CBaseImage::~CBaseImage() {
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
-    m_pOrigPixels = NULL;
-    delete[] static_cast<uint8_t*>(m_pDIBPixels);
-    m_pDIBPixels = NULL;
-    delete[] static_cast<uint8_t*>(m_pDIBPixelsLUTProcessed);
-    m_pDIBPixelsLUTProcessed = NULL;
+    m_pOrigPixels = nullptr;
+    delete[] static_cast<uint8_t*>(m_pBitmapPixels);
+    m_pBitmapPixels = nullptr;
+    delete[] static_cast<uint8_t*>(m_pBitmapPixelsLUTProcessed);
+    m_pBitmapPixelsLUTProcessed = nullptr;
     delete[] m_pLUTRGB;
-    m_pLUTRGB = NULL;
+    m_pLUTRGB = nullptr;
     delete[] m_pSaturationLUTs;
-    m_pSaturationLUTs = NULL;
+    m_pSaturationLUTs = nullptr;
     delete m_pHistogram;
-    m_pHistogram = NULL;
-    m_pLastDIB = NULL;
+    m_pHistogram = nullptr;
+    m_pLastBitmap = nullptr;
     delete[] static_cast<uint8_t*>(m_pEXIFData);
-    m_pEXIFData = NULL;
+    m_pEXIFData = nullptr;
     delete m_pEXIFReader;
-    m_pEXIFReader = NULL;
+    m_pEXIFReader = nullptr;
 }
 
-void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, DSize fullTargetSize,
+void CBaseImage::ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUTProcessed, DSize fullTargetSize,
                                  DSize clippingSize, DPoint targetOffset, DRect oldClippingRect,
                                  EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, 
                                  double dRotation, EResizeType eResizeType) {
@@ -146,47 +146,47 @@ void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
     DRect newClippingRect = DRect(targetOffset, clippingSize);
     DRect sourceRect;
     if (sourceRect.IntersectRect(oldClippingRect, newClippingRect)) {
-        // there is an intersection, reuse the non LUT processed DIB
+        // there is an intersection, reuse the non LUT processed bitmap
         sourceRect.OffsetRect(-oldOffset.x, -oldOffset.y);
         DRect targetRect = DRect(DPoint(std::max<long>(0, oldOffset.x - newClippingRect.left), std::max<long>(0, oldOffset.y - newClippingRect.top)),
             DSize(sourceRect.Width(), sourceRect.Height()));
 
-        bool bCanUseLUTProcDIB = ApplyCorrectionLUT(imageProcParams, eProcFlags, pDIBPixelsLUTProcessed, fullTargetSize,
-            targetOffset, pDIBPixels, clippingSize, true, false) != NULL;
+        bool bCanUseLUTProcBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, pBitmapPixelsLUTProcessed, fullTargetSize,
+            targetOffset, pBitmapPixels, clippingSize, true, false) != nullptr;
 
         // the LUT processed pixels cannot be used and the original pixels are not available -
-        // full recreation of DIBs is needed
-        if (!bCanUseLUTProcDIB && pDIBPixels == NULL) {
-            delete[] static_cast<uint8_t*>(pDIBPixelsLUTProcessed); pDIBPixelsLUTProcessed = NULL;
+        // full recreation of bitmaps is needed
+        if (!bCanUseLUTProcBitmap && pBitmapPixels == nullptr) {
+            delete[] static_cast<uint8_t*>(pBitmapPixelsLUTProcessed); pBitmapPixelsLUTProcessed = nullptr;
             return;
         }
 
-        // Copy the reusable part of original DIB pixels
-        void* pPannedPixels = (bCanUseLUTProcDIB == false) ? 
-            CBasicProcessing::CopyRect32bpp(NULL, pDIBPixels, clippingSize, targetRect, oldSize, sourceRect) :
-            NULL;
+        // Copy the reusable part of original bitmap pixels
+        void* pPannedPixels = (bCanUseLUTProcBitmap == false) ? 
+            CBasicProcessing::CopyRect32bpp(nullptr, pBitmapPixels, clippingSize, targetRect, oldSize, sourceRect) :
+            nullptr;
 
-        // get rid of original DIB, will be recreated automatically when needed
-        delete[] static_cast<uint8_t*>(pDIBPixels); pDIBPixels = NULL;
+        // get rid of original bitmap, will be recreated automatically when needed
+        delete[] static_cast<uint8_t*>(pBitmapPixels); pBitmapPixels = nullptr;
 
-        // Copy the reusable part of processed DIB pixels
-        void* pPannedPixelsLUTProcessed = bCanUseLUTProcDIB ? 
-            CBasicProcessing::CopyRect32bpp(NULL, pDIBPixelsLUTProcessed, clippingSize, targetRect, oldSize, sourceRect) :
-            NULL;
+        // Copy the reusable part of processed bitmap pixels
+        void* pPannedPixelsLUTProcessed = bCanUseLUTProcBitmap ? 
+            CBasicProcessing::CopyRect32bpp(nullptr, pBitmapPixelsLUTProcessed, clippingSize, targetRect, oldSize, sourceRect) :
+            nullptr;
 
-        // Delete old LUT processed DIB, we copied the part that can be reused to a new DIB (pPannedPixelsLUTProcessed)
-        delete[] static_cast<uint8_t*>(pDIBPixelsLUTProcessed); pDIBPixelsLUTProcessed = NULL;
+        // Delete old LUT processed bitmap, we copied the part that can be reused to a new bitmap (pPannedPixelsLUTProcessed)
+        delete[] static_cast<uint8_t*>(pBitmapPixelsLUTProcessed); pBitmapPixelsLUTProcessed = nullptr;
 
         if (targetRect.top > 0) {
             DSize clipSize(clippingSize.cx, targetRect.top);
             void* pTop = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, eResizeType);
             
-            if (!bCanUseLUTProcDIB) {
+            if (!bCanUseLUTProcBitmap) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pTop,
                     clippingSize, DRect(DPoint(0, 0), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
-                void* pTopProc = NULL;
+                void* pTopProc = nullptr;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pTopProc, fullTargetSize, targetOffset, pTop, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pTopProc,
                     clippingSize, DRect(DPoint(0, 0), clipSize),
@@ -201,12 +201,12 @@ void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
             DPoint offset(targetOffset.x, targetOffset.y + targetRect.bottom);
             void* pBottom = Resample(fullTargetSize, clipSize, offset, eProcFlags, eResizeType);
             
-            if (!bCanUseLUTProcDIB) {
+            if (!bCanUseLUTProcBitmap) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pBottom,
                     clippingSize, DRect(DPoint(0, targetRect.bottom), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
-                void* pBottomProc = NULL;
+                void* pBottomProc = nullptr;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pBottomProc, fullTargetSize, offset, pBottom, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pBottomProc,
                     clippingSize, DRect(DPoint(0, targetRect.bottom), clipSize),
@@ -220,12 +220,12 @@ void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
             DSize clipSize(targetRect.left, clippingSize.cy);
             void* pLeft = Resample(fullTargetSize, clipSize, targetOffset, eProcFlags, eResizeType);
             
-            if (!bCanUseLUTProcDIB) {
+            if (!bCanUseLUTProcBitmap) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pLeft,
                     clippingSize, DRect(DPoint(0, 0), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
-                void* pLeftProc = NULL;
+                void* pLeftProc = nullptr;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pLeftProc, fullTargetSize, targetOffset, pLeft, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pLeftProc,
                     clippingSize, DRect(DPoint(0, 0), clipSize),
@@ -240,12 +240,12 @@ void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
             DPoint offset(targetOffset.x + targetRect.right, targetOffset.y);
             void* pRight = Resample(fullTargetSize, clipSize, offset, eProcFlags, eResizeType);
             
-            if (!bCanUseLUTProcDIB) {
+            if (!bCanUseLUTProcBitmap) {
                 CBasicProcessing::CopyRect32bpp(pPannedPixels, pRight,
                     clippingSize, DRect(DPoint(targetRect.right, 0), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
-                void* pRigthProc = NULL;
+                void* pRigthProc = nullptr;
                 ApplyCorrectionLUT(imageProcParams, eProcFlags, pRigthProc, fullTargetSize, offset, pRight, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pRigthProc,
                     clippingSize, DRect(DPoint(targetRect.right, 0), clipSize),
@@ -255,13 +255,13 @@ void CBaseImage::ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProces
 
             delete[] static_cast<uint8_t*>(pRight);
         }
-        pDIBPixels = pPannedPixels;
-        pDIBPixelsLUTProcessed = pPannedPixelsLUTProcessed;
+        pBitmapPixels = pPannedPixels;
+        pBitmapPixelsLUTProcessed = pPannedPixelsLUTProcessed;
         return;
     }
 
-    delete[] static_cast<uint8_t*>(pDIBPixels); pDIBPixels = NULL;
-    delete[] static_cast<uint8_t*>(pDIBPixelsLUTProcessed); pDIBPixelsLUTProcessed = NULL;
+    delete[] static_cast<uint8_t*>(pBitmapPixels); pBitmapPixels = nullptr;
+    delete[] static_cast<uint8_t*>(pBitmapPixelsLUTProcessed); pBitmapPixelsLUTProcessed = nullptr;
 }
 
 void* CBaseImage::Resample(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType) {
@@ -269,7 +269,7 @@ void* CBaseImage::Resample(DSize fullTargetSize, DSize clippingSize, DPoint targ
     Helpers::CPUType cpu = CSettingsProvider::This().AlgorithmImplementation();
     EFilterType filter = CSettingsProvider::This().DownsamplingFilter();
 
-    if (fullTargetSize.cx > 65535 || fullTargetSize.cy > 65535) return NULL;
+    if (fullTargetSize.cx > 65535 || fullTargetSize.cy > 65535) return nullptr;
 
     if (GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling) && !(eResizeType == NoResize) && (filter>0)) {
         if (SupportsSIMD(cpu)) {
@@ -317,7 +317,7 @@ bool CBaseImage::Rotate(int nRotation) {
     void* pNewOriginalPixels = (m_nOriginalChannels == 3)
         ? CBasicProcessing::Rotate24bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, nRotation)
         : CBasicProcessing::Rotate32bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, nRotation);
-    if (pNewOriginalPixels == NULL) return false;
+    if (pNewOriginalPixels == nullptr) return false;
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
     m_pOrigPixels = pNewOriginalPixels;
     if (nRotation != 180) {
@@ -335,7 +335,7 @@ bool CBaseImage::Mirror(bool bHorizontally) {
     void* pNewOriginalPixels = (m_nOriginalChannels == 3)
         ? CBasicProcessing::Mirror24bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, bHorizontally)
         : CBasicProcessing::Mirror32bpp(m_nOrigWidth, m_nOrigHeight, m_pOrigPixels, bHorizontally);
-    if (pNewOriginalPixels == NULL) return false;
+    if (pNewOriginalPixels == nullptr) return false;
     delete[] static_cast<uint8_t*>(m_pOrigPixels);
     m_pOrigPixels = pNewOriginalPixels;
     m_rotationParams.Rotation = CRotationParams::RotationAfterMirror(m_rotationParams.Rotation, bHorizontally);
@@ -343,17 +343,17 @@ bool CBaseImage::Mirror(bool bHorizontally) {
     return true;
 }
 
-void* CBaseImage::DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded) {
-    if (bGenerateDIBIfNeeded && m_pLastDIB == NULL) {
-        m_pLastDIB = GetDIB(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_imageProcParams, m_eProcFlags);
+void* CBaseImage::BitmapPixelsLastProcessed(bool bGenerateBitmapIfNeeded) {
+    if (bGenerateBitmapIfNeeded && m_pLastBitmap == nullptr) {
+        m_pLastBitmap = GetBitmap(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_imageProcParams, m_eProcFlags);
     }
-    return m_pLastDIB;
+    return m_pLastBitmap;
 }
 
-void CBaseImage::VerifyDIBPixelsCreated() {
-    if (m_pDIBPixels == NULL) {
+void CBaseImage::VerifyBitmapPixelsCreated() {
+    if (m_pBitmapPixels == nullptr) {
         EResizeType eResizeType = GetResizeType(m_FullTargetSize, DSize(m_nOrigWidth, m_nOrigHeight));
-        m_pDIBPixels = Resample(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_eProcFlags, eResizeType);
+        m_pBitmapPixels = Resample(m_FullTargetSize, m_ClippingSize, m_TargetOffset, m_eProcFlags, eResizeType);
     }
 }
 
@@ -380,7 +380,7 @@ void CBaseImage::SetInitialProcessParams(CProcessParams* pParams) {
 // Private
 ///////////////////////////////////////////////////////////////////////////////////
 
-void* CBaseImage::GetDIBInternal(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
+void* CBaseImage::GetBitmapInternal(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
                          const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
                          bool &bParametersChanged) {
 
@@ -391,7 +391,7 @@ void* CBaseImage::GetDIBInternal(DSize fullTargetSize, DSize clippingSize, DPoin
     // Check if resampling due to change of geometric parameters is needed
     bool bMustResampleGeometry = bTargetSizeChanged || clippingSize != m_ClippingSize || targetOffset != m_TargetOffset;
 
-    qDebug() << "GetDIB:" << "HQchanged" << bMustResampleQuality
+    qDebug() << "GetBitmap:" << "HQchanged" << bMustResampleQuality
              << "targetChanged" << bTargetSizeChanged
              << "clipChanged" << (clippingSize != m_ClippingSize)
              << "offsetChanged" << (targetOffset != m_TargetOffset)
@@ -411,14 +411,14 @@ void* CBaseImage::GetDIBInternal(DSize fullTargetSize, DSize clippingSize, DPoin
     uint64_t startTimeMs = Helpers::GetTimeMs();
 
     // Check if only the LUT must be reapplied but no resampling (resampling is much slower than the LUTs)
-    void * pDIB = NULL;
+    void * pBitmap = nullptr;
     if (!bMustResampleQuality && !bMustResampleGeometry) {
-        pDIB = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pDIBPixelsLUTProcessed, 
-            fullTargetSize, targetOffset, m_pDIBPixels, clippingSize, false, false, bParametersChanged);
+        pBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pBitmapPixelsLUTProcessed, 
+            fullTargetSize, targetOffset, m_pBitmapPixels, clippingSize, false, false, bParametersChanged);
     }
 
-    // ApplyCorrectionLUT() could have failed, then recreate the DIBs
-    if (pDIB == NULL) {
+    // ApplyCorrectionLUT() could have failed, then recreate the bitmaps
+    if (pBitmap == nullptr) {
         // The original is kept with 3 channels: resampling is equally fast for 3 and 4 channels, a conversion
         // would cost time and memory (rotation and mirroring also work on 3 channels)
 
@@ -429,45 +429,45 @@ void* CBaseImage::GetDIBInternal(DSize fullTargetSize, DSize clippingSize, DPoin
 
         m_bFirstReprocessing = false;
         if (bPanningOnly) {
-            ResampleWithPan(m_pDIBPixels, m_pDIBPixelsLUTProcessed, fullTargetSize, clippingSize, targetOffset, 
+            ResampleWithPan(m_pBitmapPixels, m_pBitmapPixelsLUTProcessed, fullTargetSize, clippingSize, targetOffset, 
                 oldClippingRect, eProcFlags, imageProcParams, 0.0, eResizeType);
         } else {
-            delete[] static_cast<uint8_t*>(m_pDIBPixelsLUTProcessed); m_pDIBPixelsLUTProcessed = NULL;
-            delete[] static_cast<uint8_t*>(m_pDIBPixels); m_pDIBPixels = NULL;
+            delete[] static_cast<uint8_t*>(m_pBitmapPixelsLUTProcessed); m_pBitmapPixelsLUTProcessed = nullptr;
+            delete[] static_cast<uint8_t*>(m_pBitmapPixels); m_pBitmapPixels = nullptr;
         }
 
-        // both DIBs are NULL, do normal resampling
-        if (m_pDIBPixels == NULL && m_pDIBPixelsLUTProcessed == NULL) {
-            m_pDIBPixels = Resample(fullTargetSize, clippingSize, targetOffset, eProcFlags, eResizeType);
+        // both bitmaps are nullptr, do normal resampling
+        if (m_pBitmapPixels == nullptr && m_pBitmapPixelsLUTProcessed == nullptr) {
+            m_pBitmapPixels = Resample(fullTargetSize, clippingSize, targetOffset, eProcFlags, eResizeType);
         }
 
-        // if ResampleWithPan() has preserved this DIB, we can reuse it
-        if (m_pDIBPixelsLUTProcessed == NULL) {
-            pDIB = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pDIBPixelsLUTProcessed, fullTargetSize,
-                targetOffset, m_pDIBPixels, clippingSize, false, false);
+        // if ResampleWithPan() has preserved this bitmap, we can reuse it
+        if (m_pBitmapPixelsLUTProcessed == nullptr) {
+            pBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pBitmapPixelsLUTProcessed, fullTargetSize,
+                targetOffset, m_pBitmapPixels, clippingSize, false, false);
         } else {
-            pDIB = m_pDIBPixelsLUTProcessed;
+            pBitmap = m_pBitmapPixelsLUTProcessed;
         }
     }
 
-    uint64_t dibLoadDelayMs = Helpers::GetTimeMs() - startTimeMs; 
-    if (dibLoadDelayMs > 1) {
-        m_dibLoadDelayMs = dibLoadDelayMs;
+    uint64_t bitmapLoadDelayMs = Helpers::GetTimeMs() - startTimeMs; 
+    if (bitmapLoadDelayMs > 1) {
+        m_bitmapLoadDelayMs = bitmapLoadDelayMs;
     }
 
     // Only now, after ApplyCorrectionLUT(): it compares the new parameters with these to detect a change
     m_eProcFlags = eProcFlags;
     m_imageProcParams = imageProcParams;
 
-    m_pLastDIB = pDIB;
+    m_pLastBitmap = pBitmap;
     
-    return pDIB;
+    return pBitmap;
 }
 
 void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-                                           void * & pCachedTargetDIB, DSize fullTargetSize, DPoint targetOffset, 
-                                           void * pSourceDIB, DSize dibSize,
-                                           bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged) {
+                                           void * & pCachedTargetBitmap, DSize fullTargetSize, DPoint targetOffset, 
+                                           void * pSourceBitmap, DSize bitmapSize,
+                                           bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap, bool &bParametersChanged) {
 
     bool bAutoContrast = GetProcessingFlag(eProcFlags, PFLAG_AutoContrast);
     bool bAutoContrastOld = GetProcessingFlag(m_eProcFlags, PFLAG_AutoContrast);
@@ -483,25 +483,25 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
 
     bParametersChanged = bMustReapplyLUTs;
 
-    if (!bMustReapplyLUTs && pCachedTargetDIB != NULL) {
+    if (!bMustReapplyLUTs && pCachedTargetBitmap != nullptr) {
         // consider special case that nothing is dimmed and no LUT is applied but
         // processed pixel is here, we do not want to use it - in this case we just continue.
         if (!bNoLUTsApplied) {
-            return pCachedTargetDIB;
+            return pCachedTargetBitmap;
         }
     }
 
-    // If it shall only be checked if this method would be able to reuse the existing pCachedTargetDIB, return
+    // If it shall only be checked if this method would be able to reuse the existing pCachedTargetBitmap, return
     if (bOnlyCheck) {
-        return NULL;
+        return nullptr;
     }
 
-    if (pSourceDIB == NULL) {
-        return NULL;
+    if (pSourceBitmap == nullptr) {
+        return nullptr;
     }
 
     // Calculate the histogram if needed (after rotation)
-    if (m_pHistogram == NULL) {
+    if (m_pHistogram == nullptr) {
         m_pHistogram = new CHistogram(*this);
     }
 
@@ -509,26 +509,26 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
     const CHistogram* pHistogram = m_pHistogram;
     bool bSpecialHistogram = false;
     
-    if (bMustUse3ChannelLUT && (m_pLUTRGB == NULL || bCorrectionFactorChanged || bAutoContrast != bAutoContrastOld)) {
+    if (bMustUse3ChannelLUT && (m_pLUTRGB == nullptr || bCorrectionFactorChanged || bAutoContrast != bAutoContrastOld)) {
         delete[] m_pLUTRGB;
         float fBrightnessCorrFactor = bAutoContrast ? 1.0f : 0.0f;
         float fContrastCorrFactor = bAutoContrast ? (float) imageProcParams.ContrastCorrectionFactor : 0.0f;
         m_pLUTRGB = CHistogramCorr::CalculateCorrectionLUT(*pHistogram, fBrightnessCorrFactor, fContrastCorrFactor);
     } else if (!bMustUse3ChannelLUT) {
         delete[] m_pLUTRGB;
-        m_pLUTRGB = NULL;
+        m_pLUTRGB = nullptr;
     }
     
-    if (bMustUseSaturationLUTs && (m_pSaturationLUTs == NULL || bSaturationChanged)) {
+    if (bMustUseSaturationLUTs && (m_pSaturationLUTs == nullptr || bSaturationChanged)) {
         delete[] m_pSaturationLUTs;
         m_pSaturationLUTs = CBasicProcessing::CreateColorSaturationLUTs(imageProcParams.Saturation);
     } else if (!bMustUseSaturationLUTs) {
         delete[] m_pSaturationLUTs;
-        m_pSaturationLUTs = NULL;
+        m_pSaturationLUTs = nullptr;
     }
     
-    delete[] static_cast<uint8_t*>(pCachedTargetDIB);
-    pCachedTargetDIB = NULL;
+    delete[] static_cast<uint8_t*>(pCachedTargetBitmap);
+    pCachedTargetBitmap = nullptr;
     if (bSpecialHistogram) {
         delete pHistogram;
     }
@@ -537,7 +537,7 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
         // LUT --> apply correction. Without auto contrast only the saturation is changed (identity LUT).
         uint8_t identityLUT[3*256];
         const uint8_t* pLUT = m_pLUTRGB;
-        if (pLUT == NULL) {
+        if (pLUT == nullptr) {
             for (int i = 0; i < 256; i++) {
                 identityLUT[i] = identityLUT[i + 256] = identityLUT[i + 256*2] = (uint8_t)i;
             }
@@ -545,19 +545,19 @@ void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcPar
         }
 
         if (bMustUseSaturationLUTs) {
-            pCachedTargetDIB = CBasicProcessing::ApplySaturationAnd3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, m_pSaturationLUTs, pLUT);
+            pCachedTargetBitmap = CBasicProcessing::ApplySaturationAnd3ChannelLUT32bpp(bitmapSize.cx, bitmapSize.cy, pSourceBitmap, m_pSaturationLUTs, pLUT);
         } else {
-            pCachedTargetDIB = CBasicProcessing::Apply3ChannelLUT32bpp(dibSize.cx, dibSize.cy, pSourceDIB, pLUT);
+            pCachedTargetBitmap = CBasicProcessing::Apply3ChannelLUT32bpp(bitmapSize.cx, bitmapSize.cy, pSourceBitmap, pLUT);
         }
-    } else if (bCanTakeOwnershipOfSourceDIB) {
-        // no LUTs, just take over ownership of source DIB if we are allowed
-        pCachedTargetDIB = pSourceDIB;
+    } else if (bCanTakeOwnershipOfSourceBitmap) {
+        // no LUTs, just take over ownership of source bitmap if we are allowed
+        pCachedTargetBitmap = pSourceBitmap;
     } else {
         // no LUTs, no dimming --> return original pixels
-        return pSourceDIB;
+        return pSourceBitmap;
     }
 
-    return pCachedTargetDIB;
+    return pCachedTargetBitmap;
 }
 
 CBaseImage::EResizeType CBaseImage::GetResizeType(DSize targetSize, DSize sourceSize) {
@@ -571,7 +571,7 @@ CBaseImage::EResizeType CBaseImage::GetResizeType(DSize targetSize, DSize source
 }
 
 int CBaseImage::GetRotationFromEXIF(int nOrigRotation) {
-    if (m_pEXIFReader != NULL && m_pEXIFReader->ImageOrientationPresent() && CSettingsProvider::This().AutoRotateEXIF()) {
+    if (m_pEXIFReader != nullptr && m_pEXIFReader->ImageOrientationPresent() && CSettingsProvider::This().AutoRotateEXIF()) {
         switch (m_pEXIFReader->GetImageOrientation()) {
             case 1:
                 m_bRotationByEXIF = true;
@@ -592,14 +592,14 @@ int CBaseImage::GetRotationFromEXIF(int nOrigRotation) {
 }
 
 void CBaseImage::InvalidateAllCachedPixelData() {
-    m_pLastDIB = NULL;
+    m_pLastBitmap = nullptr;
     delete m_pHistogram; // the sampling grid changes with rotation, the histogram must be recalculated
-    m_pHistogram = NULL;
+    m_pHistogram = nullptr;
     delete[] m_pLUTRGB; // calculated from the histogram
-    m_pLUTRGB = NULL;
-    delete[] static_cast<uint8_t*>(m_pDIBPixels);
-    m_pDIBPixels = NULL;
-    delete[] static_cast<uint8_t*>(m_pDIBPixelsLUTProcessed);
-    m_pDIBPixelsLUTProcessed = NULL;
+    m_pLUTRGB = nullptr;
+    delete[] static_cast<uint8_t*>(m_pBitmapPixels);
+    m_pBitmapPixels = nullptr;
+    delete[] static_cast<uint8_t*>(m_pBitmapPixelsLUTProcessed);
+    m_pBitmapPixelsLUTProcessed = nullptr;
     m_ClippingSize = DSize(0, 0);
 }

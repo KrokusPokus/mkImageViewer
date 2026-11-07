@@ -43,7 +43,7 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     char* pBuf = (char*)pBuffer;
     /* Read the header */
     amtRead += 14;
-    if (bufsize < amtRead) return NULL;
+    if (bufsize < amtRead) return nullptr;
     header.type = *((uint16_t*)pBuf); pBuf = pBuf + sizeof(uint16_t);
     header.size = *((uint32_t*)pBuf); pBuf += sizeof(uint32_t);
     header.reserved1 = *((uint16_t*)pBuf); pBuf += sizeof(uint16_t);
@@ -53,40 +53,40 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     /* Read and check the information header */
     std::size_t size = sizeof(BMINFOHEADER);
     amtRead += size;
-    if (bufsize < amtRead) return NULL;
+    if (bufsize < amtRead) return nullptr;
     memcpy(&infoheader, pBuf, size);
     //pBuf += size;
 
     /* Only 24 and 32 bpp */
     if (infoheader.bits != 24 && infoheader.bits != 32 && infoheader.bits != 8) {
-        return NULL;
+        return nullptr;
     }
     /* Not too big files (height is negative for top-down DIBs) */
     if (infoheader.width <= 0 || infoheader.width > (int)MAX_IMAGE_DIMENSION ||
         infoheader.height == 0 || infoheader.height < -(int)MAX_IMAGE_DIMENSION || infoheader.height > (int)MAX_IMAGE_DIMENSION) {
-        return NULL;
+        return nullptr;
     }
     if ((double)infoheader.width * abs(infoheader.height) > MAX_IMAGE_PIXELS) {
         bOutOfMemory = true;
-        return NULL;
+        return nullptr;
     }
 
     // read palette for 8 bpp DIBs
     uint8_t palette[4 * 256];
     if (infoheader.bits == 8) {
         off = (std::size_t)infoheader.size + 14;
-        if (bufsize < off) return NULL;
+        if (bufsize < off) return nullptr;
         pBuf = ((char*)pBuffer) + off;
         size = 256 * 4;
         amtRead = off + size;
-        if (bufsize < amtRead) return NULL;
+        if (bufsize < amtRead) return nullptr;
         memcpy(palette, pBuf, size);
         //pBuf += size;
     }
 
     /* Seek to the start of the image data */
     amtRead = off = header.offset;
-    if (bufsize < off) return NULL;
+    if (bufsize < off) return nullptr;
     pBuf = ((char*)pBuffer) + off;
 
     // DIBs are normally stored flipped vertically (meaning they are stored bottom-up)
@@ -106,17 +106,17 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
     int64_t nImageBytes = (int64_t)infoheader.height * paddedWidth;
     if (nImageBytes > MAX_BMP_FILE_SIZE) {
         bOutOfMemory = true;
-        return NULL; // corrupt or manipulated header
+        return nullptr; // corrupt or manipulated header
     }
     int fileSizeBytes = (int)nImageBytes; // <= MAX_BMP_FILE_SIZE, fits into an int
     if (bufsize - off < (std::size_t)fileSizeBytes) {
-        return NULL; // the file can not contain the pixel data: do not allocate memory for it
+        return nullptr; // the file can not contain the pixel data: do not allocate memory for it
     }
 
     uint8_t* pDest = new(std::nothrow) uint8_t[fileSizeBytes];
-    if (pDest == NULL) {
+    if (pDest == nullptr) {
         bOutOfMemory = true;
-        return NULL;
+        return nullptr;
     }
     uint8_t* pStart = bFlipped ? pDest + (std::size_t)paddedWidth * (infoheader.height - 1) : pDest;
     for (int nLine = 0; nLine < infoheader.height; nLine++) {
@@ -124,7 +124,7 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
         if (bufsize < amtRead)
         {
             delete[] pDest;
-            return NULL;
+            return nullptr;
         }
         memcpy(pStart, pBuf, paddedWidth);
         pBuf += paddedWidth;
@@ -133,11 +133,11 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
 
     // Convert 8 bpp DIBs
     if (infoheader.bits == 8) {
-        uint8_t* pTemp = (uint8_t*)CBasicProcessing::Convert8bppTo32bppDIB(infoheader.width, infoheader.height, pDest, palette);
+        uint8_t* pTemp = (uint8_t*)CBasicProcessing::Convert8bppTo32bppBitmap(infoheader.width, infoheader.height, pDest, palette);
         delete[] pDest;
-        if (pTemp == NULL) {
+        if (pTemp == nullptr) {
             bOutOfMemory = true;
-            return NULL;
+            return nullptr;
         }
         pDest = pTemp;
         infoheader.bits = 32;

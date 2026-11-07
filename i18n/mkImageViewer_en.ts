@@ -2,405 +2,405 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en" sourcelanguage="en">
 <context>
-    <name>CMainDlg</name>
+    <name>CMainWindow</name>
     <message>
-        <location filename="../src/MainDlg.cpp" line="794"/>
+        <location filename="../src/MainWindow.cpp" line="794"/>
         <source>No image loaded!
 Press ESC to exit...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1417"/>
+        <location filename="../src/MainWindow.cpp" line="1417"/>
         <source>Next image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1418"/>
+        <location filename="../src/MainWindow.cpp" line="1418"/>
         <source>Previous image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1423"/>
+        <location filename="../src/MainWindow.cpp" line="1423"/>
         <source>Current View</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1424"/>
+        <location filename="../src/MainWindow.cpp" line="1424"/>
         <source>Rotate +90</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1425"/>
+        <location filename="../src/MainWindow.cpp" line="1425"/>
         <source>Rotate -90</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1427"/>
+        <location filename="../src/MainWindow.cpp" line="1427"/>
         <source>Mirror horizontally</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1428"/>
+        <location filename="../src/MainWindow.cpp" line="1428"/>
         <source>Mirror vertically</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1629"/>
+        <location filename="../src/MainWindow.cpp" line="1629"/>
         <source>Black and white</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1430"/>
-        <location filename="../src/MainDlg.cpp" line="1613"/>
+        <location filename="../src/MainWindow.cpp" line="1430"/>
+        <location filename="../src/MainWindow.cpp" line="1613"/>
         <source>Fit to window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1431"/>
-        <location filename="../src/MainDlg.cpp" line="1613"/>
+        <location filename="../src/MainWindow.cpp" line="1431"/>
+        <location filename="../src/MainWindow.cpp" line="1613"/>
         <source>Fill with crop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1441"/>
+        <location filename="../src/MainWindow.cpp" line="1441"/>
         <source>Full screen mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1452"/>
+        <location filename="../src/MainWindow.cpp" line="1452"/>
         <source>Play folder as slideshow/animation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1456"/>
+        <location filename="../src/MainWindow.cpp" line="1456"/>
         <source>Pause slideshow/animation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1462"/>
+        <location filename="../src/MainWindow.cpp" line="1462"/>
         <source>Slideshow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1468"/>
+        <location filename="../src/MainWindow.cpp" line="1468"/>
         <source>Waiting time	%1 sec</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1472"/>
+        <location filename="../src/MainWindow.cpp" line="1472"/>
         <source>Transition Effect</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1483"/>
-        <location filename="../src/MainDlg.cpp" line="1613"/>
+        <location filename="../src/MainWindow.cpp" line="1483"/>
+        <location filename="../src/MainWindow.cpp" line="1613"/>
         <source>None</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1485"/>
+        <location filename="../src/MainWindow.cpp" line="1485"/>
         <source>Blend</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1487"/>
+        <location filename="../src/MainWindow.cpp" line="1487"/>
         <source>Slide from right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1488"/>
+        <location filename="../src/MainWindow.cpp" line="1488"/>
         <source>Slide from left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1489"/>
+        <location filename="../src/MainWindow.cpp" line="1489"/>
         <source>Slide from top</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1490"/>
+        <location filename="../src/MainWindow.cpp" line="1490"/>
         <source>Slide from bottom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1492"/>
+        <location filename="../src/MainWindow.cpp" line="1492"/>
         <source>Roll from right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1493"/>
+        <location filename="../src/MainWindow.cpp" line="1493"/>
         <source>Roll from left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1494"/>
+        <location filename="../src/MainWindow.cpp" line="1494"/>
         <source>Roll from top</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1495"/>
+        <location filename="../src/MainWindow.cpp" line="1495"/>
         <source>Roll from bottom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1497"/>
+        <location filename="../src/MainWindow.cpp" line="1497"/>
         <source>Scroll from right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1498"/>
+        <location filename="../src/MainWindow.cpp" line="1498"/>
         <source>Scroll from left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1499"/>
+        <location filename="../src/MainWindow.cpp" line="1499"/>
         <source>Scroll from top</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1500"/>
+        <location filename="../src/MainWindow.cpp" line="1500"/>
         <source>Scroll from bottom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1503"/>
+        <location filename="../src/MainWindow.cpp" line="1503"/>
         <source>Transition Speed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1510"/>
+        <location filename="../src/MainWindow.cpp" line="1510"/>
         <source>Very fast</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1510"/>
+        <location filename="../src/MainWindow.cpp" line="1510"/>
         <source>Fast</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1510"/>
+        <location filename="../src/MainWindow.cpp" line="1510"/>
         <source>Normal</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1510"/>
+        <location filename="../src/MainWindow.cpp" line="1510"/>
         <source>Slow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1510"/>
+        <location filename="../src/MainWindow.cpp" line="1510"/>
         <source>Very slow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1522"/>
+        <location filename="../src/MainWindow.cpp" line="1522"/>
         <source>Movie</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1527"/>
+        <location filename="../src/MainWindow.cpp" line="1527"/>
         <source>Playback speed	%1 fps</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1533"/>
+        <location filename="../src/MainWindow.cpp" line="1533"/>
         <source>Reload image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1536"/>
+        <location filename="../src/MainWindow.cpp" line="1536"/>
         <source>Edit image in default editor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1538"/>
+        <location filename="../src/MainWindow.cpp" line="1538"/>
         <source>Copy original image content to clipboard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1541"/>
+        <location filename="../src/MainWindow.cpp" line="1541"/>
         <source>Copy file path to clipboard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1544"/>
+        <location filename="../src/MainWindow.cpp" line="1544"/>
         <source>Cut file to clipboard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1545"/>
+        <location filename="../src/MainWindow.cpp" line="1545"/>
         <source>Show in folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1883"/>
+        <location filename="../src/MainWindow.cpp" line="1883"/>
         <source>Could not write the EXIF orientation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1672"/>
+        <location filename="../src/MainWindow.cpp" line="1672"/>
         <source>Could not open keymap.txt</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1555"/>
+        <location filename="../src/MainWindow.cpp" line="1555"/>
         <source>Folder Mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1547"/>
+        <location filename="../src/MainWindow.cpp" line="1547"/>
         <source>EXIF Rotate +90</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1549"/>
+        <location filename="../src/MainWindow.cpp" line="1549"/>
         <source>EXIF Rotate -90</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1560"/>
+        <location filename="../src/MainWindow.cpp" line="1560"/>
         <source>Loop folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1560"/>
+        <location filename="../src/MainWindow.cpp" line="1560"/>
         <source>Loop recursively</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1560"/>
+        <location filename="../src/MainWindow.cpp" line="1560"/>
         <source>Loop siblings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1573"/>
+        <location filename="../src/MainWindow.cpp" line="1573"/>
         <source>Sort Order</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1587"/>
+        <location filename="../src/MainWindow.cpp" line="1587"/>
         <source>File name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainWindow.cpp" line="1588"/>
         <source>Modification date</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1589"/>
+        <location filename="../src/MainWindow.cpp" line="1589"/>
         <source>File size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1590"/>
+        <location filename="../src/MainWindow.cpp" line="1590"/>
         <source>Random</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1595"/>
+        <location filename="../src/MainWindow.cpp" line="1595"/>
         <source>Ascending</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1600"/>
+        <location filename="../src/MainWindow.cpp" line="1600"/>
         <source>Descending</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1606"/>
+        <location filename="../src/MainWindow.cpp" line="1606"/>
         <source>Auto Zoom Mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1613"/>
+        <location filename="../src/MainWindow.cpp" line="1613"/>
         <source>Fit to window (never upsize)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1613"/>
+        <location filename="../src/MainWindow.cpp" line="1613"/>
         <source>Fill with crop (never upsize)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1613"/>
+        <location filename="../src/MainWindow.cpp" line="1613"/>
         <source>Book Mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1625"/>
+        <location filename="../src/MainWindow.cpp" line="1625"/>
         <source>Auto Contrast</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1636"/>
+        <location filename="../src/MainWindow.cpp" line="1636"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1640"/>
+        <location filename="../src/MainWindow.cpp" line="1640"/>
         <source>Exit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3821"/>
-        <location filename="../src/MainDlg.cpp" line="3831"/>
+        <location filename="../src/MainWindow.cpp" line="3821"/>
+        <location filename="../src/MainWindow.cpp" line="3831"/>
         <source>Delete File</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3822"/>
+        <location filename="../src/MainWindow.cpp" line="3822"/>
         <source>Do you really want to move this file to the trash?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3824"/>
-        <location filename="../src/MainDlg.cpp" line="3834"/>
+        <location filename="../src/MainWindow.cpp" line="3824"/>
+        <location filename="../src/MainWindow.cpp" line="3834"/>
         <source>Delete multiple elements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3825"/>
+        <location filename="../src/MainWindow.cpp" line="3825"/>
         <source>Do you really want to move these %1 files to the trash?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3829"/>
+        <location filename="../src/MainWindow.cpp" line="3829"/>
         <source>This process cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3832"/>
+        <location filename="../src/MainWindow.cpp" line="3832"/>
         <source>Are you sure you want to delete this file permanently?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3835"/>
+        <location filename="../src/MainWindow.cpp" line="3835"/>
         <source>Are you sure you want to delete these %1 files permanently?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3893"/>
+        <location filename="../src/MainWindow.cpp" line="3893"/>
         <source>Name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3895"/>
+        <location filename="../src/MainWindow.cpp" line="3895"/>
         <source>Size:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3897"/>
+        <location filename="../src/MainWindow.cpp" line="3897"/>
         <source>Date:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3906"/>
+        <location filename="../src/MainWindow.cpp" line="3906"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3907"/>
+        <location filename="../src/MainWindow.cpp" line="3907"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>

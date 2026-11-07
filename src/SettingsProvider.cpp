@@ -126,7 +126,7 @@ namespace {
     }
 
     // Tests if the CPU supports AVX2, SSE, MMX(2)
-    Helpers::CPUType ProbeCPU(void) {
+    Helpers::CPUType ProbeCPU() {
         static Helpers::CPUType cpuType = Helpers::CPU_Unknown;
 
         if (cpuType != Helpers::CPU_Unknown) {

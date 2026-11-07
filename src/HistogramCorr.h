@@ -55,7 +55,7 @@ public:
         float fBrightnessCorrectionFactor, float fContrastCorrectionFactor);
 
 private:
-    CHistogramCorr(void);
+    CHistogramCorr();
 
     static float sm_ContrastCorrectionStrength;
     static float sm_BrightnessCorrStrength;

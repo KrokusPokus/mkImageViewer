@@ -379,8 +379,8 @@ const CommandInfo& info(Command id) {
     return kTable[i];
 }
 
-ArrayView<DefaultBinding> defaultBindings() {
-    return { kDefaultBindings, sizeof(kDefaultBindings) / sizeof(kDefaultBindings[0]) };
+std::span<const DefaultBinding> defaultBindings() {
+    return kDefaultBindings;
 }
 
 bool isValidArg(const CommandInfo& ci, int arg) {

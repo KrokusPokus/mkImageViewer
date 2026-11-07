@@ -16,7 +16,7 @@ namespace {
 // (and across resampling calls), avoiding an allocation per strip, which caused mmap/munmap, page faults,
 // zeroing of fresh pages by the kernel and TLB shootdowns.
 // A buffer must be released on the thread that acquired it (CXMMImage objects are local to one strip).
-// Acquire() returns nullptr if memory is exhausted (no exception, CXMMImage::AlignedPtr() is then NULL).
+// Acquire() returns nullptr if memory is exhausted (no exception, CXMMImage::AlignedPtr() is then nullptr).
 class CScratchBuffers {
 public:
     ~CScratchBuffers() {
@@ -117,14 +117,14 @@ CXMMImage::CXMMImage(int nWidth, int nHeight, bool bPadHeight, int padding, bool
 
 //GF: version for f32 SSE & AVX2
 CXMMImage::CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirstY, int nLastY, 
-    const void* pDIB, int nChannels, int padding) {
+    const void* pBitmap, int nChannels, int padding) {
     int nSectionWidth = nLastX - nFirstX + 1;
     int nSectionHeight = nLastY - nFirstY + 1;
     Init(nSectionWidth, nSectionHeight, false, padding, true);
 
-    if (m_pMemory != NULL) {
+    if (m_pMemory != nullptr) {
         int nSrcLineWidthPadded = Helpers::DoPadding(nWidth * nChannels, 4);
-        const uint8_t* pSrc = (uint8_t*)pDIB + (long long)nFirstY*(long long)nSrcLineWidthPadded + (long long)nFirstX*(long long)nChannels;
+        const uint8_t* pSrc = (uint8_t*)pBitmap + (long long)nFirstY*(long long)nSrcLineWidthPadded + (long long)nFirstX*(long long)nChannels;
         for (int j = 0; j < nSectionHeight; j++) {
             ConvertLine(j, pSrc, nChannels, padding);
             pSrc += nSrcLineWidthPadded;
@@ -217,10 +217,10 @@ void CXMMImage::ZeroPaddingColumns(float* pDst, int padding) const {
     }
 }
 
-CXMMImage::~CXMMImage(void) {
-    if (m_pMemory != NULL) {
+CXMMImage::~CXMMImage() {
+    if (m_pMemory != nullptr) {
         t_scratchBuffers.Release(m_pMemory);
-        m_pMemory = NULL;
+        m_pMemory = nullptr;
     }
 }
 
@@ -259,7 +259,7 @@ void CXMMImage::Init(int nWidth, int nHeight, bool bPadHeight, int padding, bool
     /*
     // Allocate memory aligned on page boundaries
     m_pMemory = ::VirtualAlloc(
-                        NULL,      // let the call determine the start address
+                        nullptr,      // let the call determine the start address
                         nMemSize, // the size
                         MEM_RESERVE | MEM_COMMIT,    // I want that memory, now
                         PAGE_READWRITE);            // need both read and write

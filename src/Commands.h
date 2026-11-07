@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -139,7 +140,7 @@ enum class Category : std::uint8_t {
 // Argumente
 //
 // Die Werte dieser Enums sind NUR Namen fuer das Argument. Sie sind absichtlich von den Enums im
-// restlichen Programm (Helpers::EAutoZoomMode, Helpers::ESorting, ...) entkoppelt. MainDlg
+// restlichen Programm (Helpers::EAutoZoomMode, Helpers::ESorting, ...) entkoppelt. MainWindow
 // uebersetzt sie explizit (siehe Beispiel im Begleittext), dadurch haengt Commands.h an nichts.
 // ---------------------------------------------------------------------------------------------
 enum class AutoZoomArg   { None, FitNoZoom, FillNoZoom, Fit, Fill, BookMode };
@@ -221,17 +222,6 @@ struct DefaultBinding {
     int arg;
 };
 
-// Minimale Sicht auf ein konstantes Array (statt std::span, das erst C++20 ist).
-template <class T>
-struct ArrayView {
-    const T* first = nullptr;
-    std::size_t count = 0;
-    constexpr const T* begin() const { return first; }
-    constexpr const T* end() const { return first + count; }
-    constexpr std::size_t size() const { return count; }
-    constexpr const T& operator[](std::size_t i) const { return first[i]; }
-};
-
 // ---------------------------------------------------------------------------------------------
 // Zugriff
 // ---------------------------------------------------------------------------------------------
@@ -243,7 +233,7 @@ const std::array<CommandInfo, kCommandCount>& allCommands();
 const CommandInfo& info(Command id);
 
 // Standardbelegung (Grundlage fuer "keymap.txt einmalig ausschreiben" und "Standard wiederherstellen").
-ArrayView<DefaultBinding> defaultBindings();
+std::span<const DefaultBinding> defaultBindings();
 
 // Sucht nach kanonischem Namen (Klein/Gross egal). nullptr, wenn unbekannt.
 const CommandInfo* findByName(std::string_view name);

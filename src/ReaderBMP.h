@@ -17,7 +17,7 @@ public:
                  std::size_t sizebytes); // size of data.
 
 private:
-    CReaderBMP(void);
+    CReaderBMP();
 };
 
 #endif // READERBMP_H

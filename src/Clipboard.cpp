@@ -13,11 +13,11 @@
 #include <QUrl>
 
 void CClipboard::CopyImageToClipboard(CBaseImage* pImage, const QString& fileName) {
-    if (pImage == nullptr || pImage->DIBPixelsLastProcessed(true) == nullptr) {
+    if (pImage == nullptr || pImage->BitmapPixelsLastProcessed(true) == nullptr) {
         return;
     }
 
-    DoCopy(pImage->DIBWidth(), pImage->DIBHeight(), pImage->DIBPixelsLastProcessed(true), fileName);
+    DoCopy(pImage->BitmapWidth(), pImage->BitmapHeight(), pImage->BitmapPixelsLastProcessed(true), fileName);
 }
 
 void CClipboard::CopyFullImageToClipboard(CBaseImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, const QString& fileName) {
@@ -25,12 +25,12 @@ void CClipboard::CopyFullImageToClipboard(CBaseImage* pImage, const CImageProces
         return;
     }
 
-    void* pDIB = pImage->GetDIB(pImage->OrigSize(), pImage->OrigSize(), DPoint(0, 0), procParams, eFlags);
-    DoCopy(pImage->OrigWidth(), pImage->OrigHeight(), pDIB, fileName);
+    void* pBitmap = pImage->GetBitmap(pImage->OrigSize(), pImage->OrigSize(), DPoint(0, 0), procParams, eFlags);
+    DoCopy(pImage->OrigWidth(), pImage->OrigHeight(), pBitmap, fileName);
 }
 
 void CClipboard::CopyPathToClipboard(CBaseImage* pImage, const QString& fileName) {
-    if (pImage == nullptr || pImage->DIBPixelsLastProcessed(true) == nullptr) {
+    if (pImage == nullptr || pImage->BitmapPixelsLastProcessed(true) == nullptr) {
         return;
     }
     DoCopyFileNameText(fileName);
@@ -64,8 +64,8 @@ void CClipboard::CutFileToClipboard(const QString& fileName) {
     clipboard->setMimeData(mimeData);
 }
 
-void CClipboard::DoCopy(int nWidth, int nHeight, const void* pSourceImageDIB32, const QString& fileName) {
-    if (pSourceImageDIB32 == nullptr || nWidth <= 0 || nHeight <= 0) {
+void CClipboard::DoCopy(int nWidth, int nHeight, const void* pSourceImageBitmap32, const QString& fileName) {
+    if (pSourceImageBitmap32 == nullptr || nWidth <= 0 || nHeight <= 0) {
         return;
     }
 
@@ -74,12 +74,12 @@ void CClipboard::DoCopy(int nWidth, int nHeight, const void* pSourceImageDIB32, 
         return;
     }
 
-    // 1. QImage aus dem 32bpp-DIB-Puffer (BGRA) erzeugen und KOPIEREN: Der Puffer gehört dem CBaseImage und wird
+    // 1. QImage aus dem 32bpp-bitmap-Puffer (BGRA) erzeugen und KOPIEREN: Der Puffer gehört dem CBaseImage und wird
     // beim nächsten Zoom, Pan oder Bildwechsel freigegeben. Die Zwischenablage wandelt das Bild aber erst um, wenn
     // ein anderes Programm einfügt - ohne Kopie läse sie dann freigegebenen Speicher.
-    // Format_RGB32 wie beim Zeichnen: Das Alpha-Byte des DIB ist nicht in jedem Fall gesetzt (z. B. 32-Bit-BMP mit
+    // Format_RGB32 wie beim Zeichnen: Das Alpha-Byte des bitmap ist nicht in jedem Fall gesetzt (z. B. 32-Bit-BMP mit
     // Alpha 0), als ARGB wäre das Bild in der Zwischenablage dann durchsichtig.
-    const QImage image = QImage(static_cast<const uchar*>(pSourceImageDIB32), nWidth, nHeight, nWidth * 4, QImage::Format_RGB32).copy();
+    const QImage image = QImage(static_cast<const uchar*>(pSourceImageBitmap32), nWidth, nHeight, nWidth * 4, QImage::Format_RGB32).copy();
     if (image.isNull()) {
         return; // the copy could not be allocated
     }

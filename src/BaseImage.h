@@ -38,26 +38,26 @@ public:
     CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
         EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs, bool bInArchive);
 
-    ~CBaseImage(void);
+    ~CBaseImage();
 
-    // Gets resampled and processed 32 bpp DIB image (up or downsampled).
+    // Gets resampled and processed 32 bpp bitmap image (up or downsampled).
     // Parameters:
     // fullTargetSize: Full target size of resized image to render (without any clipping to actual clipping size)
-    // clippingSize: Sub-rectangle in fullTargetSize to render (the returned DIB has this size)
+    // clippingSize: Sub-rectangle in fullTargetSize to render (the returned bitmap has this size)
     // targetOffset: Offset of the clipping rectangle in full target size
     // imageProcParams: Processing parameters, such as contrast and brightness
     // eProcFlags: Processing flags, e.g. high quality resampling, auto contrast
     // Return value:
-    // The returned DIB is a 32 bpp DIB (BGRA). Note that the returned pointer must not
-    // be deleted by the caller and is only valid until another call to GetDIB() is done, the CBaseImage
+    // The returned bitmap is a 32 bpp bitmap (BGRA). Note that the returned pointer must not
+    // be deleted by the caller and is only valid until another call to GetBitmap() is done, the CBaseImage
     // object is disposed or the Rotate() or any other method affecting original pixels is called!
-    // Note: The method tries to satisfy consecutive requests as efficient as possible. Calling the GetDIB()
+    // Note: The method tries to satisfy consecutive requests as efficient as possible. Calling the GetBitmap()
     // method multiple times with the same set of parameters will return the same image starting from the second
     // call without doing image processing anymore.
-    void* GetDIB(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
+    void* GetBitmap(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
         const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags) {
         bool bNotUsed;
-        return GetDIBInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, bNotUsed);
+        return GetBitmapInternal(fullTargetSize, clippingSize, targetOffset, imageProcParams, eProcFlags, bNotUsed);
     }
 
     // Operations on original pixels of the image
@@ -80,15 +80,15 @@ public:
     int InitOrigWidth() const { return m_nInitOrigWidth; }
     int InitOrigHeight() const { return m_nInitOrigHeight; }
 
-    // Size of DIB - size of resampled section of the original image. If zero, no DIB is currently available.
-    int DIBWidth() const { return m_ClippingSize.cx; }
-    int DIBHeight() const { return m_ClippingSize.cy; }
+    // Size of bitmap - size of resampled section of the original image. If zero, no bitmap is currently available.
+    int BitmapWidth() const { return m_ClippingSize.cx; }
+    int BitmapHeight() const { return m_ClippingSize.cy; }
 
     // Gets the rotation applied to the pixels
     const CRotationParams& GetRotationParams() {return m_rotationParams; }
 
-    // Declare the cached DIB as invalid - forcing it to be regenerated on next GetDIB() call
-    void SetDIBInvalid() { m_ClippingSize = DSize(0, 0); }
+    // Declare the cached bitmap as invalid - forcing it to be regenerated on next GetBitmap() call
+    void SetBitmapInvalid() { m_ClippingSize = DSize(0, 0); }
 
     // Verify that the image is currently rotated by the specified parameters and rotate the original pixels of the image if not.
     bool VerifyRotation(const CRotationParams& rotationParams);
@@ -99,22 +99,22 @@ public:
     // raw access to original pixels - do not delete or store the returned pointer
     void* OriginalPixels() { return  m_pOrigPixels; }
     const void* OriginalPixels() const { return m_pOrigPixels; }
-    // remove original pixels from class - OriginalPixels() will return NULL afterwards
-    void DetachOriginalPixels() { m_pOrigPixels = NULL; }
+    // remove original pixels from class - OriginalPixels() will return nullptr afterwards
+    void DetachOriginalPixels() { m_pOrigPixels = nullptr; }
 
     // returns the number of channels in the OriginalPixels (3 or 4, corresponding to 24 bpp and 32 bpp)
     int OriginalChannels() const { return m_nOriginalChannels; }
 
-    // raw access to DIB pixels with no LUT applied - do not delete or store the returned pointer
-    // note that this DIB can be NULL due to optimization if currently only the processed DIB is maintained
-    void* DIBPixels() { return m_pDIBPixels; }
-    const void* DIBPixels() const { return m_pDIBPixels; }
+    // raw access to bitmap pixels with no LUT applied - do not delete or store the returned pointer
+    // note that this bitmap can be nullptr due to optimization if currently only the processed bitmap is maintained
+    void* BitmapPixels() { return m_pBitmapPixels; }
+    const void* BitmapPixels() const { return m_pBitmapPixels; }
 
-    // Verifies that the original DIB pixels (DIBPixels()) are available
-    void VerifyDIBPixelsCreated();
+    // Verifies that the original bitmap pixels (BitmapPixels()) are available
+    void VerifyBitmapPixelsCreated();
 
-    // Gets the DIB last processed. If none, the last used parameters are taken to generate the DIB - if bGenerateDIBIfNeeded is true 
-    void* DIBPixelsLastProcessed(bool bGenerateDIBIfNeeded);
+    // Gets the bitmap last processed. If none, the last used parameters are taken to generate the bitmap - if bGenerateBitmapIfNeeded is true 
+    void* BitmapPixelsLastProcessed(bool bGenerateBitmapIfNeeded);
 
     // Gets the image processing flags last used to process an image
     EProcessingFlags GetLastProcessFlags() const { return m_eProcFlags; }
@@ -142,13 +142,13 @@ public:
     // load request. The rotation in pParams is completed by the EXIF orientation of the image.
     void SetInitialProcessParams(CProcessParams* pParams);
 
-    // Gets the EXIF data block (including the APP1 marker in the first two bytes) of the image. Returns NULL if none.
+    // Gets the EXIF data block (including the APP1 marker in the first two bytes) of the image. Returns nullptr if none.
     void* GetEXIFData() { return m_pEXIFData; }
 
     // Gets the size of the EXIF data block in bytes, including the APP1 marker (2 bytes)
     int GetEXIFDataLength() { return m_nEXIFSize; }
 
-    // Gets the EXIF reader for this image if the image contains EXIF data, NULL if not.
+    // Gets the EXIF reader for this image if the image contains EXIF data, nullptr if not.
     CEXIFReader* GetEXIFReader() { return m_pEXIFReader; }
 
     // Gets the image format this image has originally
@@ -180,8 +180,8 @@ public:
     // Converts the target offset from 'center of image' based format to pixel coordinate format 
     static DPoint ConvertOffset(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset);
 
-    // Debug: Ticks (milliseconds) of the last GetDIB
-    uint64_t GetDIBLoadDelayMs() const { return m_dibLoadDelayMs; }
+    // Debug: Ticks (milliseconds) of the last GetBitmap
+    uint64_t GetBitmapLoadDelayMs() const { return m_bitmapLoadDelayMs; }
 
     // Debug: Loading time of image in ms
     void SetFileLoadDelayMs(uint64_t tc) { m_fileLoadDelayMs = tc; }
@@ -217,12 +217,12 @@ private:
 
     // Processed data of size m_ClippingSize, with LUT applied and without
     // The version without LUT is used to efficiently reapply a different LUT
-    // Size of the DIBs is m_ClippingSize
-    void* m_pDIBPixelsLUTProcessed;
-    void* m_pDIBPixels;
-    void* m_pLastDIB; // one of the pointers above
+    // Size of the bitmaps is m_ClippingSize
+    void* m_pBitmapPixelsLUTProcessed;
+    void* m_pBitmapPixels;
+    void* m_pLastBitmap; // one of the pointers above
 
-    // Image processing parameters and flags during last call to GetDIB()
+    // Image processing parameters and flags during last call to GetBitmap()
     CImageProcessingParams m_imageProcParams;
     EProcessingFlags m_eProcFlags;
 
@@ -236,14 +236,14 @@ private:
     CRotationParams m_rotationParams; // current rotation and mirroring of the original pixels
     bool m_bRotationByEXIF; // is the rotation given by EXIF
 
-    // This is the geometry that was requested during last GetDIB() call
+    // This is the geometry that was requested during last GetBitmap() call
     DSize m_FullTargetSize; 
-    DSize m_ClippingSize; // this is the size of the DIB
+    DSize m_ClippingSize; // this is the size of the bitmap
     DPoint m_TargetOffset;
 
     bool m_bFirstReprocessing; // true if never reprocessed before, some optimizations may be not done initially
 
-    uint64_t m_dibLoadDelayMs;
+    uint64_t m_bitmapLoadDelayMs;
     uint64_t m_fileLoadDelayMs;
 
     // stuff needed to perform LUT processing
@@ -251,35 +251,35 @@ private:
     int32_t* m_pSaturationLUTs; // Saturation LUTs
     CHistogram* m_pHistogram; // histogram of the original pixels, for the automatic correction
 
-    // Internal GetDIB() implementation with (low quality) rotation with GetDIB().
-    // bUsingOriginalDIB is output parameter and contains if the cached DIB could be used and no processing has been done
-    void* GetDIBInternal(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
+    // Internal GetBitmap() implementation with (low quality) rotation with GetBitmap().
+    // bUsingOriginalBitmap is output parameter and contains if the cached bitmap could be used and no processing has been done
+    void* GetBitmapInternal(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset,
                          const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
                          bool& bParametersChanged);
 
-    // Resample when panning was done, using existing data in DIBs. Old clipping rectangle is given in oldClippingRect
-    void ResampleWithPan(void* & pDIBPixels, void* & pDIBPixelsLUTProcessed, DSize fullTargetSize, 
+    // Resample when panning was done, using existing data in bitmaps. Old clipping rectangle is given in oldClippingRect
+    void ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUTProcessed, DSize fullTargetSize, 
         DSize clippingSize, DPoint targetOffset, DRect oldClippingRect,
         EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, double dRotation, EResizeType eResizeType);
 
-    // Resample to given target size. Returns resampled DIB
+    // Resample to given target size. Returns resampled bitmap
     void* Resample(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType);
 
-    // pCachedTargetDIB is a pointer at the caller side holding the old processed DIB.
-    // Returns a pointer to DIB to be used (either pCachedTargetDIB or pSourceDIB)
-    // If bOnlyCheck is set to true, the method does nothing but only checks if the existing processed DIB
-    // can be used (return != NULL) or not (return == NULL)
+    // pCachedTargetBitmap is a pointer at the caller side holding the old processed bitmap.
+    // Returns a pointer to bitmap to be used (either pCachedTargetBitmap or pSourceBitmap)
+    // If bOnlyCheck is set to true, the method does nothing but only checks if the existing processed bitmap
+    // can be used (return != nullptr) or not (return == nullptr)
     // The out parameter bParametersChanged returns if one of the parameters relevant for image processing has been changed since the last call
     void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-        void * & pCachedTargetDIB, DSize fullTargetSize, DPoint targetOffset,
-        void * pSourceDIB, DSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB, bool &bParametersChanged);
+        void * & pCachedTargetBitmap, DSize fullTargetSize, DPoint targetOffset,
+        void * pSourceBitmap, DSize bitmapSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap, bool &bParametersChanged);
 
     void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-        void * & pCachedTargetDIB, DSize fullTargetSize, DPoint targetOffset, 
-        void * pSourceDIB, DSize dibSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceDIB) {
+        void * & pCachedTargetBitmap, DSize fullTargetSize, DPoint targetOffset, 
+        void * pSourceBitmap, DSize bitmapSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap) {
         bool bNotUsed;
-        return ApplyCorrectionLUT(imageProcParams, eProcFlags, pCachedTargetDIB, fullTargetSize, targetOffset, 
-            pSourceDIB, dibSize, bOnlyCheck, bCanTakeOwnershipOfSourceDIB, bNotUsed);
+        return ApplyCorrectionLUT(imageProcParams, eProcFlags, pCachedTargetBitmap, fullTargetSize, targetOffset, 
+            pSourceBitmap, bitmapSize, bOnlyCheck, bCanTakeOwnershipOfSourceBitmap, bNotUsed);
     }
 
     // Get if from source to target size it is down or upsampling

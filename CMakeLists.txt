@@ -73,7 +73,7 @@ qt_add_executable(mkImageViewer
     src/BaseImage.h src/BaseImage.cpp
     src/ImageProvider.h src/ImageProvider.cpp
     src/KeyMap.h src/KeyMap.cpp
-    src/MainDlg.h src/MainDlg.cpp
+    src/MainWindow.h src/MainWindow.cpp
     src/MultiMonitorSupport.h src/MultiMonitorSupport.cpp
     src/ProcessingThreadPool.h src/ProcessingThreadPool.cpp
     src/ReaderBMP.h src/ReaderBMP.cpp

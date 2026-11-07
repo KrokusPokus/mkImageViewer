@@ -48,7 +48,7 @@ CImageProvider::CImageProvider(QObject* pParent, int nNumBuffers)
     m_nCurrentTimeStamp(0) {
 }
 
-CImageProvider::~CImageProvider(void) {
+CImageProvider::~CImageProvider() {
     // The load thread is terminated by its destructor (m_pLoadThread) before the requests are released
 }
 

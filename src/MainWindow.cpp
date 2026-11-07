@@ -1,4 +1,4 @@
-#include "MainDlg.h"
+#include "MainWindow.h"
 
 #include "BaseImage.h"
 #include "Clipboard.h"
@@ -165,7 +165,7 @@ namespace {
     }
 
     // Gets default image processing parameters (saturation unchanged; the black and white mode is applied
-    // in CMainDlg::GetEffectiveProcessingParams())
+    // in CMainWindow::GetEffectiveProcessingParams())
     CImageProcessingParams GetDefaultProcessingParams() {
         return CImageProcessingParams(
             1.0,  // Saturation
@@ -287,7 +287,7 @@ namespace {
 // Public
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-CMainDlg::CMainDlg(const QString& sStartupFile)
+CMainWindow::CMainWindow(const QString& sStartupFile)
     : QMainWindow(nullptr) {
     m_sStartupFile = sStartupFile;
 
@@ -314,9 +314,9 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     CHistogramCorr::SetBrightnessCorrectionStrength((float)sp.AutoBrightnessAmount());
 
 
-    m_pFileList = NULL;
-    m_pImageProvider = NULL;
-    m_pCurrentImage = NULL;
+    m_pFileList = nullptr;
+    m_pImageProvider = nullptr;
+    m_pCurrentImage = nullptr;
     m_nLastLoadError = FileLoad_Ok;
 
     m_nLastSlideShowImageTickCount = 0;
@@ -339,7 +339,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_bDragging = false;
     m_bDoDragging = false;
     m_offsets = QPoint(0, 0);
-    m_DIBOffsets = QPoint(0, 0);
+    m_BitmapOffsets = QPoint(0, 0);
     m_nCapturedX = m_nCapturedY = 0;
     m_nMouseX = m_nMouseY = 0;
 
@@ -468,7 +468,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
                                                   nFrameIndex,
                                                   CreateProcessParams(true)));
 
-    if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
+    if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
     }
 
@@ -494,21 +494,21 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     this->setAcceptDrops(true);
     this->setMouseTracking(true); // Aktiviert permanente Mouse-Move-Events
 
-    connect(m_pDirectoryWatcher, &CDirectoryWatcher::DirectoryFileListChanged, this, &CMainDlg::onActiveDirectoryFilelistChanged);
-    connect(m_pDirectoryWatcher, &CDirectoryWatcher::DisplayedFileChangedOnDisk, this, &CMainDlg::onDisplayedFileChangedOnDisk);
+    connect(m_pDirectoryWatcher, &CDirectoryWatcher::DirectoryFileListChanged, this, &CMainWindow::onActiveDirectoryFilelistChanged);
+    connect(m_pDirectoryWatcher, &CDirectoryWatcher::DisplayedFileChangedOnDisk, this, &CMainWindow::onDisplayedFileChangedOnDisk);
 
 }
 
-CMainDlg::~CMainDlg() {
+CMainWindow::~CMainWindow() {
     delete m_pFileList;
     delete m_pDirectoryWatcher;
-    if (m_pImageProvider != NULL) delete m_pImageProvider;
+    if (m_pImageProvider != nullptr) delete m_pImageProvider;
     delete m_pImageProcParams;
     delete m_pImageProcParamsKept;
     delete m_pKeyMap;
 }
 
-void CMainDlg::paintEvent(QPaintEvent* /*event*/)
+void CMainWindow::paintEvent(QPaintEvent* /*event*/)
 {
     if (m_bLockPaint) {
         return;
@@ -531,7 +531,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     QColor backColor = CSettingsProvider::This().ColorBackground();
     painter.fillRect(rect(), backColor);
 
-    if (m_pCurrentImage != NULL) {
+    if (m_pCurrentImage != nullptr) {
         qint64 startTime = QDateTime::currentMSecsSinceEpoch();
 
         m_pCurrentImage->VerifyRotation(CRotationParams(m_nRotation, m_bUserMirrored));
@@ -549,30 +549,30 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
         m_dRealizedZoom = (double)newSize.width() / m_pCurrentImage->OrigSize().cx;
         QPoint unlimitedOffsets = m_offsets;
         m_offsets = LimitOffsets(m_offsets, m_clientRect.size(), newSize);
-        m_DIBOffsets = m_bZoomMode ? (unlimitedOffsets - m_offsets) : QPoint(0, 0);
+        m_BitmapOffsets = m_bZoomMode ? (unlimitedOffsets - m_offsets) : QPoint(0, 0);
 
         QSize clippedSize(std::min<long>(m_clientRect.width(), newSize.width()), std::min<long>(m_clientRect.height(), newSize.height()));
         DPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, m_offsets);
 
-        void* pDIBData = m_pCurrentImage->GetDIB(newSize,
+        void* pBitmapData = m_pCurrentImage->GetBitmap(newSize,
                                                  clippedSize,
                                                  offsetsInImage,
                                                  GetEffectiveProcessingParams(),
                                                  CreateProcessingFlags(m_bHQResampling && !m_bTemporaryLowQ && !m_bZoomMode, m_bAutoContrast, false));
 
-        // Das rohe DIB über Qt QImage hochperformant zeichnen
-        if (pDIBData != NULL) {
-            QImage dibImage(static_cast<uchar*>(pDIBData), clippedSize.width(), clippedSize.height(), QImage::Format_RGB32);
+        // Das rohe bitmap über Qt QImage hochperformant zeichnen
+        if (pBitmapData != nullptr) {
+            QImage bitmapImage(static_cast<uchar*>(pBitmapData), clippedSize.width(), clippedSize.height(), QImage::Format_RGB32);
 
-            int xDest = (m_clientRect.width() - clippedSize.width()) / 2 + m_DIBOffsets.x();
-            int yDest = (m_clientRect.height() - clippedSize.height()) / 2 + m_DIBOffsets.y();
+            int xDest = (m_clientRect.width() - clippedSize.width()) / 2 + m_BitmapOffsets.x();
+            int yDest = (m_clientRect.height() - clippedSize.height()) / 2 + m_BitmapOffsets.y();
 
-            // Draw in device pixels: undo Qt's scaling, so every DIB pixel lands on one pixel of the window buffer
+            // Draw in device pixels: undo Qt's scaling, so every bitmap pixel lands on one pixel of the window buffer
             // (pure copy without filtering, also with scaling like 125 % or 150 %)
             painter.save();
             const qreal dpr = devicePixelRatioF();
             painter.scale(1.0 / dpr, 1.0 / dpr);
-            painter.drawImage(xDest, yDest, dibImage);
+            painter.drawImage(xDest, yDest, bitmapImage);
             painter.restore();
         }
 
@@ -622,7 +622,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             const QString clientHeight_forDisplay = QString::number(m_clientRect.height());
             const QString numThreads_forDisplay = QString::number(iNumThreads);
             const QString fileLoadDelayMs_forDisplay = QString::number(m_pCurrentImage->GetFileLoadDelayMs());
-            const QString dibLoadDelayMs_forDisplay = QString::number(m_pCurrentImage->GetDIBLoadDelayMs());
+            const QString bitmapLoadDelayMs_forDisplay = QString::number(m_pCurrentImage->GetBitmapLoadDelayMs());
             const QString paintTime_forDisplay = QString::number(paintTime);
 
             QString infoText;
@@ -646,13 +646,13 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
                                  sFileSize, origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay,
                                  realHeight_forDisplay, zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay,
                                  numThreads_forDisplay, sCPU, sFilter, fileLoadDelayMs_forDisplay,
-                                 dibLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
+                                 bitmapLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
                     } else {
                         infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n%18\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms\nPainting Image:  %17 ms")
                             .arg(visiblePath, frameNumber_forDisplay, frameCount_forDisplay, sFileSize,
                                  origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay, realHeight_forDisplay,
                                  zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay, numThreads_forDisplay,
-                                 sCPU, sFilter, fileLoadDelayMs_forDisplay, dibLoadDelayMs_forDisplay,
+                                 sCPU, sFilter, fileLoadDelayMs_forDisplay, bitmapLoadDelayMs_forDisplay,
                                  paintTime_forDisplay, sRotationLine);
                     }
                 } else {
@@ -660,13 +660,13 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
                         .arg(visiblePath, sFileSize, origWidth_forDisplay, origHeight_forDisplay,
                              realWidth_forDisplay, realHeight_forDisplay, zoom_forDisplay, clientWidth_forDisplay,
                              clientHeight_forDisplay, numThreads_forDisplay, sCPU, sFilter,
-                             fileLoadDelayMs_forDisplay, dibLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
+                             fileLoadDelayMs_forDisplay, bitmapLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
                 }
             } else {
                 infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n%14\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms\nPainting Image:  %13 ms")
                     .arg(origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay, realHeight_forDisplay,
                          zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay, numThreads_forDisplay,
-                         sCPU, sFilter, fileLoadDelayMs_forDisplay, dibLoadDelayMs_forDisplay,
+                         sCPU, sFilter, fileLoadDelayMs_forDisplay, bitmapLoadDelayMs_forDisplay,
                          paintTime_forDisplay, sRotationLine);
             }
 
@@ -778,7 +778,7 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
     }
 }
 
-void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect, QPainter& painter)
+void CMainWindow::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect, QPainter& painter)
 {
     // Einheitliche Schriftart für Fehlermeldungen setzen (z. B. Arial oder Standard-GUI-Font)
     QFont font = QApplication::font();
@@ -786,12 +786,12 @@ void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect,
     font.setPointSize(12);
     painter.setFont(font);
 
-    if (m_sStartupFile.isEmpty() && m_pCurrentImage == NULL) {
+    if (m_sStartupFile.isEmpty() && m_pCurrentImage == nullptr) {
         QRect rectText(0, clientRect.height() / 2 - Helpers::ScaleWithDPI(40), clientRect.width(), Helpers::ScaleWithDPI(80));
         QString message = tr("No image loaded!\nPress ESC to exit...");
         painter.drawText(rectText, Qt::AlignCenter | Qt::TextWordWrap, message);
     }
-    else if (pCurrentImage == NULL) {
+    else if (pCurrentImage == nullptr) {
         const CImagePosition position = CurrentPosition();
         QString sFileName;
         qint64 nFileSize = 0;
@@ -810,7 +810,7 @@ void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect,
         DrawImageLoadErrorText(painter, clientRect, sFileName, nFileSize, m_nLastLoadError, m_eLoadErrorReason, position);
     }
 }
-void CMainDlg::resizeEvent(QResizeEvent* event) {
+void CMainWindow::resizeEvent(QResizeEvent* event) {
     if (isMinimized()) {
         QMainWindow::resizeEvent(event);
         return;
@@ -841,12 +841,12 @@ void CMainDlg::resizeEvent(QResizeEvent* event) {
     QMainWindow::resizeEvent(event);
 }
 
-void CMainDlg::closeEvent(QCloseEvent* event) {
+void CMainWindow::closeEvent(QCloseEvent* event) {
     CleanupAndTerminate();
     event->accept(); // Erlaubt das Schließen des Fensters
 }
 
-void CMainDlg::mousePressEvent(QMouseEvent* event) {
+void CMainWindow::mousePressEvent(QMouseEvent* event) {
     StopTransition();
     m_nMouseX = ToPx(event->pos()).x();
     m_nMouseY = ToPx(event->pos()).y();
@@ -908,7 +908,7 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
     QMainWindow::mousePressEvent(event);
 }
 
-void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
+void CMainWindow::mouseReleaseEvent(QMouseEvent* event) {
     m_nMouseX = ToPx(event->pos()).x();
     m_nMouseY = ToPx(event->pos()).y();
 
@@ -936,12 +936,12 @@ void CMainDlg::mouseReleaseEvent(QMouseEvent* event) {
     QMainWindow::mouseReleaseEvent(event);
 }
 
-void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
+void CMainWindow::mouseDoubleClickEvent(QMouseEvent* event) {
     m_nMouseX = ToPx(event->pos()).x();
     m_nMouseY = ToPx(event->pos()).y();
 
     if (event->button() == Qt::LeftButton) {
-        if (m_pCurrentImage != NULL) {
+        if (m_pCurrentImage != nullptr) {
             if (HandleMouseButtonByKeymap(Mouse_DblClk)) {
                 return;
             }
@@ -958,7 +958,7 @@ void CMainDlg::mouseDoubleClickEvent(QMouseEvent* event) {
     QMainWindow::mouseDoubleClickEvent(event);
 }
 
-void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
+void CMainWindow::mouseMoveEvent(QMouseEvent* event) {
     // Turn mouse pointer on when mouse has moved some distance
     m_nMouseX = ToPx(event->pos()).x();
     m_nMouseY = ToPx(event->pos()).y();
@@ -985,7 +985,7 @@ void CMainDlg::mouseMoveEvent(QMouseEvent* event) {
     }
 }
 
-void CMainDlg::wheelEvent(QWheelEvent* event) {
+void CMainWindow::wheelEvent(QWheelEvent* event) {
     StopTransition();
     bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
     bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
@@ -1001,7 +1001,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
             // Smart handling:
             // Pan vertically (if image is higher than window)
             // OR go to previous/next image (if image is smaller).
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 if (nDelta < 0) {
                     if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
                         if (PerformPan(0, -ScaleToPx(PAN_STEP), false) == true) {
@@ -1056,7 +1056,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                     );
             }
         } else if (bShift) { // Pan horizontally
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 if (nDelta < 0) {
                     if (PerformPan(-ScaleToPx(PAN_STEP), 0, false) == true) {
                         this->update();
@@ -1068,7 +1068,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
                 }
             }
         } else if (bCtrl) { // Pan vertically
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 if (nDelta < 0) {
                     if (PerformPan(0, -ScaleToPx(PAN_STEP), false) == true) {
                         this->update();
@@ -1091,7 +1091,7 @@ void CMainDlg::wheelEvent(QWheelEvent* event) {
     event->accept();
 }
 
-void CMainDlg::keyPressEvent(QKeyEvent* event) {
+void CMainWindow::keyPressEvent(QKeyEvent* event) {
     StopTransition();
     bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
     bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
@@ -1174,7 +1174,7 @@ void CMainDlg::keyPressEvent(QKeyEvent* event) {
     QMainWindow::keyPressEvent(event);
 }
 
-void CMainDlg::keyReleaseEvent(QKeyEvent* event) {
+void CMainWindow::keyReleaseEvent(QKeyEvent* event) {
     int vkCode = event->key();
 
     if (!event->isAutoRepeat()) {
@@ -1191,13 +1191,13 @@ void CMainDlg::keyReleaseEvent(QKeyEvent* event) {
     QMainWindow::keyReleaseEvent(event);
 }
 
-void CMainDlg::dragEnterEvent(QDragEnterEvent* event) {
+void CMainWindow::dragEnterEvent(QDragEnterEvent* event) {
     if (event->mimeData()->hasUrls()) {
         event->acceptProposedAction();
     }
 }
 
-void CMainDlg::dropEvent(QDropEvent* event) {
+void CMainWindow::dropEvent(QDropEvent* event) {
     const QMimeData* mimeData = event->mimeData();
     if (mimeData->hasUrls()) {
         QList<QUrl> urlList = mimeData->urls();
@@ -1221,7 +1221,7 @@ void CMainDlg::dropEvent(QDropEvent* event) {
     }
 }
 
-void CMainDlg::timerEvent(QTimerEvent* event) {
+void CMainWindow::timerEvent(QTimerEvent* event) {
     int timerId = event->timerId();
 
     if (timerId == m_animationTimerId || (timerId == m_slideshowTimerId && m_nCurrentTimeout > 0)) {
@@ -1379,7 +1379,7 @@ static auto NavigationModeForArg(Cmd::LoopModeArg arg) {
     }
 }
 
-void CMainDlg::onShowContextMenu(const QPoint &pos) {
+void CMainWindow::onShowContextMenu(const QPoint &pos) {
     MouseOn();
 
     QMenu menu(this);
@@ -1642,7 +1642,7 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     }
 }
 
-void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
+void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
     using Cmd::Command;
 
     StopTransition();   // the result of a command must be visible right away
@@ -1668,32 +1668,32 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             ReloadImage(false);
             break;
         case Command::ReloadFull:
-            if (m_pFileList != NULL && m_pFileList->CurrentFileExists())
+            if (m_pFileList != nullptr && m_pFileList->CurrentFileExists())
                 {
-                m_pFileList->Reload(NULL);
+                m_pFileList->Reload(nullptr);
                 this->update();
                 }
 
             ReloadImage(false);
             break;
         case Command::CopyScreen:
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 CClipboard::CopyImageToClipboard(m_pCurrentImage, m_pFileList->Current());
             }
             break;
         case Command::CopyFull:
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 CClipboard::CopyFullImageToClipboard(m_pCurrentImage, GetEffectiveProcessingParams(), CreateDefaultProcessingFlags(), m_pFileList->Current());
                 this->update();
             }
             break;
         case Command::CopyPath:
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 CClipboard::CopyPathToClipboard(m_pCurrentImage, m_pFileList->Current());
             }
             break;
         case Command::CutFile:
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 CClipboard::CutFileToClipboard(m_pFileList->Current());
             }
             break;
@@ -1730,7 +1730,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             if (m_bIsAnimationPlaying) {
                 SetToast(QStringLiteral("Animation Paused"));
                 StopAnimation(); // stop any running animation
-            } else if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
+            } else if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation()) {
                 SetToast(QStringLiteral("Animation Continued"));
                 StartAnimation();
             }
@@ -1739,7 +1739,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             if (m_bIsAnimationPlaying) {
                 SetToast(QStringLiteral("Animation Paused"));
                 StopAnimation(); // stop any running animation
-            } else if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
+            } else if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation()) {
                 SetToast(QStringLiteral("Animation Continued"));
                 StartAnimation();
             } else {
@@ -1826,7 +1826,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::Rotate90:
         case Command::Rotate270:
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 uint32_t nRotationDelta = (inv.id == Command::Rotate90) ? 90 : 270;
                 m_nRotation = (m_nRotation + nRotationDelta) % 360;
                 m_nUserRotation = (m_nUserRotation + nRotationDelta) % 360;
@@ -1839,7 +1839,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::ExifRotate90:
         case Command::ExifRotate270:
-            if (m_pCurrentImage != NULL) {
+            if (m_pCurrentImage != nullptr) {
                 bool bWritten = false;
                 if (!CurrentPosition().InArchive) {
                     // The own change is no "file changed on disk", the reload follows here
@@ -1855,7 +1855,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::MirrorH:
         case Command::MirrorV:
-            if (m_pCurrentImage != NULL && m_pCurrentImage->Mirror(inv.id == Command::MirrorH)) {
+            if (m_pCurrentImage != nullptr && m_pCurrentImage->Mirror(inv.id == Command::MirrorH)) {
                 m_nRotation = CRotationParams::RotationAfterMirror(m_nRotation, inv.id == Command::MirrorH);
                 m_nUserRotation = CRotationParams::RotationAfterMirror(m_nUserRotation, inv.id == Command::MirrorH);
                 m_bUserMirrored = !m_bUserMirrored;
@@ -2038,7 +2038,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             }
             m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
             m_pImageProvider->ClearAllRequests();
-            m_pCurrentImage = NULL;
+            m_pCurrentImage = nullptr;
             ReloadImage(true);
             break;
         case Command::ToggleEmbeddedColorProfiles:
@@ -2051,7 +2051,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             }
             m_pImageProvider->NotifyNotUsed(m_pCurrentImage);
             m_pImageProvider->ClearAllRequests();
-            m_pCurrentImage = NULL;
+            m_pCurrentImage = nullptr;
             ReloadImage(true);
             break;
         case Command::ToggleResamplingQuality:
@@ -2064,7 +2064,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
         case Command::PanRight:
         case Command::PanLeft:
             if (sp.SmartPanningKeys() == false) {
-                if (m_pCurrentImage != NULL) {
+                if (m_pCurrentImage != nullptr) {
                     int iRealHeight = (int) (m_dZoom * (m_pCurrentImage->OrigHeight()));
                     int iRealWidth = (int) (m_dZoom * (m_pCurrentImage->OrigWidth()));
 
@@ -2089,7 +2089,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                         (inv.id == Command::PanUp) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanDown) ? -ScaleToPx(PAN_STEP) : 0, false);
                 }
             } else {
-                if (m_pCurrentImage != NULL) {
+                if (m_pCurrentImage != nullptr) {
                     int iRealHeight = (int) (m_dZoom * (m_pCurrentImage->OrigHeight()));
                     int iRealWidth = (int) (m_dZoom * (m_pCurrentImage->OrigWidth()));
 
@@ -2165,7 +2165,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             }
             break;
         case Command::ToggleSortRandom:
-            if (m_pFileList != NULL) {
+            if (m_pFileList != nullptr) {
                 Helpers::ESorting nSortMode = m_pFileList->GetSorting();
                 bool bSortedAscending = m_pFileList->IsSortedAscending();
 
@@ -2220,7 +2220,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
     }
 }
 
-void CMainDlg::ChangeFolderLanguage() {
+void CMainWindow::ChangeFolderLanguage() {
     const QString sCurrentFileName = CurrentFileName(false);
     if (sCurrentFileName.isEmpty()) {
         return;
@@ -2305,7 +2305,7 @@ void CMainDlg::ChangeFolderLanguage() {
     }
 }
 
-void CMainDlg::OpenDefaultEditor() {
+void CMainWindow::OpenDefaultEditor() {
     const QString sCurrentFileName = CurrentFileName(false);
     if (sCurrentFileName.isEmpty()) {
         return;
@@ -2335,7 +2335,7 @@ void CMainDlg::OpenDefaultEditor() {
         Helpers::openFileListWithHandler(sEditor, { sCurrentFileName });
 }
 
-void CMainDlg::ExploreFile() {
+void CMainWindow::ExploreFile() {
     const QString sCurrentFileName = CurrentFileName(false);
     if (sCurrentFileName.isEmpty()) {
         return;
@@ -2375,7 +2375,7 @@ void CMainDlg::ExploreFile() {
                                          });
 }
 
-void CMainDlg::OpenFile(const QString& fileName) {
+void CMainWindow::OpenFile(const QString& fileName) {
     StopMovieMode();
     StopAnimation();
 
@@ -2442,7 +2442,7 @@ void CMainDlg::OpenFile(const QString& fileName) {
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
 
     AfterNewImageLoaded(true, false);
-    if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation()) {
+    if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
     }
     m_startMouse = QPoint(-1, -1);
@@ -2450,15 +2450,15 @@ void CMainDlg::OpenFile(const QString& fileName) {
     this->update();
 }
 
-void CMainDlg::StartDragging(int nX, int nY, bool bDragWithZoomNavigator) {
+void CMainWindow::StartDragging(int nX, int nY, bool bDragWithZoomNavigator) {
     m_startMouse = QPoint(-1, -1);
     m_bDragging = true;
     m_nCapturedX = nX;
     m_nCapturedY = nY;
 }
 
-void CMainDlg::DoDragging() {
-    if (m_bDragging && m_pCurrentImage != NULL) {
+void CMainWindow::DoDragging() {
+    if (m_bDragging && m_pCurrentImage != nullptr) {
         int nXDelta = m_nMouseX - m_nCapturedX;
         int nYDelta = m_nMouseY - m_nCapturedY;
         if (!m_bDoDragging && (nXDelta != 0 || nYDelta != 0)) {
@@ -2472,22 +2472,22 @@ void CMainDlg::DoDragging() {
     }
 }
 
-void CMainDlg::EndDragging() {
+void CMainWindow::EndDragging() {
     m_bDragging = false;
     m_bDoDragging = false;
-    if (m_pCurrentImage != NULL) {
-        m_pCurrentImage->VerifyDIBPixelsCreated();
+    if (m_pCurrentImage != nullptr) {
+        m_pCurrentImage->VerifyBitmapPixelsCreated();
     }
-    if (m_DIBOffsets != QPoint(0, 0)) {
+    if (m_BitmapOffsets != QPoint(0, 0)) {
         update();
     }
 }
 
-void CMainDlg::GotoImage(EImagePosition ePos) {
+void CMainWindow::GotoImage(EImagePosition ePos) {
     GotoImage(ePos, 0);
 }
 
-void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
+void CMainWindow::GotoImage(EImagePosition ePos, int nFlags) {
     // A new image ends a running transition. Not the frames of an animation: they continue behind the transition.
     if (ePos != POS_NextFrame) {
         StopTransition();
@@ -2521,7 +2521,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
     // don't wrap around to index 0
     // The position is also known if the current image could not be loaded (e.g. a page of an archive)
     const CImagePosition position = CurrentPosition();
-    const bool bImageLoaded = (m_pCurrentImage != NULL);
+    const bool bImageLoaded = (m_pCurrentImage != nullptr);
 
     bool bNoWrapAroundEdgeFrame = !CSettingsProvider::This().WrapAroundFolder() &&
         position.FrameCount > 1 && !position.IsAnimation;
@@ -2662,7 +2662,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
         // (decoder of an animation, list of entries of an archive) and from other cached frames or pages of it.
         m_pImageProvider->ReloadFile(m_pFileList->Current());
     }
-    m_pCurrentImage = NULL;
+    m_pCurrentImage = nullptr;
 
     // do not perform a new image request if flagged
     if (nFlags & NO_REQUEST) {
@@ -2684,7 +2684,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
                                                   nFrameIndex,
                                                   procParams));
 
-    m_nLastLoadError = (m_pCurrentImage == NULL) ? ((m_pFileList->Current().isEmpty()) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
+    m_nLastLoadError = (m_pCurrentImage == nullptr) ? ((m_pFileList->Current().isEmpty()) ? FileLoad_NoFilesInDirectory : FileLoad_LoadError) : FileLoad_Ok;
 
     /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos6  m_offsets.x:" << m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
@@ -2696,7 +2696,7 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 
     // If current image is animated, start playback. In a slide show it plays (and loops) until the display time of the
     // slide show is over. Not in a movie: there an image is only shown for a fraction of a second.
-    if (m_pCurrentImage != NULL && m_pCurrentImage->IsAnimation() && !IsFastMovieMode()) {
+    if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation() && !IsFastMovieMode()) {
         if (m_bIsAnimationPlaying) {
             AdjustAnimationFrameTime();
         } else {
@@ -2718,13 +2718,13 @@ void CMainDlg::GotoImage(EImagePosition ePos, int nFlags) {
 /* Debugging */ qDebug() << "GotoImage() Pos9 after repaint() nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 }
 
-void CMainDlg::ReloadImage(bool keepParameters, bool updateWindow) {
+void CMainWindow::ReloadImage(bool keepParameters, bool updateWindow) {
     int flags = keepParameters ? KEEP_PARAMETERS : 0;
-    GotoImage(CMainDlg::POS_Current, updateWindow ? flags : flags | NO_UPDATE_WINDOW);
+    GotoImage(CMainWindow::POS_Current, updateWindow ? flags : flags | NO_UPDATE_WINDOW);
 }
 
 // returns true on success, false if nothing was done
-bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
+bool CMainWindow::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
     double dOldZoom = m_dZoom;
     m_bUserZoom = true;
     m_isUserFitToScreen = false;
@@ -2734,7 +2734,7 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
         m_dZoom = dValue;
     }
 
-    if (m_pCurrentImage == NULL) {
+    if (m_pCurrentImage == nullptr) {
         m_dZoom = std::max(Helpers::ZoomMin, std::min(Helpers::ZoomMax, m_dZoom));
         return true;
     }
@@ -2831,7 +2831,7 @@ bool CMainDlg::PerformZoom(double dValue, bool bExponent, bool bZoomToMouse) {
     return true;
 }
 
-bool CMainDlg::PerformPan(int dx, int dy, bool bAbsolute) {
+bool CMainWindow::PerformPan(int dx, int dy, bool bAbsolute) {
     if ((m_virtualImageSize.width() > 0 && m_virtualImageSize.width() > m_clientRect.width()) ||
         (m_virtualImageSize.height() > 0 && m_virtualImageSize.height() > m_clientRect.height())) {
         if (bAbsolute) {
@@ -2847,8 +2847,8 @@ bool CMainDlg::PerformPan(int dx, int dy, bool bAbsolute) {
     return false;
 }
 
-double CMainDlg::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge) {
-    if (m_pCurrentImage != NULL) {
+double CMainWindow::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnlarge) {
+    if (m_pCurrentImage != nullptr) {
         double dZoom;
         Helpers::GetImageRect(m_pCurrentImage->OrigWidth(), m_pCurrentImage->OrigHeight(),
             m_clientRect.width(), m_clientRect.height(), bAllowEnlarge, bFillWithCrop, false, GetAutoZoomMode(), dZoom);
@@ -2859,9 +2859,9 @@ double CMainDlg::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowEnla
     }
 }
 
-void CMainDlg::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool bAdjustWindowSize) {
+void CMainWindow::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool bAdjustWindowSize) {
     m_isUserFitToScreen = false;
-    if (m_pCurrentImage != NULL) {
+    if (m_pCurrentImage != nullptr) {
         double dOldZoom = m_dZoom;
         m_dZoom = GetZoomFactorForFitToScreen(bFillWithCrop, bAllowEnlarge);
         if (bAllowEnlarge) {
@@ -2879,14 +2879,14 @@ void CMainDlg::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool
     }
 }
 
-void CMainDlg::ResetZoomTo100Percents(bool bZoomToMouse) {
-    if (m_pCurrentImage != NULL && fabs(m_dZoom - 1) > 0.01) {
+void CMainWindow::ResetZoomTo100Percents(bool bZoomToMouse) {
+    if (m_pCurrentImage != nullptr && fabs(m_dZoom - 1) > 0.01) {
         // the current design (unless changed) cursor always shows in windowed mode, so always zoom to cursor when not fullscreen
         PerformZoom(1.0, false, bZoomToMouse || !m_bFullScreenMode);
     }
 }
 
-CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
+CProcessParams CMainWindow::CreateProcessParams(bool bNoProcessingAfterLoad) {
     int nClientWidth = m_clientRect.width();
     int nClientHeight = m_clientRect.height();
 
@@ -2896,7 +2896,7 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
         nClientHeight = monitorPx.height();
     }
 
-    qDebug() << "CMainDlg::CreateProcessParams() nClientWidth:" << nClientWidth << "nClientHeight:" << nClientHeight;
+    qDebug() << "CMainWindow::CreateProcessParams() nClientWidth:" << nClientWidth << "nClientHeight:" << nClientHeight;
 
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
 
@@ -2929,7 +2929,7 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
     }
 }
 
-void CMainDlg::SetKeepParams(bool bKeep) {
+void CMainWindow::SetKeepParams(bool bKeep) {
     if (bKeep && !m_bKeepParams) {
         *m_pImageProcParamsKept = *m_pImageProcParams;
         m_eProcessingFlagsKept = CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, true);
@@ -2939,7 +2939,7 @@ void CMainDlg::SetKeepParams(bool bKeep) {
     m_bKeepParams = bKeep;
 }
 
-void CMainDlg::ResetParamsToDefault() {
+void CMainWindow::ResetParamsToDefault() {
     m_nRotation = 0;
     m_nUserRotation = 0;
     m_bUserMirrored = false;
@@ -2952,14 +2952,14 @@ void CMainDlg::ResetParamsToDefault() {
     //InitFromProcessingFlags(GetDefaultProcessingFlags(), m_bHQResampling, m_bAutoContrast);
 }
 
-void CMainDlg::StartSlideShowTimer(int nMilliSeconds) {
+void CMainWindow::StartSlideShowTimer(int nMilliSeconds) {
     if (m_slideshowTimerId != 0) killTimer(m_slideshowTimerId);
     m_nCurrentTimeout = nMilliSeconds;
     m_slideshowTimerId = startTimer(nMilliSeconds);
     m_nLastSlideShowImageTickCount = QDateTime::currentMSecsSinceEpoch();
 }
 
-void CMainDlg::StopSlideShowTimer(void) {
+void CMainWindow::StopSlideShowTimer() {
     if (m_nCurrentTimeout > 0) {
         m_nCurrentTimeout = 0;
 
@@ -2973,15 +2973,15 @@ void CMainDlg::StopSlideShowTimer(void) {
 // If more than this number of images per second is requested, the slide show is a movie
 static const double kMovieFps = 4.9;
 
-bool CMainDlg::IsFastMovieMode() const {
+bool CMainWindow::IsFastMovieMode() const {
     return m_bMovieMode && m_dMovieFPS > kMovieFps;
 }
 
-void CMainDlg::UpdateKeepParams() {
+void CMainWindow::UpdateKeepParams() {
     SetKeepParams(IsFastMovieMode() || m_bIsAnimationPlaying);
 }
 
-void CMainDlg::StartMovieMode(double dFPS) {
+void CMainWindow::StartMovieMode(double dFPS) {
     m_dMovieFPS = dFPS;
     m_bMovieMode = true;
     UpdateKeepParams();
@@ -2990,7 +2990,7 @@ void CMainDlg::StartMovieMode(double dFPS) {
     update();
 }
 
-void CMainDlg::StopMovieMode() {
+void CMainWindow::StopMovieMode() {
     if (m_bMovieMode) {
         m_bMovieMode = false;
         UpdateKeepParams();
@@ -3000,14 +3000,14 @@ void CMainDlg::StopMovieMode() {
     }
 }
 
-void CMainDlg::StartLowQTimer(int nTimeout) {
+void CMainWindow::StartLowQTimer(int nTimeout) {
     m_bTemporaryLowQ = true;
 
     if (m_zoomTimerId != 0) killTimer(m_zoomTimerId);
     m_zoomTimerId = startTimer(nTimeout);
 }
 
-void CMainDlg::MouseOff() {
+void CMainWindow::MouseOff() {
     if (m_bMouseOn) {
         // Prüfen, ob aktuell ein Menü/Popup offen ist (ersetzt m_bInTrackPopupMenu)
         if (QApplication::activePopupWidget() != nullptr) {
@@ -3025,14 +3025,14 @@ void CMainDlg::MouseOff() {
         }
     }
 }
-void CMainDlg::MouseOn() {
+void CMainWindow::MouseOn() {
     if (!m_bMouseOn) {
         this->unsetCursor(); // oder this->setCursor(Qt::ArrowCursor);
         m_bMouseOn = true;
     }
 }
 
-void CMainDlg::InitParametersForNewImage() {
+void CMainWindow::InitParametersForNewImage() {
     if (!m_bKeepParams) {
         ResetParamsToDefault();
     } else if (!m_bUserZoom) {
@@ -3044,13 +3044,13 @@ void CMainDlg::InitParametersForNewImage() {
     }
 }
 
-void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack) {
+void CMainWindow::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack) {
     UpdateWindowTitle();
     m_pDirectoryWatcher->SetCurrentFile(CurrentFileName(false));
     if (bSynchronize) {
         // after loading an image, the per image processing parameters must be synchronized with
         // the current processing parameters
-        if (m_pCurrentImage != NULL) {
+        if (m_pCurrentImage != nullptr) {
             if (!m_bKeepParams) {
                 // [GF] Do not restore these to how they were when the image was loaded before. If the user has intentionally changed these settings since that time, the current settings should be respected.
 
@@ -3079,7 +3079,7 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
 }
 
 // Get current filename or filepath
-QString CMainDlg::CurrentFileName(bool bFileNameOnly) {
+QString CMainWindow::CurrentFileName(bool bFileNameOnly) {
     if (m_pFileList != nullptr) {
         return bFileNameOnly ? m_pFileList->CurrentFileTitle() : m_pFileList->Current();
     } else {
@@ -3089,7 +3089,7 @@ QString CMainDlg::CurrentFileName(bool bFileNameOnly) {
 
 // Full path of the current file for display (native separators). For an image in an archive the name of the
 // file within the archive is appended, e.g. "/path/to/archive.zip/image.jpg" (also if that file could not be read).
-QString CMainDlg::CurrentDisplayPath() {
+QString CMainWindow::CurrentDisplayPath() {
     QString sPath = CurrentFileName(false);
     const CImagePosition position = CurrentPosition();
     if (!sPath.isEmpty() && position.InArchive && !position.EntryName.isEmpty()) {
@@ -3098,23 +3098,23 @@ QString CMainDlg::CurrentDisplayPath() {
     return sPath;
 }
 
-QSize CMainDlg::ClientSizePx() const {
+QSize CMainWindow::ClientSizePx() const {
     // Same rounding as Qt uses for the window buffer (measured: qRound(logical * factor) at 125 % and 150 %).
     // The factor of the window, not of the screen: on Wayland QScreen reports 2 for 125 % and 150 %.
     const qreal dpr = devicePixelRatioF();
     return QSize(qRound(width() * dpr), qRound(height() * dpr));
 }
 
-QPoint CMainDlg::ToPx(const QPoint& logical) const {
+QPoint CMainWindow::ToPx(const QPoint& logical) const {
     const qreal dpr = devicePixelRatioF();
     return QPoint(qRound(logical.x() * dpr), qRound(logical.y() * dpr));
 }
 
-int CMainDlg::ScaleToPx(int nLogical) const {
+int CMainWindow::ScaleToPx(int nLogical) const {
     return qRound(nLogical * devicePixelRatioF());
 }
 
-QRect CMainDlg::GetZoomTextRect() {
+QRect CMainWindow::GetZoomTextRect() {
     int nEndX = rect().right() - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_OFFSET_X);
     int nStartX = nEndX - Helpers::ScaleWithDPI(ZOOM_TEXT_RECT_WIDTH);
 
@@ -3124,7 +3124,7 @@ QRect CMainDlg::GetZoomTextRect() {
     return QRect(nStartX, nStartY, nEndX - nStartX, nEndY - nStartY);
 }
 
-QRect CMainDlg::GetToastTextRect() {
+QRect CMainWindow::GetToastTextRect() {
     int nEndX = rect().right() - Helpers::ScaleWithDPI(TOAST_TEXT_RECT_OFFSET_X);
     int nStartX = rect().right() / 2;
 
@@ -3135,7 +3135,7 @@ QRect CMainDlg::GetToastTextRect() {
 }
 
 
-void CMainDlg::UpdateWindowTitle(bool bForce) {
+void CMainWindow::UpdateWindowTitle(bool bForce) {
     static QString s_PrevFileExt;
     static QString s_PrevTitleText;
 
@@ -3213,8 +3213,8 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     }
 }
 
-int CMainDlg::GetLoadErrorAfterOpenFile() {
-    if (m_pCurrentImage == NULL) {
+int CMainWindow::GetLoadErrorAfterOpenFile() {
+    if (m_pCurrentImage == nullptr) {
         if (CurrentFileName(false).isEmpty()) {
             return FileLoad_NoFilesInDirectory;
         }
@@ -3223,7 +3223,7 @@ int CMainDlg::GetLoadErrorAfterOpenFile() {
     return FileLoad_Ok;
 }
 
-CImageProcessingParams CMainDlg::GetEffectiveProcessingParams() const {
+CImageProcessingParams CMainWindow::GetEffectiveProcessingParams() const {
     CImageProcessingParams params = *m_pImageProcParams;
     if (m_bBWMode) {
         params.Saturation = 0.0;
@@ -3231,7 +3231,7 @@ CImageProcessingParams CMainDlg::GetEffectiveProcessingParams() const {
     return params;
 }
 
-double CMainDlg::GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect) {
+double CMainWindow::GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect) {
     double dZoomToFit;
 
     Helpers::GetImageRect(pImage->OrigWidth(),
@@ -3251,11 +3251,11 @@ double CMainDlg::GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect) 
     return (n == 0) ? 1.1 : exp(log(1/dZoomToFit)/n);
 }
 
-EProcessingFlags CMainDlg::CreateDefaultProcessingFlags(bool bKeepParams) {
+EProcessingFlags CMainWindow::CreateDefaultProcessingFlags(bool bKeepParams) {
     return CreateProcessingFlags(m_bHQResampling, m_bAutoContrast, bKeepParams);
 }
 
-bool CMainDlg::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteCommand) {
+bool CMainWindow::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteCommand) {
     Qt::KeyboardModifiers modifiers = QGuiApplication::queryKeyboardModifiers();
     bool bAlt = modifiers.testFlag(Qt::AltModifier);
     bool bCtrl = modifiers.testFlag(Qt::ControlModifier);
@@ -3272,10 +3272,10 @@ bool CMainDlg::HandleMouseButtonByKeymap(int nMouseButtonCode, bool bExecuteComm
     return false;
 }
 
-bool CMainDlg::UseSlideShowTransitionEffect() {
+bool CMainWindow::UseSlideShowTransitionEffect() {
     return m_nCurrentTimeout >= 1000 && m_eTransitionEffect != Helpers::TE_None;
 }
-void CMainDlg::StartTransition(QImage oldFrame) {
+void CMainWindow::StartTransition(QImage oldFrame) {
     StopTransition(false);
 
     if (m_eTransitionEffect == Helpers::TE_None || m_nTransitionTime <= 0 || oldFrame.isNull() || !isVisible() || isMinimized()) {
@@ -3303,7 +3303,7 @@ void CMainDlg::StartTransition(QImage oldFrame) {
     update();
 }
 
-void CMainDlg::StopTransition(bool bRepaint) {
+void CMainWindow::StopTransition(bool bRepaint) {
     if (m_transitionTimerId == 0) {
         return;
     }
@@ -3316,7 +3316,7 @@ void CMainDlg::StopTransition(bool bRepaint) {
     }
 }
 
-void CMainDlg::PaintTransitionFrame(QPainter& painter) {
+void CMainWindow::PaintTransitionFrame(QPainter& painter) {
     const int nW = m_transitionNew.width();
     const int nH = m_transitionNew.height();
     const double dT = std::clamp(static_cast<double>(m_transitionClock.elapsed()) / std::max(1, m_nTransitionTime), 0.0, 1.0);
@@ -3352,14 +3352,14 @@ void CMainDlg::PaintTransitionFrame(QPainter& painter) {
             break;
     }
 
-    // Draw in device pixels, like the DIB in paintEvent(): the snapshots are copied 1:1, without filtering
+    // Draw in device pixels, like the bitmap in paintEvent(): the snapshots are copied 1:1, without filtering
     const qreal dpr = devicePixelRatioF();
     painter.scale(1.0 / dpr, 1.0 / dpr);
     painter.drawImage(oldPos, m_transitionOld);
     painter.setOpacity(dOpacity);
     painter.drawImage(newPos + newPart.topLeft(), m_transitionNew, newPart);
 }
-void CMainDlg::CleanupAndTerminate() {
+void CMainWindow::CleanupAndTerminate() {
     if (m_bTerminated == true) {
         return;
     }
@@ -3397,7 +3397,7 @@ void CMainDlg::CleanupAndTerminate() {
     close();
 }
 
-void CMainDlg::StartAnimation() {
+void CMainWindow::StartAnimation() {
     if (m_bIsAnimationPlaying) {
         return;
     }
@@ -3421,7 +3421,7 @@ void CMainDlg::StartAnimation() {
     m_animationTimerId = startTimer(nTimerDelay);
 }
 
-void CMainDlg::AdjustAnimationFrameTime() {
+void CMainWindow::AdjustAnimationFrameTime() {
     // restart timer with new frame time
     if (m_animationTimerId != 0) {
         killTimer(m_animationTimerId);
@@ -3456,7 +3456,7 @@ void CMainDlg::AdjustAnimationFrameTime() {
 //    }
 }
 
-void CMainDlg::StopAnimation() {
+void CMainWindow::StopAnimation() {
     if (!m_bIsAnimationPlaying) {
         return;
     }
@@ -3543,7 +3543,7 @@ static void MigrateBookmarkOnRename(const QString& sOldPath, const QString& sNew
     iniSettings.endGroup();
 }
 
-QString CMainDlg::LoadBookmark(const QString& filePath) {
+QString CMainWindow::LoadBookmark(const QString& filePath) {
     if (filePath.isEmpty()) {
         return QString();
     }
@@ -3570,7 +3570,7 @@ QString CMainDlg::LoadBookmark(const QString& filePath) {
     return value;
 }
 
-void CMainDlg::SaveBookmark() {
+void CMainWindow::SaveBookmark() {
     const QString filePath = CurrentFileName(false);
     bool bIsEndpoint = true;
 
@@ -3638,13 +3638,13 @@ void CMainDlg::SaveBookmark() {
     iniSettings.endGroup();
 }
 
-void CMainDlg::TakeLoadResult(const CImageLoadResult& result) {
+void CMainWindow::TakeLoadResult(const CImageLoadResult& result) {
     m_pCurrentImage = result.Image;
     m_currentPosition = result.Position;
     m_eLoadErrorReason = result.Error;
 }
 
-CImagePosition CMainDlg::CurrentPosition() const {
+CImagePosition CMainWindow::CurrentPosition() const {
     const QString sCurrentFile = (m_pFileList != nullptr) ? m_pFileList->Current() : QString();
     if (!sCurrentFile.isEmpty() && m_currentPosition.FileName == sCurrentFile) {
         return m_currentPosition;
@@ -3656,7 +3656,7 @@ CImagePosition CMainDlg::CurrentPosition() const {
 
 // Brings all state that depends on the file name up to date after the DISPLAYED file has been renamed
 // on disk (by RenameDialog). The image itself is not touched or reloaded, so it stays in the cache.
-void CMainDlg::OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath) {
+void CMainWindow::OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath) {
     if (sNewPath.isEmpty() || m_pFileList == nullptr) {
         return;
     }
@@ -3683,7 +3683,7 @@ void CMainDlg::OnCurrentFileRenamed(const QString& sOldPath, const QString& sNew
     update();
 }
 
-bool CMainDlg::IsBookModeFile(const QString& filePath) {
+bool CMainWindow::IsBookModeFile(const QString& filePath) {
     if (filePath.isEmpty()) {
         return false;
     }
@@ -3708,14 +3708,14 @@ bool CMainDlg::IsBookModeFile(const QString& filePath) {
            filePath.contains(QStringLiteral("\\comics\\"), Qt::CaseInsensitive);
 }
 
-double CMainDlg::MaxRatio(double valA, double valB) {
+double CMainWindow::MaxRatio(double valA, double valB) {
     double dRatio = (valA / valB);
     if (dRatio < 1.0)
         dRatio = 1 / dRatio;
     return dRatio;
 }
 
-void CMainDlg::SetToast(const QString& strToast, int nDurationMs)
+void CMainWindow::SetToast(const QString& strToast, int nDurationMs)
 {
     if (m_toastTimerId != 0) killTimer(m_toastTimerId);
     m_toastTimerId = startTimer(nDurationMs);
@@ -3727,7 +3727,7 @@ void CMainDlg::SetToast(const QString& strToast, int nDurationMs)
 /*
 * Show toast for current files sorting mode (and up counting mode).
 */
-void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
+void CMainWindow::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
 {
     static const QString sSortModes[] = {
         QStringLiteral("Sorting: Name"),
@@ -3742,7 +3742,7 @@ void CMainDlg::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
 }
 
 // Gets an index string of the form [a/b] for multiframe images, empty string for single frame images
-QString CMainDlg::GetMultiframeIndex(const CImagePosition& position) {
+QString CMainWindow::GetMultiframeIndex(const CImagePosition& position) {
     if (position.FrameCount > 1 && !position.IsAnimation) {
         const QString frameNumber_forDisplay = QString::number(position.FrameIndex + 1);
         const QString frameCount_forDisplay = QString::number(position.FrameCount);
@@ -3752,7 +3752,7 @@ QString CMainDlg::GetMultiframeIndex(const CImagePosition& position) {
     return QString();
 }
 
-QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
+QString CMainWindow::formatOutputZoomFactor(double m_dZoom) {
     // Skalierungsfaktor-Ausgabe für Werte > 200%
     if (m_dZoom > 100.0) {
         return QString::number(m_dZoom, 'f', 0) + "x";
@@ -3775,9 +3775,9 @@ QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
 }
 
 // Moves the current file to the trash or deletes it permanently, asking first according to the setting "DeleteConfirmation"
-void CMainDlg::DeleteCurrentFile(bool bPermanently) {
+void CMainWindow::DeleteCurrentFile(bool bPermanently) {
     MouseOn();
-    if (m_pCurrentImage == NULL || m_pFileList == NULL) {
+    if (m_pCurrentImage == nullptr || m_pFileList == nullptr) {
         return;
     }
     const QString currentFileName = CurrentFileName(false);
@@ -3796,7 +3796,7 @@ void CMainDlg::DeleteCurrentFile(bool bPermanently) {
     GotoImage(POS_AwayFromCurrent, NO_REQUEST);
     const bool bDeleted = bPermanently ? QFile::remove(currentFileName) : QFile::moveToTrash(currentFileName);
     if (bDeleted) {
-        fileListOfDeletedImage->Reload(NULL, false);
+        fileListOfDeletedImage->Reload(nullptr, false);
         m_pFileList->DeleteHistory(true);
         update();
         GotoImage(POS_Current);
@@ -3812,7 +3812,7 @@ void CMainDlg::DeleteCurrentFile(bool bPermanently) {
     }
 }
 
-bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bMoveToTrash) {
+bool CMainWindow::showDeleteConfirmationDialog(const QStringList &pathList, bool bMoveToTrash) {
     QString sTitle;
     QString sText;
     QString sWarning;
@@ -3925,31 +3925,31 @@ bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bM
 // SLOTS
 
 // private slot
-void CMainDlg::onDisplayedFileChangedOnDisk() {
+void CMainWindow::onDisplayedFileChangedOnDisk() {
     if (CSettingsProvider::This().ReloadWhenDisplayedImageChanged() &&
-        m_pCurrentImage != NULL &&
-        m_pFileList != NULL &&
+        m_pCurrentImage != nullptr &&
+        m_pFileList != nullptr &&
         m_pFileList->CanOpenCurrentFileForReading()) {
         ExecuteCommand({ Cmd::Command::Reload, 0 });
     }
 }
 
 // private slot
-void CMainDlg::onActiveDirectoryFilelistChanged() {
+void CMainWindow::onActiveDirectoryFilelistChanged() {
     if (CSettingsProvider::This().ReloadWhenDisplayedImageChanged()) {
-        if (m_pFileList != NULL && m_pFileList->CurrentFileExists()) {
-            m_pFileList->Reload(NULL, false);
+        if (m_pFileList != nullptr && m_pFileList->CurrentFileExists()) {
+            m_pFileList->Reload(nullptr, false);
             update(); // Qt-Methode zum Neuzeichnen
         }
 
-        if (m_pCurrentImage != NULL) {
+        if (m_pCurrentImage != nullptr) {
             GotoImage(POS_Current, KEEP_PARAMETERS);
         }
     }
 }
 
 // private slot. Reacts to emits in OnAnotherInstanceStarted() which change m_sStartupFile
-void CMainDlg::onLoadFileAsynch() {
+void CMainWindow::onLoadFileAsynch() {
     if (isEnabled() && !m_sStartupFile.isEmpty()) {
         StopMovieMode();
         StopAnimation();
@@ -3958,7 +3958,7 @@ void CMainDlg::onLoadFileAsynch() {
     }
 }
 
-bool CMainDlg::ShouldAcceptFile(const QString& testFilePath) {
+bool CMainWindow::ShouldAcceptFile(const QString& testFilePath) {
     bool bSameImageFolder = false;
     const QString sCurrentFile = CurrentFileName(false);
 
@@ -3996,19 +3996,19 @@ bool CMainDlg::ShouldAcceptFile(const QString& testFilePath) {
         }
 
         m_sStartupFile = testFilePath;
-        QMetaObject::invokeMethod(this, &CMainDlg::onLoadFileAsynch, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(this, &CMainWindow::onLoadFileAsynch, Qt::QueuedConnection);
         return true; // We tell the client that we handle it, client should exit.
     }
 
     return false;
 }
 
-void CMainDlg::focusOutEvent(QFocusEvent* event) {
+void CMainWindow::focusOutEvent(QFocusEvent* event) {
     m_bPanKeyUp = m_bPanKeyDown = m_bPanKeyLeft = m_bPanKeyRight = false;
     QMainWindow::focusOutEvent(event);
 }
 
-bool CMainDlg::event(QEvent* e) {
+bool CMainWindow::event(QEvent* e) {
     if (e->type() == QEvent::DevicePixelRatioChange) {
         // Scaling changed or the window moved to a monitor with another factor: same logical size, other pixel count
         m_clientRect = QRect(QPoint(0, 0), ClientSizePx());
@@ -4029,7 +4029,7 @@ bool CMainDlg::event(QEvent* e) {
     return QMainWindow::event(e);
 }
 
-void CMainDlg::DiscardPendingInput() {
+void CMainWindow::DiscardPendingInput() {
     m_bDropInput = true;
     QCoreApplication::processEvents(QEventLoop::AllEvents);
     m_bDropInput = false;

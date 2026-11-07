@@ -3,7 +3,7 @@
 #include "BaseImage.h"
 #include "GeometryTypes.h"
 #include "Helpers.h"
-#include "MainDlg.h"
+#include "MainWindow.h"
 #include "MaxImageDef.h"
 #include "ReaderBMP.h"
 #include "ReaderTGA.h"
@@ -51,8 +51,8 @@ using namespace bit7z;
 // static initializers
 std::atomic<int> CImageLoadThread::m_curHandle(0);
 
-// The DIBs handed to CBaseImage are BGRA. QImage::Format_ARGB32 / Format_RGB32 have exactly this layout on little endian.
-static_assert(Q_BYTE_ORDER == Q_LITTLE_ENDIAN, "The 32bpp DIB layout (B,G,R,A) assumes a little endian platform");
+// The bitmaps handed to CBaseImage are BGRA. QImage::Format_ARGB32 / Format_RGB32 have exactly this layout on little endian.
+static_assert(Q_BYTE_ORDER == Q_LITTLE_ENDIAN, "The 32bpp bitmap layout (B,G,R,A) assumes a little endian platform");
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // static helpers
@@ -373,7 +373,7 @@ bool IsImageSizeAcceptable(const QSize& size, bool& bOutOfMemory) {
     return true;
 }
 
-// Converts a decoded QImage into a CBaseImage (32bpp BGRA DIB).
+// Converts a decoded QImage into a CBaseImage (32bpp BGRA bitmap).
 // - If enabled in the settings, the embedded ICC profile is applied (conversion to sRGB). Images without a profile,
 //   or with a profile Qt cannot use, have an invalid colorSpace() and are left untouched.
 // - Images with an alpha channel are blended onto the background according to nTransparencyMode.
@@ -407,22 +407,22 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
     const int nWidth = image.width();
     const int nHeight = image.height();
     const size_t nRowBytes = static_cast<size_t>(nWidth) * 4;
-    std::unique_ptr<uint8_t[]> pDIB(new (std::nothrow) uint8_t[nRowBytes * static_cast<size_t>(nHeight)]);
-    if (!pDIB) {
+    std::unique_ptr<uint8_t[]> pBitmap(new (std::nothrow) uint8_t[nRowBytes * static_cast<size_t>(nHeight)]);
+    if (!pBitmap) {
         isOutOfMemory = true;
         return nullptr;
     }
     for (int y = 0; y < nHeight; ++y) {
-        std::memcpy(pDIB.get() + static_cast<size_t>(y) * nRowBytes, image.constScanLine(y), nRowBytes);
+        std::memcpy(pBitmap.get() + static_cast<size_t>(y) * nRowBytes, image.constScanLine(y), nRowBytes);
     }
     image = QImage(); // release the decoded image before the CBaseImage is created
 
     if (bHasAlphaChannel) {
-        Helpers::BlendAlpha(reinterpret_cast<uint32_t*>(pDIB.get()), nWidth, nHeight, nTransparencyMode);
+        Helpers::BlendAlpha(reinterpret_cast<uint32_t*>(pBitmap.get()), nWidth, nHeight, nTransparencyMode);
     }
-    CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pDIB.get(), pEXIFData, 4, frame.eFormat,
+    CBaseImage* pJPEGImage = new CBaseImage(nWidth, nHeight, pBitmap.get(), pEXIFData, 4, frame.eFormat,
                                             frame.bIsAnimation, frame.nFrameIndex, frame.nFrameCount, frame.nFrameTimeMs, frame.bInArchive);
-    pDIB.release(); // owned by the CBaseImage now
+    pBitmap.release(); // owned by the CBaseImage now
     return pJPEGImage;
 }
 
@@ -726,10 +726,10 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
 // Public
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-CImageLoadThread::CImageLoadThread(void) : CWorkThread() {
+CImageLoadThread::CImageLoadThread() : CWorkThread() {
 }
 
-CImageLoadThread::~CImageLoadThread(void) {
+CImageLoadThread::~CImageLoadThread() {
     Terminate(); // *must* happen first
     DeleteCachedQtImageReader();
     DeleteCachedWebpDecoder();
@@ -1308,9 +1308,9 @@ bool CImageLoadThread::ProcessImageAfterLoad(CRequest * request) {
 
     LimitOffsets(request->ProcessParams.Offsets, QSize(request->ProcessParams.TargetWidth, request->ProcessParams.TargetHeight), newSize);
 
-    // this will process the image and cache the processed DIB in the CBaseImage instance
+    // this will process the image and cache the processed bitmap in the CBaseImage instance
     const DPoint offsetInImage = request->Image->ConvertOffset(newSize, clippedSize, request->ProcessParams.Offsets);
-    return nullptr != request->Image->GetDIB(newSize, clippedSize, offsetInImage,
+    return nullptr != request->Image->GetBitmap(newSize, clippedSize, offsetInImage,
                                              request->ProcessParams.ImageProcParams, request->ProcessParams.ProcFlags);
 }
 

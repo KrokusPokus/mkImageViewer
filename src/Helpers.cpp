@@ -412,18 +412,18 @@ namespace Helpers {
 
     void* FindEXIFBlock(void* pJPEGStream, int nStreamLength) {
         uint8_t* pEXIFBlock = (uint8_t*)Helpers::FindJPEGMarker(pJPEGStream, nStreamLength, 0xE1);
-        if (pEXIFBlock == NULL) {
-            return NULL;
+        if (pEXIFBlock == nullptr) {
+            return nullptr;
         }
         // The segment (marker, length, "Exif\0\0", data) must be completely inside of the stream: the length comes from
         // the file, and CBaseImage copies as many bytes as it says
         const int nAvailable = nStreamLength - static_cast<int>(pEXIFBlock - static_cast<uint8_t*>(pJPEGStream));
         if (nAvailable < 10) {
-            return NULL;
+            return nullptr;
         }
         const int nSegmentSize = pEXIFBlock[2] * 256 + pEXIFBlock[3] + 2;
         if (nSegmentSize < 10 || nSegmentSize > nAvailable || memcmp(pEXIFBlock + 4, "Exif", 4) != 0) {
-            return NULL;
+            return nullptr;
         }
         return pEXIFBlock;
     }

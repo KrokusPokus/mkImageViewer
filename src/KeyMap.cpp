@@ -400,7 +400,7 @@ void CKeyMap::AddDefaultEscapeHandling() {
 //    ("Numpad1"), bekommt weiterhin Vorrang vor der normalen Ziffer.
 //
 // Zeichen, die nur ueber Shift erreichbar sind (DE: '*' = Shift+'+', US: '+' = Shift+'='),
-// loest CMainDlg::keyPressEvent() ueber QKeyMapper::possibleKeys() auf: Es ruft diese Funktion
+// loest CMainWindow::keyPressEvent() ueber QKeyMapper::possibleKeys() auf: Es ruft diese Funktion
 // fuer jeden Kandidaten erneut auf (Grundebene der Taste mit Shift, dann das Zeichen ohne Shift).
 //
 // Rueckgabe std::nullopt = Taste nicht belegt. Ein belegtes DoNothing ist ein gueltiger Treffer

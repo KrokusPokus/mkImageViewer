@@ -30,8 +30,8 @@ public:
 // Worker thread in thread pool, executing image processing operations on image strips
 class CProcessingThread : public CWorkThread {
 public:
-    CProcessingThread(void) {}
-    ~CProcessingThread(void) {}
+    CProcessingThread() {}
+    ~CProcessingThread() {}
 
     // Start a processing request on this thread asynchronously (nimmt nun shared_ptr)
     void StartProcess(std::shared_ptr<CWrappedRequest> pRequest) {
@@ -64,7 +64,7 @@ void CProcessingThreadPool::CreateThreadPoolThreads(int nNumCores) {
             m_threads[i] = new CProcessingThread();
         }
     } else {
-        m_threads = NULL;
+        m_threads = nullptr;
     }
 }
 
@@ -75,7 +75,7 @@ void CProcessingThreadPool::StopAllThreads() {
     }
     delete[] m_threads;
     m_nNumThreads = 0;
-    m_threads = NULL;
+    m_threads = nullptr;
 }
 
 bool CProcessingThreadPool::Process(CProcessingRequest* pRequest) {
@@ -142,8 +142,8 @@ bool CProcessingThreadPool::Process(CProcessingRequest* pRequest) {
     return pRequest->Success;
 }
 
-CProcessingThreadPool::CProcessingThreadPool(void) {
-    m_threads = NULL;
+CProcessingThreadPool::CProcessingThreadPool() {
+    m_threads = nullptr;
     m_nNumThreads = 0;
 }
 

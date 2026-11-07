@@ -1,4 +1,4 @@
-#include "MainDlg.h"
+#include "MainWindow.h"
 
 #include "SettingsProvider.h"
 
@@ -116,9 +116,9 @@ int main(int argc, char *argv[])
         for (qint64 pid : activePids) {
             if (pid == myPid) continue;
 
-            QString pipeName = QString("mkImageViewer_Pipe_%1").arg(pid);
+            QString socketName = QString("mkImageViewer_Socket_%1").arg(pid);
             QLocalSocket socket;
-            socket.connectToServer(pipeName);
+            socket.connectToServer(socketName);
 
             if (socket.waitForConnected(kIpcTimeoutMs)) {
                 // Frage diese Instanz, ob sie die Datei übernehmen will
@@ -150,10 +150,10 @@ int main(int argc, char *argv[])
     RegisterPid(myPid, true, shm, sem);
 
     // Eigenen lokalen Server aufspannen (mit unserer PID im Namen)
-    QString myPipeName = QString("mkImageViewer_Pipe_%1").arg(myPid);
-    QLocalServer::removeServer(myPipeName); // Sicherheishalber aufräumen
+    QString mySocketName = QString("mkImageViewer_Socket_%1").arg(myPid);
+    QLocalServer::removeServer(mySocketName); // Sicherheishalber aufräumen
     QLocalServer localServer;
-    localServer.listen(myPipeName);
+    localServer.listen(mySocketName);
 
     int nRet = 0;
     try {
@@ -162,16 +162,16 @@ int main(int argc, char *argv[])
             app.installTranslator(&translator);
         }
 
-        CMainDlg dlgMain(sStartupFile);
+        CMainWindow mainWindow(sStartupFile);
 
-        QObject::connect(&localServer, &QLocalServer::newConnection, &dlgMain, [&localServer, &dlgMain]() {
+        QObject::connect(&localServer, &QLocalServer::newConnection, &mainWindow, [&localServer, &mainWindow]() {
             auto* clientSocket = localServer.nextPendingConnection();
             if (!clientSocket) return;
 
             clientSocket->waitForReadyRead(kIpcTimeoutMs);
             QString sCopyDataFile = QString::fromUtf8(clientSocket->readAll());
             //qDebug() << "As Server: Client sent path to evaluate:" << sCopyDataFile;
-            if (dlgMain.ShouldAcceptFile(sCopyDataFile)) {
+            if (mainWindow.ShouldAcceptFile(sCopyDataFile)) {
                 //qDebug() << "As Server: I accept that file. The client should exit.";
                 clientSocket->write("ACK");
             } else {
@@ -182,11 +182,11 @@ int main(int argc, char *argv[])
             clientSocket->deleteLater();
         });
 
-        dlgMain.show();
+        mainWindow.show();
         nRet = app.exec();
 
-        if (CSettingsProvider::This().StickyWindowSize() && !dlgMain.IsFullScreenMode() && !dlgMain.IsMaximizedMode()) {
-            CSettingsProvider::This().SaveStickyWindowRect(dlgMain.WindowRectOnClose());
+        if (CSettingsProvider::This().StickyWindowSize() && !mainWindow.IsFullScreenMode() && !mainWindow.IsMaximizedMode()) {
+            CSettingsProvider::This().SaveStickyWindowRect(mainWindow.WindowRectOnClose());
         }
     }
     catch (...) {

@@ -14,7 +14,7 @@ public:
     static bool IsAlphaChannelValid(int width, int height, uint32_t* pImageData);
 
 private:
-    CReaderTGA(void);
+    CReaderTGA();
 };
 
 

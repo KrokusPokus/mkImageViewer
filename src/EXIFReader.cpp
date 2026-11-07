@@ -622,7 +622,7 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
     }
 }
 
-CEXIFReader::~CEXIFReader(void) {
+CEXIFReader::~CEXIFReader() {
     delete m_pLatitude;
     delete m_pLongitude;
 }

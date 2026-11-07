@@ -56,8 +56,8 @@ public:
 class CImageLoadThread : public CWorkThread
 {
 public:
-    CImageLoadThread(void);
-    ~CImageLoadThread(void);
+    CImageLoadThread();
+    ~CImageLoadThread();
 
     // Asynchronous loading  of an image.
     // Returns identifier to query for resulting image. The query can be done as soon as the message is
@@ -98,7 +98,7 @@ private:
             FrameIndex = nFrameIndex;
             CompletedCallback = callback;
             RequestHandle = ++m_curHandle;
-            Image = NULL;
+            Image = nullptr;
         }
 
         QString FileName;
