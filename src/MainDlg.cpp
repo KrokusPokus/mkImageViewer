@@ -105,6 +105,23 @@ namespace {
         return QString();
     }
 
+    // Line of the info overlay: the arrow points to where the bottom of the unrotated image is on the screen. All
+    // rotations in degrees clockwise (0, 90, 180, 270). Without any resulting rotation there is nothing to explain.
+    QString FormatRotationLine(int nTotalRotation, int nExifRotation, int nUserRotation) {
+        const auto formatDelta = [](int nRotation) {
+            return nRotation == 270 ? QStringLiteral("-90") : QStringLiteral("+%1").arg(nRotation);
+        };
+        const QChar arrow = nTotalRotation == 90 ? QChar(0x2190) : nTotalRotation == 180 ? QChar(0x2191) : nTotalRotation == 270 ? QChar(0x2192) : QChar(0x2193);
+        QString sLine = QStringLiteral("Down:        ") + arrow;
+        if (nTotalRotation != 0) {
+            QStringList sources;
+            if (nExifRotation != 0) sources << QStringLiteral("EXIF-rotated ") + formatDelta(nExifRotation);
+            if (nUserRotation != 0) sources << QStringLiteral("User-rotated ") + formatDelta(nUserRotation);
+            sLine += QStringLiteral(" (") + sources.join(QStringLiteral(", ")) + QLatin1Char(')');
+        }
+        return sLine;
+    }
+
     QString FormatFileSize(qint64 bytes) {
         static const QLocale locale = QLocale::system();
 
@@ -613,6 +630,11 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             unsigned int iRealWidth = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigWidth()));
             unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
+            // The rotation of the shown image is made up of the EXIF rotation and the rotation by the user
+            const int nTotalRotation = (m_nRotation % 360 + 360) % 360;
+            const int nExifRotation = m_pCurrentImage->IsRotationByEXIF() ? m_pCurrentImage->GetInitialRotation() % 360 : 0;
+            const QString sRotationLine = FormatRotationLine(nTotalRotation, nExifRotation, (nTotalRotation - nExifRotation + 360) % 360);
+
             QString infoText;
             QString sFullPath = CurrentFileName(false);
 
@@ -626,29 +648,29 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
 
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     if (m_bIsAnimationPlaying) {
-                        infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms\nPainting Image:  %18 ms")
+                        infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n%19\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms\nPainting Image:  %18 ms")
                         .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
                             .arg(m_pCurrentImage->FrameTimeMs()).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                             .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
+                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
                     } else {
-                        infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms\nPainting Image:  %17 ms")
+                        infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n%18\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms\nPainting Image:  %17 ms")
                         .arg(visiblePath).arg(m_pCurrentImage->FrameIndex() + 1).arg(m_pCurrentImage->NumberOfFrames())
                             .arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                             .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
+                            .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
                     }
                 } else {
-                    infoText = QString("%1\nFile Size:   %2\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms\nPainting Image:  %15 ms")
+                    infoText = QString("%1\nFile Size:   %2\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n%16\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms\nPainting Image:  %15 ms")
                     .arg(visiblePath).arg(sFileSize).arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                         .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                        .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
+                        .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
                 }
             } else {
-                infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms\nPainting Image:  %13 ms")
+                infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n%14\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms\nPainting Image:  %13 ms")
                 .arg(m_pCurrentImage->OrigWidth()).arg(m_pCurrentImage->OrigHeight())
                     .arg(iRealWidth).arg(iRealHeight).arg(m_dZoom).arg(m_clientRect.width()).arg(m_clientRect.height())
-                    .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime);
+                    .arg(iNumThreads).arg(sCPU).arg(sFilter).arg(m_pCurrentImage->GetFileLoadDelayMs()).arg(m_pCurrentImage->GetDIBLoadDelayMs()).arg(paintTime).arg(sRotationLine);
             }
 
             // QPainter Konfiguration für Text
