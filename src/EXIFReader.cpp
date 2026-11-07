@@ -2,7 +2,6 @@
 #include "Helpers.h"
 
 #include <cmath>
-#include <cstdio>
 #include <algorithm>
 #include <cstring>
 #include <QByteArray>

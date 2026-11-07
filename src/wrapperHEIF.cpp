@@ -3,6 +3,7 @@
 #include "ICCProfileTransform.h"
 
 #include <bit>
+#include <cmath>
 #include <cstring>
 
 void * HeifReader::ReadImage(int &width,
@@ -37,7 +38,7 @@ void * HeifReader::ReadImage(int &width,
 
     if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION)
         return NULL;
-    if (abs((double)width * height) > MAX_IMAGE_PIXELS) {
+    if (std::abs((double)width * height) > MAX_IMAGE_PIXELS) {
         outOfMemory = true;
         return NULL;
     }

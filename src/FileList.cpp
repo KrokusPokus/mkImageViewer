@@ -1,5 +1,4 @@
 #include "FileList.h"
-#include "SettingsProvider.h"
 #include "Helpers.h"
 #include "DirectoryWatcher.h"
 
@@ -50,8 +49,8 @@ static const QCollator& GetLogicalCollator() {
 // Unterstützte Dateiendungen
 static const QStringList& GetSupportedFileEndingList() {
     static const QStringList endings = {
-        QStringLiteral("jpg"), QStringLiteral("jpeg"), QStringLiteral("jfif"), QStringLiteral("bmp"), 
-        QStringLiteral("png"), QStringLiteral("tif"),  QStringLiteral("tiff"), QStringLiteral("gif"), 
+        QStringLiteral("jpg"), QStringLiteral("jpeg"), QStringLiteral("jfif"), QStringLiteral("bmp"),
+        QStringLiteral("png"), QStringLiteral("apng"), QStringLiteral("tif"),  QStringLiteral("tiff"), QStringLiteral("gif"),
         QStringLiteral("webp"), QStringLiteral("jxl"),  QStringLiteral("avif"), QStringLiteral("heif"), 
         QStringLiteral("heic"), QStringLiteral("tga"),  QStringLiteral("qoi"),  QStringLiteral("psd"), 
         QStringLiteral("psb"), QStringLiteral("ico"),  QStringLiteral("cbz"),  QStringLiteral("cb7")

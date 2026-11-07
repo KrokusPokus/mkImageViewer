@@ -7,6 +7,7 @@
 #include "ICCProfileTransform.h"
 
 #include <bit>
+#include <cmath>
 #include <cstring>
 
 static int CountJxlFrames(const uint8_t* jxl_data, size_t size) {
@@ -103,7 +104,7 @@ bool JxlReader::DecodeJpegXlOneShot(const uint8_t* jxl, size_t size, std::vector
             cache.info = info;
             if (cache.info.xsize > MAX_IMAGE_DIMENSION || cache.info.ysize > MAX_IMAGE_DIMENSION)
                 return false;
-            if (abs((double)cache.info.xsize * cache.info.ysize) > MAX_IMAGE_PIXELS) {
+            if (std::abs((double)cache.info.xsize * cache.info.ysize) > MAX_IMAGE_PIXELS) {
                 outOfMemory = true;
                 return false;
             }

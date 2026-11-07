@@ -1,7 +1,7 @@
 #include "ReaderTGA.h"
-#include "BaseImage.h"
 #include "BasicProcessing.h"
 #include "MaxImageDef.h"
+
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>

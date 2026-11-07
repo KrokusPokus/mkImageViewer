@@ -1,5 +1,4 @@
 #include "Helpers.h"
-#include "BaseImage.h"
 #include "SettingsProvider.h"
 
 #include <algorithm>

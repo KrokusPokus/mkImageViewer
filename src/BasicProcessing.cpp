@@ -16,7 +16,6 @@
     #endif
 #endif
 
-#include <cmath>
 #include <cstring>
 #include <functional>
 

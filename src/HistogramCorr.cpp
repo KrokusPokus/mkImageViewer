@@ -2,7 +2,9 @@
 #include "BaseImage.h"
 #include "Helpers.h"
 
-#include <math.h>
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 
 float CHistogramCorr::sm_ContrastCorrectionStrength = 0.5f;
 float CHistogramCorr::sm_BrightnessCorrStrength = 0.2f;
@@ -35,7 +37,7 @@ CHistogram::CHistogram(const CBaseImage & image) {
     const uint8* pSourcePixels = (const uint8*)image.OriginalPixels();
 
     double dFactor = (double)nWidth/nHeight;
-    int nSamplesX = Helpers::DoPadding((int)(dFactor*sqrt(NUM_VALUES/dFactor)), 4);
+    int nSamplesX = Helpers::DoPadding((int)(dFactor*std::sqrt(NUM_VALUES/dFactor)), 4);
     int nSamplesY = Helpers::DoPadding((int)(nSamplesX/dFactor), 4);
 
     uint32 nY = 0;
@@ -69,10 +71,10 @@ void CHistogram::Init(const int* pChannelB, const int* pChannelG, const int* pCh
     m_nBMean = (int) (CalculateSum(pChannelB) / m_nTotalValues);
     m_nGMean = (int) (CalculateSum(pChannelG) / m_nTotalValues);
     m_nRMean = (int) (CalculateSum(pChannelR) / m_nTotalValues);
-    memcpy(m_ChannelB, pChannelB, sizeof(int)*256);
-    memcpy(m_ChannelG, pChannelG, sizeof(int)*256);
-    memcpy(m_ChannelR, pChannelR, sizeof(int)*256);
-    memcpy(m_ChannelGrey, pChannelGrey, sizeof(int)*256);
+    std::memcpy(m_ChannelB, pChannelB, sizeof(int)*256);
+    std::memcpy(m_ChannelG, pChannelG, sizeof(int)*256);
+    std::memcpy(m_ChannelR, pChannelR, sizeof(int)*256);
+    std::memcpy(m_ChannelGrey, pChannelGrey, sizeof(int)*256);
 }
 
 
@@ -152,10 +154,10 @@ uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
 
     const float cCuttingLevel = 0.001f; // black/white point cutting level
     const float cBrightnessCorr = 1.0f; // strength of brightness correction
-    const float cLog0dot5 = log10f(0.5f);
+    const float cLog0dot5 = std::log10(0.5f);
 
-    float fContrastStrengthLog = (sm_ContrastCorrectionStrength == 0) ? 100 : log10f(sm_ContrastCorrectionStrength)/cLog0dot5;
-    float fContrastFactorLog = (fContrastCorrectionFactor == 0) ? 100 : log10f(fContrastCorrectionFactor)/cLog0dot5;
+    float fContrastStrengthLog = (sm_ContrastCorrectionStrength == 0) ? 100 : std::log10(sm_ContrastCorrectionStrength)/cLog0dot5;
+    float fContrastFactorLog = (fContrastCorrectionFactor == 0) ? 100 : std::log10(fContrastCorrectionFactor)/cLog0dot5;
     float fStrength = std::max(1e-4f, fContrastStrengthLog*fContrastFactorLog);
 
     int nLevel = (int) (histogram.GetTotalValues()*cCuttingLevel + 0.5f);
@@ -172,13 +174,13 @@ uint8* CHistogramCorr::CalculateCorrectionLUT(const CHistogram & histogram,
 
     // Reduce the maximal applied correction - if the black or white point is far from 0,
     // respectively 1, we only apply a decreasing fraction of the full correction.
-    float fHistogramWidthFactor = powf((fWhitePtGrey - fBlackPtGrey), fStrength*0.5f);
-    fBlackPtB = fBlackPtB*powf((1 - fBlackPtB)*(1 - fBlackPtGrey), fStrength)*fHistogramWidthFactor;
-    fBlackPtG = fBlackPtG*powf((1 - fBlackPtG)*(1 - fBlackPtGrey), fStrength)*fHistogramWidthFactor;
-    fBlackPtR = fBlackPtR*powf((1 - fBlackPtR)*(1 - fBlackPtGrey), fStrength)*fHistogramWidthFactor;
-    fWhitePtB = 1 - (1 - fWhitePtB)*powf(fWhitePtB*fWhitePtGrey, fStrength)*fHistogramWidthFactor;
-    fWhitePtG = 1 - (1 - fWhitePtG)*powf(fWhitePtG*fWhitePtGrey, fStrength)*fHistogramWidthFactor;
-    fWhitePtR = 1 - (1 - fWhitePtR)*powf(fWhitePtR*fWhitePtGrey, fStrength)*fHistogramWidthFactor;
+    float fHistogramWidthFactor = std::pow((fWhitePtGrey - fBlackPtGrey), fStrength*0.5f);
+    fBlackPtB = fBlackPtB*std::pow((1 - fBlackPtB)*(1 - fBlackPtGrey), fStrength)*fHistogramWidthFactor;
+    fBlackPtG = fBlackPtG*std::pow((1 - fBlackPtG)*(1 - fBlackPtGrey), fStrength)*fHistogramWidthFactor;
+    fBlackPtR = fBlackPtR*std::pow((1 - fBlackPtR)*(1 - fBlackPtGrey), fStrength)*fHistogramWidthFactor;
+    fWhitePtB = 1 - (1 - fWhitePtB)*std::pow(fWhitePtB*fWhitePtGrey, fStrength)*fHistogramWidthFactor;
+    fWhitePtG = 1 - (1 - fWhitePtG)*std::pow(fWhitePtG*fWhitePtGrey, fStrength)*fHistogramWidthFactor;
+    fWhitePtR = 1 - (1 - fWhitePtR)*std::pow(fWhitePtR*fWhitePtGrey, fStrength)*fHistogramWidthFactor;
 
     // If the brightness decreased by the correction, undo this
     float fMeanBlackPt = (fBlackPtB + fBlackPtG + fBlackPtR)/3;

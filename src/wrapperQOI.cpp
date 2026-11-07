@@ -6,6 +6,8 @@
 #include "MaxImageDef.h"
 #include "Helpers.h"
 
+#include <cmath>
+
 #define LINEAR_TO_SRGB(rgb) ((rgb) > 0 ? ((rgb) < 255 ? (255.0 * (1.055 * pow((rgb)/255.0, 1.0/2.4) - 0.055)) : 255) : 0)
 
 void* QoiReaderWriter::ReadImage(int& width,
@@ -24,7 +26,7 @@ void* QoiReaderWriter::ReadImage(int& width,
     width = desc.width;
     height = desc.height;
     nchannels = desc.channels;
-    if (abs((double)width * height) > MAX_IMAGE_PIXELS)
+    if (std::abs((double)width * height) > MAX_IMAGE_PIXELS)
         outOfMemory = true;
     if (outOfMemory || width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
         QOI_FREE(pDecodedPixels);

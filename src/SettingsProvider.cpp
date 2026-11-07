@@ -10,6 +10,9 @@
 #include <x86intrin.h>
 #endif
 
+#include <algorithm>
+#include <thread>    // Needed for std::thread::hardware_concurrency()
+
 #include <QApplication>
 #include <QCheckBox>
 #include <QColorDialog>
@@ -32,8 +35,6 @@
 #include <QStandardPaths>
 #include <QVBoxLayout>
 
-#include <thread>    // Needed for std::thread::hardware_concurrency()
-#include <algorithm>
 
 namespace {
 

@@ -151,6 +151,7 @@ EImageFormat GetImageFormatFromName(const QString& sFileName) {
         { QStringLiteral("jfif"), IF_JPEG },
         { QStringLiteral("bmp"),  IF_WindowsBMP },
         { QStringLiteral("png"),  IF_PNG },
+        { QStringLiteral("apng"), IF_PNG },
         { QStringLiteral("tif"),  IF_TIFF },
         { QStringLiteral("tiff"), IF_TIFF },
         { QStringLiteral("webp"), IF_WEBP },
