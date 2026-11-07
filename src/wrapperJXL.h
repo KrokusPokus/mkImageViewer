@@ -1,6 +1,7 @@
 #ifndef JXLWRAPPER_H
 #define JXLWRAPPER_H
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 

@@ -1,13 +1,17 @@
 #include "EXIFReader.h"
+
 #include "Helpers.h"
 
-#include <cmath>
-#include <algorithm>
-#include <cstring>
 #include <QByteArray>
 #include <QDebug>
 #include <QFile>
 #include <QSaveFile>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <string.h>
 
 double CEXIFReader::UNKNOWN_DOUBLE_VALUE = 283740261.192864;
 

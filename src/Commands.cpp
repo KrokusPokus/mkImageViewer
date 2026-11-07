@@ -4,6 +4,8 @@
 
 #include <cassert>
 #include <charconv>
+#include <system_error>
+#include <utility>
 
 // Markiert einen Anzeigetext fuer lupdate. Die Uebersetzung geschieht erst bei der Anzeige:
 //     QCoreApplication::translate("Command", info.displayText)

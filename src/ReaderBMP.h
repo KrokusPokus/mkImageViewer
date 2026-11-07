@@ -1,7 +1,7 @@
 #ifndef READERBMP_H
 #define READERBMP_H
 
-#include "ImageProcessingTypes.h"
+#include <cstddef>
 
 class CBaseImage;
 

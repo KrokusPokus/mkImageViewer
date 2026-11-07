@@ -1,7 +1,13 @@
 #include "ReaderBMP.h"
-#include "Helpers.h"
+
 #include "BasicProcessing.h"
+#include "Helpers.h"
 #include "MaxImageDef.h"
+
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <new>
 
 //////////////////////////////////////////////////////////////////////////////////
 // BITMAP reading

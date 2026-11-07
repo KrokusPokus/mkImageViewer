@@ -1,4 +1,5 @@
 #include "XMMImage.h"
+
 #include "Helpers.h"
 #include "LookupTables.h"    // needed for sRGB8_LinRGB12[256]
 

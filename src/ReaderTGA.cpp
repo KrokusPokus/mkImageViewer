@@ -1,10 +1,12 @@
 #include "ReaderTGA.h"
+
 #include "BasicProcessing.h"
+#include "Helpers.h"
 #include "MaxImageDef.h"
 
 #include <cstdint>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 #include <new>
 
 // The TGA reader has been adapted and extended from the TGA reader used in an example of the BOINC project

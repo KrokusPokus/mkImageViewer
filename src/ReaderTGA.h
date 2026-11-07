@@ -1,7 +1,9 @@
 #ifndef READERTGA_H
 #define READERTGA_H
 
-#include "Helpers.h"
+#include "ImageProcessingTypes.h"
+
+#include <cstddef>
 
 class CBaseImage;
 

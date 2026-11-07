@@ -1,9 +1,11 @@
 #include "HistogramCorr.h"
+
 #include "BaseImage.h"
 #include "Helpers.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 
 float CHistogramCorr::sm_ContrastCorrectionStrength = 0.5f;

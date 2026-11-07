@@ -3,7 +3,6 @@
 
 #include <cstddef>
 
-
 // PNG / APNG reader based on libpng. Plain C++20, no Qt.
 //
 // Threading: the decoder state (an APNG animation that is read frame by frame) is process wide.

@@ -10,56 +10,56 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPalette>
+#include <QSize>
 #include <QStringList>
 #include <QtMath>
 
 #include <algorithm>
 
 namespace {
+    // NAME_MAX unter Linux: maximale Laenge EINES Dateinamens in Bytes (nicht Zeichen!).
+    constexpr int kMaxNameBytes = 255;
 
-// NAME_MAX unter Linux: maximale Laenge EINES Dateinamens in Bytes (nicht Zeichen!).
-constexpr int kMaxNameBytes = 255;
+    // Nachbarnamen werden auf diese Breite begrenzt, sonst macht ein 200 Zeichen langer Dateiname
+    // den ganzen Dialog beliebig breit (adjustSize() kennt kein Maximum).
+    constexpr int kMaxLabelWidth = 360;
 
-// Nachbarnamen werden auf diese Breite begrenzt, sonst macht ein 200 Zeichen langer Dateiname
-// den ganzen Dialog beliebig breit (adjustSize() kennt kein Maximum).
-constexpr int kMaxLabelWidth = 360;
-
-// Trennt "archive.tar.gz" in "archive.tar" + ".gz". Ein fuehrender Punkt zaehlt nicht als
-// Endung: ".gitignore" bleibt komplett Name (QFileInfo::suffix() wuerde hier "gitignore" liefern
-// und den Basisnamen leer lassen, das Eingabefeld waere dann leer).
-void splitName(const QString& fileName, QString& base, QString& ext) {
-    const int dot = fileName.lastIndexOf(QLatin1Char('.'));
-    if (dot > 0) {
-        base = fileName.left(dot);
-        ext = fileName.mid(dot);
-    } else {
-        base = fileName;
-        ext.clear();
-    }
-}
-
-// Einzeiliges Label, das zu lange Namen in der Mitte mit "..." kuerzt statt den Dialog aufzuweiten.
-class ElidedLabel : public QLabel {
-public:
-    using QLabel::QLabel;
-
-    QSize sizeHint() const override {
-        QSize s = QLabel::sizeHint();
-        s.setWidth(qMin(s.width(), kMaxLabelWidth));
-        return s;
-    }
-    QSize minimumSizeHint() const override {
-        return QSize(0, QLabel::minimumSizeHint().height());
+    // Trennt "archive.tar.gz" in "archive.tar" + ".gz". Ein fuehrender Punkt zaehlt nicht als
+    // Endung: ".gitignore" bleibt komplett Name (QFileInfo::suffix() wuerde hier "gitignore" liefern
+    // und den Basisnamen leer lassen, das Eingabefeld waere dann leer).
+    void splitName(const QString& fileName, QString& base, QString& ext) {
+        const int dot = fileName.lastIndexOf(QLatin1Char('.'));
+        if (dot > 0) {
+            base = fileName.left(dot);
+            ext = fileName.mid(dot);
+        } else {
+            base = fileName;
+            ext.clear();
+        }
     }
 
-protected:
-    void paintEvent(QPaintEvent*) override {
-        QPainter p(this);
-        p.setPen(palette().color(foregroundRole()));
-        const QString t = fontMetrics().elidedText(text(), Qt::ElideMiddle, width());
-        p.drawText(rect(), int(alignment()) | Qt::TextSingleLine, t);
-    }
-};
+    // Einzeiliges Label, das zu lange Namen in der Mitte mit "..." kuerzt statt den Dialog aufzuweiten.
+    class ElidedLabel : public QLabel {
+    public:
+        using QLabel::QLabel;
+
+        QSize sizeHint() const override {
+            QSize s = QLabel::sizeHint();
+            s.setWidth(qMin(s.width(), kMaxLabelWidth));
+            return s;
+        }
+        QSize minimumSizeHint() const override {
+            return QSize(0, QLabel::minimumSizeHint().height());
+        }
+
+    protected:
+        void paintEvent(QPaintEvent*) override {
+            QPainter p(this);
+            p.setPen(palette().color(foregroundRole()));
+            const QString t = fontMetrics().elidedText(text(), Qt::ElideMiddle, width());
+            p.drawText(rect(), int(alignment()) | Qt::TextSingleLine, t);
+        }
+    };
 
 } // namespace
 

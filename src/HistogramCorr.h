@@ -2,7 +2,6 @@
 #define HISTOGRAMCORR_H
 
 #include "ImageProcessingTypes.h"
-#include "WTLCompat.h"
 
 class CBaseImage;
 

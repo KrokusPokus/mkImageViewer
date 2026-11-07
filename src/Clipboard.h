@@ -2,6 +2,7 @@
 #define CLIPBOARD_H
 
 #include "ProcessParams.h"
+#include "WTLCompat.h"
 
 #include <QString>
 

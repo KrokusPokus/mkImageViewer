@@ -1,4 +1,5 @@
 #include "wrapperJXL.h"
+
 #include "jxl/decode.h"
 #include "jxl/decode_cxx.h"
 #include "jxl/resizable_parallel_runner.h"
@@ -8,7 +9,9 @@
 
 #include <bit>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
+#include <new>
 
 static int CountJxlFrames(const uint8_t* jxl_data, size_t size) {
     auto decoder = JxlDecoderMake(nullptr);

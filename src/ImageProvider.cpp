@@ -1,15 +1,21 @@
 #include "ImageProvider.h"
+
 #include "BaseImage.h"
-#include "ImageLoadThread.h"
 #include "FileList.h"
+#include "Helpers.h"
+#include "ImageLoadThread.h"
 #include "ProcessParams.h"
 
-#include <algorithm>
-#include <climits>
+#include <QDebug>
 #include <QDir>
 #include <QFileInfo>
 #include <QMutexLocker>
-#include <QDebug>
+#include <QStringList>
+
+#include <algorithm>
+#include <climits>
+#include <cstddef>
+#include <vector>
 
 namespace {
 

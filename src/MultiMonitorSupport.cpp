@@ -1,9 +1,11 @@
 #include "MultiMonitorSupport.h"
+
 #include "SettingsProvider.h"
 
+#include <QApplication>
+#include <QDebug>
 #include <QGuiApplication>
 #include <QScreen>
-#include <QApplication>
 #include <QStyle>
 
 static QRect defaultWindowRect = QRect(0, 0, 0, 0);

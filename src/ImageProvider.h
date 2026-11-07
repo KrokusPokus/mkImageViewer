@@ -1,16 +1,17 @@
 #ifndef IMAGEPROVIDER_H
 #define IMAGEPROVIDER_H
 
+#include "ImageLoadResult.h"
+
+#include <QDebug>
+#include <QMutex>
+#include <QObject>
+#include <QString>
+#include <QWaitCondition>
+
+#include <atomic>
 #include <list>
 #include <memory>
-#include <atomic>
-#include <QString>
-#include <QObject>
-#include <QMutex>
-#include <QWaitCondition>
-#include <QDebug>
-
-#include "ImageLoadResult.h"
 
 class CBaseImage;
 class CImageLoadThread;

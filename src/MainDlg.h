@@ -3,17 +3,25 @@
 
 #define KEY_MAGIC 2978465
 
-#include "ProcessParams.h"
-#include "Helpers.h"
 #include "Commands.h"
+#include "Helpers.h"
+#include "ImageLoadResult.h"
+#include "ProcessParams.h"
+#include "WTLCompat.h"
 
-#include <QMainWindow>
 #include <QCoreApplication>
-#include <QFileIconProvider>
 #include <QElapsedTimer>
+#include <QFileIconProvider>
 #include <QHash>
 #include <QImage>
+#include <QMainWindow>
+#include <QPoint>
+#include <QRect>
+#include <QSize>
 #include <QString>
+#include <QStringList>
+
+#include <cstddef>
 
 class CFileList;
 class CImageProvider;
@@ -28,6 +36,11 @@ class QMouseEvent;
 class QWheelEvent;
 class QCloseEvent;
 class QDropEvent;
+class QDragEnterEvent;
+class QEvent;
+class QFocusEvent;
+class QPainter;
+class QTimerEvent;
 
 // The main dialog is a full screen modal dialog with no border and no window title.
 // This dialog is the main window of the application.

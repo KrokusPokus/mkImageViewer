@@ -1,10 +1,16 @@
 #include "wrapperHEIF.h"
-#include "MaxImageDef.h"
+
+#include "libheif/heif_cxx.h"
 #include "ICCProfileTransform.h"
+#include "MaxImageDef.h"
 
 #include <bit>
 #include <cmath>
+#include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <new>
+#include <vector>
 
 void * HeifReader::ReadImage(int &width,
                        int &height,

@@ -1,11 +1,19 @@
-
 #include "wrapperWEBP.h"
+
 #include "webp/decode.h"
 #include "webp/encode.h"
 #include "webp/demux.h"
 #include "MaxImageDef.h"
 #include "Helpers.h"
 #include "ICCProfileTransform.h"
+#include "ImageProcessingTypes.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <new>
 
 struct WebpReaderWriter::webp_cache {
     WebPAnimDecoder* decoder;

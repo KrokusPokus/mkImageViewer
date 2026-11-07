@@ -2,18 +2,21 @@
 #define IMAGELOADTHREAD_H
 
 #include "ImageLoadResult.h"
+#include "ImageProcessingTypes.h"
+#include "libbit7z/include/bittypes.hpp"
 #include "ProcessParams.h"
 #include "WorkThread.h"
-#include "libbit7z/include/bittypes.hpp"
-
-#include <functional>
-#include <memory>
-#include <vector>
 
 #include <QAtomicInt>
 #include <QFile>
 #include <QImageReader>
 #include <QString>
+
+#include <atomic>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <vector>
 
 enum class EDecodeStatus { Ok, NotDecodable, OutOfMemory, Exception };
 

@@ -2,8 +2,13 @@
 #define BASEIMAGE_H
 
 #include "ProcessParams.h"
+#include "ImageProcessingTypes.h"
+#include "WTLCompat.h"
 
 #include <QString>
+
+#include <cstddef>
+#include <cstdint>
 
 class CHistogram;
 class CEXIFReader;

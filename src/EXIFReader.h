@@ -2,8 +2,11 @@
 #define EXIFREADER_H
 
 #include "ImageProcessingTypes.h"
+
 #include <QString>
 #include <QDateTime>
+
+#include <cmath>
 
 // Signed rational number: numerator/denominator
 class SignedRational {
@@ -26,11 +29,11 @@ public:
     GPSCoordinate(const QString& reference, double degrees, double minutes, double seconds) {
         m_sReference = reference;
         if (minutes == 0.0 && seconds == 0.0) {
-            minutes = 60 * abs(degrees - (int)degrees);
+            minutes = 60 * std::abs(degrees - (int)degrees);
             degrees = (int)degrees;
         }
         if (seconds == 0.0) {
-            seconds = 60 * abs(minutes - (int)minutes);
+            seconds = 60 * std::abs(minutes - (int)minutes);
             minutes = (int)minutes;
         }
         Degrees = degrees;

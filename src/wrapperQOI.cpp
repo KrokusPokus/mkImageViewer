@@ -1,5 +1,5 @@
-
 #include "wrapperQOI.h"
+
 #define QOI_IMPLEMENTATION
 #define QOI_NO_STDIO
 #include "qoi/qoi.h"
@@ -7,6 +7,8 @@
 #include "Helpers.h"
 
 #include <cmath>
+#include <cstddef>
+#include <new>
 
 #define LINEAR_TO_SRGB(rgb) ((rgb) > 0 ? ((rgb) < 255 ? (255.0 * (1.055 * pow((rgb)/255.0, 1.0/2.4) - 0.055)) : 255) : 0)
 
@@ -41,11 +43,11 @@ void* QoiReaderWriter::ReadImage(int& width,
         for (int i = 0; i < size; i += nchannels) {
             int j = i / decoded_stride * padded_stride + i % decoded_stride;
             if (desc.colorspace == QOI_LINEAR) {
-                pPixelData[j  ] = (unsigned char)LINEAR_TO_SRGB(pDecodedPixels[i+2]);
+                pPixelData[j  ] = (unsigned char)LINEAR_TO_SRGB(pDecodedPixels[i+2]); // NOLINT(clang-analyzer-security.ArrayBound): i+2 < size == Puffergroesse
                 pPixelData[j+1] = (unsigned char)LINEAR_TO_SRGB(pDecodedPixels[i+1]);
                 pPixelData[j+2] = (unsigned char)LINEAR_TO_SRGB(pDecodedPixels[i  ]);
             } else {
-                pPixelData[j  ] = pDecodedPixels[i+2];
+                pPixelData[j  ] = pDecodedPixels[i+2]; // NOLINT(clang-analyzer-security.ArrayBound): i+2 < size == Puffergroesse
                 pPixelData[j+1] = pDecodedPixels[i+1];
                 pPixelData[j+2] = pDecodedPixels[i  ];
             }

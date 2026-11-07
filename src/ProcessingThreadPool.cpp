@@ -1,7 +1,13 @@
 #include "ProcessingThreadPool.h"
+
 #include "ImageProcessingTypes.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Supporting classes

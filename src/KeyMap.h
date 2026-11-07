@@ -3,9 +3,10 @@
 
 #include "Commands.h"
 
+#include <QString>
+
 #include <optional>
 #include <unordered_map>
-#include <QString>
 
 enum InternalMouseCodes {
     Mouse_Left = 0x1000,

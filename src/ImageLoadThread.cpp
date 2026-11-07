@@ -1,11 +1,16 @@
 #include "ImageLoadThread.h"
-#include "Helpers.h"
+
 #include "BaseImage.h"
-#include "MaxImageDef.h"
+#include "Helpers.h"
 #include "MainDlg.h"
+#include "MaxImageDef.h"
 #include "ReaderBMP.h"
 #include "ReaderTGA.h"
 #include "SettingsProvider.h"
+#include "WTLCompat.h"
+#include "libjpeg-turbo/include/turbojpeg.h"
+#include "libheif/heif_cxx.h"
+#include "libbit7z/include/bitarchivereader.hpp"
 #include "wrapperAVIF.h"
 #include "wrapperHEIF.h"
 #include "wrapperJXL.h"
@@ -14,20 +19,6 @@
 #include "wrapperTJPEG.h"
 #include "wrapperWEBP.h"
 #include "zip/zip.h"
-#include "libjpeg-turbo/include/turbojpeg.h"
-
-#include <algorithm>
-#include <climits>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <memory>
-#include <new>
-#include <span>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
 
 #include <QBuffer>
 #include <QByteArray>
@@ -42,7 +33,19 @@
 #include <QSize>
 #include <QString>
 
-#include "libbit7z/include/bitarchivereader.hpp"
+#include <algorithm>
+#include <climits>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <new>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 using namespace bit7z;
 
 // static initializers

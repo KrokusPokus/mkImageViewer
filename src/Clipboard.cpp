@@ -1,14 +1,16 @@
 #include "Clipboard.h"
+
 #include "BaseImage.h"
 #include "Helpers.h"
 
-#include <QGuiApplication>
-#include <QClipboard>
-#include <QMimeData>
-#include <QImage>
-#include <QUrl>
 #include <QByteArray>
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QImage>
+#include <QMimeData>
 #include <QString>
+#include <QUrl>
+
 #include <algorithm>
 
 void CClipboard::CopyImageToClipboard(CBaseImage* pImage, const QString& fileName) {

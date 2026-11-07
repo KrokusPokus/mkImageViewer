@@ -3,15 +3,16 @@
 
 #include "ImageLoadResult.h"
 #include "ImageProcessingTypes.h" // defines int8, uint8, int16, uint16, int32, uint32, EFilterType, EImageFormat
-#include "WTLCompat.h"
-
-#include <cfloat>
 
 #include <QFileInfo>
 #include <QList>
 #include <QString>
 #include <QStringList>
 #include <QRgb>
+#include <QSize>
+
+#include <cfloat>
+#include <cstdint>
 
 class CBaseImage;
 class CFileList;

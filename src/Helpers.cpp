@@ -1,15 +1,8 @@
 #include "Helpers.h"
+
 #include "SettingsProvider.h"
 
-#include <algorithm>
-#include <chrono>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-
-#include <QString>
-#include <QStringDecoder>
-#include <QtEndian>
+#include <QColor>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDesktopServices>
@@ -20,8 +13,17 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QString>
+#include <QStringDecoder>
 #include <QTextStream>
 #include <QUrl>
+#include <QtEndian>
+
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <functional>
 
 namespace {
 

@@ -1,20 +1,25 @@
 #include "MainDlg.h"
-#include "SettingsProvider.h"
 
-#include <clocale>
+#include "SettingsProvider.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QDataStream>
 #include <QDir>
 #include <QFileInfo>
 #include <QImageReader>
+#include <QList>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QObject>
 #include <QSharedMemory>
-#include <QSystemSemaphore>
 #include <QString>
-#include <QDataStream>
+#include <QStringList>
+#include <QSystemSemaphore>
 #include <QTranslator>
+
+#include <clocale>
+#include <cstring>
 
 // Eindeutige Namen für Shared Memory und Semaphor
 const QString kShmKey = "mkImageViewer_Instance_Registry_v1";

@@ -3,6 +3,7 @@
 #include "avif/avif.h"
 #include "BasicProcessing.h"
 #include "ICCProfileTransform.h"
+#include "WTLCompat.h"
 
 #include <algorithm>
 #include <cstdint>

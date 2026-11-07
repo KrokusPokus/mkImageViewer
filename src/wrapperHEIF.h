@@ -1,8 +1,6 @@
 #ifndef HEIFWRAPPER_H
 #define HEIFWRAPPER_H
 
-#include "libheif/heif_cxx.h"
-
 class HeifReader
 {
 public:

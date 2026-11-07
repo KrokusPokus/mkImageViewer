@@ -5,8 +5,8 @@
 
 #include <QString>
 #include <QDateTime>
+
 #include <list>
-#include <memory>
 
 class CDirectoryWatcher;
 

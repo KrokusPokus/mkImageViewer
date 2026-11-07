@@ -22,6 +22,7 @@
 #include <stop_token>
 #include <thread>
 #include <vector>
+#include <utility>
 
 // Manual-reset event (replacement for Win32 CreateEvent(TRUE, FALSE)).
 class CCompletionEvent {

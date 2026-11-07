@@ -1,40 +1,39 @@
 #include "SettingsProvider.h"
 
-#include <cstdint>
-
-// Einziger minimaler Header-Abfang für x86-Intrinsics über alle Compiler hinweg
-#if defined(_MSC_VER)
-#include <intrin.h>
-#elif defined(__GNUC__) || defined(__clang__)
-#include <cpuid.h>
-#include <x86intrin.h>
-#endif
-
-#include <algorithm>
-#include <thread>    // Needed for std::thread::hardware_concurrency()
-
 #include <QApplication>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QDebug>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QFrame>
 #include <QHBoxLayout>
+#include <QHash>
 #include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMap>
+#include <QPalette>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QStandardPaths>
+#include <QStringView>
 #include <QVBoxLayout>
 
+#include <algorithm>
+#include <cpuid.h>
+#include <initializer_list>
+#include <thread>    // Needed for std::thread::hardware_concurrency()
+#include <x86intrin.h>
 
 namespace {
 

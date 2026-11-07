@@ -1,10 +1,12 @@
-
 #include "wrapperTJPEG.h"
-#include "MaxImageDef.h"
-#include "ICCProfileTransform.h"
 
-#include <cmath>
+#include "ICCProfileTransform.h"
+#include "MaxImageDef.h"
+
 #include <climits>
+#include <cmath>
+#include <cstddef>
+#include <new>
 
 void * TurboJpeg::ReadImage(int &width,
                        int &height,

@@ -3,6 +3,7 @@
 
 #include "Helpers.h"
 #include "ProcessParams.h"
+#include "ImageProcessingTypes.h"
 
 #include <QString>
 #include <QRect>

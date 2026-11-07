@@ -1,15 +1,18 @@
 #include "BaseImage.h"
+
 #include "BasicProcessing.h"
-
-#include "Helpers.h"
-#include "SettingsProvider.h"
-#include "HistogramCorr.h"
 #include "EXIFReader.h"
-
-#include <cmath>
-#include <cassert>
+#include "Helpers.h"
+#include "HistogramCorr.h"
+#include "SettingsProvider.h"
 
 #include <QColor>
+#include <QDebug>
+
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstring>
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Static helpers

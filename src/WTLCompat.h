@@ -1,12 +1,12 @@
 #ifndef WTLCOMPAT_H
 #define WTLCOMPAT_H
 
-#include <algorithm>
-
 #include <QPoint>
 #include <QRect>
 #include <QSize>
 #include <QString>
+
+#include <algorithm>
 
 struct DSize {
     int cx{0};

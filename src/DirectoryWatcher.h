@@ -1,10 +1,10 @@
 #ifndef DIRECTORYWATCHER_H
 #define DIRECTORYWATCHER_H
 
-#include <QObject>
-#include <QString>
 #include <QDateTime>
 #include <QFileSystemWatcher>
+#include <QObject>
+#include <QString>
 #include <QTimer>
 
 class CDirectoryWatcher : public QObject {

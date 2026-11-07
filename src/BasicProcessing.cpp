@@ -1,9 +1,10 @@
 #include "BasicProcessing.h"
+
+#include "Helpers.h"
+#include "LookupTables.h"    // needed for LinRGB12_sRGB8[4096]
+#include "ProcessingThreadPool.h"
 #include "ResizeFilter.h"
 #include "XMMImage.h"
-#include "Helpers.h"
-#include "ProcessingThreadPool.h"
-#include "LookupTables.h"    // needed for LinRGB12_sRGB8[4096]
 
 #include <immintrin.h> // Beinhaltet alle SSE/AVX-Intrinsics und _mm_round_ps für GCC/Clang/MSVC
 
@@ -18,6 +19,10 @@
 
 #include <cstring>
 #include <functional>
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <new>
 
 #if defined(__linux__)
 #include <unistd.h> // sysconf() for the cache sizes

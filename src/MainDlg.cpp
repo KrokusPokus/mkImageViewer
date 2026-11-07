@@ -1,55 +1,65 @@
-// MainDlg.cpp : implementation of the CMainDlg class
-//
-/////////////////////////////////////////////////////////////////////////////
-
 #include "MainDlg.h"
-#include "FileList.h"
-#include "ImageProvider.h"
+
 #include "BaseImage.h"
-#include "SettingsProvider.h"
-#include "MultiMonitorSupport.h"
-#include "HistogramCorr.h"
 #include "Clipboard.h"
-#include "ProcessParams.h"
-#include "ResizeFilter.h"
-#include "ProcessingThreadPool.h"
-#include "KeyMap.h"
 #include "Commands.h"
 #include "DirectoryWatcher.h"
 #include "EXIFReader.h"
+#include "FileList.h"
+#include "HistogramCorr.h"
+#include "ImageProcessingTypes.h"
+#include "ImageProvider.h"
+#include "KeyMap.h"
+#include "MultiMonitorSupport.h"
+#include "ProcessParams.h"
+#include "ProcessingThreadPool.h"
 #include "RenameDialog.h"
+#include "ResizeFilter.h"
+#include "SettingsProvider.h"
 
 #include <QActionGroup>
 #include <QApplication>
 #include <QBuffer>
+#include <QDebug>
 #include <QDesktopServices>
+#include <QDialog>
 #include <QDir>
+#include <QEvent>
 #include <QFileInfo>
+#include <QGuiApplication>
+#include <QKeyCombination>
 #include <QKeyEvent>
+#include <QLibrary>
 #include <QList>
+#include <QMap>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMetaType>
 #include <QMimeData>
 #include <QPainter>
 #include <QPainterPath>
 #include <QProcess>
-#include <QTimer>
 #include <QPushButton>
 #include <QRect>
 #include <QRegularExpression>
 #include <QScreen>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QString>
 #include <QThread>
+#include <QTimer>
+#include <QTimerEvent>
 #include <QUrl>
-#include <QtGlobal>
-#include <QLibrary>
-
-// Private Qt-API: Liefert dieselben Tasten-Kandidaten, mit denen Qt QShortcut/QAction aufloest.
-#include <QtGui/private/qkeymapper_p.h>
 #include <QVariant>
+#include <QtGlobal>
+#include <QtGui/private/qkeymapper_p.h>     // Private Qt-API: Liefert dieselben Tasten-Kandidaten, mit denen Qt QShortcut/QAction aufloest.
+
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdlib>
 #include <optional>
+#include <utility>
 
 // Damit CommandInvocation als QVariant an QActions haengen kann (Kontextmenue).
 Q_DECLARE_METATYPE(Cmd::CommandInvocation)

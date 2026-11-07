@@ -3,7 +3,6 @@
 
 #include <QRect>
 
-
 class QWidget; // Forward-Deklaration
 
 // Support for multiple-monitor systems (Qt-based)

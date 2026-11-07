@@ -1,19 +1,17 @@
 #ifndef IMAGEPROCESSINGTYPES_H
 #define IMAGEPROCESSINGTYPES_H
 
-#include <string>
-
-/// signed 8 bit integer value
+// signed 8 bit integer value
 typedef signed char int8;
-/// unsigned 8 bit integer value
+// unsigned 8 bit integer value
 typedef unsigned char uint8;
-/// signed 16 bit integer value
+// signed 16 bit integer value
 typedef signed short int16;
-/// unsigned 16 bit integer value
+// unsigned 16 bit integer value
 typedef unsigned short uint16;
-/// signed 32 bit integer value
+// signed 32 bit integer value
 typedef signed int int32;
-/// unsigned 32 bit integer value
+// unsigned 32 bit integer value
 typedef unsigned int uint32;
 
 enum EFilterType {

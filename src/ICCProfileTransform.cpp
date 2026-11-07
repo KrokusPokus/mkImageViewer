@@ -4,6 +4,10 @@
 // This define is necessary for 32-bit builds to work, for some reason
 #define CMS_DLL
 #include "lcms2.h"
+#include "Helpers.h"
+
+#include <cstring>
+
 #define TYPE_LabA_8 (COLORSPACE_SH(PT_Lab)|EXTRA_SH(1)|CHANNELS_SH(3)|BYTES_SH(1))
 
 

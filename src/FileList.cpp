@@ -1,17 +1,21 @@
 #include "FileList.h"
-#include "Helpers.h"
-#include "DirectoryWatcher.h"
 
-#include <QDir>
-#include <QFileInfo>
-#include <QDirIterator>
+#include "DirectoryWatcher.h"
+#include "Helpers.h"
+
 #include <QCollator>
+#include <QDir>
+#include <QDirIterator>
 #include <QFile>
-#include <QTextStream>
+#include <QFileInfo>
 #include <QSet>
-#include <random>
+#include <QStringList>
+#include <QTextStream>
+
 #include <algorithm>
 #include <cassert>
+#include <limits>
+#include <random>
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Static initialization
