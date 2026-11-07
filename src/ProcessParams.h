@@ -69,7 +69,6 @@ public:
     // offsets are relative to center of image and refer to original image size (not zoomed)
     CProcessParams(int nTargetWidth,
                    int nTargetHeight,
-                   CSize monitorSize,
                    const CRotationParams& rotationParams,
                    int nUserRotation,
                    double dZoom,
@@ -80,7 +79,6 @@ public:
                    EProcessingFlags eProcFlags)
         : TargetWidth(nTargetWidth),
         TargetHeight(nTargetHeight),
-        MonitorSize(monitorSize),
         RotationParams(rotationParams),
         UserRotation(nUserRotation),
         Zoom(dZoom),
@@ -92,7 +90,6 @@ public:
 
     int TargetWidth{0};
     int TargetHeight{0};
-    CSize MonitorSize{};
     CRotationParams RotationParams{};
     int UserRotation{0};
     double Zoom{1.0};

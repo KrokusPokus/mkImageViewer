@@ -16,6 +16,7 @@
 #include "RenameDialog.h"
 #include "ResizeFilter.h"
 #include "SettingsProvider.h"
+#include "WTLCompat.h"
 
 #include <QActionGroup>
 #include <QApplication>
@@ -276,46 +277,6 @@ namespace {
         painter.drawText(rectText, Qt::AlignHCenter | Qt::TextWordWrap, message);
     }
 
-    // Draws a 32 bit DIB centered in the given target area, filling the remaining area with the given brush
-    // The bmInfo struct will be initialized by this method and does not need to be preinitialized.
-    // Return value is the top, left coordinate of the painted DIB in the target area
-    /*
-    QPoint DrawDIB32bppWithBlackBorders(QPainter& painter, void* pDIBData, const QColor& backColor, const CRect& targetArea, CSize dibSize, CPoint offset) {
-        int targetWidth = targetArea.Width();
-        int targetHeight = targetArea.Height();
-
-        int xDest = (targetWidth - dibSize.cx) / 2 + offset.x;
-        int yDest = (targetHeight - dibSize.cy) / 2 + offset.y;
-
-        // 1. Verbleibende Randbereiche (Borders) mit der Hintergrundfarbe füllen
-        if (xDest > 0) {
-            QRect r(0, 0, xDest, targetHeight);
-            painter.fillRect(r, backColor);
-        }
-        if (xDest + dibSize.cx < targetWidth) {
-            QRect r(xDest + dibSize.cx, 0, targetWidth - (xDest + dibSize.cx), targetHeight);
-            painter.fillRect(r, backColor);
-        }
-        if (yDest > 0) {
-            QRect r(xDest, 0, dibSize.cx, yDest);
-            painter.fillRect(r, backColor);
-        }
-        if (yDest + dibSize.cy < targetHeight) {
-            QRect r(xDest, yDest + dibSize.cy, dibSize.cx, targetHeight - (yDest + dibSize.cy));
-            painter.fillRect(r, backColor);
-        }
-
-        // 2. Rohdaten als QImage wrappen und hochperformant zeichnen
-        if (pDIBData != nullptr) {
-            // QImage übernimmt den Pinselstrich direkt auf die DIB-Daten (Format_RGB32 entspricht Windows 32bpp)
-            QImage dibImage(static_cast<uchar*>(pDIBData), dibSize.cx, dibSize.cy, QImage::Format_RGB32);
-            painter.drawImage(xDest, yDest, dibImage);
-        }
-
-        return QPoint(xDest, yDest);
-    }
-    */
-
 } // namespace
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -336,7 +297,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_pImageProcParamsKept = new CImageProcessingParams();
     m_eProcessingFlagsKept = PFLAG_HighQualityResampling;
     m_dZoomKept = -1;
-    m_offsetKept = CPoint(0, 0);
+    m_offsetKept = QPoint(0, 0);
 
     m_bKeepParams = false;
     m_eAutoZoomModeWindowed = sp.AutoZoomMode();
@@ -410,7 +371,7 @@ CMainDlg::CMainDlg(const QString& sStartupFile)
     m_bPanTimerActive = false;
     m_nBookModePageHeight = sp.BookModePageHeight();
     m_bAllowSmoothPanning = sp.AllowSmoothPanning();
-    m_offsets_custom = CPoint(0, 0);
+    m_offsets_custom = QPoint(0, 0);
     m_customAnimationFrameTime = 0;
 
     m_eSortModeBeforeRandom = Helpers::FS_FileName;
@@ -868,7 +829,6 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
         QPoint pos = ToPx(event->pos());
 
         this->grabMouse();
-        CPoint pointClicked(pos.x(), pos.y());
 
         bool bCtrl = event->modifiers().testFlag(Qt::ControlModifier);
         bool bShift = event->modifiers().testFlag(Qt::ShiftModifier);
@@ -884,7 +844,7 @@ void CMainDlg::mousePressEvent(QMouseEvent* event) {
             m_dStartZoom = m_dZoom;
             m_nCapturedX = m_nMouseX; m_nCapturedY = m_nMouseY;
         } else if (bDraggingRequired) {
-            StartDragging(pointClicked.x, pointClicked.y, false);
+            StartDragging(pos.x(), pos.y(), false);
         }
         return;
     }
@@ -1938,7 +1898,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                 }
 
                 m_dZoom = -1.0;
-                m_offsets = CPoint(0, 0);
+                m_offsets = QPoint(0, 0);
 
                 if (bIsBookModeFile == true) {
                     if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
@@ -2030,7 +1990,7 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                 else
                     m_eAutoZoomModeWindowed = eAutoZoomMode;
                 m_dZoom = -1.0;
-                m_offsets = CPoint(0, 0);
+                m_offsets = QPoint(0, 0);
                 this->update();
                 break;
             }
@@ -2952,7 +2912,6 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
         }
 
         return CProcessParams(nClientWidth, nClientHeight,
-            CMultiMonitorSupport::GetMonitorRect(this).size(),
             CRotationParams(0, m_bUserMirrored),
             m_nUserRotation,
             m_dZoomKept,
@@ -2965,8 +2924,7 @@ CProcessParams CMainDlg::CreateProcessParams(bool bNoProcessingAfterLoad) {
         m_isUserFitToScreen = false;
         CSettingsProvider& sp = CSettingsProvider::This();
         return CProcessParams(nClientWidth, nClientHeight,
-            CMultiMonitorSupport::GetMonitorRect(this).size(),
-            CRotationParams(0), 0, -1, eAutoZoomMode, CPoint(0, 0), m_eTransparencyMode,
+            CRotationParams(0), 0, -1, eAutoZoomMode, QPoint(0, 0), m_eTransparencyMode,
             GetDefaultProcessingParams(),
             SetProcessingFlag(GetDefaultProcessingFlags(), PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
     }
@@ -2987,7 +2945,7 @@ void CMainDlg::ResetParamsToDefault() {
     m_nUserRotation = 0;
     m_bUserMirrored = false;
     m_dZoom = m_dZoomMult = -1.0;
-    m_offsets = CPoint(0, 0);
+    m_offsets = QPoint(0, 0);
     m_bUserZoom = false;
     m_bUserPan = false;
     *m_pImageProcParams = GetDefaultProcessingParams();
@@ -3112,9 +3070,9 @@ void CMainDlg::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool b
             // [GF] Adjust m_offsets for BookMode
             if (GetAutoZoomMode() == Helpers::ZM_BookMode) {
                 if (bMoveBack == false)
-                    m_offsets = CPoint(-65000,65000);    // Book page RTL manga mode: focus top right (RTL). TODO: implement LTR option. (Not really needed - in BookMode, the page is never wider than window.)
+                    m_offsets = QPoint(-65000,65000);    // Book page RTL manga mode: focus top right (RTL). TODO: implement LTR option. (Not really needed - in BookMode, the page is never wider than window.)
                 else
-                    m_offsets = CPoint(65000,-65000);    // Book page RTL mode: focus bottom left (RTL). TODO: implement LTR option. (Not really needed - in BookMode, the page is never wider than window.)
+                    m_offsets = QPoint(65000,-65000);    // Book page RTL mode: focus bottom left (RTL). TODO: implement LTR option. (Not really needed - in BookMode, the page is never wider than window.)
 
                 m_offsets_custom = m_offsets;
             }

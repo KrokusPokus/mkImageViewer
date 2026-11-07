@@ -2,7 +2,6 @@
 #define CLIPBOARD_H
 
 #include "ProcessParams.h"
-#include "WTLCompat.h"
 
 #include <QString>
 
@@ -18,10 +17,6 @@ public:
     // Copy processed full size image as a 24 bpp DIB to the clipboard, i.e. in original resolution.
     static void CopyFullImageToClipboard(CBaseImage * pImage, const CImageProcessingParams& procParams,
         EProcessingFlags eFlags, const QString& fileName);
-
-    // Copy section of full size image as a 24 bpp DIB to the clipboard, i.e. in original resolution.
-    static void CopyFullImageToClipboard(CBaseImage * pImage, const CImageProcessingParams& procParams,
-        EProcessingFlags eFlags, CRect clipRect, const QString& fileName);
 
     // Copy file path to the clipboard.
     static void CopyPathToClipboard(CBaseImage* pImage, const QString& fileName);

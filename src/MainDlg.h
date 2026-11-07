@@ -7,7 +7,6 @@
 #include "Helpers.h"
 #include "ImageLoadResult.h"
 #include "ProcessParams.h"
-#include "WTLCompat.h"
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -81,7 +80,6 @@ public:
     const QRect& WindowRectOnClose() { return m_windowRectOnClose; } // only valid after having closed the window
     double GetZoomMultiplier(CBaseImage* pImage, const QRect& clientRect);
     Helpers::EAutoZoomMode GetAutoZoomMode() { return m_bFullScreenMode ? m_eAutoZoomModeFullscreen : m_eAutoZoomModeWindowed; }
-    CPoint GetOffsets() { return m_offsets; }
     CImageProcessingParams* GetImageProcessingParams() { return m_pImageProcParams; }
     EProcessingFlags CreateDefaultProcessingFlags(bool bKeepParams = false);
     // Current processing parameters as passed to the image processing, with the black and white mode applied

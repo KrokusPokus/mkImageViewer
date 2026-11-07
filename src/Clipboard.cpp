@@ -2,6 +2,7 @@
 
 #include "BaseImage.h"
 #include "Helpers.h"
+#include "WTLCompat.h"
 
 #include <QByteArray>
 #include <QClipboard>
@@ -10,8 +11,6 @@
 #include <QMimeData>
 #include <QString>
 #include <QUrl>
-
-#include <algorithm>
 
 void CClipboard::CopyImageToClipboard(CBaseImage* pImage, const QString& fileName) {
     if (pImage == nullptr || pImage->DIBPixelsLastProcessed(true) == nullptr) {
@@ -22,21 +21,12 @@ void CClipboard::CopyImageToClipboard(CBaseImage* pImage, const QString& fileNam
 }
 
 void CClipboard::CopyFullImageToClipboard(CBaseImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, const QString& fileName) {
-    CopyFullImageToClipboard(pImage, procParams, eFlags, CRect(0, 0, pImage->OrigWidth(), pImage->OrigHeight()), fileName);
-}
-
-void CClipboard::CopyFullImageToClipboard(CBaseImage* pImage, const CImageProcessingParams& procParams, EProcessingFlags eFlags, CRect clipRect, const QString& fileName) {
     if (pImage == nullptr) {
         return;
     }
 
-    clipRect.left = std::max<int>(0, clipRect.left);
-    clipRect.top = std::max<int>(0, clipRect.top);
-    clipRect.right = std::min<int>(pImage->OrigWidth(), clipRect.right);
-    clipRect.bottom = std::min<int>(pImage->OrigHeight(), clipRect.bottom);
-
-    void* pDIB = pImage->GetDIB(pImage->OrigSize(), clipRect.Size(), clipRect.TopLeft(), procParams, eFlags);
-    DoCopy(clipRect.Width(), clipRect.Height(), pDIB, fileName);
+    void* pDIB = pImage->GetDIB(pImage->OrigSize(), pImage->OrigSize(), CPoint(0, 0), procParams, eFlags);
+    DoCopy(pImage->OrigWidth(), pImage->OrigHeight(), pDIB, fileName);
 }
 
 void CClipboard::CopyPathToClipboard(CBaseImage* pImage, const QString& fileName) {

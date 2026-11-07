@@ -359,7 +359,7 @@ namespace Helpers {
                 if (bFillCrop) dAR = dARMax;
                 if (dAR <= 1.0) {
                     dZoom = 1.0;
-                    return CSize(nWidth, nHeight);
+                    return QSize(nWidth, nHeight);
                 }
             }
             if (bFillCrop && bLimitAR) {
