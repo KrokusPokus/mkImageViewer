@@ -4,64 +4,64 @@
 <context>
     <name>CMainDlg</name>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1415"/>
+        <location filename="../src/MainDlg.cpp" line="1417"/>
         <source>Next image</source>
         <translation>Nächstes Bild</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1416"/>
+        <location filename="../src/MainDlg.cpp" line="1418"/>
         <source>Previous image</source>
         <translation>Voriges Bild</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1421"/>
+        <location filename="../src/MainDlg.cpp" line="1423"/>
         <source>Current View</source>
         <translation>Anzeigeweise</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1422"/>
+        <location filename="../src/MainDlg.cpp" line="1424"/>
         <source>Rotate +90</source>
         <translation>Drehen +90</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1423"/>
+        <location filename="../src/MainDlg.cpp" line="1425"/>
         <source>Rotate -90</source>
         <translation>Drehen -90</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1425"/>
+        <location filename="../src/MainDlg.cpp" line="1427"/>
         <source>Mirror horizontally</source>
         <translation>Horizontal spiegeln</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1426"/>
+        <location filename="../src/MainDlg.cpp" line="1428"/>
         <source>Mirror vertically</source>
         <translation>Vertikal spiegeln</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1627"/>
+        <location filename="../src/MainDlg.cpp" line="1629"/>
         <source>Black and white</source>
         <translation>Schwarzweiß</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1428"/>
-        <location filename="../src/MainDlg.cpp" line="1611"/>
+        <location filename="../src/MainDlg.cpp" line="1430"/>
+        <location filename="../src/MainDlg.cpp" line="1613"/>
         <source>Fit to window</source>
         <translation>An Fenster anpassen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1429"/>
-        <location filename="../src/MainDlg.cpp" line="1611"/>
+        <location filename="../src/MainDlg.cpp" line="1431"/>
+        <location filename="../src/MainDlg.cpp" line="1613"/>
         <source>Fill with crop</source>
         <translation>Fenster ausfüllen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1439"/>
+        <location filename="../src/MainDlg.cpp" line="1441"/>
         <source>Full screen mode</source>
         <translation>Vollbildmodus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1450"/>
+        <location filename="../src/MainDlg.cpp" line="1452"/>
         <source>Play folder as slideshow/animation</source>
         <translation>Ordner als Diaschau/Animation abspielen</translation>
     </message>
@@ -70,169 +70,169 @@
         <translation type="vanished">Diaschau/Animation pausieren	0xff</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="792"/>
+        <location filename="../src/MainDlg.cpp" line="794"/>
         <source>No image loaded!
 Press ESC to exit...</source>
         <translation>Kein Bild geladen! Drücke ESC zum beenden...</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1454"/>
+        <location filename="../src/MainDlg.cpp" line="1456"/>
         <source>Pause slideshow/animation</source>
         <translation>Diaschau/Animation pausieren</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1460"/>
+        <location filename="../src/MainDlg.cpp" line="1462"/>
         <source>Slideshow</source>
         <translation>Diaschau</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1466"/>
+        <location filename="../src/MainDlg.cpp" line="1468"/>
         <source>Waiting time	%1 sec</source>
         <translation>Wartezeit %1 Sekunden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1470"/>
+        <location filename="../src/MainDlg.cpp" line="1472"/>
         <source>Transition Effect</source>
         <translation>Übergangseffekt</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1481"/>
-        <location filename="../src/MainDlg.cpp" line="1611"/>
+        <location filename="../src/MainDlg.cpp" line="1483"/>
+        <location filename="../src/MainDlg.cpp" line="1613"/>
         <source>None</source>
         <translation>Keiner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1483"/>
+        <location filename="../src/MainDlg.cpp" line="1485"/>
         <source>Blend</source>
         <translation>Überblenden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1485"/>
+        <location filename="../src/MainDlg.cpp" line="1487"/>
         <source>Slide from right</source>
         <translation>Gleiten von rechts</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1486"/>
+        <location filename="../src/MainDlg.cpp" line="1488"/>
         <source>Slide from left</source>
         <translation>Gleiten von links</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1487"/>
+        <location filename="../src/MainDlg.cpp" line="1489"/>
         <source>Slide from top</source>
         <translation>Gleiten von oben</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1488"/>
+        <location filename="../src/MainDlg.cpp" line="1490"/>
         <source>Slide from bottom</source>
         <translation>Gleiten von unten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1490"/>
+        <location filename="../src/MainDlg.cpp" line="1492"/>
         <source>Roll from right</source>
         <translation>Rollen von rechts</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1491"/>
+        <location filename="../src/MainDlg.cpp" line="1493"/>
         <source>Roll from left</source>
         <translation>Rollen von links</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1492"/>
+        <location filename="../src/MainDlg.cpp" line="1494"/>
         <source>Roll from top</source>
         <translation>Rollen von oben</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1493"/>
+        <location filename="../src/MainDlg.cpp" line="1495"/>
         <source>Roll from bottom</source>
         <translation>Rollen von unten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1495"/>
+        <location filename="../src/MainDlg.cpp" line="1497"/>
         <source>Scroll from right</source>
         <translation>Scrollen von rechts</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1496"/>
+        <location filename="../src/MainDlg.cpp" line="1498"/>
         <source>Scroll from left</source>
         <translation>Scrollen von links</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1497"/>
+        <location filename="../src/MainDlg.cpp" line="1499"/>
         <source>Scroll from top</source>
         <translation>Scrollen von oben</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1498"/>
+        <location filename="../src/MainDlg.cpp" line="1500"/>
         <source>Scroll from bottom</source>
         <translation>Scrollen von unten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1501"/>
+        <location filename="../src/MainDlg.cpp" line="1503"/>
         <source>Transition Speed</source>
         <translation>Übergangsgeschwindigkeit</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1508"/>
+        <location filename="../src/MainDlg.cpp" line="1510"/>
         <source>Very fast</source>
         <translation>Sehr schnell</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1508"/>
+        <location filename="../src/MainDlg.cpp" line="1510"/>
         <source>Fast</source>
         <translation>Schnell</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1508"/>
+        <location filename="../src/MainDlg.cpp" line="1510"/>
         <source>Normal</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1508"/>
+        <location filename="../src/MainDlg.cpp" line="1510"/>
         <source>Slow</source>
         <translation>Langsam</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1508"/>
+        <location filename="../src/MainDlg.cpp" line="1510"/>
         <source>Very slow</source>
         <translation>Sehr langsam</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1520"/>
+        <location filename="../src/MainDlg.cpp" line="1522"/>
         <source>Movie</source>
         <translation>Animation</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1525"/>
+        <location filename="../src/MainDlg.cpp" line="1527"/>
         <source>Playback speed	%1 fps</source>
         <translation>Wiedergabe-Geschwindigkeit	%1 fps</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1531"/>
+        <location filename="../src/MainDlg.cpp" line="1533"/>
         <source>Reload image</source>
         <translation>Bild neu laden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1534"/>
+        <location filename="../src/MainDlg.cpp" line="1536"/>
         <source>Edit image in default editor</source>
         <translation>Bild in Standard-Anwendung bearbeiten</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1536"/>
+        <location filename="../src/MainDlg.cpp" line="1538"/>
         <source>Copy original image content to clipboard</source>
         <translation>Bildinhalt in Zwischenablagge kopieren</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1539"/>
+        <location filename="../src/MainDlg.cpp" line="1541"/>
         <source>Copy file path to clipboard</source>
         <translation>Datei-Pfad in Zwischenablage kopieren</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1542"/>
+        <location filename="../src/MainDlg.cpp" line="1544"/>
         <source>Cut file to clipboard</source>
         <translation>Datei ausschneiden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1543"/>
+        <location filename="../src/MainDlg.cpp" line="1545"/>
         <source>Show in folder</source>
         <translation>In Ordner anzeigen</translation>
     </message>
@@ -245,107 +245,107 @@ Press ESC to exit...</source>
         <translation type="vanished">Drehen -90 und in der Datei speichern (EXIF)</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1881"/>
+        <location filename="../src/MainDlg.cpp" line="1883"/>
         <source>Could not write the EXIF orientation</source>
         <translation>EXIF-Ausrichtung konnte nicht geschrieben werden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1670"/>
+        <location filename="../src/MainDlg.cpp" line="1672"/>
         <source>Could not open keymap.txt</source>
         <translation>keymap.txt konnte nicht geöffnet werden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1553"/>
+        <location filename="../src/MainDlg.cpp" line="1555"/>
         <source>Folder Mode</source>
         <translation>Ordner Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1545"/>
+        <location filename="../src/MainDlg.cpp" line="1547"/>
         <source>EXIF Rotate +90</source>
         <translation>EXIF Rotation +90</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1547"/>
+        <location filename="../src/MainDlg.cpp" line="1549"/>
         <source>EXIF Rotate -90</source>
         <translation>EXIF Rotation -90</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1558"/>
+        <location filename="../src/MainDlg.cpp" line="1560"/>
         <source>Loop folder</source>
         <translation>Nur dieser Ordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1558"/>
+        <location filename="../src/MainDlg.cpp" line="1560"/>
         <source>Loop recursively</source>
         <translation>Dieser Ordner und alle Unterordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1558"/>
+        <location filename="../src/MainDlg.cpp" line="1560"/>
         <source>Loop siblings</source>
         <translation>Dieser Ordner und Geschwister-Ordner</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1571"/>
+        <location filename="../src/MainDlg.cpp" line="1573"/>
         <source>Sort Order</source>
         <translation>Sortieren nach</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1585"/>
+        <location filename="../src/MainDlg.cpp" line="1587"/>
         <source>File name</source>
         <translation>Dateiname</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1586"/>
+        <location filename="../src/MainDlg.cpp" line="1588"/>
         <source>Modification date</source>
         <translation>Änderungsdatum</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1587"/>
+        <location filename="../src/MainDlg.cpp" line="1589"/>
         <source>File size</source>
         <translation>Dateigröße</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1588"/>
+        <location filename="../src/MainDlg.cpp" line="1590"/>
         <source>Random</source>
         <translation>Zufällig</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1593"/>
+        <location filename="../src/MainDlg.cpp" line="1595"/>
         <source>Ascending</source>
         <translation>A-Z</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1598"/>
+        <location filename="../src/MainDlg.cpp" line="1600"/>
         <source>Descending</source>
         <translation>Z-A</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1604"/>
+        <location filename="../src/MainDlg.cpp" line="1606"/>
         <source>Auto Zoom Mode</source>
         <translation>Auto-Zoom Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1611"/>
+        <location filename="../src/MainDlg.cpp" line="1613"/>
         <source>Fit to window (never upsize)</source>
         <translation>An Fenster anpassen (nie vergrößern)</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1611"/>
+        <location filename="../src/MainDlg.cpp" line="1613"/>
         <source>Fill with crop (never upsize)</source>
         <translation>Fenster ausfüllen (nie vergrößern)</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1611"/>
+        <location filename="../src/MainDlg.cpp" line="1613"/>
         <source>Book Mode</source>
         <translation>Buch-Modus</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1623"/>
+        <location filename="../src/MainDlg.cpp" line="1625"/>
         <source>Auto Contrast</source>
         <translation>Auto-Kontrastkorrektur</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1634"/>
+        <location filename="../src/MainDlg.cpp" line="1636"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
@@ -354,69 +354,69 @@ Press ESC to exit...</source>
         <translation type="vanished">Einstellungen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="1638"/>
+        <location filename="../src/MainDlg.cpp" line="1640"/>
         <source>Exit</source>
         <translation>Beenden</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3816"/>
-        <location filename="../src/MainDlg.cpp" line="3826"/>
+        <location filename="../src/MainDlg.cpp" line="3821"/>
+        <location filename="../src/MainDlg.cpp" line="3831"/>
         <source>Delete File</source>
         <translation>Datei löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3817"/>
+        <location filename="../src/MainDlg.cpp" line="3822"/>
         <source>Do you really want to move this file into the recycle bin?</source>
         <translation>Möchtest du diese Datei wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3819"/>
-        <location filename="../src/MainDlg.cpp" line="3829"/>
+        <location filename="../src/MainDlg.cpp" line="3824"/>
+        <location filename="../src/MainDlg.cpp" line="3834"/>
         <source>Delete multiple elements</source>
         <translation>Mehrere Dateien löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3820"/>
+        <location filename="../src/MainDlg.cpp" line="3825"/>
         <source>Do you really want to move these %1 files into the recycle bin?</source>
         <translation>Möchtest du diese %1 Dateien wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3824"/>
+        <location filename="../src/MainDlg.cpp" line="3829"/>
         <source>This process cannot be undone.</source>
         <translation>Dieser Vorgang kann nicht rückgängig gemacht werden.</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3827"/>
+        <location filename="../src/MainDlg.cpp" line="3832"/>
         <source>Are you sure you want to delete this file permanently?</source>
         <translation>Möchtest du diese Datei wirklich unwiderruflich löschen?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3830"/>
+        <location filename="../src/MainDlg.cpp" line="3835"/>
         <source>Are you sure you want to delete these %1 files permanently?</source>
         <translation>Möchtest du diese %1 Dateien wirklich unwiderruflich löschen?</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3888"/>
+        <location filename="../src/MainDlg.cpp" line="3893"/>
         <source>Name:</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3890"/>
+        <location filename="../src/MainDlg.cpp" line="3895"/>
         <source>Size:</source>
         <translation>Größe:</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3892"/>
+        <location filename="../src/MainDlg.cpp" line="3897"/>
         <source>Date:</source>
         <translation>Datum:</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3901"/>
+        <location filename="../src/MainDlg.cpp" line="3906"/>
         <source>Delete</source>
         <translation>Löschen</translation>
     </message>
     <message>
-        <location filename="../src/MainDlg.cpp" line="3902"/>
+        <location filename="../src/MainDlg.cpp" line="3907"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
     </message>
