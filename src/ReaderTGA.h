@@ -10,7 +10,6 @@ class CBaseImage;
 class CReaderTGA
 {
 public:
-    // Geändert von LPCTSTR strFileName zu const void* pBuffer, std::size_t bufsize
     static void* ReadImage(int& width, int& height, int& targetChannels, bool& bOutOfMemory, const void* pBuffer, std::size_t bufsize);
     static bool IsAlphaChannelValid(int width, int height, uint32_t* pImageData);
 

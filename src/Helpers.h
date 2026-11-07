@@ -60,6 +60,13 @@ namespace Helpers {
         NM_LoopSameDirectoryLevel
     };
 
+    // When to ask before a file is deleted
+    enum EDeleteConfirmation {
+        DC_Always,
+        DC_OnlyWhenNoRecycleBin, // only when the file is deleted permanently, not when moved to the trash
+        DC_Never
+    };
+
     // Single instance modes
     enum ESingleInstanceMode {
         SI_Never,

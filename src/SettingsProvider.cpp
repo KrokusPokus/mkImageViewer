@@ -125,7 +125,7 @@ namespace {
         return stringMap.value(effect, "None");
     }
 
-    // Tests if the CPU supports AVX2, SSE, MMX(2) - Einheitlich für alle x86-Compiler
+    // Tests if the CPU supports AVX2, SSE, MMX(2)
     Helpers::CPUType ProbeCPU(void) {
         static Helpers::CPUType cpuType = Helpers::CPU_Unknown;
 
@@ -136,11 +136,7 @@ namespace {
         int abcd[4] = { 0 };
 
         // 1. Check if CPU supports AVX and the xgetbv instruction
-#if defined(_MSC_VER)
-        __cpuid(abcd, 1);
-#else
         __get_cpuid(1, (unsigned int*)&abcd[0], (unsigned int*)&abcd[1], (unsigned int*)&abcd[2], (unsigned int*)&abcd[3]);
-#endif
 
         if ((abcd[2] & 0x18000000) != 0x18000000) { // AVX and OSXSAVE bits
             return (cpuType = Helpers::CPU_SSE);
@@ -152,7 +148,7 @@ namespace {
             return (cpuType = Helpers::CPU_SSE);
         }
 
-        // 2. Check if operating system supports AVX(2) via xgetbv (Standard auf allen x86-Compilern)
+        // 2. Check if operating system supports AVX(2) via xgetbv
         unsigned long long xcr0 = _xgetbv(0);
         if ((xcr0 & 6) != 6) {
             return (cpuType = Helpers::CPU_SSE);
@@ -160,11 +156,7 @@ namespace {
 
         // 3. Check if AVX2 instructions are supported
         const int AVX2BITMASK = 1 << 5;
-#if defined(_MSC_VER)
-        __cpuidex(abcd, 7, 0);
-#else
         __cpuid_count(7, 0, abcd[0], abcd[1], abcd[2], abcd[3]);
-#endif
 
         cpuType = (abcd[1] & AVX2BITMASK) ? Helpers::CPU_AVX2 : Helpers::CPU_SSE;
         return cpuType;
@@ -498,6 +490,12 @@ QWidget* SettingsDialog::createSystemPage() {
     layout->addRow(tr("Single instance:"), m_comboSingleInstance);
     layout->addRow("", m_checkSingleFullScreenInstance);
 
+    m_comboDeleteConfirmation = createChoiceBox({ { tr("Always"), "Always" },
+                                                  { tr("Only for permanent deletion"), "OnlyWhenNoRecycleBin" },
+                                                  { tr("Never"), "Never" } });
+    m_comboDeleteConfirmation->setToolTip(tr("Ask before a file is moved to the trash or deleted permanently (DeleteConfirmation)"));
+    layout->addRow(tr("Confirm deletion:"), m_comboDeleteConfirmation);
+
     m_checkReloadWhenImageChanged = new QCheckBox(tr("Reload the image when it has changed"));
     m_checkReloadWhenImageChanged->setToolTip(tr("ReloadWhenDisplayedImageChanged"));
     layout->addRow("", m_checkReloadWhenImageChanged);
@@ -556,6 +554,7 @@ void SettingsDialog::loadFrom(const CSettingsProvider& settings) {
     selectChoice(m_comboFolderNavigation, settings.GetString("FolderNavigation", "LoopFolder"), "LoopFolder");
     selectChoice(m_comboSlideShowTransitionEffect, ConvertTransitionEffectToString(settings.m_eSlideShowTransitionEffect), "Blend");
     selectChoice(m_comboSingleInstance, settings.GetString("SingleInstance", "PerFolder"), "PerFolder");
+    selectChoice(m_comboDeleteConfirmation, settings.GetString("DeleteConfirmation", "OnlyWhenNoRecycleBin"), "Always");
     selectChoice(m_comboCpuType, settings.GetString("CPUType", "AutoDetect"), "AutoDetect");
 
     // Image
@@ -636,6 +635,7 @@ void SettingsDialog::saveToSettings() {
     settings.WriteString("FileDisplayOrder", chosenIniValue(m_comboFileDisplayOrder));
     settings.WriteString("FolderNavigation", chosenIniValue(m_comboFolderNavigation));
     settings.WriteString("SingleInstance", chosenIniValue(m_comboSingleInstance));
+    settings.WriteString("DeleteConfirmation", chosenIniValue(m_comboDeleteConfirmation));
     settings.WriteString("SlideShowTransitionEffect", chosenIniValue(m_comboSlideShowTransitionEffect));
     settings.WriteString("TransparencyColor", QString("%1 %2 %3").arg(m_colorTrans.red()).arg(m_colorTrans.green()).arg(m_colorTrans.blue()));
     settings.WriteString("TransparencyMode", chosenIniValue(m_comboTransparencyMode));
@@ -753,6 +753,16 @@ void CSettingsProvider::ReadAllINISettings() {
         m_eDownsamplingFilter = Filter_Downsampling_Lanczos2;
     } else {
         m_eDownsamplingFilter = Filter_Downsampling_Catrom;
+    }
+
+    // An unknown value asks always: better one question too many than a file deleted by accident
+    QString sDeleteConfirmation = GetString("DeleteConfirmation", "OnlyWhenNoRecycleBin");
+    if (sDeleteConfirmation.compare("OnlyWhenNoRecycleBin", Qt::CaseInsensitive) == 0) {
+        m_eDeleteConfirmation = Helpers::DC_OnlyWhenNoRecycleBin;
+    } else if (sDeleteConfirmation.compare("Never", Qt::CaseInsensitive) == 0) {
+        m_eDeleteConfirmation = Helpers::DC_Never;
+    } else {
+        m_eDeleteConfirmation = Helpers::DC_Always;
     }
 
     QString sSingleInstanceMode = GetString("SingleInstance", "PerFolder");

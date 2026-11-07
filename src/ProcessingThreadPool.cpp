@@ -15,7 +15,6 @@
 // A request wrapping another request and adding information about the image strip to process.
 class CWrappedRequest : public CRequestBase {
 public:
-    // Anpassung an CCompletionEvent statt HANDLE
     CWrappedRequest(CProcessingRequest * pRequest, int nOffset, int nSize, std::shared_ptr<CCompletionEvent> eventFinished)
         : CRequestBase(std::move(eventFinished)) {
         InnerRequest = pRequest;
@@ -112,7 +111,7 @@ bool CProcessingThreadPool::Process(CProcessingRequest* pRequest) {
                 return (nBlocks / nNumThreadsUsed + (nThread < nBlocks % nNumThreadsUsed ? 1 : 0)) * pRequest->StripPadding;
             };
 
-            // Modernes atomares Counter-Objekt und CCompletionEvent statt Windows-Handles
+            // Atomarer Zaehler der laufenden Threads und Event, das nach dem letzten Thread gesetzt wird
             auto nRequestThreadCounter = std::make_shared<std::atomic<int>>(nNumThreadsUsed - 1);
             auto eventFinished = std::make_shared<CCompletionEvent>();
 

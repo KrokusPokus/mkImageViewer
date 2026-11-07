@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
         sStartupFile = QDir::cleanPath(QFileInfo(args.first()).absoluteFilePath());
         QFileInfo fileInfo(sStartupFile);
         if (fileInfo.isDir()) {
-            if (!sStartupFile.endsWith('/') && !sStartupFile.endsWith('\\')) {
+            if (!sStartupFile.endsWith('/')) {
                 sStartupFile.append('/');
             }
         }

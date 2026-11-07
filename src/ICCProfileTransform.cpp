@@ -1,8 +1,6 @@
 #include "ICCProfileTransform.h"
 #include "SettingsProvider.h"
 
-// This define is necessary for 32-bit builds to work, for some reason
-#define CMS_DLL
 #include "lcms2.h"
 #include "Helpers.h"
 
@@ -40,13 +38,11 @@ void* ICCProfileTransform::CreateTransform(const void* profile, unsigned int siz
     }
 
     if (sRGBProfile == nullptr) {
-        try {
-            sRGBProfile = cmsCreate_sRGBProfile();
-        } catch (...) {}
+        sRGBProfile = cmsCreate_sRGBProfile();
     }
 
     if (sRGBProfile == nullptr) {
-        return nullptr; // lcms2.dll not found or out of memory
+        return nullptr; // out of memory
     }
 
     cmsHPROFILE hInProfile = cmsOpenProfileFromMem(profile, size);

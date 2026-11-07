@@ -366,7 +366,7 @@ Press ESC to exit...</source>
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="3822"/>
-        <source>Do you really want to move this file into the recycle bin?</source>
+        <source>Do you really want to move this file to the trash?</source>
         <translation>Möchtest du diese Datei wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
@@ -377,7 +377,7 @@ Press ESC to exit...</source>
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="3825"/>
-        <source>Do you really want to move these %1 files into the recycle bin?</source>
+        <source>Do you really want to move these %1 files to the trash?</source>
         <translation>Möchtest du diese %1 Dateien wirklich in den Papierkorb verschieben?</translation>
     </message>
     <message>
@@ -419,6 +419,14 @@ Press ESC to exit...</source>
         <location filename="../src/MainDlg.cpp" line="3907"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Could not delete the file</source>
+        <translation>Die Datei konnte nicht gelöscht werden</translation>
+    </message>
+    <message>
+        <source>Could not move the file to the trash</source>
+        <translation>Die Datei konnte nicht in den Papierkorb verschoben werden</translation>
     </message>
 </context>
 <context>
@@ -1211,6 +1219,18 @@ Press ESC to exit...</source>
     <message>
         <source>Decoder:</source>
         <translation type="vanished">Decoder:</translation>
+    </message>
+    <message>
+        <source>Only for permanent deletion</source>
+        <translation>Nur beim endgültigen Löschen</translation>
+    </message>
+    <message>
+        <source>Confirm deletion:</source>
+        <translation>Löschen bestätigen:</translation>
+    </message>
+    <message>
+        <source>Ask before a file is moved to the trash or deleted permanently (DeleteConfirmation)</source>
+        <translation>Nachfragen, bevor eine Datei in den Papierkorb verschoben oder endgültig gelöscht wird (DeleteConfirmation)</translation>
     </message>
 </context>
 </TS>

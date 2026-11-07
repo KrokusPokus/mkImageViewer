@@ -207,7 +207,7 @@ private:
     // animation or the movie mode is running). Switching it on takes over the current state.
     void SetKeepParams(bool bKeep);
     void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
-    void onLoadFileAsynch(); // WM_COPYDATAhandler and OnAnotherInstanceStarted() call this via invokeMethod()
+    void onLoadFileAsynch(); // OnAnotherInstanceStarted() calls this via invokeMethod()
     void OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath);
 
     QRect GetZoomTextRect();
@@ -246,7 +246,8 @@ private:
 
     void ChangeFolderLanguage();
     void OpenDefaultEditor();
-    bool showDeleteConfirmationDialog(const QStringList &pathList, bool bRecycleOnly);
+    void DeleteCurrentFile(bool bPermanently);
+    bool showDeleteConfirmationDialog(const QStringList &pathList, bool bMoveToTrash);
 
     QString LoadBookmark(const QString& sFilePath);
     void SaveBookmark();

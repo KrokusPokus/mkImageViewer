@@ -199,8 +199,8 @@ void CImageProvider::FileHasRenamed(const QString& sOldFileName, const QString& 
         }
     }
 
-    // 2. Continue all requests of the file (every frame index) under the new name. Linux file names are
-    //    case-sensitive, so compare exactly (the Windows original used _tcsicmp).
+    // 2. Continue all requests of the file (every frame index) under the new name. File names are
+    //    case-sensitive, so compare exactly.
     //    FileName is only touched on the GUI thread: CImageLoadThread::CRequest copies the name in its
     //    constructor. A load that is already running keeps using the old name and fails if the file is
     //    gone, in which case FindRequest() drops the empty result and the next request loads it again.

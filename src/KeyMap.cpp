@@ -244,9 +244,9 @@ static QString _FindFirstExisting(const QStringList& dirs, const QString& sFileN
 }
 
 // Laedt die Tastenbelegung. Suchreihenfolge fuer keymap.txt:
-//     1. AppConfigLocation  (z.B. %AppData%\mkImageViewer bzw. ~/.config/mkImageViewer)
-//     2. Verzeichnis der Exe
-//     3. AppDataLocation    (z.B. /usr/share/mkImageViewer bei einer Linux-Installation)
+//     1. AppConfigLocation  (z.B. ~/.config/mkImageViewer)
+//     2. Programmverzeichnis
+//     3. AppDataLocation    (z.B. /usr/share/mkImageViewer)
 //
 // Gibt es in KEINEM dieser Verzeichnisse eine keymap.txt, wird die eingebaute Standardbelegung
 // (Cmd::defaultKeyMapFileText()) einmalig als keymap.txt in die AppConfigLocation geschrieben

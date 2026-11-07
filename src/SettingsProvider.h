@@ -84,6 +84,7 @@ private:
 
     // System
     class QComboBox* m_comboSingleInstance;
+    class QComboBox* m_comboDeleteConfirmation;
     class QCheckBox* m_checkSingleFullScreenInstance;
     class QCheckBox* m_checkReloadWhenImageChanged;
     class QSpinBox*  m_spinCacheRange;
@@ -148,6 +149,7 @@ public:
     Helpers::EAutoZoomMode AutoZoomModeFullscreen() const { return m_eAutoZoomModeFullscreen; }
     Helpers::ENavigationMode Navigation() const { return m_eNavigation; }
     Helpers::ESingleInstanceMode SingleInstanceMode() const { return m_eSingleInstanceMode; }
+    Helpers::EDeleteConfirmation DeleteConfirmation() const { return m_eDeleteConfirmation; }
     Helpers::ESorting Sorting() const { return m_eSorting; }
     Helpers::ETransitionEffect SlideShowTransitionEffect() const { return m_eSlideShowTransitionEffect; }
     Helpers::ETransparencyMode TransparencyMode() const { return m_eTransparencyMode; }
@@ -166,8 +168,7 @@ public:
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
     void SetUseEmbeddedColorProfiles(int bUseEmbeddedColorProfiles) { m_bUseEmbeddedColorProfiles = (bUseEmbeddedColorProfiles != 0); }
 
-    // This will only save a subset of settings to the INI file located in AppData\mkImageViewer\mkImageViewer.ini.
-    // Note that this INI file has precedence over the INI file at the program directory
+    // This will only save a subset of settings to settings.ini in the application's config directory.
     void SaveSettings(const CImageProcessingParams& procParams,
                       EProcessingFlags eProcFlags,
                       Helpers::ENavigationMode eNavigationMode, Helpers::ESorting eFileSorting, bool isSortedAscending,
@@ -207,6 +208,7 @@ private:
     Helpers::ETransitionEffect m_eSlideShowTransitionEffect;
     int m_nSlideShowEffectTimeMs{200};
     Helpers::ESingleInstanceMode m_eSingleInstanceMode;
+    Helpers::EDeleteConfirmation m_eDeleteConfirmation;
     bool m_bSingleFullScreenInstance{true};
     bool m_bWrapAroundFolder{true};
     bool m_bAutoRotateEXIF{true};

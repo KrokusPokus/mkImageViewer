@@ -105,16 +105,6 @@ private:
     F m_f;
 };
 
-// Suppresses the "missing DLL" system dialogs while a delay-loaded codec DLL is touched.
-// Restores the previous error mode on every exit path. No-op on non-Windows platforms.
-class CErrorModeGuard {
-public:
-    CErrorModeGuard() {}
-    ~CErrorModeGuard() {}
-    CErrorModeGuard(const CErrorModeGuard&) = delete;
-    CErrorModeGuard& operator=(const CErrorModeGuard&) = delete;
-};
-
 // Reads a whole file into a freshly allocated buffer. Returns nullptr on failure, eError tells why.
 std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, qint64 nMaxSize, qint64& nFileSize, ELoadError& eError) {
     nFileSize = 0;
@@ -989,13 +979,7 @@ void CImageLoadThread::DeleteCachedJxlDecoder() {
 }
 
 void CImageLoadThread::DeleteCachedAvifDecoder() {
-    {
-        // prevent crashing when libavif/dav1d fail or missing
-        CErrorModeGuard errorModeGuard;
-        try {
-            AvifReader::DeleteCache();
-        } catch (...) {}
-    }
+    AvifReader::DeleteCache();
     m_sLastAvifFileName.clear();
 }
 
@@ -1056,7 +1040,6 @@ void CImageLoadThread::ProcessReadFileRequest(CRequest* request, EImageFormat eF
 //    AVIF/HEIF always read frame 0, and the CBaseImage is created as an entry of the container IF_ZIP.
 EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat eFormat, std::unique_ptr<char[]>& pBuffer,
                                                  size_t nSize, const CDecodeTarget& target) {
-    CErrorModeGuard errorModeGuard;
     const Helpers::ETransparencyMode eTransparency = request->ProcessParams.TransparencyMode;
     const CEncodedData in{ pBuffer.get(), nSize };
     const bool bHaveData = (in.pData != nullptr);
@@ -1521,7 +1504,6 @@ void CImageLoadThread::ProcessReadZipRequest(CRequest* request) {
         DeleteCachedJxlDecoder();
         DeleteCachedAvifDecoder();
     });
-    CErrorModeGuard errorModeGuard;
 
     try {
         const EEntryRead eRead = ReadZipEntry(z, use7z ? m_p7zLibrary.get() : nullptr, sArchivePath, zip, pBuffer);

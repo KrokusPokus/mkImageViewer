@@ -27,6 +27,7 @@
 #include <QDir>
 #include <QEvent>
 #include <QFileInfo>
+#include <QFontDatabase>
 #include <QGuiApplication>
 #include <QKeyCombination>
 #include <QKeyEvent>
@@ -670,7 +671,9 @@ void CMainDlg::paintEvent(QPaintEvent* /*event*/)
             }
 
             // QPainter Konfiguration für Text
-            painter.setFont(QFont("Consolas", 10));
+            QFont infoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+            infoFont.setPointSize(10);
+            painter.setFont(infoFont);
 
             QRect textRect = rect().adjusted(20, 20, -20, -20);
 
@@ -800,7 +803,7 @@ void CMainDlg::DisplayErrors(CBaseImage* pCurrentImage, const QRect& clientRect,
             nFileSize = static_cast<qint64>(position.EntrySize);
         } else {
             // a file, or an archive that could not be opened: the file itself and its size
-            sFileName = QDir::toNativeSeparators(CurrentFileName(false));
+            sFileName = CurrentFileName(false);
             nFileSize = QFileInfo(CurrentFileName(false)).size();
         }
 
@@ -840,7 +843,7 @@ void CMainDlg::resizeEvent(QResizeEvent* event) {
 
 void CMainDlg::closeEvent(QCloseEvent* event) {
     CleanupAndTerminate();
-    event->accept(); // Erlaubt das Schließen des Fensters (entspricht bHandled = FALSE)
+    event->accept(); // Erlaubt das Schließen des Fensters
 }
 
 void CMainDlg::mousePressEvent(QMouseEvent* event) {
@@ -1222,9 +1225,6 @@ void CMainDlg::timerEvent(QTimerEvent* event) {
     int timerId = event->timerId();
 
     if (timerId == m_animationTimerId || (timerId == m_slideshowTimerId && m_nCurrentTimeout > 0)) {
-        // In Qt läuft die Event-Queue sequenziell ab, das manuelle Herausfischen
-        // von WM_TIMER-Messages via PeekMessage entfällt hier in der Regel.
-
         qint64 currentTick = QDateTime::currentMSecsSinceEpoch();
         qint64 nRealDisplayTimeMs = currentTick - m_nLastSlideShowImageTickCount;
 
@@ -1444,8 +1444,7 @@ void CMainDlg::onShowContextMenu(const QPoint &pos) {
     // 3. Play folder as slideshow/movie (Untermenü)
     QMenu* menuMovie = menu.addMenu(tr("Play folder as slideshow/animation"));
 
-    // (Der Text enthielt frueher "\t0xff" - ein Relikt aus der Win32-Zeit. Die Anzeige uebernimmt
-    //  jetzt AddCmd; fuer StopMovie ist keine Taste belegt, Esc laeuft ueber DefaultEscape.)
+    // Die Tastenanzeige uebernimmt AddCmd; fuer StopMovie ist keine Taste belegt, Esc laeuft ueber DefaultEscape.
     QAction* actStopMovie = AddCmd(menuMovie, tr("Pause slideshow/animation"), Cmd::Command::StopMovie);
     actStopMovie->setEnabled(m_bMovieMode);
 
@@ -1699,33 +1698,10 @@ void CMainDlg::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             }
             break;
         case Command::DeleteFile:
-            MouseOn();
-            if (m_pCurrentImage != NULL && m_pFileList != NULL) {
-                QString currentFileName = CurrentFileName(false);
-                if (currentFileName.isEmpty()) {
-                    break;
-                }
-
-                if (!showDeleteConfirmationDialog({currentFileName}, false)) {
-                    break;
-                }
-
-                CFileList* fileListOfDeletedImage = m_pFileList;
-                GotoImage(POS_AwayFromCurrent, NO_REQUEST);
-                if (QFile::remove(currentFileName)) {
-                    fileListOfDeletedImage->Reload(NULL, false);
-                    m_pFileList->DeleteHistory(true);
-                    update();
-                    GotoImage(POS_Current);
-                } else {
-                    update();
-                    if (m_pFileList->Current().isEmpty()) {
-                        GotoImage(POS_First);
-                    } else {
-                        GotoImage(POS_Previous);
-                    }
-                }
-            }
+            DeleteCurrentFile(false);
+            break;
+        case Command::DeleteFilePermanently:
+            DeleteCurrentFile(true);
             break;
         case Command::NextFrame:
             GotoImage(POS_NextFrame);
@@ -2380,9 +2356,9 @@ void CMainDlg::ExploreFile() {
 
     if (QFile::exists(mkFolderWidgetPath) && (fileManager.isEmpty() || fileManager == "mkFolderWidget")) {
         QStringList args;
-        args << QDir::toNativeSeparators(targetPath);
+        args << targetPath;
         if (!targetFile.isEmpty()) {
-            args << "-f" << QDir::toNativeSeparators(targetFile);
+            args << "-f" << targetFile;
         }
         QProcess::startDetached(mkFolderWidgetPath, args);
         return;
@@ -3044,7 +3020,6 @@ void CMainDlg::MouseOff() {
                 this->setCursor(Qt::BlankCursor);
             }
 
-            // Verwendung von QPoint statt Win32-Structs
             m_startMouse = QPoint(-1, -1);
             m_bMouseOn = false;
         }
@@ -3120,7 +3095,7 @@ QString CMainDlg::CurrentDisplayPath() {
     if (!sPath.isEmpty() && position.InArchive && !position.EntryName.isEmpty()) {
         sPath += QLatin1Char('/') + position.EntryName;
     }
-    return QDir::toNativeSeparators(sPath);
+    return sPath;
 }
 
 QSize CMainDlg::ClientSizePx() const {
@@ -3173,7 +3148,7 @@ void CMainDlg::UpdateWindowTitle(bool bForce) {
     if (sCurrentFileName.isEmpty()) {
         sWindowText = APP_TITLE;
     } else {
-        QString visibleName = QDir::toNativeSeparators(sCurrentFileName);
+        QString visibleName = sCurrentFileName;
 
         // also for a page of an archive that could not be read
         const QString indexStr = GetMultiframeIndex(CurrentPosition());
@@ -3466,7 +3441,7 @@ void CMainDlg::AdjustAnimationFrameTime() {
     m_nExpectedNextAnimationTickCount += std::max(10, usedFrameTime);
 
     // If we can't process and display frames fast enough, m_nLastAnimationOffset will build up more and more.
-    // SetTimer() allows for a minimum delay of 10 ms, but be still can't keep up.
+    // The timer allows for a minimum delay of 10 ms, but be still can't keep up.
     // At this point, there are only two things we can do:
     //      1) Don't drop frames by sticking to the timer and accepting that the animation is playing back slower than intended.
     //    2) Drop frames by sidestepping the timer and calling GotoImage() directly with "NO_UPDATE_WINDOW".
@@ -3799,21 +3774,59 @@ QString CMainDlg::formatOutputZoomFactor(double m_dZoom) {
     return QString::number(qRound(m_dZoom * 100)) + " %";
 }
 
-bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bRecycleOnly) {
+// Moves the current file to the trash or deletes it permanently, asking first according to the setting "DeleteConfirmation"
+void CMainDlg::DeleteCurrentFile(bool bPermanently) {
+    MouseOn();
+    if (m_pCurrentImage == NULL || m_pFileList == NULL) {
+        return;
+    }
+    const QString currentFileName = CurrentFileName(false);
+    if (currentFileName.isEmpty()) {
+        return;
+    }
+
+    const Helpers::EDeleteConfirmation eConfirmation = CSettingsProvider::This().DeleteConfirmation();
+    const bool bConfirm = eConfirmation == Helpers::DC_Always ||
+                          (eConfirmation == Helpers::DC_OnlyWhenNoRecycleBin && bPermanently);
+    if (bConfirm && !showDeleteConfirmationDialog({currentFileName}, !bPermanently)) {
+        return;
+    }
+
+    CFileList* fileListOfDeletedImage = m_pFileList;
+    GotoImage(POS_AwayFromCurrent, NO_REQUEST);
+    const bool bDeleted = bPermanently ? QFile::remove(currentFileName) : QFile::moveToTrash(currentFileName);
+    if (bDeleted) {
+        fileListOfDeletedImage->Reload(NULL, false);
+        m_pFileList->DeleteHistory(true);
+        update();
+        GotoImage(POS_Current);
+    } else {
+        update();
+        if (m_pFileList->Current().isEmpty()) {
+            GotoImage(POS_First);
+        } else {
+            GotoImage(POS_Previous);
+        }
+        // No automatic fallback to a permanent deletion: the user only asked for the trash
+        SetToast(bPermanently ? tr("Could not delete the file") : tr("Could not move the file to the trash"));
+    }
+}
+
+bool CMainDlg::showDeleteConfirmationDialog(const QStringList &pathList, bool bMoveToTrash) {
     QString sTitle;
     QString sText;
     QString sWarning;
     QMessageBox::Icon iIcon;
 
-    if (bRecycleOnly) {
+    if (bMoveToTrash) {
         iIcon = QMessageBox::Question;
         sWarning = "";
         if (pathList.size() == 1) {
             sTitle = tr("Delete File");
-            sText = tr("Do you really want to move this file into the recycle bin?");
+            sText = tr("Do you really want to move this file to the trash?");
         } else {
             sTitle = tr("Delete multiple elements");
-            sText = QString(tr("Do you really want to move these %1 files into the recycle bin?")).arg(pathList.size());
+            sText = QString(tr("Do you really want to move these %1 files to the trash?")).arg(pathList.size());
         }
     } else {
         iIcon = QMessageBox::Warning;
@@ -3935,7 +3948,7 @@ void CMainDlg::onActiveDirectoryFilelistChanged() {
     }
 }
 
-// private slot. Reacts to emits in OnAnotherInstanceStarted() or nativeEvent WM_COPYDATA handler which change m_sStartupFile
+// private slot. Reacts to emits in OnAnotherInstanceStarted() which change m_sStartupFile
 void CMainDlg::onLoadFileAsynch() {
     if (isEnabled() && !m_sStartupFile.isEmpty()) {
         StopMovieMode();

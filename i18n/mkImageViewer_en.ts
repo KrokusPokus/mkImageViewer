@@ -350,7 +350,7 @@ Press ESC to exit...</source>
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="3822"/>
-        <source>Do you really want to move this file into the recycle bin?</source>
+        <source>Do you really want to move this file to the trash?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -361,7 +361,7 @@ Press ESC to exit...</source>
     </message>
     <message>
         <location filename="../src/MainDlg.cpp" line="3825"/>
-        <source>Do you really want to move these %1 files into the recycle bin?</source>
+        <source>Do you really want to move these %1 files to the trash?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -402,6 +402,14 @@ Press ESC to exit...</source>
     <message>
         <location filename="../src/MainDlg.cpp" line="3907"/>
         <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not delete the file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not move the file to the trash</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1078,6 +1086,18 @@ Press ESC to exit...</source>
     <message>
         <location filename="../src/SettingsProvider.cpp" line="519"/>
         <source>ForceQImageReader</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Only for permanent deletion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Confirm deletion:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ask before a file is moved to the trash or deleted permanently (DeleteConfirmation)</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

@@ -1,7 +1,7 @@
 #ifndef WORKTHREAD_H
 #define WORKTHREAD_H
 
-// Portable (C++20, no Qt, no Win32) single-worker request queue.
+// Portable (C++20, no Qt) single-worker request queue.
 //
 // Usage contract:
 //  * Derive, implement ProcessRequest() (and optionally AfterFinishProcess()/OnCancelled()).
@@ -24,7 +24,7 @@
 #include <vector>
 #include <utility>
 
-// Manual-reset event (replacement for Win32 CreateEvent(TRUE, FALSE)).
+// Manual-reset event: stays set after Set(), Wait() returns immediately from then on.
 class CCompletionEvent {
 public:
     void Set() {

@@ -56,7 +56,8 @@ enum class Command : std::uint16_t {
     CopyFull,
     CopyPath,
     CutFile,
-    DeleteFile,
+    DeleteFile,               // in den Papierkorb
+    DeleteFilePermanently,
     RenameFile,               // noch ohne Funktion im Hauptfenster (kommt spaeter)
     ExploreFile,
     OpenDefaultEditor,

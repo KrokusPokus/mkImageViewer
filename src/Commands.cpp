@@ -125,7 +125,8 @@ constexpr std::array<CommandInfo, kCommandCount> kTable = {{
     make(Command::CopyFull,          "CopyFull",          Category::File, CMD_TR("Copy original image content to clipboard")),
     make(Command::CopyPath,          "CopyPath",          Category::File, CMD_TR("Copy file path to clipboard")),
     make(Command::CutFile,           "CutFile",           Category::File, CMD_TR("Cut file to clipboard")),
-    make(Command::DeleteFile,        "DeleteFile",        Category::File, CMD_TR("Delete file")),
+    make(Command::DeleteFile,        "DeleteFile",        Category::File, CMD_TR("Move file to trash")),
+    make(Command::DeleteFilePermanently, "DeleteFilePermanently", Category::File, CMD_TR("Delete file permanently")),
     make(Command::RenameFile,        "RenameFile",        Category::File, CMD_TR("Rename file")),
     make(Command::ExploreFile,       "ExploreFile",       Category::File, CMD_TR("Show in folder")),
     make(Command::OpenDefaultEditor, "OpenDefaultEditor", Category::File, CMD_TR("Edit image in default editor")),
@@ -211,7 +212,7 @@ constexpr DefaultBinding kDefaultBindings[] = {
     { "Plus",      Command::ZoomIn,     0 },
     { "Minus",     Command::ZoomOut,    0 },
     { "Del",       Command::DeleteFile, 0 },
-    { "Shift+Del", Command::DeleteFile, 0 },
+    { "Shift+Del", Command::DeleteFilePermanently, 0 },
     { "F2",        Command::RenameFile, 0 },
 
     { "F1",     Command::Help,                    0 },

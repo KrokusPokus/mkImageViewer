@@ -3,7 +3,7 @@
 
 #include <cstddef>
 
-// AVIF reader based on libavif. Plain C++20, no Qt, no Win32.
+// AVIF reader based on libavif. Plain C++20, no Qt.
 //
 // Threading: the decoder state (an animation that is read frame by frame) is process wide.
 // All calls must come from one thread at a time (the image loading thread).

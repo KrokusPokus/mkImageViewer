@@ -6,16 +6,7 @@
 #include "ResizeFilter.h"
 #include "XMMImage.h"
 
-#include <immintrin.h> // Beinhaltet alle SSE/AVX-Intrinsics und _mm_round_ps für GCC/Clang/MSVC
-
-// Fallback für _MM_ALIGN16, falls der Compiler es nicht bereitstellt
-#ifndef _MM_ALIGN16
-    #if defined(_MSC_VER)
-        #define _MM_ALIGN16 __declspec(align(16))
-    #else
-        #define _MM_ALIGN16 __attribute__((aligned(16)))
-    #endif
-#endif
+#include <immintrin.h> // Beinhaltet alle SSE/AVX-Intrinsics und _mm_round_ps
 
 #include <cstdint>
 #include <cstring>
@@ -25,16 +16,7 @@
 #include <cstddef>
 #include <new>
 
-#if defined(__linux__)
 #include <unistd.h> // sysconf() for the cache sizes
-#endif
-
-// This macro allows for aligned definition of a 16 byte value with initialization of the 8 components
-// to a single value
-#define DECLARE_ALIGNED_DQWORD(name, initializer) \
-    int16_t _tempVal##name[16]; \
-    int16_t* name = (int16_t*)((((std::uintptr_t)&(_tempVal##name) + 15) & ~15)); \
-    name[0] = name[1] = name[2] = name[3] = name[4] = name[5] = name[6] = name[7] = initializer;
 
 #define ALPHA_OPAQUE 0xFF000000
 
@@ -1034,7 +1016,7 @@ static CXMMImage* ApplyFilter_SSE(int nSourceHeight, int nTargetHeight, int nWid
     const uint8_t* pSourceStart = (const uint8_t*)pSourceImg->AlignedPtr() + nStartXAligned * sizeof(float);
     XMMFilterKernel** pKernelIndexStart = filter.Indices;
 
-    _MM_ALIGN16 float XMM255[4] = {4095.0,  4095.0, 4095.0, 4095.0};
+    alignas(16) float XMM255[4] = {4095.0,  4095.0, 4095.0, 4095.0};
 
     __m128 xmm0 = _mm_setzero_ps();
     __m128 xmm1 = *((__m128*)XMM255);
@@ -1449,12 +1431,10 @@ struct CCacheSizes {
 static const CCacheSizes& GetCacheSizes() {
     static const CCacheSizes sizes = [] {
         CCacheSizes c;
-#if defined(__linux__)
         long nL2 = sysconf(_SC_LEVEL2_CACHE_SIZE);
         long nL3 = sysconf(_SC_LEVEL3_CACHE_SIZE);
         if (nL2 > 0) c.nL2 = (size_t)nL2;
         if (nL3 > 0) c.nL3 = (size_t)nL3;
-#endif
         return c;
     }();
     return sizes;

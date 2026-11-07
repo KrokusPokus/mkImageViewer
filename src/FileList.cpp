@@ -191,8 +191,7 @@ void CFileList::FileHasRenamed(const QString& sOldFileName, const QString& sNewF
     }
 
     // The file the list was created for (used e.g. by Reload() as the start of the wrap-around).
-    // The old code compared case-insensitive (Windows); file names on Linux are case-sensitive,
-    // otherwise renaming "a.jpg" would also hit an unrelated "A.jpg".
+    // File names are case-sensitive: renaming "a.jpg" must not hit an unrelated "A.jpg".
     if (!m_sInitialFile.isEmpty() && QDir::cleanPath(QFileInfo(m_sInitialFile).absoluteFilePath()) == sOld) {
         m_sInitialFile = sNew;
     }
@@ -477,8 +476,8 @@ CFileList* CFileList::WrapToNextImage() {
 
         bool bFound = false;
         for (int nStep = 0; nStep < 2; nStep++) {
-            for (const QString& dirName : dirList) {
-                if (dirName.compare(sThisDirTitle, Qt::CaseInsensitive) == 0) {
+            for (const QString& dirName : std::as_const(dirList)) {
+                if (dirName == sThisDirTitle) {
                     bFound = true;
                 } else if (bFound) {
                     const QString candidatePath = sNextDirRoot + QDir::separator() + dirName;
@@ -522,7 +521,7 @@ CFileList* CFileList::FindFileRecursively(const QString& sDirectory, const QStri
                     return pFileList;
                 }
             }
-            if (subDirName.compare(sFindAfter, Qt::CaseInsensitive) == 0) {
+            if (subDirName == sFindAfter) {
                 bStart = true;
             }
         }
@@ -577,7 +576,7 @@ CFileList* CFileList::TryCreateFileList(const QString& directory, int nNewLevel)
 
     CFileList* pList = this;
     while (pList != nullptr) {
-        if (pList->m_sDirectory.compare(cleanDir, Qt::CaseInsensitive) == 0) {
+        if (pList->m_sDirectory == cleanDir) {
             return nullptr;
         }
         pList = pList->m_prev;

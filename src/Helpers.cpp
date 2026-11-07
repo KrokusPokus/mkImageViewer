@@ -94,18 +94,9 @@ namespace {
             line = url.toLocalFile();
         }
 
-#ifdef Q_OS_WIN
-        static const QRegularExpression winEnvRegex(R"(%([A-Za-z0-9_()]+)%)");
-        line = expandVariablesOnce(line, winEnvRegex, [](const QRegularExpressionMatch &m) {
-            const QByteArray name = m.captured(1).toUtf8();
-            if (!qEnvironmentVariableIsSet(name.constData())) return m.captured(0);
-            return qEnvironmentVariable(name.constData());
-        });
-#else
-        // Gilt für Linux UND macOS (POSIX-Semantik ist identisch)
         if (line == "~") {
             line = QDir::homePath();
-        } else if (line.startsWith("~/") || line.startsWith("~\\")) {
+        } else if (line.startsWith("~/")) {
             line = QDir::homePath() + line.mid(1);
         }
 
@@ -117,7 +108,6 @@ namespace {
             if (!qEnvironmentVariableIsSet(name.constData())) return m.captured(0);
             return qEnvironmentVariable(name.constData());
         });
-#endif
 
         return QDir::cleanPath(line);
     }
@@ -665,21 +655,21 @@ QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
             return;
         }
 
-        if (!handlerApp.contains('/') && !handlerApp.contains('\\')) {
+        if (!handlerApp.contains('/')) {
             QString localAppPath = QDir(QCoreApplication::applicationDirPath()).filePath(handlerApp);
             if (QFile::exists(localAppPath)) {
-                QProcess::startDetached(QDir::toNativeSeparators(localAppPath), fileList);
+                QProcess::startDetached(localAppPath, fileList);
                 return;
             }
 
             QString absolutePath = QStandardPaths::findExecutable(handlerApp);
             if (!absolutePath.isEmpty()) {
                 // bool QProcess::startDetached(const QString &program, const QStringList &arguments = {}, const QString &workingDirectory = QString(), qint64 *pid = nullptr)
-                QProcess::startDetached(QDir::toNativeSeparators(absolutePath), fileList);
+                QProcess::startDetached(absolutePath, fileList);
                 return;
             }
         } else if (QFile::exists(handlerApp)) {
-            QProcess::startDetached(QDir::toNativeSeparators(handlerApp), fileList);
+            QProcess::startDetached(handlerApp, fileList);
             return;
         }
     }

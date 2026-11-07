@@ -49,19 +49,13 @@ void CClipboard::CutFileToClipboard(const QString& fileName) {
     QMimeData* mimeData = new QMimeData();
     QUrl fileUrl = QUrl::fromLocalFile(fileName);
 
-    // 1. Standard-Datei-URL Liste (Cross-Platform)
+    // 1. Standard-Datei-URL Liste
     mimeData->setUrls({ fileUrl });
 
-    // 2. Windows-spezifischer Preferred DropEffect (Ausschneiden/Verschieben)
-    // 0x02 = DROPEFFECT_MOVE
-    QByteArray dropEffect(4, 0);
-    dropEffect[0] = 0x02;
-    mimeData->setData("Preferred DropEffect", dropEffect);
-
-    // 3. Linux / KDE Cut-Marker
+    // 2. KDE Cut-Marker
     mimeData->setData("application/x-kde-cutselection", "1");
 
-    // 4. Linux / Freedesktop Standard (GNOME/Nautilus/Dolphin)
+    // 3. Freedesktop Standard (GNOME/Nautilus/Dolphin)
     // Format: "cut\nfile:///pfad/zur/datei.jpg\n"
     QByteArray gnomePayload = ("cut\n" + fileUrl.toString() + "\n").toUtf8();
     mimeData->setData("x-special/gnome-copied-files", gnomePayload);
@@ -92,7 +86,7 @@ void CClipboard::DoCopy(int nWidth, int nHeight, const void* pSourceImageDIB32, 
 
     QMimeData* mimeData = new QMimeData();
 
-    // Bild-Daten setzen (Qt erzeugt intern CF_DIB / image/png / image/bmp etc.)
+    // Bild-Daten setzen (Qt erzeugt intern image/png / image/bmp etc.)
     mimeData->setImageData(image);
 
     // 2. Falls ein Dateiname vorhanden ist, auch als Datei-URL anhängen
