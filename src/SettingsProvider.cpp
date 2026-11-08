@@ -362,6 +362,9 @@ QWidget* SettingsDialog::createQualityPage() {
     m_comboDownSamplingFilter->setToolTip(tr("Filter used for downscaling (DownSamplingFilter)"));
     layout->addRow("", m_checkHighQualityResampling);
     layout->addRow(tr("Downsampling filter:"), m_comboDownSamplingFilter);
+    m_checkIntermediateDownsampling = new QCheckBox(tr("Use half size intermediate image for strong downscaling"));
+    m_checkIntermediateDownsampling->setToolTip(tr("IntermediateDownsampling"));
+    layout->addRow("", m_checkIntermediateDownsampling);
 
     m_checkUseEmbeddedColorProfiles = new QCheckBox(tr("Apply embedded ICC profiles"));
     m_checkUseEmbeddedColorProfiles->setToolTip(tr("UseEmbeddedColorProfiles"));
@@ -567,6 +570,7 @@ void SettingsDialog::loadFrom(const CSettingsProvider& settings) {
 
     // Quality & Color
     m_checkHighQualityResampling->setChecked(settings.m_bHQRS);
+    m_checkIntermediateDownsampling->setChecked(settings.m_bIntermediateDownsampling);
     m_checkUseEmbeddedColorProfiles->setChecked(settings.m_bUseEmbeddedColorProfiles);
     m_checkAutoContrastCorrection->setChecked(settings.m_bAutoContrastCorrection);
     m_spinAutoContrastAmount->setValue(settings.m_dAutoContrastAmount);
@@ -609,6 +613,7 @@ void SettingsDialog::saveToSettings() {
     settings.WriteBool("ForceQImageReader", m_checkForceQImageReader->isChecked());
     settings.WriteString("DefaultImageEditor", m_editDefaultImageEditor->text().trimmed());
     settings.WriteBool("HighQualityResampling", m_checkHighQualityResampling->isChecked());
+    settings.WriteBool("IntermediateDownsampling", m_checkIntermediateDownsampling->isChecked());
     settings.WriteBool("NavigateWithMouseWheel", m_checkNavigateMouseWheel->isChecked());
     settings.WriteBool("ReloadWhenDisplayedImageChanged", m_checkReloadWhenImageChanged->isChecked());
     settings.WriteBool("ShowAppNameInTitle", m_checkShowAppNameInTitle->isChecked());
@@ -850,6 +855,7 @@ void CSettingsProvider::ReadWriteableINISettings() {
     m_eAutoZoomModeFullscreen = GetAutoZoomMode("AutoZoomModeFullscreen", m_eAutoZoomMode);
 
     m_bHQRS = GetBool("HighQualityResampling", true);
+    m_bIntermediateDownsampling = GetBool("IntermediateDownsampling", true);
     m_eSlideShowTransitionEffect = ConvertTransitionEffectFromString(GetString("SlideShowTransitionEffect", ""));
 
     // -------------------------------------------------------------------------------------------

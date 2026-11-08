@@ -100,7 +100,7 @@ public:
     void* OriginalPixels() { return  m_pOrigPixels; }
     const void* OriginalPixels() const { return m_pOrigPixels; }
     // remove original pixels from class - OriginalPixels() will return nullptr afterwards
-    void DetachOriginalPixels() { m_pOrigPixels = nullptr; }
+    void DetachOriginalPixels() { m_pOrigPixels = nullptr; FreeHalfSizePixels(); }
 
     // returns the number of channels in the OriginalPixels (3 or 4, corresponding to 24 bpp and 32 bpp)
     int OriginalChannels() const { return m_nOriginalChannels; }
@@ -222,6 +222,12 @@ private:
     void* m_pBitmapPixels;
     void* m_pLastBitmap; // one of the pointers above
 
+    // Half size version of the original pixels (32 bpp BGRA, size m_HalfSize), downsampled with Catmull-Rom.
+    // Used as source for strong downscaling instead of the original pixels (see GetHalfSizeSource()).
+    // Created on demand, nullptr if not available.
+    void* m_pHalfSizePixels;
+    DSize m_HalfSize;
+
     // Image processing parameters and flags during last call to GetBitmap()
     CImageProcessingParams m_imageProcParams;
     EProcessingFlags m_eProcFlags;
@@ -281,6 +287,12 @@ private:
         return ApplyCorrectionLUT(imageProcParams, eProcFlags, pCachedTargetBitmap, fullTargetSize, targetOffset, 
             pSourceBitmap, bitmapSize, bOnlyCheck, bCanTakeOwnershipOfSourceBitmap, bNotUsed);
     }
+
+    // Returns the half size intermediate image if it shall be used as downsampling source for the given target size,
+    // creating it if needed. Returns nullptr if the original pixels shall be used.
+    const void* GetHalfSizeSource(DSize fullTargetSize);
+
+    void FreeHalfSizePixels() { delete[] static_cast<uint8_t*>(m_pHalfSizePixels); m_pHalfSizePixels = nullptr; m_HalfSize = DSize(0, 0); }
 
     // Get if from source to target size it is down or upsampling
     EResizeType GetResizeType(DSize targetSize, DSize sourceSize);

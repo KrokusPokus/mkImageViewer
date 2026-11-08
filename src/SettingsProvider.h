@@ -57,6 +57,7 @@ private:
     // Qualität & Farbe
     class QCheckBox* m_checkHighQualityResampling;
     class QComboBox* m_comboDownSamplingFilter;
+    class QCheckBox* m_checkIntermediateDownsampling;
     class QCheckBox* m_checkUseEmbeddedColorProfiles;
     class QCheckBox* m_checkAutoContrastCorrection;
     class QDoubleSpinBox* m_spinAutoContrastAmount;
@@ -118,6 +119,8 @@ public:
     bool DefaultMaximized() const { return m_bDefaultMaximized; }
     bool ExplicitWindowRect() const { return m_bExplicitWindowRect; }
     bool HighQualityResampling() const { return m_bHQRS; }
+    // Strong downscaling (target <= 1/4 of the original) uses a cached half size version of the image as source
+    bool IntermediateDownsampling() const { return m_bIntermediateDownsampling; }
     bool IsSortedAscending() const { return m_bIsSortedAscending; }
     bool NavigateWithMouseWheel() const { return m_bNavigateMouseWheel; }
     bool ReloadWhenDisplayedImageChanged() const { return m_bReloadWhenDisplayedImageChanged; }
@@ -187,6 +190,7 @@ private:
     QString m_stateFileFullPath;
 
     bool m_bHQRS{true};
+    bool m_bIntermediateDownsampling{true};
     bool m_bShowFullPathInTitle{false};
     bool m_bShowAppNameInTitle{true};
     bool m_bShowFullScreen{false};
