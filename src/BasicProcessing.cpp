@@ -857,8 +857,8 @@ static void RotateBlock(const float* pSrc, float* pTgt, int nWidth, int nTargetP
     int nIncTargetChannel = nTargetPaddedWidth;
     int nIncTargetLine = nIncTargetChannel * 3;
     int nIncSource = nPaddedWidth * 3 - nBlockWidth * 3;
-    const float* pSource = pSrc + nPaddedWidth * 3 * nYStart + nXStart * 3;
-    float* pTarget = pTgt + nTargetPaddedWidth * 3 * nXStart + nYStart;
+    const float* pSource = pSrc + (size_t)nPaddedWidth * 3 * nYStart + nXStart * 3;
+    float* pTarget = pTgt + (size_t)nTargetPaddedWidth * 3 * nXStart + nYStart;
     float* pStartYPtr = pTarget;
     int nLoopX = Helpers::DoPadding(nBlockWidth, simdPixelsPerRegister) / simdPixelsPerRegister;
     int nTargetIncrement = ((simdPixelsPerRegister - 1) * nIncTargetLine) + nIncTargetChannel;
