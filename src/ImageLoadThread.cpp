@@ -63,7 +63,7 @@ using namespace std::string_view_literals;
 
 // Upper bound for a single archive entry we are willing to inflate into memory.
 // The size stored in an archive is attacker controlled, so it must be checked before allocating.
-const uint64_t kMaxZipEntrySize =
+constexpr uint64_t kMaxZipEntrySize =
     std::max({ static_cast<uint64_t>(MAX_JPEG_FILE_SIZE), static_cast<uint64_t>(MAX_WEBP_FILE_SIZE),
               static_cast<uint64_t>(MAX_PNG_FILE_SIZE), static_cast<uint64_t>(MAX_JXL_FILE_SIZE),
               static_cast<uint64_t>(MAX_HEIF_FILE_SIZE), static_cast<uint64_t>(MAX_BMP_FILE_SIZE) });

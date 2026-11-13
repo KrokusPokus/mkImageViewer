@@ -62,7 +62,7 @@ void * HeifReader::ReadImage(int &width,
     }
     std::vector<uint8_t> iccp = image.get_raw_color_profile();
     void* transform = ICCProfileTransform::CreateTransform(iccp.data(), iccp.size(), ICCProfileTransform::FORMAT_RGBA);
-    if (!ICCProfileTransform::DoTransform(transform, data, pPixelData, width, height, stride=stride)) {
+    if (!ICCProfileTransform::DoTransform(transform, data, pPixelData, width, height, stride)) {
         unsigned int* o = (unsigned int*)pPixelData;
         for (size_t i = 0; i < nRows; i++) {
             unsigned int* p = (unsigned int*)(data + i * stride);

@@ -220,10 +220,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
             uint16_t pixel = 0;
             int r = 0, g = 0, b = 0;
 
-            // Since we convert 16-bit images to 24 bit, we hardcode the channels to 3.
-            // We then calculate the stride and allocate memory for the pixels.
-            int channels = 3;
-            int stride = channels * width;
+            // 16 bit images are converted to 24 bit (3 bytes BGR per pixel)
 
             // Load in all the pixel data pixel by pixel
             for (int y = 0; y < height; y++)

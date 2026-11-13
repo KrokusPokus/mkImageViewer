@@ -40,7 +40,7 @@ void* QoiReaderWriter::ReadImage(int& width,
         return nullptr;
     }
     // one line fits into an int (width <= MAX_IMAGE_DIMENSION), the whole image may not
-    const std::size_t decoded_stride = width * nchannels;
+    const std::size_t decoded_stride = static_cast<std::size_t>(width) * nchannels;
     const std::size_t padded_stride = Helpers::DoPadding(width * nchannels, 4);
     const std::size_t size = decoded_stride * height;
     unsigned char* pPixelData = new(std::nothrow) unsigned char[padded_stride * height];
