@@ -50,6 +50,23 @@ static const QCollator& GetLogicalCollator() {
     return collator;
 }
 
+// Order of folder names for the folder navigation modes: the same name order as the files (natural,
+// case-insensitive, the exact name as tie-breaker: "Foto" and "foto" can both exist on Linux),
+// reversed when sorting descending.
+// Folders are always ordered by name, also when the files are sorted by date, size or randomly.
+static bool FolderNameAscending(const QString& sName, const QString& sOther) {
+    const int nByName = GetLogicalCollator().compare(sName, sOther);
+    if (nByName != 0) {
+        return nByName < 0;
+    }
+    return sName < sOther;
+}
+
+static bool FolderNameLess(const QString& sName, const QString& sOther) {
+    // Descending: "other before this", see CFileDesc::operator < for why not "not this before other"
+    return CFileDesc::IsSortedAscending() ? FolderNameAscending(sName, sOther) : FolderNameAscending(sOther, sName);
+}
+
 // Unterstützte Dateiendungen
 static const QStringList& GetSupportedFileEndingList() {
     static const QStringList endings = {
@@ -470,9 +487,7 @@ CFileList* CFileList::WrapToNextImage() {
             return nullptr;
         }
 
-        std::sort(dirList.begin(), dirList.end(), [](const QString& a, const QString& b) {
-            return GetLogicalCollator().compare(a, b) < 0;
-        });
+        std::sort(dirList.begin(), dirList.end(), FolderNameLess);
 
         bool bFound = false;
         for (int nStep = 0; nStep < 2; nStep++) {
@@ -508,9 +523,7 @@ CFileList* CFileList::FindFileRecursively(const QString& sDirectory, const QStri
     QStringList dirList = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 
     if (!dirList.isEmpty()) {
-        std::sort(dirList.begin(), dirList.end(), [](const QString& a, const QString& b) {
-            return GetLogicalCollator().compare(a, b) < 0;
-        });
+        std::sort(dirList.begin(), dirList.end(), FolderNameLess);
 
         bool bStart = sFindAfter.isEmpty();
         for (const QString& subDirName : dirList) {
