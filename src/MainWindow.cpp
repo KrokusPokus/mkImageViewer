@@ -2523,7 +2523,7 @@ void CMainWindow::GotoImage(EImagePosition ePos, int nFlags) {
     const CImagePosition position = CurrentPosition();
     const bool bImageLoaded = (m_pCurrentImage != nullptr);
 
-    bool bNoWrapAroundEdgeFrame = !CSettingsProvider::This().WrapAroundFolder() &&
+    bool bNoWrapAroundEdgeFrame = !m_pFileList->WrapsAround() &&
         position.FrameCount > 1 && !position.IsAnimation;
 
     int nFrameIndex = 0;
@@ -2538,14 +2538,14 @@ void CMainWindow::GotoImage(EImagePosition ePos, int nFlags) {
             if (position.IsMultiPageArchive()) {
                 nFrameIndex = 0;
             } else {
-                m_pFileList->First();
+                m_pFileList = m_pFileList->First();
             }
             break;
         case POS_Last:
             if (position.IsMultiPageArchive()) {
                 nFrameIndex = position.FrameCount - 1;
             } else {
-                m_pFileList->Last();
+                m_pFileList = m_pFileList->Last();
             }
             break;
         case POS_Next:

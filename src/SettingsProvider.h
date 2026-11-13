@@ -135,7 +135,8 @@ public:
     bool ForceQImageReader() const { return m_bForceQImageReader; }
     // .desktop-ID (z.B. "org.kde.krita.desktop"), Programmname oder Pfad; leer = Standardprogramm des Systems
     QString DefaultImageEditor() const { return m_sDefaultImageEditor; }
-    bool WrapAroundFolder() const { return m_bWrapAroundFolder && m_eNavigation == Helpers::NM_LoopDirectory; }
+    // what it means depends on the navigation mode, which can be changed at runtime, see CFileList::WrapsAround()
+    bool WrapAroundFolder() const { return m_bWrapAroundFolder; }
 
     // Ursprüngliche Rückgabetypen für vollständige Drop-in Compatibility
     QColor ColorBackground() const { return m_colorBackground; }

@@ -5,6 +5,7 @@
 
 #include <QString>
 #include <QDateTime>
+#include <QStringList>
 
 #include <list>
 
@@ -76,11 +77,16 @@ public:
     // Move to previous file in list.
     CFileList* Prev();
 
-    // Move to first file in current folder (according to sort order)
-    void First();
+    // Move to first file (according to sort order): of the current folder, or in LoopSameFolderLevel mode
+    // of the first sibling folder containing images. The filelist object of that file is returned.
+    CFileList* First();
 
-    // Move to last file in current folder (according to sort order)
-    void Last();
+    // Move to last file (according to sort order): of the current folder, or in LoopSameFolderLevel mode
+    // of the last sibling folder containing images. The filelist object of that file is returned.
+    CFileList* Last();
+
+    // Returns if navigation wraps around from the last to the first file and vice versa in the current navigation mode
+    bool WrapsAround() const;
 
     // Move away from current image, either forward or backward (if on last image)
     CFileList* AwayFromCurrent();
@@ -149,6 +155,11 @@ private:
     // filelists for several folders are chained
     CFileList* m_next{ nullptr };
     CFileList* m_prev{ nullptr };
+    // LoopSameFolderLevel: the chain is a cache of the sibling folders loaded so far, in folder order.
+    // These flags are true if it is known that no other sibling folder with images lies between
+    // this folder and m_next (m_prev), so the folders on disk need not be enumerated again.
+    bool m_bNextIsAdjacent{ false };
+    bool m_bPrevIsAdjacent{ false };
     std::list<CFileDesc> m_fileList;
     std::list<CFileDesc>::iterator m_iter;          // current position in m_fileList
     std::list<CFileDesc>::iterator m_iterStart;     // start of iteration in m_fileList
@@ -165,6 +176,19 @@ private:
     CFileList* TryCreateFileList(const QString& directory, int nNewLevel);
     CFileList* WrapToNextImage();
     CFileList* WrapToPrevImage();
+    bool UsesStartFileAsLoopStart() const;
+    // LoopSameFolderLevel: all sibling folders form one file list, see NextInFolderList()
+    CFileList* NextInFolderList();
+    CFileList* PrevInFolderList();
+    CFileList* AdjacentFolder(bool bForward);
+    CFileList* OuterFolder(bool bFirst);
+    bool GetSiblingFolders(QString& sParentDir, QStringList& dirList) const;
+    CFileList* AdjacentSiblingFolder(bool bForward);
+    CFileList* OuterSiblingFolder(bool bFirst);
+    CFileList* GetFolderList(const QString& sDirectory, int nLevel);
+    void InsertAfter(CFileList* pList, bool bAdjacent);
+    void InsertBefore(CFileList* pList, bool bAdjacent);
+    void Unlink();
     void FindFiles();
     static bool IsImageFile(const QString& sEnding);
 };
