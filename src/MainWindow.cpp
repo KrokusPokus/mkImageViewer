@@ -22,6 +22,7 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QBuffer>
+#include <QDateTime>
 #include <QDebug>
 #include <QDialog>
 #include <QDir>
@@ -59,7 +60,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdint>
 #include <cstdlib>
 #include <optional>
 #include <utility>
@@ -134,6 +134,19 @@ namespace {
             sLine += QStringLiteral(" (") + sources.join(QStringLiteral(", ")) + QLatin1Char(')');
         }
         return sLine;
+    }
+
+    QString FormatFileSize(qint64 bytes);
+
+    // "58,3 MiB  (Original 45,8 MiB, Bitmap 7,9 MiB, Half Size 11,4 MiB)" - Half Size only if present
+    QString FormatMemoryUsage(const CBaseImage::CMemoryUsage& usage) {
+        QString s = FormatFileSize(static_cast<qint64>(usage.Total()))
+            + QStringLiteral("  (Original ") + FormatFileSize(static_cast<qint64>(usage.Original))
+            + QStringLiteral(", Bitmap ") + FormatFileSize(static_cast<qint64>(usage.Bitmap));
+        if (usage.HalfSize > 0) {
+            s += QStringLiteral(", Half Size ") + FormatFileSize(static_cast<qint64>(usage.HalfSize));
+        }
+        return s + QLatin1Char(')');
     }
 
     QString FormatFileSize(qint64 bytes) {
@@ -462,6 +475,13 @@ CMainWindow::CMainWindow(const QString& sStartupFile)
 
     // create JPEG provider and request first image - no processing yet, the first paintEvent() creates a low quality preview
     m_pImageProvider = new CImageProvider(this, nReadAheadBuffers);
+    // Keep the cache memory in the info overlay up to date (e.g. read ahead images that finish after painting).
+    // Queued: the signal also comes from the load thread, and from the GUI thread it must not repaint synchronously.
+    connect(m_pImageProvider, &CImageProvider::CachedImagesChanged, this, [this]() {
+        if (m_bShowInfo) {
+            update();
+        }
+    }, Qt::QueuedConnection);
 
     TakeLoadResult(m_pImageProvider->RequestImage(m_pFileList,
                                                   CImageProvider::FORWARD,
@@ -626,6 +646,17 @@ void CMainWindow::paintEvent(QPaintEvent* /*event*/)
             const QString bitmapLoadDelayMs_forDisplay = QString::number(m_pCurrentImage->GetBitmapLoadDelayMs());
             const QString paintTime_forDisplay = QString::number(paintTime);
 
+
+            // Zeitangaben aus EXIF (GetAcquisitionTime/GetDateTime liefern QDateTime, daher formatieren)
+            const QString sDateTimeFormat = QStringLiteral("yyyy-MM-dd  HH:mm:ss");
+            QString exifAcquisitionTime;
+            CEXIFReader* pEXIF = m_pCurrentImage->GetEXIFReader();
+            if (pEXIF != nullptr) {
+                if (pEXIF->GetAcquisitionTimePresent()) {
+                    exifAcquisitionTime = pEXIF->GetAcquisitionTime().toString(sDateTimeFormat);
+                }
+            }
+
             QString infoText;
             QString sFullPath = CurrentFileName(false);
 
@@ -637,31 +668,41 @@ void CMainWindow::paintEvent(QPaintEvent* /*event*/)
                 QString sFileSize = FormatFileSize(bArchiveEntry ? static_cast<qint64>(position.EntrySize) : fileInfo.size());
                 QString visiblePath = CurrentDisplayPath(); // for images in an archive "archive/file"
 
+                QString sTimeLines;
+                const QDateTime fileModified = fileInfo.lastModified();
+                if (fileModified.isValid()) {
+                    sTimeLines += (bArchiveEntry ? QStringLiteral("\nArchive Time: ") : QStringLiteral("\nFile Time:   "))
+                    + fileModified.toString(sDateTimeFormat);
+                }
+                if (!exifAcquisitionTime.isEmpty()) {
+                    sTimeLines += QStringLiteral("\nEXIF Time:   ") + exifAcquisitionTime;
+                }
+
                 if (m_pCurrentImage->NumberOfFrames() > 1) {
                     const QString frameNumber_forDisplay = QString::number(m_pCurrentImage->FrameIndex() + 1);
                     const QString frameCount_forDisplay = QString::number(m_pCurrentImage->NumberOfFrames());
                     if (m_bIsAnimationPlaying) {
                         const QString frameTimeMs_forDisplay = QString::number(m_pCurrentImage->FrameTimeMs());
-                        infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n%19\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms\nPainting Image:  %18 ms")
+                        infoText = QString("%1\nFrame %2 of %3 (%4 ms)\nFile Size:   %5%20\n\nImage Size:  %6 x %7\nZoomed Size: %8 x %9   (Zoom Factor: %10)\nWindow Size: %11 x %12\n%19\n\nCPU-Threads: %13\nCPU-Algorithm: %14\nDownsampling-Filter: %15\n\nLoading Image:  %16 ms\nScaling Image:  %17 ms\nPainting Image:  %18 ms")
                             .arg(visiblePath, frameNumber_forDisplay, frameCount_forDisplay, frameTimeMs_forDisplay,
                                  sFileSize, origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay,
                                  realHeight_forDisplay, zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay,
                                  numThreads_forDisplay, sCPU, sFilter, fileLoadDelayMs_forDisplay,
-                                 bitmapLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
+                                 bitmapLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine, sTimeLines);
                     } else {
-                        infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n%18\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms\nPainting Image:  %17 ms")
+                        infoText = QString("%1\nFrame %2 of %3\nFile Size:   %4%19\n\nImage Size:  %5 x %6\nZoomed Size: %7 x %8   (Zoom Factor: %9)\nWindow Size: %10 x %11\n%18\n\nCPU-Threads: %12\nCPU-Algorithm: %13\nDownsampling-Filter: %14\n\nLoading Image:  %15 ms\nScaling Image:  %16 ms\nPainting Image:  %17 ms")
                             .arg(visiblePath, frameNumber_forDisplay, frameCount_forDisplay, sFileSize,
                                  origWidth_forDisplay, origHeight_forDisplay, realWidth_forDisplay, realHeight_forDisplay,
                                  zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay, numThreads_forDisplay,
                                  sCPU, sFilter, fileLoadDelayMs_forDisplay, bitmapLoadDelayMs_forDisplay,
-                                 paintTime_forDisplay, sRotationLine);
+                                 paintTime_forDisplay, sRotationLine, sTimeLines);
                     }
                 } else {
-                    infoText = QString("%1\nFile Size:   %2\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n%16\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms\nPainting Image:  %15 ms")
+                    infoText = QString("%1\nFile Size:   %2%17\n\nImage Size:  %3 x %4\nZoomed Size: %5 x %6   (Zoom Factor: %7)\nWindow Size: %8 x %9\n%16\n\nCPU-Threads: %10\nCPU-Algorithm: %11\nDownsampling-Filter: %12\n\nLoading Image:  %13 ms\nScaling Image:  %14 ms\nPainting Image:  %15 ms")
                         .arg(visiblePath, sFileSize, origWidth_forDisplay, origHeight_forDisplay,
                              realWidth_forDisplay, realHeight_forDisplay, zoom_forDisplay, clientWidth_forDisplay,
                              clientHeight_forDisplay, numThreads_forDisplay, sCPU, sFilter,
-                             fileLoadDelayMs_forDisplay, bitmapLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine);
+                             fileLoadDelayMs_forDisplay, bitmapLoadDelayMs_forDisplay, paintTime_forDisplay, sRotationLine, sTimeLines);
                 }
             } else {
                 infoText = QString("\n\nImage Size:  %1 x %2\nZoomed Size: %3 x %4   (Zoom Factor: %5)\nWindow Size: %6 x %7\n%14\n\nCPU-Threads: %8\nCPU-Algorithm: %9\nDownsampling-Filter: %10\n\nLoading Image:  %11 ms\nScaling Image:  %12 ms\nPainting Image:  %13 ms")
@@ -669,6 +710,30 @@ void CMainWindow::paintEvent(QPaintEvent* /*event*/)
                          zoom_forDisplay, clientWidth_forDisplay, clientHeight_forDisplay, numThreads_forDisplay,
                          sCPU, sFilter, fileLoadDelayMs_forDisplay, bitmapLoadDelayMs_forDisplay,
                          paintTime_forDisplay, sRotationLine);
+            }
+
+            // Speicherbedarf der Pixelpuffer: aktuelles Bild (aufgeschluesselt) und Summe aller Bilder im Cache
+            infoText += QStringLiteral("\n\nImage Memory: ") + FormatMemoryUsage(m_pCurrentImage->GetMemoryUsage());
+            if (m_pImageProvider != nullptr) {
+                // Summe und eine Zeile je Cache-Eintrag; "*" markiert das angezeigte Bild
+                const std::vector<CImageProvider::CCachedImageInfo> cached = m_pImageProvider->CachedImagesInfo();
+                size_t nCacheBytes = 0;
+                QString sCacheLines;
+                for (const auto& entry : cached) {
+                    nCacheBytes += entry.Memory.Total();
+                    QString sName = QFileInfo(entry.FileName).fileName();
+                    if (entry.Position.InArchive && !entry.Position.EntryName.isEmpty()) {
+                        sName += QLatin1Char('/') + entry.Position.EntryName;
+                    }
+                    if (entry.Position.FrameCount > 1) {
+                        sName += QStringLiteral(" [%1/%2]").arg(entry.FrameIndex + 1).arg(entry.Position.FrameCount);
+                    }
+                    sCacheLines += (entry.Image == m_pCurrentImage ? QStringLiteral("\n * ") : QStringLiteral("\n   "))
+                        + sName + QStringLiteral(":  ") + FormatMemoryUsage(entry.Memory);
+                }
+                infoText += QStringLiteral("\nCache Memory: ") + FormatFileSize(static_cast<qint64>(nCacheBytes))
+                    + QStringLiteral("  (%1 %2)").arg(cached.size()).arg(cached.size() == 1 ? QStringLiteral("image") : QStringLiteral("images"))
+                    + sCacheLines;
             }
 
             // QPainter Konfiguration für Text

@@ -1,6 +1,7 @@
 #ifndef IMAGEPROVIDER_H
 #define IMAGEPROVIDER_H
 
+#include "BaseImage.h"
 #include "ImageLoadResult.h"
 
 #include <QDebug>
@@ -12,6 +13,7 @@
 #include <atomic>
 #include <list>
 #include <memory>
+#include <vector>
 
 class CBaseImage;
 class CImageLoadThread;
@@ -42,6 +44,21 @@ public:
     void ClearAllRequests();
     bool FreeAllPossibleMemory();
 
+    // One loaded image in the cache, see CachedImagesInfo()
+    struct CCachedImageInfo {
+        QString FileName;               // full path (for archives: path of the archive)
+        int FrameIndex = 0;
+        CImagePosition Position;        // archive entry, number of frames (FileName is not set here)
+        const CBaseImage* Image = nullptr; // only to identify the image (e.g. the current one), do not store
+        bool InUse = false;
+        CBaseImage::CMemoryUsage Memory;
+    };
+
+    // Pixel memory of all loaded images in the cache (the image in use and the read ahead images), in the order
+    // of the cache list. Images still being loaded are not listed: the load thread is writing them.
+    // Call from the GUI thread only.
+    std::vector<CCachedImageInfo> CachedImagesInfo() const;
+
     // Tells the provider that a file was renamed (full paths). Cached and pending requests of the
     // file continue under the new name, so FindRequest() finds the image again without decoding it anew.
     // Call from the GUI thread only, like all other methods that touch m_requestList.
@@ -51,6 +68,11 @@ public:
     // for the file (decoders, archive listing) and all cached images of the file (every frame or page) are removed.
     // Images in use are not touched. Call from the GUI thread only.
     void ReloadFile(const QString& sFileName);
+
+signals:
+    // The set of cached images has changed: an image has finished loading (emitted from the LOAD THREAD) or a
+    // request was removed from the cache (emitted from the GUI thread). Connect with Qt::QueuedConnection.
+    void CachedImagesChanged();
 
 private:
     struct CImageRequest {
@@ -99,6 +121,8 @@ private:
     std::unique_ptr<CImageLoadThread> m_pLoadThread;
     int m_nNumBuffers;
     int m_nCurrentTimeStamp;
+    // Set in the destructor: the completion callback of a load that finishes during shutdown emits no signal anymore
+    std::atomic<bool> m_bShuttingDown{false};
 
     void RemoveUnusedImages(bool bRemoveAlsoReadAhead);
     RequestPtr StartRequestAndWaitUntilReady(const QString& sFileName, int nFrameIndex, const CProcessParams & processParams);

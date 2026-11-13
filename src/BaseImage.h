@@ -24,6 +24,15 @@ struct CDimRect {
 // Class holding a decoded image (not just JPEG - any supported format) and its meta data (if available).
 class CBaseImage {
 public:
+    // Memory used by the pixel buffers of the image (in bytes), see GetMemoryUsage()
+    struct CMemoryUsage {
+        size_t Original = 0;    // original pixels (m_pOrigPixels)
+        size_t HalfSize = 0;    // half size intermediate image (m_pHalfSizePixels), 0 if not created
+        size_t Bitmap = 0;      // resampled bitmaps (m_pBitmapPixels + m_pBitmapPixelsLUTProcessed)
+        size_t Total() const { return Original + HalfSize + Bitmap; }
+    };
+
+public:
     // Ownership of memory in pPixels goes to class, accessing this pointer after the constructor has been called
     // may causes access violations (use OriginalPixels() instead).
     // nChannels can be 1 (greyscale image), 3 (BGR color image) or 4 (BGRA color image, A ignored)
@@ -101,6 +110,10 @@ public:
     const void* OriginalPixels() const { return m_pOrigPixels; }
     // remove original pixels from class - OriginalPixels() will return nullptr afterwards
     void DetachOriginalPixels() { m_pOrigPixels = nullptr; FreeHalfSizePixels(); }
+
+    // Memory currently used by the pixel buffers, calculated from their sizes and channels.
+    // The buffers are created and released by the GUI thread (GetBitmap()), so call it from the GUI thread only.
+    CMemoryUsage GetMemoryUsage() const;
 
     // returns the number of channels in the OriginalPixels (3 or 4, corresponding to 24 bpp and 32 bpp)
     int OriginalChannels() const { return m_nOriginalChannels; }

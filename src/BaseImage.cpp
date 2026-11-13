@@ -311,6 +311,29 @@ void* CBaseImage::Resample(DSize fullTargetSize, DSize clippingSize, DPoint targ
     }
 }
 
+CBaseImage::CMemoryUsage CBaseImage::GetMemoryUsage() const {
+    CMemoryUsage usage;
+    if (m_pOrigPixels != nullptr) {
+        // 3 channel rows are padded to 4 bytes, 4 channel rows need no padding (1 channel is converted to 4)
+        const size_t nStride = (m_nOriginalChannels == 3)
+            ? static_cast<size_t>(Helpers::DoPadding(m_nOrigWidth * 3, 4))
+            : static_cast<size_t>(m_nOrigWidth) * 4;
+        usage.Original = nStride * static_cast<size_t>(m_nOrigHeight);
+    }
+    if (m_pHalfSizePixels != nullptr) {
+        usage.HalfSize = static_cast<size_t>(m_HalfSize.cx) * static_cast<size_t>(m_HalfSize.cy) * 4; // 32 bpp BGRA
+    }
+    // Both bitmaps have the size m_ClippingSize and 32 bpp. m_pLastBitmap points to one of them, not counted.
+    const size_t nBitmapBytes = static_cast<size_t>(m_ClippingSize.cx) * static_cast<size_t>(m_ClippingSize.cy) * 4;
+    if (m_pBitmapPixels != nullptr) {
+        usage.Bitmap += nBitmapBytes;
+    }
+    if (m_pBitmapPixelsLUTProcessed != nullptr) {
+        usage.Bitmap += nBitmapBytes;
+    }
+    return usage;
+}
+
 const void* CBaseImage::GetHalfSizeSource(DSize fullTargetSize) {
     if (!CSettingsProvider::This().IntermediateDownsampling() || m_pOrigPixels == nullptr) {
         FreeHalfSizePixels(); // release the memory when switched off

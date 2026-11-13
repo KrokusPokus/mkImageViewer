@@ -49,6 +49,7 @@ CImageProvider::CImageProvider(QObject* pParent, int nNumBuffers)
 }
 
 CImageProvider::~CImageProvider() {
+    m_bShuttingDown = true;
     // The load thread is terminated by its destructor (m_pLoadThread) before the requests are released
 }
 
@@ -144,6 +145,25 @@ void CImageProvider::ClearAllRequests() {
             iter = DeleteElementAt(iter);
         }
     }
+}
+
+std::vector<CImageProvider::CCachedImageInfo> CImageProvider::CachedImagesInfo() const {
+    std::vector<CCachedImageInfo> infos;
+    infos.reserve(m_requestList.size());
+    for (const auto& pRequest : m_requestList) {
+        // Ready is set by the load thread after the image is complete (atomic, orders the access to Image)
+        if (pRequest->Ready && pRequest->Image != nullptr) {
+            CCachedImageInfo info;
+            info.FileName = pRequest->FileName;
+            info.FrameIndex = pRequest->FrameIndex;
+            info.Position = pRequest->Position;
+            info.Image = pRequest->Image;
+            info.InUse = pRequest->InUse;
+            info.Memory = pRequest->Image->GetMemoryUsage();
+            infos.push_back(std::move(info));
+        }
+    }
+    return infos;
 }
 
 bool CImageProvider::FreeAllPossibleMemory() {
@@ -332,14 +352,20 @@ CImageProvider::RequestPtr CImageProvider::StartNewRequest(const QString& sFileN
         nFrameIndex,
         processParams,
         bReadAhead,
-        [pRequest, pLoadThread](int handle) {
-            QMutexLocker l(&pRequest->Mutex);
-            CImageData d = pLoadThread->GetLoadedImage(handle);
-            pRequest->Image = d.Image;
-            pRequest->Error = d.Error;
-            pRequest->Position = d.Position;
-            pRequest->Ready = true;
-            pRequest->WaitCondition.wakeAll();
+        [this, pRequest, pLoadThread](int handle) {
+            {
+                QMutexLocker l(&pRequest->Mutex);
+                CImageData d = pLoadThread->GetLoadedImage(handle);
+                pRequest->Image = d.Image;
+                pRequest->Error = d.Error;
+                pRequest->Position = d.Position;
+                pRequest->Ready = true;
+                pRequest->WaitCondition.wakeAll();
+            }
+            // Runs in the load thread: the queued connection delivers it to the GUI thread
+            if (!m_bShuttingDown) {
+                emit CachedImagesChanged();
+            }
         }
         );
     return pRequest;
@@ -383,11 +409,14 @@ void CImageProvider::SetAllRequestsInactive() {
 }
 
 std::list<CImageProvider::RequestPtr>::iterator CImageProvider::DeleteElementAt(std::list<RequestPtr>::iterator iteratorAt) {
-    return m_requestList.erase(iteratorAt);
+    auto iterNext = m_requestList.erase(iteratorAt);
+    emit CachedImagesChanged();
+    return iterNext;
 }
 
 void CImageProvider::DeleteElement(RequestPtr pRequest) {
     m_requestList.remove(pRequest);
+    emit CachedImagesChanged();
 }
 
 void CImageProvider::CancelPendingReadAhead(const RequestPtr& pKeep, CFileList* pFileList, EReadAheadDirection eDirection,
