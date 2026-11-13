@@ -1,5 +1,4 @@
 #include "ICCProfileTransform.h"
-#include "SettingsProvider.h"
 
 #include "lcms2.h"
 #include "Helpers.h"
@@ -10,6 +9,7 @@
 
 
 void* ICCProfileTransform::sRGBProfile = nullptr;
+std::atomic<bool> ICCProfileTransform::sEnabled{true};
 
 // Hilfsfunktion zur Prüfung, ob ein Profil sRGB ist
 static bool IsStandardsRGB(cmsHPROFILE hProfile) {
@@ -88,7 +88,7 @@ void* ICCProfileTransform::CreateTransform(const void* profile, unsigned int siz
 bool ICCProfileTransform::DoTransform(void* transform, const void* inputBuffer, void* outputBuffer, unsigned int width, unsigned int height, unsigned int stride)
 {
     unsigned int numPixels = width * height;
-    if (transform == nullptr || inputBuffer == nullptr || outputBuffer == nullptr || numPixels == 0 || !CSettingsProvider::This().UseEmbeddedColorProfiles())
+    if (transform == nullptr || inputBuffer == nullptr || outputBuffer == nullptr || numPixels == 0 || !IsEnabled())
         return false;
     cmsUInt32Number inFormat = cmsGetTransformInputFormat(transform);
     int nchannels;

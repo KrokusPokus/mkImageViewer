@@ -188,14 +188,10 @@ bool CSettingsProvider::ShowSettingsDialog(QWidget* parent) {
     dlg.loadFromSettings();
     if (dlg.exec() == QDialog::Accepted) {
         dlg.saveToSettings();
-        ReloadAllSettings();
+        ReadAllINISettings(); // the dialog reads the members, so all of them must reflect the INI again
         return true;
     }
     return false;
-}
-
-void CSettingsProvider::ReloadAllSettings() {
-    ReadWriteableINISettings();
 }
 
 // ============================================================================
@@ -709,8 +705,35 @@ CSettingsProvider::CSettingsProvider(DefaultsOnly) {
 }
 
 void CSettingsProvider::ReadAllINISettings() {
-    // Read settings that can be written with SaveSettings()
-    ReadWriteableINISettings();
+    m_bAutoContrastCorrection = GetBool("AutoContrastCorrection", false);
+
+    QString sNavigation = GetString("FolderNavigation", "LoopFolder");
+    if (sNavigation.compare("LoopSameFolderLevel", Qt::CaseInsensitive) == 0) {
+        m_eNavigation = Helpers::NM_LoopSameDirectoryLevel;
+    } else if (sNavigation.compare("LoopSubFolders", Qt::CaseInsensitive) == 0) {
+        m_eNavigation = Helpers::NM_LoopSubDirectories;
+    } else {
+        m_eNavigation = Helpers::NM_LoopDirectory;
+    }
+
+    QString sSorting = GetString("FileDisplayOrder", "FileName");
+    if (sSorting.compare("LastModDate", Qt::CaseInsensitive) == 0) {
+        m_eSorting = Helpers::FS_LastModTime;
+    } else if (sSorting.compare("Random", Qt::CaseInsensitive) == 0) {
+        m_eSorting = Helpers::FS_Random;
+    } else if (sSorting.compare("FileSize", Qt::CaseInsensitive) == 0) {
+        m_eSorting = Helpers::FS_FileSize;
+    } else {
+        m_eSorting = Helpers::FS_FileName;
+    }
+
+    m_bIsSortedAscending = GetBool("FileSortAscending", true);
+    m_eAutoZoomMode = GetAutoZoomMode("AutoZoomMode", Helpers::ZM_FitToScreen);
+    m_eAutoZoomModeFullscreen = GetAutoZoomMode("AutoZoomModeFullscreen", m_eAutoZoomMode);
+
+    m_bHQRS = GetBool("HighQualityResampling", true);
+    m_bIntermediateDownsampling = GetBool("IntermediateDownsampling", true);
+    m_eSlideShowTransitionEffect = ConvertTransitionEffectFromString(GetString("SlideShowTransitionEffect", ""));
 
     // Read sticky window position (StateLocation)
     ReadStickyWindowRect();
@@ -815,8 +838,9 @@ void CSettingsProvider::ReadAllINISettings() {
     m_bReloadWhenDisplayedImageChanged = GetBool("ReloadWhenDisplayedImageChanged", true);
 
     // -------------------------------------------------------------------------------------------
-    // [GF] Custom non-writable ini settings of this mod
+    // [GF] Custom ini settings of this mod
 
+    m_nBookModePageHeight = GetInt("BookModePageHeight", 122, 100, 1000);
     m_bBookModeLaunchFullscreen = GetBool("BookModeLaunchFullscreen", true);
     m_bSmoothPanning = GetBool("SmoothPanning", true);
     m_bSmartPanningKeys = GetBool("SmartPanningKeys", true);
@@ -825,45 +849,6 @@ void CSettingsProvider::ReadAllINISettings() {
     // Distance in file list for which decoded images will be kept in cache to speed up access.
     // The default of 2 means: Two pages forward + two pages backward.
     m_nCacheRange = GetInt("CacheRange", 2, 0, 8);
-}
-
-void CSettingsProvider::ReadWriteableINISettings() {
-    m_bAutoContrastCorrection = GetBool("AutoContrastCorrection", false);
-
-    QString sNavigation = GetString("FolderNavigation", "LoopFolder");
-    if (sNavigation.compare("LoopSameFolderLevel", Qt::CaseInsensitive) == 0) {
-        m_eNavigation = Helpers::NM_LoopSameDirectoryLevel;
-    } else if (sNavigation.compare("LoopSubFolders", Qt::CaseInsensitive) == 0) {
-        m_eNavigation = Helpers::NM_LoopSubDirectories;
-    } else {
-        m_eNavigation = Helpers::NM_LoopDirectory;
-    }
-
-    QString sSorting = GetString("FileDisplayOrder", "FileName");
-    if (sSorting.compare("LastModDate", Qt::CaseInsensitive) == 0) {
-        m_eSorting = Helpers::FS_LastModTime;
-    } else if (sSorting.compare("Random", Qt::CaseInsensitive) == 0) {
-        m_eSorting = Helpers::FS_Random;
-    } else if (sSorting.compare("FileSize", Qt::CaseInsensitive) == 0) {
-        m_eSorting = Helpers::FS_FileSize;
-    } else {
-        m_eSorting = Helpers::FS_FileName;
-    }
-
-    m_bIsSortedAscending = GetBool("FileSortAscending", true);
-    m_eAutoZoomMode = GetAutoZoomMode("AutoZoomMode", Helpers::ZM_FitToScreen);
-    m_eAutoZoomModeFullscreen = GetAutoZoomMode("AutoZoomModeFullscreen", m_eAutoZoomMode);
-
-    m_bHQRS = GetBool("HighQualityResampling", true);
-    m_bIntermediateDownsampling = GetBool("IntermediateDownsampling", true);
-    m_eSlideShowTransitionEffect = ConvertTransitionEffectFromString(GetString("SlideShowTransitionEffect", ""));
-
-    // -------------------------------------------------------------------------------------------
-    // [GF] Custom writable ini settings of this mod
-
-    m_nBookModePageHeight = GetInt("BookModePageHeight", 122, 100, 1000);
-
-    // -------------------------------------------------------------------------------------------
 }
 
 void CSettingsProvider::SaveCustomSettings() {

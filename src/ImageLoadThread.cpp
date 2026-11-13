@@ -3,6 +3,7 @@
 #include "BaseImage.h"
 #include "GeometryTypes.h"
 #include "Helpers.h"
+#include "ICCProfileTransform.h"
 #include "MainWindow.h"
 #include "MaxImageDef.h"
 #include "ReaderBMP.h"
@@ -394,7 +395,7 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
         return nullptr;
     }
 
-    if (CSettingsProvider::This().UseEmbeddedColorProfiles()) {
+    if (ICCProfileTransform::IsEnabled()) {
         const QColorSpace colorSpace = image.colorSpace();
         if (colorSpace.isValid() && colorSpace != SrgbColorSpace()) {
             image.convertToColorSpace(SrgbColorSpace());

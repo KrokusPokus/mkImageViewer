@@ -169,10 +169,6 @@ public:
     int LastSettingsPage() const;
     void SaveLastSettingsPage(int nPage);
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
-    void SetUseEmbeddedColorProfiles(int bUseEmbeddedColorProfiles) { m_bUseEmbeddedColorProfiles = (bUseEmbeddedColorProfiles != 0); }
-
-    // Lädt alle INI-Einstellungen erneut ein
-    void ReloadAllSettings();
 
     friend class SettingsDialog;
 
@@ -229,7 +225,6 @@ private:
     Helpers::ETransparencyMode m_eTransparencyMode;
 
     void ReadAllINISettings();
-    void ReadWriteableINISettings();
     void ReadStickyWindowRect();
 
     QString GetString(const QString& sKey, const QString& sDefault) const;

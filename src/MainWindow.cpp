@@ -8,6 +8,7 @@
 #include "FileList.h"
 #include "GeometryTypes.h"
 #include "HistogramCorr.h"
+#include "ICCProfileTransform.h"
 #include "ImageProcessingTypes.h"
 #include "ImageProvider.h"
 #include "KeyMap.h"
@@ -365,6 +366,7 @@ CMainWindow::CMainWindow(const QString& sStartupFile)
 
     m_eTransparencyMode = sp.TransparencyMode();
     m_bUseEmbeddedColorProfiles = sp.UseEmbeddedColorProfiles();
+    ICCProfileTransform::SetEnabled(m_bUseEmbeddedColorProfiles);
 
     /*############################################*/
     /* Custom variables of the linear scaling mod */
@@ -2041,7 +2043,7 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::ToggleEmbeddedColorProfiles:
             m_bUseEmbeddedColorProfiles = !m_bUseEmbeddedColorProfiles;
-            CSettingsProvider::This().SetUseEmbeddedColorProfiles(m_bUseEmbeddedColorProfiles);
+            ICCProfileTransform::SetEnabled(m_bUseEmbeddedColorProfiles);
             if (m_bUseEmbeddedColorProfiles == false) {
                 SetToast(QStringLiteral("Embedded Color Profiles: ignored"));
             } else {

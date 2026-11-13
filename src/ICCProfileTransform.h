@@ -1,6 +1,8 @@
 #ifndef ICCPROFILETRANSFORM_H
 #define ICCPROFILETRANSFORM_H
 
+#include <atomic>
+
 class ICCProfileTransform
 {
 public:
@@ -31,8 +33,14 @@ public:
     // Free memory associated with the given transform
     static void DeleteTransform(void* transform);
 
+    // Runtime switch for using embedded color profiles (initialized from the INI, toggled by the user).
+    // Atomic: set in the GUI thread, read in the image load threads.
+    static void SetEnabled(bool bEnabled) { sEnabled.store(bEnabled, std::memory_order_relaxed); }
+    static bool IsEnabled() { return sEnabled.load(std::memory_order_relaxed); }
+
 private:
     static void* sRGBProfile;
+    static std::atomic<bool> sEnabled;
 };
 
 
