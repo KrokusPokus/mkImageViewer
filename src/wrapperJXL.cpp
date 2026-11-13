@@ -223,7 +223,7 @@ void* JxlReader::ReadImage(int& width,
     void*& exif_chunk,
     bool& outOfMemory,
     const void* buffer,
-    int sizebytes)
+    std::size_t sizebytes)
 {
     outOfMemory = false;
     width = height = 0;

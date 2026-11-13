@@ -1,10 +1,8 @@
 #include "wrapperWEBP.h"
 
 #include "webp/decode.h"
-#include "webp/encode.h"
 #include "webp/demux.h"
 #include "MaxImageDef.h"
-#include "Helpers.h"
 #include "ICCProfileTransform.h"
 
 #include <algorithm>
@@ -34,7 +32,7 @@ void* WebpReaderWriter::ReadImage(int& width,
     void*& exif_chunk,
     bool& outOfMemory,
     const void* buffer,
-    int sizebytes)
+    std::size_t sizebytes)
 {
     uint8_t* pPixelData = nullptr;
     WebPBitstreamFeatures features;
@@ -117,7 +115,8 @@ void* WebpReaderWriter::ReadImage(int& width,
         WebPAnimDecoderOptions anim_config;
         WebPAnimDecoderOptionsInit(&anim_config);
         anim_config.color_mode = MODE_BGRA;
-        uint8_t* cached_webp_bytes = new(std::nothrow) uint8_t[sizebytes];
+        // WebPMalloc(): DeleteCache() releases cache.data with WebPDataClear(), i.e. WebPFree()
+        uint8_t* cached_webp_bytes = static_cast<uint8_t*>(WebPMalloc(sizebytes));
         if (cached_webp_bytes == nullptr) {
             outOfMemory = true;
             return nullptr;
@@ -176,23 +175,4 @@ void WebpReaderWriter::DeleteCache() {
     WebPDataClear(&cache.data);
     ICCProfileTransform::DeleteTransform(cache.transform);
     cache = { 0 };
-}
-
-void* WebpReaderWriter::Compress(const void* source,
-    int width,
-    int height,
-    size_t& len,
-    int quality,
-    bool lossless) {
-
-    uint8_t* pOutput = nullptr;
-    if (lossless)
-        len = WebPEncodeLosslessBGR((uint8_t*)source, width, height, Helpers::DoPadding(width * 3, 4), &pOutput);
-    else
-        len = WebPEncodeBGR((uint8_t*)source, width, height, Helpers::DoPadding(width * 3, 4), (float)quality, &pOutput);
-    return pOutput;
-}
-
-void WebpReaderWriter::FreeMemory(void* pointer) {
-    free(pointer);
 }

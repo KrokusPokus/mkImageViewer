@@ -34,7 +34,6 @@
 #include <QString>
 
 #include <algorithm>
-#include <climits>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -64,12 +63,10 @@ using namespace std::string_view_literals;
 
 // Upper bound for a single archive entry we are willing to inflate into memory.
 // The size stored in an archive is attacker controlled, so it must be checked before allocating.
-// The wrappers take 'int' sizes, hence the INT_MAX cap.
-const uint64_t kMaxZipEntrySize = std::min<uint64_t>(
+const uint64_t kMaxZipEntrySize =
     std::max({ static_cast<uint64_t>(MAX_JPEG_FILE_SIZE), static_cast<uint64_t>(MAX_WEBP_FILE_SIZE),
               static_cast<uint64_t>(MAX_PNG_FILE_SIZE), static_cast<uint64_t>(MAX_JXL_FILE_SIZE),
-              static_cast<uint64_t>(MAX_HEIF_FILE_SIZE), static_cast<uint64_t>(MAX_BMP_FILE_SIZE) }),
-    static_cast<uint64_t>(INT_MAX));
+              static_cast<uint64_t>(MAX_HEIF_FILE_SIZE), static_cast<uint64_t>(MAX_BMP_FILE_SIZE) });
 
 // Flags for the decoder caches that must survive when switching to another format
 enum CacheKeep : unsigned {
@@ -106,7 +103,7 @@ private:
 };
 
 // Reads a whole file into a freshly allocated buffer. Returns nullptr on failure, eError tells why.
-std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, qint64 nMaxSize, qint64& nFileSize, ELoadError& eError) {
+std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, uint64_t nMaxSize, size_t& nFileSize, ELoadError& eError) {
     nFileSize = 0;
     eError = ELoadError::None;
 
@@ -120,7 +117,7 @@ std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, qint64 nMaxSize,
         eError = ELoadError::NotDecodable; // empty file
         return nullptr;
     }
-    if (nSize > std::min<qint64>(nMaxSize, INT_MAX)) {
+    if (static_cast<uint64_t>(nSize) > nMaxSize) { // nSize > 0 (checked above)
         eError = ELoadError::TooLarge;
         return nullptr;
     }
@@ -133,7 +130,7 @@ std::unique_ptr<char[]> ReadWholeFile(const QString& sFileName, qint64 nMaxSize,
         eError = ELoadError::FileNotReadable;
         return nullptr;
     }
-    nFileSize = nSize;
+    nFileSize = static_cast<size_t>(nSize);
     return pBuffer;
 }
 
@@ -430,11 +427,11 @@ CBaseImage* ConvertQImageToJPEGImage(QImage image, void* pEXIFData, const CImage
 // This is what QImage::fromData() does internally; a QImageReader is used directly because it reports the image
 // size before the pixels are decoded, which keeps the MAX_IMAGE_DIMENSION / MAX_IMAGE_PIXELS limits effective.
 // pData must stay valid for the duration of the call (it is not copied).
-CBaseImage* DecodeBufferWithQt(const void* pData, int nSize, void* pEXIFData, const CImageFrameInfo& frame,
+CBaseImage* DecodeBufferWithQt(const void* pData, size_t nSize, void* pEXIFData, const CImageFrameInfo& frame,
                                bool& isOutOfMemory, Helpers::ETransparencyMode nTransparencyMode) {
     isOutOfMemory = false;
     try {
-        QByteArray data = QByteArray::fromRawData(static_cast<const char*>(pData), nSize);
+        QByteArray data = QByteArray::fromRawData(static_cast<const char*>(pData), static_cast<qsizetype>(nSize));
         QBuffer buffer(&data);
         if (!buffer.open(QIODevice::ReadOnly)) {
             return nullptr;
@@ -571,7 +568,7 @@ using DecoderFn = bool (*)(const CEncodedData& in, int nFrameIndex, CDecoded& ou
 
 bool DecodeJpeg(const CEncodedData& in, int, CDecoded& out) {
     out.pixels.reset(static_cast<uint8_t*>(TurboJpeg::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.eChromoSubSampling,
-                                                                 out.bOutOfMemory, in.pData, static_cast<int>(in.nSize))));
+                                                                 out.bOutOfMemory, in.pData, in.nSize)));
     if (out.nChannels != 3 && out.nChannels != 1) { // color and b/w JPEG is supported
         out.pixels.reset();
     }
@@ -607,7 +604,7 @@ bool DecodeWebp(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
     out.bHasAnimation = (in.pData == nullptr);
     out.pixels.reset(static_cast<uint8_t*>(WebpReaderWriter::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bHasAnimation,
                                                                         out.nFrameCount, out.nFrameTimeMs, out.pExif, out.bOutOfMemory,
-                                                                        in.pData, static_cast<int>(in.nSize))));
+                                                                        in.pData, in.nSize)));
     if (out.nChannels != 4) {
         out.pixels.reset();
     }
@@ -628,7 +625,7 @@ bool DecodePng(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
 bool DecodeJxl(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
     out.pixels.reset(static_cast<uint8_t*>(JxlReader::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bHasAnimation,
                                                                  out.nFrameCount, out.nFrameTimeMs, out.pExif, out.bOutOfMemory,
-                                                                 in.pData, static_cast<int>(in.nSize))));
+                                                                 in.pData, in.nSize)));
     out.nFrameIndex = nFrameIndex;
     out.bBlendAlpha = true;
     return out.pixels != nullptr;
@@ -646,7 +643,7 @@ bool DecodeAvif(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
 bool DecodeHeif(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
     out.pixels.reset(static_cast<uint8_t*>(HeifReader::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.nFrameCount,
                                                                   out.pExif, out.bOutOfMemory, nFrameIndex,
-                                                                  in.pData, static_cast<int>(in.nSize))));
+                                                                  in.pData, in.nSize)));
     out.nFrameIndex = nFrameIndex;
     out.bBlendAlpha = true;
     return out.pixels != nullptr;
@@ -654,7 +651,7 @@ bool DecodeHeif(const CEncodedData& in, int nFrameIndex, CDecoded& out) {
 
 bool DecodeQoi(const CEncodedData& in, int, CDecoded& out) {
     out.pixels.reset(static_cast<uint8_t*>(QoiReaderWriter::ReadImage(out.nWidth, out.nHeight, out.nChannels, out.bOutOfMemory,
-                                                                       in.pData, static_cast<int>(in.nSize))));
+                                                                       in.pData, in.nSize)));
     out.bBlendAlpha = (out.nChannels == 4);
     return out.pixels != nullptr;
 }
@@ -699,7 +696,7 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
     // JPEG: the EXIF block is part of the file data (CBaseImage copies it)
     void* pEXIF = d.pExif;
     if (eFormat == IF_JPEG) {
-        pEXIF = Helpers::FindEXIFBlock(in.pData, static_cast<int>(in.nSize));
+        pEXIF = Helpers::FindEXIFBlock(in.pData, in.nSize);
     }
 
     std::unique_ptr<CBaseImage> pImage;
@@ -714,7 +711,7 @@ std::unique_ptr<CBaseImage> CreateImage(CDecoded& d, EImageFormat eFormat, const
     d.pixels.release(); // owned by the CBaseImage now
 
     if (eFormat == IF_JPEG) {
-        pImage->SetJPEGComment(Helpers::GetJPEGComment(in.pData, static_cast<int>(in.nSize)));
+        pImage->SetJPEGComment(Helpers::GetJPEGComment(in.pData, in.nSize));
     }
     return pImage;
 }
@@ -1014,14 +1011,14 @@ void CImageLoadThread::ProcessReadFileRequest(CRequest* request, EImageFormat eF
     }
 
     std::unique_ptr<char[]> pBuffer;
-    qint64 nFileSize = 0;
+    size_t nFileSize = 0;
     if (!bUseCachedDecoder) {
-        pBuffer = ReadWholeFile(request->FileName, static_cast<qint64>(MaxFileSizeForFormat(eFormat)), nFileSize, request->Error);
+        pBuffer = ReadWholeFile(request->FileName, MaxFileSizeForFormat(eFormat), nFileSize, request->Error);
         if (!pBuffer) {
             return;
         }
     }
-    DecodeFromBuffer(request, eFormat, pBuffer, static_cast<size_t>(nFileSize), CDecodeTarget{});
+    DecodeFromBuffer(request, eFormat, pBuffer, nFileSize, CDecodeTarget{});
 }
 
 // Decodes the encoded image in pBuffer and stores the result in request->Image. This is the only place that knows
@@ -1048,7 +1045,7 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
         // Qt decodes the (first frame of the) buffer. pEXIFData is only used for the rotation done by the CBaseImage.
         auto decodeWithQt = [&](void* pEXIFData) {
             bool bQtOutOfMemory = false;
-            request->Image = DecodeBufferWithQt(in.pData, static_cast<int>(in.nSize), pEXIFData, MakeFrameInfo(eFormat, target),
+            request->Image = DecodeBufferWithQt(in.pData, in.nSize, pEXIFData, MakeFrameInfo(eFormat, target),
                                                 bQtOutOfMemory, eTransparency);
             if (request->Image != nullptr) {
                 return EDecodeStatus::Ok;

@@ -18,7 +18,7 @@ public:
         void*& exif, // Pointer to Exif data (must be freed by caller)
         bool& outOfMemory, // set to true when no memory to read image
         const void* buffer, // memory address containing jxl compressed data.
-        int sizebytes); // size of jxl compressed data
+        std::size_t sizebytes); // size of jxl compressed data
 
     static void DeleteCache();
 

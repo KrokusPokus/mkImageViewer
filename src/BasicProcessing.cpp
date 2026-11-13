@@ -422,10 +422,10 @@ void* CBasicProcessing::Mirror24bpp(int nWidth, int nHeight, const void* pPixels
 void CBasicProcessing::MirrorVInplace(int nWidth, int nHeight, int nStride, void* pBitmapPixels) {
     for (int j = 0; j < (nHeight >> 1); j++) {
         if ((nStride & 3) == 0) {
-            uint32_t nPixelsPerStride = nStride >> 2;
+            const size_t nPixelsPerStride = nStride >> 2;
             uint32_t* pSource = (uint32_t*)pBitmapPixels + (nHeight - 1 - j) * nPixelsPerStride;
             uint32_t* pTgt = (uint32_t*)pBitmapPixels + j * nPixelsPerStride;
-            for (int i = 0; i < nPixelsPerStride; i++) {
+            for (size_t i = 0; i < nPixelsPerStride; i++) {
                 uint32_t t = *pTgt;
                 *pTgt = *pSource;
                 *pSource = t;

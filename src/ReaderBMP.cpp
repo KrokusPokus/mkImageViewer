@@ -101,19 +101,18 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
 
     int bytesPerPixel = infoheader.bits / 8;
     int paddedWidth = Helpers::DoPadding(infoheader.width * bytesPerPixel, 4);
-    // 64 bit: width and height can be up to 65535 each, so the product overflows an int (the buffer would be
+    // size_t: width and height can be up to 65535 each, so the product overflows an int (the buffer would be
     // allocated far too small and the copy below would write beyond it)
-    int64_t nImageBytes = (int64_t)infoheader.height * paddedWidth;
+    const std::size_t nImageBytes = static_cast<std::size_t>(infoheader.height) * paddedWidth; // height > 0 here
     if (nImageBytes > MAX_BMP_FILE_SIZE) {
         bOutOfMemory = true;
         return nullptr; // corrupt or manipulated header
     }
-    int fileSizeBytes = (int)nImageBytes; // <= MAX_BMP_FILE_SIZE, fits into an int
-    if (bufsize - off < (std::size_t)fileSizeBytes) {
+    if (bufsize - off < nImageBytes) {
         return nullptr; // the file can not contain the pixel data: do not allocate memory for it
     }
 
-    uint8_t* pDest = new(std::nothrow) uint8_t[fileSizeBytes];
+    uint8_t* pDest = new(std::nothrow) uint8_t[nImageBytes];
     if (pDest == nullptr) {
         bOutOfMemory = true;
         return nullptr;

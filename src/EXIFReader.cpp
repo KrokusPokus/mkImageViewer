@@ -604,7 +604,7 @@ CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFo
                     return; // the thumbnail is not (completely) inside of the EXIF data
                 }
                 uint8_t* pSOI = tiff.p + nOffsetSOI;
-                const uint8_t* pSOF = reinterpret_cast<const uint8_t*>(Helpers::FindJPEGMarker(pSOI, static_cast<int>(nJPEGBytes), 0xC0));
+                const uint8_t* pSOF = reinterpret_cast<const uint8_t*>(Helpers::FindJPEGMarker(pSOI, nJPEGBytes, 0xC0));
                 // the SOF segment is read up to byte 8 (height, width)
                 if (pSOF != nullptr && pSOF + 9 <= pSOI + nJPEGBytes) {
                     m_nThumbWidth = pSOF[7] * 256 + pSOF[8];

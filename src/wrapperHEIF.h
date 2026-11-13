@@ -1,6 +1,8 @@
 #ifndef HEIFWRAPPER_H
 #define HEIFWRAPPER_H
 
+#include <cstddef>
+
 class HeifReader
 {
 public:
@@ -13,7 +15,7 @@ public:
                          bool &outOfMemory, // set to true when no memory to read image
                          int frame_index, // index of requested frame
                          const void *buffer, // memory address containing heic compressed data.
-                         int sizebytes); // size of heic compressed data.
+                         std::size_t sizebytes); // size of heic compressed data.
 };
 
 

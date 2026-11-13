@@ -375,12 +375,12 @@ namespace Helpers {
         return QSize((int)(nWidth*dZoom + 0.5), (int)(nHeight*dZoom + 0.5));
     }
 
-    const void* FindJPEGMarker(const void* pJPEGStream, int nStreamLength, unsigned char nMarker) {
+    const void* FindJPEGMarker(const void* pJPEGStream, size_t nStreamLength, unsigned char nMarker) {
         const uint8_t* pStream = static_cast<const uint8_t*>(pJPEGStream);
         if (pStream == nullptr || nStreamLength < 3 || pStream[0] != 0xFF || pStream[1] != 0xD8) {
             return nullptr; // not a JPEG
         }
-        int nIndex = 2;
+        size_t nIndex = 2;
         do {
             if (pStream[nIndex] == 0xFF) {
                 // block header found, skip padding bytes
@@ -410,18 +410,19 @@ namespace Helpers {
         }
     }
 
-    void* FindEXIFBlock(void* pJPEGStream, int nStreamLength) {
+    void* FindEXIFBlock(void* pJPEGStream, size_t nStreamLength) {
         uint8_t* pEXIFBlock = (uint8_t*)Helpers::FindJPEGMarker(pJPEGStream, nStreamLength, 0xE1);
         if (pEXIFBlock == nullptr) {
             return nullptr;
         }
         // The segment (marker, length, "Exif\0\0", data) must be completely inside of the stream: the length comes from
         // the file, and CBaseImage copies as many bytes as it says
-        const int nAvailable = nStreamLength - static_cast<int>(pEXIFBlock - static_cast<uint8_t*>(pJPEGStream));
+        // FindJPEGMarker() returns a pointer into the stream, so the offset is >= 0 and < nStreamLength
+        const size_t nAvailable = nStreamLength - static_cast<size_t>(pEXIFBlock - static_cast<uint8_t*>(pJPEGStream));
         if (nAvailable < 10) {
             return nullptr;
         }
-        const int nSegmentSize = pEXIFBlock[2] * 256 + pEXIFBlock[3] + 2;
+        const size_t nSegmentSize = pEXIFBlock[2] * 256u + pEXIFBlock[3] + 2u;
         if (nSegmentSize < 10 || nSegmentSize > nAvailable || memcmp(pEXIFBlock + 4, "Exif", 4) != 0) {
             return nullptr;
         }
@@ -443,20 +444,21 @@ QString TryConvertFromUTF8(const uint8_t* pComment, int nLengthInBytes) {
     return result;
 }
 
-QString GetJPEGComment(const void* pJPEGStream, int nStreamLength) {
+QString GetJPEGComment(const void* pJPEGStream, size_t nStreamLength) {
     const uint8_t* pCommentSeg = static_cast<const uint8_t*>(FindJPEGMarker(pJPEGStream, nStreamLength, 0xFE));
     if (!pCommentSeg) {
         return {};
     }
     
     // marker (2), length (2), comment: the comment must be completely inside of the stream (the length comes from the file)
-    const int nAvailable = nStreamLength - static_cast<int>(pCommentSeg - static_cast<const uint8_t*>(pJPEGStream));
+    // FindJPEGMarker() returns a pointer into the stream, so the offset is >= 0 and < nStreamLength
+    const size_t nAvailable = nStreamLength - static_cast<size_t>(pCommentSeg - static_cast<const uint8_t*>(pJPEGStream));
     if (nAvailable < 4) {
         return {};
     }
     pCommentSeg += 2;
     const int nCommentLen = pCommentSeg[0] * 256 + pCommentSeg[1] - 2;
-    if (nCommentLen <= 0 || nCommentLen > nAvailable - 4) {
+    if (nCommentLen <= 0 || static_cast<size_t>(nCommentLen) > nAvailable - 4) {
         return {};
     }
 

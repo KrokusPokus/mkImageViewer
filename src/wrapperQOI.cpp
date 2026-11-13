@@ -6,6 +6,7 @@
 #include "MaxImageDef.h"
 #include "Helpers.h"
 
+#include <climits>
 #include <cmath>
 #include <cstddef>
 #include <new>
@@ -17,12 +18,16 @@ void* QoiReaderWriter::ReadImage(int& width,
     int& nchannels,
     bool& outOfMemory,
     const void* buffer,
-    int sizebytes)
+    std::size_t sizebytes)
 {
     outOfMemory = false;
 
+    // qoi_decode() takes the size as int
+    if (sizebytes > static_cast<std::size_t>(INT_MAX))
+        return nullptr;
+
     qoi_desc desc = { 0 };
-    unsigned char* pDecodedPixels = (unsigned char*)qoi_decode(buffer, sizebytes, &desc, 0);
+    unsigned char* pDecodedPixels = (unsigned char*)qoi_decode(buffer, static_cast<int>(sizebytes), &desc, 0);
     if (pDecodedPixels == nullptr)
         return nullptr;
     width = desc.width;
@@ -34,14 +39,15 @@ void* QoiReaderWriter::ReadImage(int& width,
         QOI_FREE(pDecodedPixels);
         return nullptr;
     }
-    int decoded_stride = width * nchannels;
-    int padded_stride = Helpers::DoPadding(decoded_stride, 4);
-    int size = decoded_stride * height;
+    // one line fits into an int (width <= MAX_IMAGE_DIMENSION), the whole image may not
+    const std::size_t decoded_stride = width * nchannels;
+    const std::size_t padded_stride = Helpers::DoPadding(width * nchannels, 4);
+    const std::size_t size = decoded_stride * height;
     unsigned char* pPixelData = new(std::nothrow) unsigned char[padded_stride * height];
     if (pPixelData != nullptr) {
         // Copy from RGB(A) to BGR(A)
-        for (int i = 0; i < size; i += nchannels) {
-            int j = i / decoded_stride * padded_stride + i % decoded_stride;
+        for (std::size_t i = 0; i < size; i += nchannels) {
+            const std::size_t j = i / decoded_stride * padded_stride + i % decoded_stride;
             if (desc.colorspace == QOI_LINEAR) {
                 pPixelData[j  ] = (unsigned char)LINEAR_TO_SRGB(pDecodedPixels[i+2]); // NOLINT(clang-analyzer-security.ArrayBound): i+2 < size == Puffergroesse
                 pPixelData[j+1] = (unsigned char)LINEAR_TO_SRGB(pDecodedPixels[i+1]);
@@ -59,40 +65,4 @@ void* QoiReaderWriter::ReadImage(int& width,
     }
     QOI_FREE(pDecodedPixels);
     return (void*)pPixelData;
-}
-
-void* QoiReaderWriter::Compress(const void* source,
-    int width,
-    int height,
-    int& len) {
-
-    int nchannels = 3;
-    void* pOutput = nullptr;
-
-    qoi_desc desc;
-    desc.width = width;
-    desc.height = height;
-    desc.channels = nchannels;
-    desc.colorspace = QOI_SRGB;
-    int input_stride = width * nchannels;
-    int padded_stride = Helpers::DoPadding(input_stride, 4);
-    int size = input_stride * height;
-    unsigned char* pPixelData = new(std::nothrow) unsigned char[input_stride * height];
-    unsigned char* pSourcePixels = (unsigned char*)source;
-    if (pPixelData != nullptr) {
-        // Copy from BGR to RGB
-        for (int i = 0; i < size; i += nchannels) {
-            int j = i / input_stride * padded_stride + i % input_stride;
-            pPixelData[i  ] = pSourcePixels[j+2];
-            pPixelData[i+1] = pSourcePixels[j+1];
-            pPixelData[i+2] = pSourcePixels[j  ];
-        }
-        pOutput = qoi_encode(pPixelData, &desc, &len);
-        delete[] pPixelData;
-    }
-    return pOutput;
-}
-
-void QoiReaderWriter::FreeMemory(void* pointer) {
-    QOI_FREE(pointer);
 }

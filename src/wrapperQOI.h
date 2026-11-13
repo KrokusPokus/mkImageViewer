@@ -1,6 +1,8 @@
 #ifndef QOIWRAPPER_H
 #define QOIWRAPPER_H
 
+#include <cstddef>
+
 class QoiReaderWriter
 {
 public:
@@ -10,15 +12,7 @@ public:
         int& bpp,     // BYTES (not bits) PER PIXEL.
         bool& outOfMemory, // set to true when no memory to read image
         const void* buffer, // memory address containing qoi compressed data.
-        int sizebytes); // size of qoi compressed data.
-
-    // Compress image data into QOI stream, returns compressed data.
-    static void* Compress(const void* buffer, // address of image in memory, format must be 3 bytes per pixel BRGBGR with padding to 4 byte boundary
-        int width, // width of image in pixels
-        int height, // height of image in pixels.
-        int& len); // returns length of compressed data
-
-    static void FreeMemory(void* pointer);
+        std::size_t sizebytes); // size of qoi compressed data.
 };
 
 

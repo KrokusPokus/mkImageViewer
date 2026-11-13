@@ -44,7 +44,10 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
         return nullptr;
     }
 
-    const char* pBuf = static_cast<const char*>(pBuffer);
+    const char* const pStart = static_cast<const char*>(pBuffer);
+    const char* pBuf = pStart;
+    // Byte offset of p in the buffer (p is never before the start of the buffer)
+    const auto Offset = [pStart](const char* p) { return static_cast<std::size_t>(p - pStart); };
 
     uint8_t length = *reinterpret_cast<const uint8_t*>(pBuf); pBuf += 1;
 
@@ -122,8 +125,8 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
     }
 
     // Now we move the pointer to the pixel data
-    pBuf = static_cast<const char*>(pBuffer) + 18 + length;
-    if (static_cast<std::size_t>(pBuf - static_cast<const char*>(pBuffer)) > bufsize)
+    pBuf = pStart + 18 + length;
+    if (Offset(pBuf) > bufsize)
     {
         delete[] pImageData;
         return nullptr;
@@ -133,7 +136,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
     uint8_t palette[768];
     if (isIndexed)
     {
-        if (static_cast<std::size_t>((pBuf + 768) - static_cast<const char*>(pBuffer)) > bufsize)
+        if (Offset(pBuf + 768) > bufsize)
         {
             delete[] pImageData;
             return nullptr;
@@ -153,7 +156,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
             uint8_t* pLine = pImage;
             for (int x = 0; x < width; x++)
             {
-                if (static_cast<std::size_t>(pBuf - static_cast<const char*>(pBuffer)) + 1 > bufsize)
+                if (Offset(pBuf) + 1 > bufsize)
                 {
                     delete[] pImageData;
                     return nullptr;
@@ -174,7 +177,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
             uint8_t* pLine = pImage;
             for (int x = 0; x < width; x++)
             {
-                if (static_cast<std::size_t>(pBuf - static_cast<const char*>(pBuffer)) + 1 > bufsize)
+                if (Offset(pBuf) + 1 > bufsize)
                 {
                     delete[] pImageData;
                     return nullptr;
@@ -201,7 +204,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
             // Load in all the pixel data line by line
             for (int y = 0; y < height; y++)
             {
-                if (static_cast<std::size_t>((pBuf + stride) - static_cast<const char*>(pBuffer)) > bufsize)
+                if (Offset(pBuf + stride) > bufsize)
                 {
                     delete[] pImageData;
                     return nullptr;
@@ -228,7 +231,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
                 uint8_t* pLine = pImage;
                 for (int i = 0; i < width; i++)
                 {
-                    if (static_cast<std::size_t>((pBuf + sizeof(uint16_t)) - static_cast<const char*>(pBuffer)) > bufsize)
+                    if (Offset(pBuf + sizeof(uint16_t)) > bufsize)
                     {
                         delete[] pImageData;
                         return nullptr;
@@ -290,7 +293,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
         const std::size_t numPixels = static_cast<std::size_t>(width) * height;
         while (i < numPixels)
         {
-            if (static_cast<std::size_t>(pBuf - static_cast<const char*>(pBuffer)) + 1 > bufsize)
+            if (Offset(pBuf) + 1 > bufsize)
             {
                 delete[] pImageData;
                 return nullptr;
@@ -314,7 +317,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
                 rleID -= 127;
                 useSameColor = true;
 
-                if (static_cast<std::size_t>((pBuf + channels) - static_cast<const char*>(pBuffer)) > bufsize)
+                if (Offset(pBuf + channels) > bufsize)
                 {
                     delete[] pImageData;
                     return nullptr;
@@ -329,7 +332,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
             {
                 if (!useSameColor)
                 {
-                    if (static_cast<std::size_t>((pBuf + channels) - static_cast<const char*>(pBuffer)) > bufsize)
+                    if (Offset(pBuf + channels) > bufsize)
                     {
                         delete[] pImageData;
                         return nullptr;

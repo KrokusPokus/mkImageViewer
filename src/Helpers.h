@@ -11,6 +11,7 @@
 #include <QSize>
 
 #include <cfloat>
+#include <cstddef>
 #include <cstdint>
 
 class CBaseImage;
@@ -223,17 +224,17 @@ namespace Helpers {
 
     // Finds a JPEG marker (beginning with 0xFF) in a JPEG stream. 
     // To find the first non-marker block, set nMarker to zero.
-    const void* FindJPEGMarker(const void* pJPEGStream, int nStreamLength, unsigned char nMarker);
+    const void* FindJPEGMarker(const void* pJPEGStream, size_t nStreamLength, unsigned char nMarker);
 
     // Finds the EXIF block in the JPEG bytes stream, nullptr if no EXIF block or if the block (by its length field)
     // reaches beyond the end of the stream
-    void* FindEXIFBlock(void* pJPEGStream, int nStreamLength);
+    void* FindEXIFBlock(void* pJPEGStream, size_t nStreamLength);
 
     // try to convert a string from UTF-8. Returns empty string if no valid UTF-8 encoded string.
     QString TryConvertFromUTF8(const uint8_t* pComment, int nLengthInBytes);
 
     // Gets the content of the JPEG comment tag, empty string if no comment
-    QString GetJPEGComment(const void* pJPEGStream, int nStreamLength);
+    QString GetJPEGComment(const void* pJPEGStream, size_t nStreamLength);
 
     // Gets the frame index of the next frame, depending on the index of the last image (relevant if the image is a multiframe image)
     // bImageLoaded: false if the image at 'position' could not be loaded

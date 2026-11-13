@@ -3,7 +3,6 @@
 #include "ICCProfileTransform.h"
 #include "MaxImageDef.h"
 
-#include <climits>
 #include <cmath>
 #include <cstddef>
 #include <new>
@@ -14,7 +13,7 @@ void * TurboJpeg::ReadImage(int &width,
                        TJSAMP &chromoSubsampling,
                        bool &outOfMemory,
                        const void *buffer,
-                       int sizebytes)
+                       std::size_t sizebytes)
 {
     outOfMemory = false;
     width = height = 0;
@@ -63,43 +62,4 @@ void * TurboJpeg::ReadImage(int &width,
     tj3Destroy(hDecoder);
 
     return pPixelData;
-}
-
-void * TurboJpeg::Compress(const void *source,
-                      int width,
-                      int height,
-                      int &len,
-                      bool &outOfMemory,
-                      int quality)
-{
-    outOfMemory = false;
-    len = 0;
-    tjhandle hEncoder = tj3Init(TJINIT_COMPRESS);
-    if (hEncoder == nullptr) {
-        return nullptr;
-    }
-
-    unsigned char* pJPEGCompressed = nullptr;
-    size_t nCompressedLen = 0;
-    tj3Set(hEncoder, TJPARAM_SUBSAMP, TJSAMP_420);
-    tj3Set(hEncoder, TJPARAM_QUALITY, quality);
-    int nResult = tj3Compress8(hEncoder, (unsigned char*)source, width, TJPAD(width * 3), height, TJPF_BGR,
-        &pJPEGCompressed, &nCompressedLen);
-    if (nResult != 0 || nCompressedLen > INT_MAX) {
-        if (pJPEGCompressed == nullptr) {
-            outOfMemory = true;
-        }
-        Free(pJPEGCompressed);
-        pJPEGCompressed = nullptr;
-    }
-
-    len = nCompressedLen;
-
-    tj3Destroy(hEncoder);
-
-    return pJPEGCompressed;
-}
-
-void TurboJpeg::Free(void* buffer) {
-    tj3Free(buffer);
 }

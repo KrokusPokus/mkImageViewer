@@ -20,7 +20,7 @@ void * HeifReader::ReadImage(int &width,
                        bool &outOfMemory,
                        int frame_index,
                        const void *buffer,
-                       int sizebytes)
+                       std::size_t sizebytes)
 {
     outOfMemory = false;
     width = height = 0;
@@ -51,7 +51,10 @@ void * HeifReader::ReadImage(int &width,
     if (width < 1 || height < 1 || width * nchannels > stride)
         return nullptr;
 
-    size_t size = (size_t)width * nchannels * height;
+    // width, height >= 1 (checked above)
+    const size_t nRows = height;
+    const size_t nCols = width;
+    const size_t size = nRows * nCols * nchannels;
     pPixelData = new(std::nothrow) unsigned char[size];
     if (pPixelData == nullptr) {
         outOfMemory = true;
@@ -59,12 +62,11 @@ void * HeifReader::ReadImage(int &width,
     }
     std::vector<uint8_t> iccp = image.get_raw_color_profile();
     void* transform = ICCProfileTransform::CreateTransform(iccp.data(), iccp.size(), ICCProfileTransform::FORMAT_RGBA);
-    size_t i, j;
     if (!ICCProfileTransform::DoTransform(transform, data, pPixelData, width, height, stride=stride)) {
         unsigned int* o = (unsigned int*)pPixelData;
-        for (i = 0; i < height; i++) {
+        for (size_t i = 0; i < nRows; i++) {
             unsigned int* p = (unsigned int*)(data + i * stride);
-            for (j = 0; j < width; j++) {
+            for (size_t j = 0; j < nCols; j++) {
                 // RGBA -> BGRA conversion
                 *o = std::rotr(__builtin_bswap32(*p), 8);
                 p++;
