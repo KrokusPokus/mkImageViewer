@@ -104,6 +104,9 @@ void CDirectoryWatcher::SetCurrentFile(const QString& fileName) {
 void CDirectoryWatcher::SetCurrentDirectory(const QString& directoryName) {
     if (m_aborted) return;
     const QString fullPath = QFileInfo(directoryName).absoluteFilePath();
+    if (fullPath == m_watchedDirectory && (m_suspended || m_fileSystemWatcher->directories().contains(fullPath))) {
+        return; // already watched (or will be on Resume())
+    }
 
     if (!m_watchedDirectory.isEmpty() && m_fileSystemWatcher->directories().contains(m_watchedDirectory)) {
         m_fileSystemWatcher->removePath(m_watchedDirectory);

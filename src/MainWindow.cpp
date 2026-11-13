@@ -448,10 +448,10 @@ CMainWindow::CMainWindow(const QString& sStartupFile)
 
     // intitialize list of files to show with startup file (and folder)
     m_pFileList = new CFileList(m_sStartupFile,
-                                *m_pDirectoryWatcher,
                                 sp.Sorting(),
                                 sp.IsSortedAscending(),
                                 sp.WrapAroundFolder());
+    m_pDirectoryWatcher->SetCurrentDirectory(m_pFileList->CurrentDirectory());
 
     m_pFileList->SetNavigationMode(sp.Navigation());
 
@@ -2423,10 +2423,10 @@ void CMainWindow::OpenFile(const QString& fileName) {
     m_sStartupFile = fileName;
 
     m_pFileList = new CFileList(m_sStartupFile,
-                                *m_pDirectoryWatcher,
                                 eOldSorting,
                                 bOldAscending,
                                 CSettingsProvider::This().WrapAroundFolder());
+    m_pDirectoryWatcher->SetCurrentDirectory(m_pFileList->CurrentDirectory());
 
     // free current image and all read ahead images
     InitParametersForNewImage();
@@ -2629,6 +2629,11 @@ void CMainWindow::GotoImage(EImagePosition ePos, int nFlags) {
         case POS_AwayFromCurrent:
             m_pFileList = m_pFileList->AwayFromCurrent();
             break;
+    }
+
+    if (m_pFileList != pOldFileList) {
+        // now in another folder of the loop (LoopSameFolderLevel, LoopSubFolders): watch that folder
+        m_pDirectoryWatcher->SetCurrentDirectory(m_pFileList->CurrentDirectory());
     }
 
         /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos4 m_offsets.x:" <<  m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex;

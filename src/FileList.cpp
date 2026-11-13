@@ -1,6 +1,5 @@
 #include "FileList.h"
 
-#include "DirectoryWatcher.h"
 #include "Helpers.h"
 
 #include <QCollator>
@@ -153,9 +152,8 @@ bool CFileDesc::operator < (const CFileDesc& other) const {
 // CFileList Implementation
 ///////////////////////////////////////////////////////////////////////////////////
 
-CFileList::CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWatcher, 
+CFileList::CFileList(const QString& sInitialFile,
     Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel)
-    : m_directoryWatcher(directoryWatcher)
 {
     CFileDesc::SetSorting(eInitialSorting, isSortedAscending);
     m_bDeleteHistory = true;
@@ -169,8 +167,6 @@ CFileList::CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWa
 
     const QString sExtension = initialInfo.suffix().toLower();
     const bool bImageFile = !bIsDirectory && IsImageFile(sExtension);
-
-    m_directoryWatcher.SetCurrentDirectory(m_sDirectory);
 
     if (bImageFile || bIsDirectory) {
         FindFiles();
@@ -766,7 +762,7 @@ CFileList* CFileList::GetFolderList(const QString& sDirectory, int nLevel) {
             return pList->m_fileList.empty() ? nullptr : pList;
         }
     }
-    auto* pNewList = new CFileList(sDirectory, m_directoryWatcher, CFileDesc::GetSorting(), CFileDesc::IsSortedAscending(), m_bWrapAroundFolder, nLevel);
+    auto* pNewList = new CFileList(sDirectory, CFileDesc::GetSorting(), CFileDesc::IsSortedAscending(), m_bWrapAroundFolder, nLevel);
     if (pNewList->m_fileList.empty()) {
         delete pNewList;
         return nullptr;

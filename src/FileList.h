@@ -9,8 +9,6 @@
 
 #include <list>
 
-class CDirectoryWatcher;
-
 // Entry in the file list, allowing sorting by different sort criteria
 class CFileDesc
 {
@@ -64,7 +62,9 @@ class CFileList
 public:
     // sInitialFile is the initial file to show with path. It can either be an image file, a directory
     // or a text file containing file names to display.
-    CFileList(const QString& sInitialFile, CDirectoryWatcher& directoryWatcher,
+    // The list does not touch the directory watcher: it also creates lists of other folders while searching
+    // the next folder of the loop. The owner watches CurrentDirectory() of the list it shows.
+    CFileList(const QString& sInitialFile,
               Helpers::ESorting eInitialSorting, bool isSortedAscending, bool bWrapAroundFolder, int nLevel = 0);
     ~CFileList();
 
@@ -164,8 +164,6 @@ private:
     std::list<CFileDesc>::iterator m_iter;          // current position in m_fileList
     std::list<CFileDesc>::iterator m_iterStart;     // start of iteration in m_fileList
     std::list<CFileDesc>::iterator m_iterCheckPoint;
-
-    CDirectoryWatcher& m_directoryWatcher;
 
     void MoveIterToLast();
     void NextInFolder();
