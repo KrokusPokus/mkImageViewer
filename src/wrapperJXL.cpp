@@ -51,7 +51,7 @@ struct JxlReader::jxl_cache {
     int total_frames;
 };
 
-JxlReader::jxl_cache JxlReader::cache = { 0 };
+JxlReader::jxl_cache JxlReader::cache = {};
 
 // based on https://github.com/libjxl/libjxl/blob/main/examples/decode_oneshot.cc
 // and https://github.com/libjxl/libjxl/blob/main/examples/decode_exif_metadata.cc
@@ -278,5 +278,5 @@ void JxlReader::DeleteCache() {
     
     ICCProfileTransform::DeleteTransform(cache.transform);
     // Setting the decoder and runner to 0 (nullptr) will automatically destroy them
-    cache = { 0 };
+    cache = {};
 }

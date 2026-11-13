@@ -71,7 +71,7 @@ public:
     static void* Mirror24bpp(int nWidth, int nHeight, const void* pPixels, bool bHorizontally);
 
     // Mirror 32 bit bitmap vertically inplace
-    static void MirrorVInplace(int nWidth, int nHeight, int nStride, void* pBitmapPixels);
+    static void MirrorVInplace(int nHeight, int nStride, void* pBitmapPixels);
 
     // Crop specified 32 bpp image. Returns nullptr if cropRect is not fully inside source image.
     static void* Crop32bpp(int nWidth, int nHeight, const void* pBitmapPixels, DRect cropRect);

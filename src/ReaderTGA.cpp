@@ -392,7 +392,7 @@ void* CReaderTGA::ReadImage(int& width, int& height, int& targetChannels, bool& 
     // If image needs to be flipped, do this inplace
     if (flipVertically)
     {
-        CBasicProcessing::MirrorVInplace(width, height, targetStride, pImageData);
+        CBasicProcessing::MirrorVInplace(height, targetStride, pImageData);
     }
 
     return pImageData;

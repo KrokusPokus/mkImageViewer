@@ -232,8 +232,8 @@ namespace {
         nMaxOffsetY = std::max(0, nMaxOffsetY);
 
         return QPoint(
-            std::max<long>(-nMaxOffsetX, std::min<int>(+nMaxOffsetX, offsets.x())),
-            std::max<long>(-nMaxOffsetY, std::min<int>(+nMaxOffsetY, offsets.y()))
+            std::max<int>(-nMaxOffsetX, std::min<int>(+nMaxOffsetX, offsets.x())),
+            std::max<int>(-nMaxOffsetY, std::min<int>(+nMaxOffsetY, offsets.y()))
             );
     }
 
@@ -473,7 +473,7 @@ CMainWindow::CMainWindow(const QString& sStartupFile)
 
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
 
-    AfterNewImageLoaded(true, true); // synchronize to per image parameters
+    AfterNewImageLoaded(true); // synchronize to per image parameters
 
     if (!m_bFullScreenMode) {
         QRect windowRect = CMultiMonitorSupport::GetDefaultWindowRect();
@@ -550,7 +550,7 @@ void CMainWindow::paintEvent(QPaintEvent* /*event*/)
         m_offsets = LimitOffsets(m_offsets, m_clientRect.size(), newSize);
         m_BitmapOffsets = m_bZoomMode ? (unlimitedOffsets - m_offsets) : QPoint(0, 0);
 
-        QSize clippedSize(std::min<long>(m_clientRect.width(), newSize.width()), std::min<long>(m_clientRect.height(), newSize.height()));
+        QSize clippedSize(std::min<int>(m_clientRect.width(), newSize.width()), std::min<int>(m_clientRect.height(), newSize.height()));
         DPoint offsetsInImage = m_pCurrentImage->ConvertOffset(newSize, clippedSize, m_offsets);
 
         void* pBitmapData = m_pCurrentImage->GetBitmap(newSize,
@@ -603,8 +603,8 @@ void CMainWindow::paintEvent(QPaintEvent* /*event*/)
             else if (filter == Filter_Downsampling_Lanczos2) sFilter = "Lanczos2";
 
             double dZoom = m_dZoom > 0 ? m_dZoom : 1.0;
-            unsigned int iRealWidth = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigWidth()));
-            unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
+            int iRealWidth = static_cast<int>(dZoom * (m_pCurrentImage->OrigWidth()));
+            int iRealHeight = static_cast<int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
             // The state of the shown image is made up of the EXIF rotation and the rotation and mirroring by the user
             const int nTotalRotation = (m_nRotation % 360 + 360) % 360;
@@ -818,7 +818,6 @@ void CMainWindow::resizeEvent(QResizeEvent* event) {
     Helpers::EAutoZoomMode eAutoZoomMode = GetAutoZoomMode();
     bool bFillCrop = (eAutoZoomMode == Helpers::ZM_FillScreenNoZoom || eAutoZoomMode == Helpers::ZM_FillScreen);
     bool bAllowZoomIn = (eAutoZoomMode == Helpers::ZM_FitToScreen || eAutoZoomMode == Helpers::ZM_FillScreen);
-    bool bAdjustWindowSize = false;
 
     float dZoomForFit = GetZoomFactorForFitToScreen(bFillCrop, bAllowZoomIn);
     bool bKeepFitToScreen = !m_bResizeForNewImage && (MaxRatio(m_dZoom, dZoomForFit) < 1.01);
@@ -833,7 +832,7 @@ void CMainWindow::resizeEvent(QResizeEvent* event) {
     if (bKeepFitToScreen) {
         dZoomForFit = GetZoomFactorForFitToScreen(bFillCrop, bAllowZoomIn);    // Erneut aufrufen, da m_clientRect nun aktuell ist.
         if (MaxRatio(m_dZoom, dZoomForFit) >= 1.00001) {
-            ResetZoomToFitScreen(bFillCrop, bAllowZoomIn, bAdjustWindowSize);
+            ResetZoomToFitScreen(bFillCrop, bAllowZoomIn);
         }
     }
 
@@ -869,7 +868,7 @@ void CMainWindow::mousePressEvent(QMouseEvent* event) {
             m_dStartZoom = m_dZoom;
             m_nCapturedX = m_nMouseX; m_nCapturedY = m_nMouseY;
         } else if (bDraggingRequired) {
-            StartDragging(pos.x(), pos.y(), false);
+            StartDragging(pos.x(), pos.y());
         }
         return;
     }
@@ -886,7 +885,7 @@ void CMainWindow::mousePressEvent(QMouseEvent* event) {
         }
 
         QPoint pos = ToPx(event->pos());
-        StartDragging(pos.x(), pos.y(), false);
+        StartDragging(pos.x(), pos.y());
     }
     else if (event->button() == Qt::BackButton || event->button() == Qt::ForwardButton) {
         bool isXButton1 = (event->button() == Qt::BackButton);
@@ -1008,7 +1007,7 @@ void CMainWindow::wheelEvent(QWheelEvent* event) {
                         }
                     } else {
                         double dZoom = m_dZoom > 0 ? m_dZoom : 1.0;
-                        unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
+                        int iRealHeight = static_cast<int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
                         if (iRealHeight > m_clientRect.height()) {
                             if (PerformPan(0, -ScaleToPx(PAN_STEP), false) == true) {
@@ -1026,7 +1025,7 @@ void CMainWindow::wheelEvent(QWheelEvent* event) {
                         }
                     } else {
                         double dZoom = m_dZoom > 0 ? m_dZoom : 1.0; // not yet known (-1) until the next paint
-                        unsigned int iRealHeight = static_cast<unsigned int>(dZoom * (m_pCurrentImage->OrigHeight()));
+                        int iRealHeight = static_cast<int>(dZoom * (m_pCurrentImage->OrigHeight()));
 
                         if (iRealHeight > m_clientRect.height()) {
                             if (PerformPan(0, ScaleToPx(PAN_STEP), false) == true) {
@@ -1762,7 +1761,7 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                             (inv.arg == static_cast<int>(Cmd::SortModeArg::Random)) ? Helpers::FS_Random :
                             (inv.arg == static_cast<int>(Cmd::SortModeArg::Size)) ? Helpers::FS_FileSize : Helpers::FS_FileName;
 
-                ToastSortingMode(nSortMode, bSortedAscending);
+                ToastSortingMode(nSortMode);
                 m_pFileList->SetSorting(nSortMode, bSortedAscending);
             }
             break;
@@ -1826,7 +1825,7 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
         case Command::Rotate90:
         case Command::Rotate270:
             if (m_pCurrentImage != nullptr) {
-                uint32_t nRotationDelta = (inv.id == Command::Rotate90) ? 90 : 270;
+                int nRotationDelta = (inv.id == Command::Rotate90) ? 90 : 270;
                 m_nRotation = (m_nRotation + nRotationDelta) % 360;
                 m_nUserRotation = (m_nUserRotation + nRotationDelta) % 360;
                 m_pCurrentImage->Rotate(nRotationDelta);
@@ -1873,10 +1872,10 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             break;
         case Command::FitToScreen:
         case Command::FitToScreenNoEnlarge:
-            ResetZoomToFitScreen(false, inv.id == Command::FitToScreen, true);
+            ResetZoomToFitScreen(false, inv.id == Command::FitToScreen);
             break;
         case Command::FillWithCrop:
-            ResetZoomToFitScreen(true, true, true);
+            ResetZoomToFitScreen(true, true);
             break;
         case Command::ToggleAutoZoomFit:
             {
@@ -1930,7 +1929,7 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
         case Command::ToggleFillWithCropTo100:
             m_bShowZoomFactor = true;
             if (fabs(m_dZoom - 1) < 0.01) {
-                ResetZoomToFitScreen(inv.id == Command::ToggleFillWithCropTo100, true, true);
+                ResetZoomToFitScreen(inv.id == Command::ToggleFillWithCropTo100, true);
             } else {
                 ResetZoomTo100Percents(m_bMouseOn);
             }
@@ -2175,7 +2174,7 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                     nSortMode = m_eSortModeBeforeRandom;
                 }
 
-                ToastSortingMode(nSortMode, bSortedAscending);
+                ToastSortingMode(nSortMode);
                 m_pFileList->SetSorting(nSortMode, bSortedAscending);
             }
             break;
@@ -2440,7 +2439,7 @@ void CMainWindow::OpenFile(const QString& fileName) {
 
     m_nLastLoadError = GetLoadErrorAfterOpenFile();
 
-    AfterNewImageLoaded(true, false);
+    AfterNewImageLoaded(true);
     if (m_pCurrentImage != nullptr && m_pCurrentImage->IsAnimation()) {
         StartAnimation();
     }
@@ -2449,7 +2448,7 @@ void CMainWindow::OpenFile(const QString& fileName) {
     this->update();
 }
 
-void CMainWindow::StartDragging(int nX, int nY, bool bDragWithZoomNavigator) {
+void CMainWindow::StartDragging(int nX, int nY) {
     m_startMouse = QPoint(-1, -1);
     m_bDragging = true;
     m_nCapturedX = nX;
@@ -2689,7 +2688,7 @@ void CMainWindow::GotoImage(EImagePosition ePos, int nFlags) {
 
     bool bSynchronize = (nFlags & KEEP_PARAMETERS) == 0;
 
-    AfterNewImageLoaded(bSynchronize, false, ePos == POS_Previous);
+    AfterNewImageLoaded(bSynchronize, ePos == POS_Previous);
 
     /* Debugging */ qDebug() << "GotoImage(" << "ePos=" << ePos << ", nFlags=" << nFlags << ") Pos7  m_offsets.x:" << m_offsets.x() << "m_offsets.y:" << m_offsets.y() << "nOldFrameIndex:" << nOldFrameIndex << "nFrameIndex:" << nFrameIndex << "of" << m_pFileList->Current();
 
@@ -2858,7 +2857,7 @@ double CMainWindow::GetZoomFactorForFitToScreen(bool bFillWithCrop, bool bAllowE
     }
 }
 
-void CMainWindow::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool bAdjustWindowSize) {
+void CMainWindow::ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge) {
     m_isUserFitToScreen = false;
     if (m_pCurrentImage != nullptr) {
         double dOldZoom = m_dZoom;
@@ -2920,7 +2919,6 @@ CProcessParams CMainWindow::CreateProcessParams(bool bNoProcessingAfterLoad) {
             SetProcessingFlag(m_eProcessingFlagsKept, PFLAG_NoProcessingAfterLoad, bNoProcessingAfterLoad));
     } else {
         m_isUserFitToScreen = false;
-        CSettingsProvider& sp = CSettingsProvider::This();
         return CProcessParams(nClientWidth, nClientHeight,
             CRotationParams(0), 0, -1, eAutoZoomMode, QPoint(0, 0), m_eTransparencyMode,
             GetDefaultProcessingParams(),
@@ -2985,7 +2983,7 @@ void CMainWindow::StartMovieMode(double dFPS) {
     m_bMovieMode = true;
     UpdateKeepParams();
     StartSlideShowTimer(Helpers::RoundToInt(1000.0/dFPS));
-    AfterNewImageLoaded(false, false);
+    AfterNewImageLoaded(false);
     update();
 }
 
@@ -2994,7 +2992,7 @@ void CMainWindow::StopMovieMode() {
         m_bMovieMode = false;
         UpdateKeepParams();
         StopSlideShowTimer();
-        AfterNewImageLoaded(false, false);
+        AfterNewImageLoaded(false);
         this->update();
     }
 }
@@ -3043,7 +3041,7 @@ void CMainWindow::InitParametersForNewImage() {
     }
 }
 
-void CMainWindow::AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack) {
+void CMainWindow::AfterNewImageLoaded(bool bSynchronize, bool bMoveBack) {
     UpdateWindowTitle();
     m_pDirectoryWatcher->SetCurrentFile(CurrentFileName(false));
     if (bSynchronize) {
@@ -3368,20 +3366,6 @@ void CMainWindow::CleanupAndTerminate() {
     // geometry() liefert die ClientRect Fensterkoordinaten (ohne Window-Manager-Rahmen),
     // die setGeometry() beim Start auch fehlerfrei wiederherstellen kann.
     m_windowRectOnClose = geometry();
-
-    /*
-    if (!m_bMovieMode) {
-        EProcessingFlags eFlags = CreateDefaultProcessingFlags(m_bKeepParams);
-        CSettingsProvider::This().SaveSettings(*m_pImageProcParams,
-                                               eFlags,
-                                               m_pFileList->GetNavigationMode(),
-                                               m_pFileList->GetSorting(),
-                                               m_pFileList->IsSortedAscending(),
-                                               m_eAutoZoomModeWindowed,
-                                               m_eAutoZoomModeFullscreen,
-                                               m_eTransitionEffect);
-    }
-    */
 
     SaveBookmark();
     CSettingsProvider::This().SaveCustomSettings();
@@ -3726,7 +3710,7 @@ void CMainWindow::SetToast(const QString& strToast, int nDurationMs)
 /*
 * Show toast for current files sorting mode (and up counting mode).
 */
-void CMainWindow::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting)
+void CMainWindow::ToastSortingMode(Helpers::ESorting nSortMode)
 {
     static const QString sSortModes[] = {
         QStringLiteral("Sorting: Name"),
@@ -3736,7 +3720,6 @@ void CMainWindow::ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting
     };
 
     QString sSortMode = sSortModes[static_cast<int>(nSortMode)];
-    // sSortMode += (bUpCounting ? QStringLiteral(" ^") : QStringLiteral(" v"));
     SetToast(sSortMode);
 }
 

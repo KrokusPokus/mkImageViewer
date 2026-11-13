@@ -24,7 +24,7 @@ public:
     CXMMImage(int nWidth, int nHeight, bool bPadHeight, int padding, bool bAvoidCacheAliasing);
     // convert from section of 24 or 32 bpp bitmap, from first to (and including) last column and row
     // padding is in pixels(not bytes), the line size avoids cache aliasing (as above)
-    CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirstY, int nLastY, const void* pBitmap, int nChannels, int padding);
+    CXMMImage(int nWidth, int nFirstX, int nLastX, int nFirstY, int nLastY, const void* pBitmap, int nChannels, int padding);
     ~CXMMImage();
 
     // Pointer to the (page aligned) memory of the image

@@ -21,7 +21,7 @@ struct WebpReaderWriter::webp_cache {
     void* transform;
 };
 
-WebpReaderWriter::webp_cache WebpReaderWriter::cache = { 0 };
+WebpReaderWriter::webp_cache WebpReaderWriter::cache = {};
 
 void* WebpReaderWriter::ReadImage(int& width,
     int& height,
@@ -174,5 +174,5 @@ void WebpReaderWriter::DeleteCache() {
     WebPAnimDecoderDelete(cache.decoder);
     WebPDataClear(&cache.data);
     ICCProfileTransform::DeleteTransform(cache.transform);
-    cache = { 0 };
+    cache = {};
 }

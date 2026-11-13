@@ -92,9 +92,9 @@ public:
     void GotoImage(EImagePosition ePos);
     void ReloadImage(bool keepParameters, bool updateWindow = true);
     void ResetZoomTo100Percents(bool bZoomToMouse);
-    void ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge, bool bAdjustWindowSize);
+    void ResetZoomToFitScreen(bool bFillWithCrop, bool bAllowEnlarge);
     bool PerformPan(int dx, int dy, bool bAbsolute);
-    void StartDragging(int nX, int nY, bool bDragWithZoomNavigator);
+    void StartDragging(int nX, int nY);
     void DoDragging();
     void EndDragging();
     void ExecuteCommand(const Cmd::CommandInvocation& inv);
@@ -206,7 +206,7 @@ private:
     // Keep zoom, offsets, rotation and processing parameters between images (only used internally while an
     // animation or the movie mode is running). Switching it on takes over the current state.
     void SetKeepParams(bool bKeep);
-    void AfterNewImageLoaded(bool bSynchronize, bool bAfterStartup, bool bMoveBack = false);
+    void AfterNewImageLoaded(bool bSynchronize, bool bMoveBack = false);
     void onLoadFileAsynch(); // OnAnotherInstanceStarted() calls this via invokeMethod()
     void OnCurrentFileRenamed(const QString& sOldPath, const QString& sNewPath);
 
@@ -260,7 +260,7 @@ private:
     // [sdneon] Toast stuff
     QString m_strToast;
     void SetToast(const QString& strToast, int nDurationMs = 3000);
-    void ToastSortingMode(Helpers::ESorting nSortMode, bool bUpCounting);
+    void ToastSortingMode(Helpers::ESorting nSortMode);
     
     int m_customAnimationFrameTime;   // eigene Bildzeit in ms (PlayMovie bei Animationen), 0 = Standard der Animation
     bool m_bTerminated{false};

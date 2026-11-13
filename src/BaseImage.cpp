@@ -51,8 +51,8 @@ static CBasicProcessing::SIMDArchitecture ToSIMDArchitecture(Helpers::CPUType cp
 
 CBaseImage::CBaseImage(int nWidth, int nHeight, void* pPixels, void* pEXIFData, int nChannels,
                     EImageFormat eImageFormat, bool bIsAnimation, int nFrameIndex, int nNumberOfFrames, int nFrameTimeMs, bool bInArchive)
-    : m_rotationParams{ 0 },
-    m_bInArchive(bInArchive)
+    : m_bInArchive(bInArchive),
+    m_rotationParams{ 0 }
 {
     if (nChannels == 3 || nChannels == 4) {
         m_pOrigPixels = pPixels;
@@ -143,7 +143,7 @@ CBaseImage::~CBaseImage() {
 void CBaseImage::ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUTProcessed, DSize fullTargetSize,
                                  DSize clippingSize, DPoint targetOffset, DRect oldClippingRect,
                                  EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, 
-                                 double dRotation, EResizeType eResizeType) {
+                                 EResizeType eResizeType) {
     DPoint oldOffset = oldClippingRect.TopLeft();
     DSize oldSize = oldClippingRect.Size();
     DRect newClippingRect = DRect(targetOffset, clippingSize);
@@ -151,11 +151,11 @@ void CBaseImage::ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUT
     if (sourceRect.IntersectRect(oldClippingRect, newClippingRect)) {
         // there is an intersection, reuse the non LUT processed bitmap
         sourceRect.OffsetRect(-oldOffset.x, -oldOffset.y);
-        DRect targetRect = DRect(DPoint(std::max<long>(0, oldOffset.x - newClippingRect.left), std::max<long>(0, oldOffset.y - newClippingRect.top)),
+        DRect targetRect = DRect(DPoint(std::max<int>(0, oldOffset.x - newClippingRect.left), std::max<int>(0, oldOffset.y - newClippingRect.top)),
             DSize(sourceRect.Width(), sourceRect.Height()));
 
-        bool bCanUseLUTProcBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, pBitmapPixelsLUTProcessed, fullTargetSize,
-            targetOffset, pBitmapPixels, clippingSize, true, false) != nullptr;
+        bool bCanUseLUTProcBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, pBitmapPixelsLUTProcessed,
+            pBitmapPixels, clippingSize, true, false) != nullptr;
 
         // the LUT processed pixels cannot be used and the original pixels are not available -
         // full recreation of bitmaps is needed
@@ -190,7 +190,7 @@ void CBaseImage::ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUT
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pTopProc = nullptr;
-                ApplyCorrectionLUT(imageProcParams, eProcFlags, pTopProc, fullTargetSize, targetOffset, pTop, clipSize, false, false);
+                ApplyCorrectionLUT(imageProcParams, eProcFlags, pTopProc, pTop, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pTopProc,
                     clippingSize, DRect(DPoint(0, 0), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
@@ -210,7 +210,7 @@ void CBaseImage::ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUT
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pBottomProc = nullptr;
-                ApplyCorrectionLUT(imageProcParams, eProcFlags, pBottomProc, fullTargetSize, offset, pBottom, clipSize, false, false);
+                ApplyCorrectionLUT(imageProcParams, eProcFlags, pBottomProc, pBottom, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pBottomProc,
                     clippingSize, DRect(DPoint(0, targetRect.bottom), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
@@ -229,7 +229,7 @@ void CBaseImage::ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUT
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pLeftProc = nullptr;
-                ApplyCorrectionLUT(imageProcParams, eProcFlags, pLeftProc, fullTargetSize, targetOffset, pLeft, clipSize, false, false);
+                ApplyCorrectionLUT(imageProcParams, eProcFlags, pLeftProc, pLeft, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pLeftProc,
                     clippingSize, DRect(DPoint(0, 0), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
@@ -249,7 +249,7 @@ void CBaseImage::ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUT
                     clipSize, DRect(DPoint(0, 0), clipSize));
             } else {
                 void* pRigthProc = nullptr;
-                ApplyCorrectionLUT(imageProcParams, eProcFlags, pRigthProc, fullTargetSize, offset, pRight, clipSize, false, false);
+                ApplyCorrectionLUT(imageProcParams, eProcFlags, pRigthProc, pRight, clipSize, false, false);
                 CBasicProcessing::CopyRect32bpp(pPannedPixelsLUTProcessed, pRigthProc,
                     clippingSize, DRect(DPoint(targetRect.right, 0), clipSize),
                     clipSize, DRect(DPoint(0, 0), clipSize));
@@ -464,8 +464,8 @@ void* CBaseImage::GetBitmapInternal(DSize fullTargetSize, DSize clippingSize, DP
     // Check if only the LUT must be reapplied but no resampling (resampling is much slower than the LUTs)
     void * pBitmap = nullptr;
     if (!bMustResampleQuality && !bMustResampleGeometry) {
-        pBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pBitmapPixelsLUTProcessed, 
-            fullTargetSize, targetOffset, m_pBitmapPixels, clippingSize, false, false, bParametersChanged);
+        pBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pBitmapPixelsLUTProcessed,
+            m_pBitmapPixels, clippingSize, false, false, bParametersChanged);
     }
 
     // ApplyCorrectionLUT() could have failed, then recreate the bitmaps
@@ -481,7 +481,7 @@ void* CBaseImage::GetBitmapInternal(DSize fullTargetSize, DSize clippingSize, DP
         m_bFirstReprocessing = false;
         if (bPanningOnly) {
             ResampleWithPan(m_pBitmapPixels, m_pBitmapPixelsLUTProcessed, fullTargetSize, clippingSize, targetOffset, 
-                oldClippingRect, eProcFlags, imageProcParams, 0.0, eResizeType);
+                oldClippingRect, eProcFlags, imageProcParams, eResizeType);
         } else {
             delete[] static_cast<uint8_t*>(m_pBitmapPixelsLUTProcessed); m_pBitmapPixelsLUTProcessed = nullptr;
             delete[] static_cast<uint8_t*>(m_pBitmapPixels); m_pBitmapPixels = nullptr;
@@ -494,8 +494,8 @@ void* CBaseImage::GetBitmapInternal(DSize fullTargetSize, DSize clippingSize, DP
 
         // if ResampleWithPan() has preserved this bitmap, we can reuse it
         if (m_pBitmapPixelsLUTProcessed == nullptr) {
-            pBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pBitmapPixelsLUTProcessed, fullTargetSize,
-                targetOffset, m_pBitmapPixels, clippingSize, false, false);
+            pBitmap = ApplyCorrectionLUT(imageProcParams, eProcFlags, m_pBitmapPixelsLUTProcessed,
+                m_pBitmapPixels, clippingSize, false, false);
         } else {
             pBitmap = m_pBitmapPixelsLUTProcessed;
         }
@@ -516,8 +516,7 @@ void* CBaseImage::GetBitmapInternal(DSize fullTargetSize, DSize clippingSize, DP
 }
 
 void* CBaseImage::ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-                                           void * & pCachedTargetBitmap, DSize fullTargetSize, DPoint targetOffset, 
-                                           void * pSourceBitmap, DSize bitmapSize,
+                                           void * & pCachedTargetBitmap, void * pSourceBitmap, DSize bitmapSize,
                                            bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap, bool &bParametersChanged) {
 
     bool bAutoContrast = GetProcessingFlag(eProcFlags, PFLAG_AutoContrast);

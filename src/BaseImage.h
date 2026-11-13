@@ -266,7 +266,7 @@ private:
     // Resample when panning was done, using existing data in bitmaps. Old clipping rectangle is given in oldClippingRect
     void ResampleWithPan(void* & pBitmapPixels, void* & pBitmapPixelsLUTProcessed, DSize fullTargetSize, 
         DSize clippingSize, DPoint targetOffset, DRect oldClippingRect,
-        EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, double dRotation, EResizeType eResizeType);
+        EProcessingFlags eProcFlags, const CImageProcessingParams & imageProcParams, EResizeType eResizeType);
 
     // Resample to given target size. Returns resampled bitmap
     void* Resample(DSize fullTargetSize, DSize clippingSize, DPoint targetOffset, EProcessingFlags eProcFlags, EResizeType eResizeType);
@@ -277,14 +277,14 @@ private:
     // can be used (return != nullptr) or not (return == nullptr)
     // The out parameter bParametersChanged returns if one of the parameters relevant for image processing has been changed since the last call
     void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-        void * & pCachedTargetBitmap, DSize fullTargetSize, DPoint targetOffset,
-        void * pSourceBitmap, DSize bitmapSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap, bool &bParametersChanged);
+        void * & pCachedTargetBitmap, void * pSourceBitmap, DSize bitmapSize,
+        bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap, bool &bParametersChanged);
 
     void* ApplyCorrectionLUT(const CImageProcessingParams & imageProcParams, EProcessingFlags eProcFlags,
-        void * & pCachedTargetBitmap, DSize fullTargetSize, DPoint targetOffset, 
-        void * pSourceBitmap, DSize bitmapSize, bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap) {
+        void * & pCachedTargetBitmap, void * pSourceBitmap, DSize bitmapSize,
+        bool bOnlyCheck, bool bCanTakeOwnershipOfSourceBitmap) {
         bool bNotUsed;
-        return ApplyCorrectionLUT(imageProcParams, eProcFlags, pCachedTargetBitmap, fullTargetSize, targetOffset, 
+        return ApplyCorrectionLUT(imageProcParams, eProcFlags, pCachedTargetBitmap,
             pSourceBitmap, bitmapSize, bOnlyCheck, bCanTakeOwnershipOfSourceBitmap, bNotUsed);
     }
 

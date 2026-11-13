@@ -5,7 +5,6 @@
 #include "MaxImageDef.h"
 
 #include <bit>
-#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -42,13 +41,14 @@ void * HeifReader::ReadImage(int &width,
     width = image.get_width(heif_channel_interleaved);
     height = image.get_height(heif_channel_interleaved);
 
-    if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION)
+    // get_width()/get_height() return -1 on error
+    if (width < 1 || height < 1 || width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION)
         return nullptr;
-    if (std::abs((double)width * height) > MAX_IMAGE_PIXELS) {
+    if ((double)width * height > MAX_IMAGE_PIXELS) {
         outOfMemory = true;
         return nullptr;
     }
-    if (width < 1 || height < 1 || width * nchannels > stride)
+    if (width * nchannels > stride)
         return nullptr;
 
     // width, height >= 1 (checked above)

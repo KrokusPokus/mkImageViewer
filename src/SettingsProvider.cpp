@@ -870,48 +870,6 @@ void CSettingsProvider::SaveCustomSettings() {
     WriteInt("BookModePageHeight", m_nBookModePageHeight);
 }
 
-void CSettingsProvider::SaveSettings(const CImageProcessingParams& procParams,
-                                     EProcessingFlags eProcFlags,
-                                     Helpers::ENavigationMode eNavigationMode,
-                                     Helpers::ESorting eFileSorting,
-                                     bool isSortedAscending,
-                                     Helpers::EAutoZoomMode eAutoZoomMode,
-                                     Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
-                                     Helpers::ETransitionEffect eSlideShowTransitionEffect) {
-
-    WriteBool("AutoContrastCorrection", GetProcessingFlag(eProcFlags, PFLAG_AutoContrast));
-
-    QString sNavigation = "LoopFolder";
-    if (eNavigationMode == Helpers::NM_LoopSameDirectoryLevel) {
-        sNavigation = "LoopSameFolderLevel";
-    } else if (eNavigationMode == Helpers::NM_LoopSubDirectories) {
-        sNavigation = "LoopSubFolders";
-    }
-    WriteString("FolderNavigation", sNavigation);
-
-    QString sSorting = "FileName";
-    if (eFileSorting == Helpers::FS_LastModTime) {
-        sSorting = "LastModDate";
-    } else if (eFileSorting == Helpers::FS_FileSize) {
-        sSorting = "FileSize";
-    } else if (eFileSorting == Helpers::FS_Random) {
-        sSorting = "Random";
-    }
-
-    WriteString("FileDisplayOrder", sSorting);
-
-    WriteBool("FileSortAscending", isSortedAscending);
-
-    WriteString("AutoZoomMode", GetAutoZoomModeString(eAutoZoomMode));
-    WriteString("AutoZoomModeFullscreen", GetAutoZoomModeString(eAutoZoomModeFullScreen));
-
-    WriteBool("HighQualityResampling", GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling));
-
-    WriteString("SlideShowTransitionEffect", ConvertTransitionEffectToString(eSlideShowTransitionEffect));
-
-    ReadWriteableINISettings();
-}
-
 int CSettingsProvider::LastSettingsPage() const {
     if (m_stateFileFullPath.isEmpty()) {
         return 0;

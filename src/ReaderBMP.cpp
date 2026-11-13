@@ -62,8 +62,8 @@ void* CReaderBMP::ReadImage(int& width, int& height, int& bpp, bool& bOutOfMemor
         return nullptr;
     }
     /* Not too big files (height is negative for top-down DIBs) */
-    if (infoheader.width <= 0 || infoheader.width > (int)MAX_IMAGE_DIMENSION ||
-        infoheader.height == 0 || infoheader.height < -(int)MAX_IMAGE_DIMENSION || infoheader.height > (int)MAX_IMAGE_DIMENSION) {
+    if (infoheader.width <= 0 || infoheader.width > MAX_IMAGE_DIMENSION ||
+        infoheader.height == 0 || infoheader.height < -MAX_IMAGE_DIMENSION || infoheader.height > MAX_IMAGE_DIMENSION) {
         return nullptr;
     }
     if ((double)infoheader.width * abs(infoheader.height) > MAX_IMAGE_PIXELS) {

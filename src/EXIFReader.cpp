@@ -275,10 +275,6 @@ int ReadRationalTag(Rational & rational, uint8_t* ptr, const TiffData& tiff, boo
     return ReadRationalTag(rational, ptr, tiff, 0, bLittleEndian);
 }
 
-bool ReadSignedRationalTag(SignedRational & rational, uint8_t* ptr, const TiffData& tiff, bool bLittleEndian) {
-    return ReadRationalTag(reinterpret_cast<Rational &>(rational), ptr, tiff, bLittleEndian);
-}
-
 double ReadDoubleTag(uint8_t* ptr, const TiffData& tiff, int index, bool bLittleEndian) {
     Rational rational(0, 0);
     int nType = ReadRationalTag(rational, ptr, tiff, index, bLittleEndian);
@@ -424,9 +420,9 @@ bool CEXIFReader::RotateOrientationInFile(const QString& sFileName, int nRotatio
 }
 
 CEXIFReader::CEXIFReader(void* pApp1Block, int nBlockSize, EImageFormat eImageFormat)
-    : m_exposureTime{ 0, 0 },
-    m_acqDate{},
-    m_dateTime{}
+    : m_acqDate{},
+    m_dateTime{},
+    m_exposureTime{ 0, 0 }
 {
     m_bFlashFired = false;
     m_bFlashFlagPresent = false;

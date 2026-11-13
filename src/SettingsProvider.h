@@ -171,13 +171,6 @@ public:
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }
     void SetUseEmbeddedColorProfiles(int bUseEmbeddedColorProfiles) { m_bUseEmbeddedColorProfiles = (bUseEmbeddedColorProfiles != 0); }
 
-    // This will only save a subset of settings to settings.ini in the application's config directory.
-    void SaveSettings(const CImageProcessingParams& procParams,
-                      EProcessingFlags eProcFlags,
-                      Helpers::ENavigationMode eNavigationMode, Helpers::ESorting eFileSorting, bool isSortedAscending,
-                      Helpers::EAutoZoomMode eAutoZoomMode, Helpers::EAutoZoomMode eAutoZoomModeFullScreen,
-                      Helpers::ETransitionEffect eSlideShowTransitionEffect);
-
     // Lädt alle INI-Einstellungen erneut ein
     void ReloadAllSettings();
 

@@ -26,7 +26,7 @@ void* QoiReaderWriter::ReadImage(int& width,
     if (sizebytes > static_cast<std::size_t>(INT_MAX))
         return nullptr;
 
-    qoi_desc desc = { 0 };
+    qoi_desc desc = {};
     unsigned char* pDecodedPixels = (unsigned char*)qoi_decode(buffer, static_cast<int>(sizebytes), &desc, 0);
     if (pDecodedPixels == nullptr)
         return nullptr;

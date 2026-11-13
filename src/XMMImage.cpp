@@ -116,7 +116,7 @@ CXMMImage::CXMMImage(int nWidth, int nHeight, bool bPadHeight, int padding, bool
 }
 
 //GF: version for f32 SSE & AVX2
-CXMMImage::CXMMImage(int nWidth, int nHeight, int nFirstX, int nLastX, int nFirstY, int nLastY, 
+CXMMImage::CXMMImage(int nWidth, int nFirstX, int nLastX, int nFirstY, int nLastY, 
     const void* pBitmap, int nChannels, int padding) {
     int nSectionWidth = nLastX - nFirstX + 1;
     int nSectionHeight = nLastY - nFirstY + 1;
