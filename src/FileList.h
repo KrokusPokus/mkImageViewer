@@ -77,12 +77,12 @@ public:
     // Move to previous file in list.
     CFileList* Prev();
 
-    // Move to first file (according to sort order): of the current folder, or in LoopSameFolderLevel mode
-    // of the first sibling folder containing images. The filelist object of that file is returned.
+    // Move to first file (according to sort order): of the current folder, or in the LoopSameFolderLevel and
+    // LoopSubFolders modes of the first folder of the loop containing images. The filelist object of that file is returned.
     CFileList* First();
 
-    // Move to last file (according to sort order): of the current folder, or in LoopSameFolderLevel mode
-    // of the last sibling folder containing images. The filelist object of that file is returned.
+    // Move to last file (according to sort order): of the current folder, or in the LoopSameFolderLevel and
+    // LoopSubFolders modes of the last folder of the loop containing images. The filelist object of that file is returned.
     CFileList* Last();
 
     // Returns if navigation wraps around from the last to the first file and vice versa in the current navigation mode
@@ -129,7 +129,7 @@ public:
     // The entry is renamed in place and moved to its new position if the list is sorted by name,
     // so the iterator (current file) keeps pointing to the renamed file. No directory access, no reload.
     // Only the list of the current folder is touched: lists chained for other folders cannot contain the
-    // file (TryCreateFileList() never creates two lists for one folder).
+    // file (GetFolderList() never creates two lists for one folder).
     void FileHasRenamed(const QString& sOldFileName, const QString& sNewFileName);
 
     // Returns if the current file exists
@@ -148,16 +148,16 @@ private:
 
     bool m_bDeleteHistory{ true };
     bool m_bWrapAroundFolder{ false };
-    int m_nLevel{ 0 };
+    int m_nLevel{ 0 }; // LoopSubFolders: depth of this folder below the start folder of the loop
     QString m_sInitialFile;
     QString m_sDirectory;
 
     // filelists for several folders are chained
     CFileList* m_next{ nullptr };
     CFileList* m_prev{ nullptr };
-    // LoopSameFolderLevel: the chain is a cache of the sibling folders loaded so far, in folder order.
-    // These flags are true if it is known that no other sibling folder with images lies between
-    // this folder and m_next (m_prev), so the folders on disk need not be enumerated again.
+    // LoopSameFolderLevel and LoopSubFolders: the chain is a cache of the folders of the loop loaded so far,
+    // in folder order. These flags are true if it is known that no other folder of the loop with images lies
+    // between this folder and m_next (m_prev), so the folders on disk need not be enumerated again.
     bool m_bNextIsAdjacent{ false };
     bool m_bPrevIsAdjacent{ false };
     std::list<CFileDesc> m_fileList;
@@ -169,15 +169,9 @@ private:
 
     void MoveIterToLast();
     void NextInFolder();
-    CFileList* GotoFirstShown();
     std::list<CFileDesc>::iterator FindFile(const QString& sName);
-    CFileList* FindFileRecursively(const QString& sDirectory, const QString& sFindAfter,
-                                   bool bSearchThisFolder, int nLevel, int nRecursion);
-    CFileList* TryCreateFileList(const QString& directory, int nNewLevel);
-    CFileList* WrapToNextImage();
-    CFileList* WrapToPrevImage();
     bool UsesStartFileAsLoopStart() const;
-    // LoopSameFolderLevel: all sibling folders form one file list, see NextInFolderList()
+    // LoopSameFolderLevel and LoopSubFolders: all folders of the loop form one file list, see NextInFolderList()
     CFileList* NextInFolderList();
     CFileList* PrevInFolderList();
     CFileList* AdjacentFolder(bool bForward);
@@ -185,6 +179,9 @@ private:
     bool GetSiblingFolders(QString& sParentDir, QStringList& dirList) const;
     CFileList* AdjacentSiblingFolder(bool bForward);
     CFileList* OuterSiblingFolder(bool bFirst);
+    CFileList* AdjacentSubFolder(bool bForward);
+    CFileList* OuterSubFolder(bool bFirst);
+    QString RootDirectory() const;
     CFileList* GetFolderList(const QString& sDirectory, int nLevel);
     void InsertAfter(CFileList* pList, bool bAdjacent);
     void InsertBefore(CFileList* pList, bool bAdjacent);

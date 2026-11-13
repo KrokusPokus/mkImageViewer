@@ -13,7 +13,6 @@
 #include <QTextStream>
 
 #include <algorithm>
-#include <cassert>
 #include <limits>
 #include <random>
 
@@ -271,7 +270,7 @@ bool CFileList::CurrentFileExists() const {
 }
 
 CFileList* CFileList::Next() {
-    if (sm_eMode == Helpers::NM_LoopSameDirectoryLevel) {
+    if (sm_eMode != Helpers::NM_LoopDirectory) {
         return NextInFolderList();
     }
     if (!m_fileList.empty()) {
@@ -282,50 +281,28 @@ CFileList* CFileList::Next() {
         if (iterTemp == m_fileList.end()) {
             iterTemp = m_fileList.begin();
         }
-        if (iterTemp == m_iterStart) {
-            if (!WrapsAround() && sm_eMode == Helpers::NM_LoopDirectory) {
-                return this;
-            }
-            CFileList* pNextList = WrapToNextImage();
-            if (pNextList == nullptr) {
-                pNextList = this;
-                while (pNextList->m_prev != nullptr) pNextList = pNextList->m_prev;
-                if (pNextList != this) {
-                    return WrapsAround() ? GotoFirstShown() : this;
-                }
-            }
-            if (pNextList != this) {
-                return pNextList;
-            }
+        if (iterTemp == m_iterStart && !WrapsAround()) {
+            return this; // we are finished with this folder
         }
         NextInFolder();
-    } else {
-        CFileList* pNextList = WrapToNextImage();
-        if (pNextList != nullptr) {
-            return pNextList;
-        }
     }
     return this;
 }
 
 CFileList* CFileList::Prev() {
-    if (sm_eMode == Helpers::NM_LoopSameDirectoryLevel) {
+    if (sm_eMode != Helpers::NM_LoopDirectory) {
         return PrevInFolderList();
     }
     if (m_iter == m_iterStart) {
-        if (sm_eMode == Helpers::NM_LoopDirectory) {
-            if (!WrapsAround()) {
-                return this;
-            }
-            if (m_iter == m_fileList.begin()) {
-                MoveIterToLast();
-            } else {
-                m_iter--;
-            }
+        if (!WrapsAround()) {
             return this;
-        } else {
-            return WrapToPrevImage();
         }
+        if (m_iter == m_fileList.begin()) {
+            MoveIterToLast();
+        } else {
+            m_iter--;
+        }
+        return this;
     }
     if (!m_fileList.empty()) {
         if (m_iter == m_fileList.begin()) {
@@ -340,7 +317,7 @@ CFileList* CFileList::Prev() {
 
 CFileList* CFileList::First() {
     CFileList* pFirst = this;
-    if (sm_eMode == Helpers::NM_LoopSameDirectoryLevel) {
+    if (sm_eMode != Helpers::NM_LoopDirectory) {
         pFirst = OuterFolder(true);
         if (pFirst == nullptr) {
             pFirst = this; // no images at all
@@ -352,7 +329,7 @@ CFileList* CFileList::First() {
 
 CFileList* CFileList::Last() {
     CFileList* pLast = this;
-    if (sm_eMode == Helpers::NM_LoopSameDirectoryLevel) {
+    if (sm_eMode != Helpers::NM_LoopDirectory) {
         pLast = OuterFolder(false);
         if (pLast == nullptr) {
             pLast = this; // no images at all
@@ -364,8 +341,7 @@ CFileList* CFileList::Last() {
 }
 
 bool CFileList::WrapsAround() const {
-    // LoopSubFolders does not wrap around yet: at the end of the loop navigation stops, as before
-    return m_bWrapAroundFolder && sm_eMode != Helpers::NM_LoopSubDirectories;
+    return m_bWrapAroundFolder;
 }
 
 CFileList* CFileList::AwayFromCurrent() {
@@ -513,78 +489,19 @@ std::list<CFileDesc>::iterator CFileList::FindFile(const QString& sName) {
     return m_fileList.begin();
 }
 
-CFileList* CFileList::WrapToNextImage() {
-    if (m_next != nullptr) {
-        assert(sm_eMode != Helpers::NM_LoopDirectory);
-        return m_next;
-    }
-
-    // LoopSameFolderLevel does not come here, see NextInFolderList()
-    if (sm_eMode == Helpers::NM_LoopSubDirectories) {
-        return FindFileRecursively(m_sDirectory, QString(), false, m_nLevel, 0);
-    }
-    return nullptr;
-}
-
-CFileList* CFileList::FindFileRecursively(const QString& sDirectory, const QString& sFindAfter,
-                                           bool bSearchThisFolder, int nLevel, int nRecursion) {
-    if (bSearchThisFolder) {
-        CFileList* pFileList = TryCreateFileList(sDirectory, nLevel);
-        if (pFileList != nullptr) {
-            return pFileList;
-        }
-    }
-
-    QDir dir(sDirectory);
-    QStringList dirList = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-
-    if (!dirList.isEmpty()) {
-        std::sort(dirList.begin(), dirList.end(), FolderNameLess);
-
-        bool bStart = sFindAfter.isEmpty();
-        for (const QString& subDirName : dirList) {
-            if (bStart) {
-                const QString subDirPath = sDirectory + QDir::separator() + subDirName;
-                CFileList* pFileList = FindFileRecursively(subDirPath, QString(), true, nLevel + 1, nRecursion + 1);
-                if (pFileList != nullptr) {
-                    return pFileList;
-                }
-            }
-            if (subDirName == sFindAfter) {
-                bStart = true;
-            }
-        }
-    }
-
-    if (nLevel == 0 || nRecursion > 0) {
-        return nullptr;
-    }
-
-    // Backtrack to parent
-    const QDir parentDir(sDirectory + QStringLiteral("/.."));
-    const QString sParentDir = parentDir.canonicalPath();
-    const QString sThisDir = QFileInfo(sDirectory).fileName();
-
-    return FindFileRecursively(sParentDir, sThisDir, false, nLevel - 1, std::max(0, nRecursion - 1));
-}
-
-CFileList* CFileList::WrapToPrevImage() {
-    if (m_prev != nullptr) {
-        return m_prev;
-    }
-    return this;
-}
-
 bool CFileList::UsesStartFileAsLoopStart() const {
-    // Only LoopFolder with wrap around starts the loop at the start file. In LoopSameFolderLevel all
-    // sibling folders form one file list and the start file is just a position in it. LoopSubFolders
-    // does not wrap around (see WrapsAround()), so it starts at the beginning of the folder as before.
+    // Only LoopFolder with wrap around starts the loop at the start file. In the folder navigation
+    // modes all folders of the loop form one file list and the start file is just a position in it.
     return m_bWrapAroundFolder && sm_eMode == Helpers::NM_LoopDirectory;
 }
 
-// LoopSameFolderLevel: the files of all sibling folders (this folder included) form one list, in folder
-// order and within each folder in file order. With wrap around, the last file of the last folder is
-// followed by the first file of the first folder; without, navigation stops there.
+// LoopSameFolderLevel and LoopSubFolders: the files of all folders of the loop form one list, in folder
+// order and within each folder in file order. The folders of the loop are
+// - LoopSameFolderLevel: the sibling folders of the start folder, the start folder included
+// - LoopSubFolders: the start folder and all folders below it, depth-first, the files of a folder before
+//   its subfolders (m_nLevel is the depth of a folder below the start folder)
+// With wrap around, the last file of the last folder is followed by the first file of the first folder;
+// without, navigation stops there.
 // The chain m_prev/m_next is a cache of the folders loaded so far, kept in folder order.
 CFileList* CFileList::NextInFolderList() {
     if (!m_fileList.empty()) {
@@ -644,7 +561,7 @@ CFileList* CFileList::AdjacentFolder(bool bForward) {
     if (m_sDirectory.isEmpty()) {
         return nullptr;
     }
-    CFileList* pList = AdjacentSiblingFolder(bForward);
+    CFileList* pList = (sm_eMode == Helpers::NM_LoopSubDirectories) ? AdjacentSubFolder(bForward) : AdjacentSiblingFolder(bForward);
     if (pList == nullptr || pList == this) {
         return nullptr;
     }
@@ -662,7 +579,7 @@ CFileList* CFileList::OuterFolder(bool bFirst) {
     if (m_sDirectory.isEmpty()) {
         return m_fileList.empty() ? nullptr : this;
     }
-    CFileList* pList = OuterSiblingFolder(bFirst);
+    CFileList* pList = (sm_eMode == Helpers::NM_LoopSubDirectories) ? OuterSubFolder(bFirst) : OuterSiblingFolder(bFirst);
     if (pList != nullptr && pList != this) {
         // keep the chain in folder order: the first (last) folder belongs to its start (end)
         CFileList* pOuter = this;
@@ -731,6 +648,112 @@ CFileList* CFileList::OuterSiblingFolder(bool bFirst) {
         }
     }
     return m_fileList.empty() ? nullptr : this;
+}
+
+// LoopSubFolders: moves sDirectory (nLevel below the start folder) to the next folder in depth-first
+// order, without wrap around. Returns false if there is none.
+// Symbolic links to folders are not followed, they could lead into a cycle.
+static bool NextFolderInTree(QString& sDirectory, int& nLevel) {
+    const QStringList subFolders = GetSubFolders(sDirectory, true);
+    if (!subFolders.isEmpty()) {
+        sDirectory = ChildPath(sDirectory, subFolders.front());
+        nLevel++;
+        return true;
+    }
+    // no subfolders: the next sibling of this folder or of the nearest parent folder below the start folder
+    QString sDir = sDirectory;
+    for (int nLvl = nLevel; nLvl > 0; nLvl--) {
+        if (QDir(sDir).isRoot()) {
+            break;
+        }
+        const QFileInfo dirInfo(sDir);
+        const QString sParentDir = dirInfo.absolutePath();
+        const QString sTitle = dirInfo.fileName();
+        const QStringList siblings = GetSubFolders(sParentDir, true);
+        for (const QString& sName : siblings) {
+            if (sName != sTitle && FolderNameLess(sTitle, sName)) {
+                sDirectory = ChildPath(sParentDir, sName);
+                nLevel = nLvl;
+                return true;
+            }
+        }
+        sDir = sParentDir;
+    }
+    return false;
+}
+
+// LoopSubFolders: moves sDirectory to the last folder of its subtree in depth-first order
+static void DescendToLastFolder(QString& sDirectory, int& nLevel) {
+    for (;;) {
+        const QStringList subFolders = GetSubFolders(sDirectory, true);
+        if (subFolders.isEmpty()) {
+            return;
+        }
+        sDirectory = ChildPath(sDirectory, subFolders.back());
+        nLevel++;
+    }
+}
+
+// LoopSubFolders: moves sDirectory (nLevel below the start folder) to the previous folder in depth-first
+// order, without wrap around. Returns false if there is none (sDirectory is the start folder).
+static bool PrevFolderInTree(QString& sDirectory, int& nLevel) {
+    if (nLevel <= 0 || QDir(sDirectory).isRoot()) {
+        return false;
+    }
+    const QFileInfo dirInfo(sDirectory);
+    const QString sParentDir = dirInfo.absolutePath();
+    const QString sTitle = dirInfo.fileName();
+    const QStringList siblings = GetSubFolders(sParentDir, true);
+    for (auto iter = siblings.crbegin(); iter != siblings.crend(); ++iter) {
+        if (*iter != sTitle && FolderNameLess(*iter, sTitle)) {
+            // the previous sibling's subtree precedes this folder, its last folder comes directly before
+            sDirectory = ChildPath(sParentDir, *iter);
+            DescendToLastFolder(sDirectory, nLevel);
+            return true;
+        }
+    }
+    // no previous sibling: the parent folder comes directly before (its files precede its subfolders)
+    sDirectory = sParentDir;
+    nLevel--;
+    return true;
+}
+
+// LoopSubFolders: see AdjacentFolder(), the result is not yet linked into the chain
+CFileList* CFileList::AdjacentSubFolder(bool bForward) {
+    QString sDirectory = m_sDirectory;
+    int nLevel = m_nLevel;
+    while (bForward ? NextFolderInTree(sDirectory, nLevel) : PrevFolderInTree(sDirectory, nLevel)) {
+        CFileList* pList = GetFolderList(sDirectory, nLevel);
+        if (pList != nullptr) {
+            return pList;
+        }
+    }
+    return nullptr;
+}
+
+// LoopSubFolders: see OuterFolder(), the result is not yet linked into the chain
+CFileList* CFileList::OuterSubFolder(bool bFirst) {
+    QString sDirectory = RootDirectory();
+    int nLevel = 0;
+    if (!bFirst) {
+        DescendToLastFolder(sDirectory, nLevel);
+    }
+    do {
+        CFileList* pList = GetFolderList(sDirectory, nLevel);
+        if (pList != nullptr) {
+            return pList;
+        }
+    } while (bFirst ? NextFolderInTree(sDirectory, nLevel) : PrevFolderInTree(sDirectory, nLevel));
+    return nullptr;
+}
+
+// The start folder of the loop: LoopSubFolders loops through it and the folders below it
+QString CFileList::RootDirectory() const {
+    QString sDirectory = m_sDirectory;
+    for (int i = 0; i < m_nLevel && !sDirectory.isEmpty() && !QDir(sDirectory).isRoot(); i++) {
+        sDirectory = QFileInfo(sDirectory).absolutePath();
+    }
+    return sDirectory;
 }
 
 // Returns the file list of the given folder (absolute and clean), from the chain if already loaded,
@@ -807,44 +830,6 @@ void CFileList::NextInFolder() {
         if (m_iter == m_fileList.end()) {
             m_iter = m_fileList.begin();
         }
-    }
-}
-
-CFileList* CFileList::GotoFirstShown() {
-    if (sm_eMode == Helpers::NM_LoopDirectory) return this;
-
-    QString thisFile, prevFile;
-    const QString firstFile = Current();
-    CFileList* pThis = this;
-    do {
-        thisFile = pThis->Current();
-        CFileList* pPrev = pThis->Prev();
-        pThis = pPrev;
-        prevFile = pThis->Current();
-    } while (!thisFile.isEmpty() && !prevFile.isEmpty() && !firstFile.isEmpty() && thisFile != prevFile && prevFile != firstFile);
-
-    return pThis;
-}
-
-CFileList* CFileList::TryCreateFileList(const QString& directory, int nNewLevel) {
-    const QString cleanDir = QDir::cleanPath(directory);
-
-    CFileList* pList = this;
-    while (pList != nullptr) {
-        if (pList->m_sDirectory == cleanDir) {
-            return nullptr;
-        }
-        pList = pList->m_prev;
-    }
-
-    auto* pNewList = new CFileList(cleanDir, m_directoryWatcher, CFileDesc::GetSorting(), CFileDesc::IsSortedAscending(), m_bWrapAroundFolder, nNewLevel);
-    if (pNewList->Size() > 0) {
-        pNewList->m_prev = this;
-        m_next = pNewList;
-        return pNewList;
-    } else {
-        delete pNewList;
-        return nullptr;
     }
 }
 
