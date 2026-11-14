@@ -166,7 +166,7 @@ public:
 
     void SaveCustomSettings();
     void SaveStickyWindowRect(QRect rect);
-    // Section of the settings dialog that was shown last (state.ini)
+    // Section of the settings dialog that was shown last (state file)
     int LastSettingsPage() const;
     void SaveLastSettingsPage(int nPage);
     void SetBookModePageHeight(int nBookModePageHeight) { m_nBookModePageHeight = nBookModePageHeight; }

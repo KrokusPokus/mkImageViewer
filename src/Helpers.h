@@ -254,6 +254,10 @@ namespace Helpers {
     // Creates the folder if needed. Empty string if there is no usable config location.
     QString ConfigFilePath(const QString& sSuffix = QString());
 
+    // State file of this program: ~/.local/state/mkProjects/mkImageViewer_state.conf
+    // Creates the folder if needed. Empty string if there is no usable state location.
+    QString StateFilePath();
+
 } // namespace Helpers
 
 #endif // HELPERS_H

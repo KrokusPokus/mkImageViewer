@@ -866,12 +866,13 @@ QString GetJPEGComment(const void* pJPEGStream, size_t nStreamLength) {
         return expandSingleLine(path);
     }
 
-    QString ConfigFilePath(const QString& sSuffix) {
-        const QString sConfigBase = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
-        if (sConfigBase.isEmpty()) {
+    // <eLocation>/mkProjects/<AppName>[_<sSuffix>].conf, creates the folder if needed
+    static QString MkProjectsFilePath(QStandardPaths::StandardLocation eLocation, const QString& sSuffix) {
+        const QString sBase = QStandardPaths::writableLocation(eLocation);
+        if (sBase.isEmpty()) {
             return QString();   // QDir("").filePath() would otherwise point into the working directory
         }
-        const QString sDir = QDir(sConfigBase).filePath(QStringLiteral("mkProjects"));
+        const QString sDir = QDir(sBase).filePath(QStringLiteral("mkProjects"));
         if (!QDir().mkpath(sDir)) {
             return QString();
         }
@@ -880,6 +881,14 @@ QString GetJPEGComment(const void* pJPEGStream, size_t nStreamLength) {
             sFileName += QLatin1Char('_') + sSuffix;
         }
         return QDir(sDir).filePath(sFileName + QStringLiteral(".conf"));
+    }
+
+    QString ConfigFilePath(const QString& sSuffix) {
+        return MkProjectsFilePath(QStandardPaths::GenericConfigLocation, sSuffix);
+    }
+
+    QString StateFilePath() {
+        return MkProjectsFilePath(QStandardPaths::GenericStateLocation, QStringLiteral("state"));
     }
 
 } // namespace Helpers

@@ -25,7 +25,6 @@
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QStackedWidget>
-#include <QStandardPaths>
 #include <QStringView>
 #include <QVBoxLayout>
 
@@ -681,16 +680,11 @@ CSettingsProvider::CSettingsProvider() {
     }
 
     // ----------------------------------------------------------------------------------
-
-    const QString statePath = QStandardPaths::writableLocation(QStandardPaths::StateLocation);
-    const QDir stateDir(statePath);
-    if (!stateDir.exists()) {
-        if (!stateDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
-            return;
-        }
+    // ~/.local/state/mkProjects/mkImageViewer_state.conf
+    m_stateFileFullPath = Helpers::StateFilePath();
+    if (m_stateFileFullPath.isEmpty()) {
+        return;
     }
-
-    m_stateFileFullPath = QDir(statePath).filePath(QStringLiteral("state.ini"));
 
     ReadAllINISettings();
 }
