@@ -4088,4 +4088,3 @@ void CMainWindow::DiscardPendingInput() {
     QCoreApplication::processEvents(QEventLoop::AllEvents);
     m_bDropInput = false;
 }
-

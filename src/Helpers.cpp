@@ -651,12 +651,13 @@ QString GetJPEGComment(const void* pJPEGStream, size_t nStreamLength) {
         return DesktopEntry();
     }
 
-    // Oeffnet Datei oder URL mit dem Standardprogramm des Systems.
-    // Bewusst nicht direkt QDesktopServices: Qt geht dort auch ohne Sandbox ueber xdg-desktop-portal,
-    // und das Portal ignoriert bei lokalen Dateien den eingestellten Standard (Auswahldialog, danach
-    // die gemerkte App). xdg-open fragt dagegen die Desktop-Umgebung, also z.B. kde-open unter Plasma.
-    // Liefert true, wenn der Start angestossen wurde. Ob xdg-open die Datei wirklich oeffnen konnte,
-    // ist damit nicht gesagt.
+    // Opens a file or URL using the system's default application.
+    // We deliberately avoid using QDesktopServices directly: in that case, Qt—even outside of
+    //  a sandbox—uses xdg-desktop-portal, which ignores the user's configured default for local files
+    // (instead presenting a selection dialog, followed by remembering the chosen application).
+    // In contrast, xdg-open queries the desktop environment (e.g., using kde-open on Plasma).
+    // Returns true if the launch process was initiated.
+    // This does not guarantee that xdg-open was actually able to open the file.
     bool openWithSystemDefault(const QUrl &url) {
         if (!url.isValid()) return false;
 
