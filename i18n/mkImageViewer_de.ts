@@ -251,8 +251,8 @@ Press ESC to exit...</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1663"/>
-        <source>Could not open keymap.txt</source>
-        <translation>keymap.txt konnte nicht geöffnet werden</translation>
+        <source>Could not open the key mapping file</source>
+        <translation>Die Datei mit der Tastenbelegung konnte nicht geöffnet werden</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1546"/>

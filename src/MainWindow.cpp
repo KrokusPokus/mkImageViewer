@@ -47,7 +47,6 @@
 #include <QRegularExpression>
 #include <QScreen>
 #include <QSettings>
-#include <QStandardPaths>
 #include <QString>
 #include <QThread>
 #include <QTimer>
@@ -1189,14 +1188,14 @@ void CMainWindow::keyPressEvent(QKeyEvent* event) {
 
     // FIX (Numpad): Qt meldet Nummernblock-Tasten mit Qt::KeypadModifier. Ohne dieses Flag war
     // "Numpad1" nicht von "1" unterscheidbar (gleicher Key-Code Qt::Key_1) - die Belegungen
-    // aus keymap.txt haben sich gegenseitig ueberschrieben. CKeyMap faellt selbst auf die
+    // aus mkImageViewer_keymap.conf haben sich gegenseitig ueberschrieben. CKeyMap faellt selbst auf die
     // Nicht-Keypad-Belegung zurueck, wenn fuer die Numpad-Taste keine eigene existiert.
     const bool bKeypad = event->modifiers().testFlag(Qt::KeypadModifier);
 
     std::optional<Cmd::CommandInvocation> inv = m_pKeyMap->GetCommandForKey(vkCode, bAlt, bCtrl, bShift, bKeypad);
 
     // Layoutabhaengige Aufloesung: event->key() ist das ERZEUGTE Zeichen (DE: Shift+',' -> Key_Semicolon),
-    // keymap.txt beschreibt aber die Taste ("Ctrl+Shift+Comma"). QKeyMapper::possibleKeys() liefert ueber
+    // mkImageViewer_keymap.conf beschreibt aber die Taste ("Ctrl+Shift+Comma"). QKeyMapper::possibleKeys() liefert ueber
     // xkbcommon dieselben Kandidaten wie fuer QShortcut, zuerst die Grundebene der Taste mit allen Modifiern
     // (Ctrl+Shift+Key_Comma), danach Varianten mit "verbrauchten" Modifiern (Ctrl+Key_Semicolon).
     // Der exakte Treffer oben hat Vorrang, damit bestehende Belegungen unveraendert greifen.
@@ -1726,7 +1725,7 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
         case Command::EditKeyMap:
             // Uebergangsloesung bis zum Shortcut-Dialog. Aenderungen gelten erst nach einem Neustart.
             if (m_pKeyMap->GetFilePath().isEmpty() || !Helpers::openWithSystemDefault(QUrl::fromLocalFile(m_pKeyMap->GetFilePath()))) {
-                SetToast(tr("Could not open keymap.txt"));
+                SetToast(tr("Could not open the key mapping file"));
             }
             break;
         case Command::Reload:
@@ -3529,7 +3528,7 @@ void CMainWindow::StopAnimation() {
 // ---------------------------------------------------------------------------------------------
 // Bookmark helpers
 //
-// LoadBookmark(), SaveBookmark() and MigrateBookmarkOnRename() MUST derive the key in bookmarks.ini the
+// LoadBookmark(), SaveBookmark() and MigrateBookmarkOnRename() MUST derive the key in the bookmarks file the
 // same way, otherwise a bookmark written by one is not found by the others. Therefore the rules live
 // here once (they used to be duplicated in LoadBookmark() and SaveBookmark()).
 // ---------------------------------------------------------------------------------------------
@@ -3546,7 +3545,7 @@ static QString BookmarkEscape(QString sText) {
     return sText;
 }
 
-// Key in bookmarks.ini: archive file name without extension, otherwise the name of the parent folder.
+// Key in the bookmarks file: archive file name without extension, otherwise the name of the parent folder.
 static QString BookmarkKeyName(const QFileInfo& fileInfo) {
     QString keyName = IsBookmarkArchive(fileInfo) ? fileInfo.completeBaseName()
                                                   : fileInfo.dir().dirName();
@@ -3569,9 +3568,8 @@ static QString BookmarkKeyName(const QFileInfo& fileInfo) {
 //    name of the last viewed image. If it is the renamed file, the value is updated, otherwise
 //    LoadBookmark() would later point to a file that no longer exists.
 static void MigrateBookmarkOnRename(const QString& sOldPath, const QString& sNewPath) {
-    const QString bookmarkFilePath = QDir(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))
-                                         .filePath(QStringLiteral("bookmarks.ini"));
-    if (!QFileInfo::exists(bookmarkFilePath)) {
+    const QString bookmarkFilePath = Helpers::ConfigFilePath(QStringLiteral("bookmarks"));
+    if (bookmarkFilePath.isEmpty() || !QFileInfo::exists(bookmarkFilePath)) {
         return;   // no bookmarks yet: nothing to migrate (and no file created just for this)
     }
 
@@ -3603,10 +3601,9 @@ QString CMainWindow::LoadBookmark(const QString& filePath) {
         return QString();
     }
 
-    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    const QString bookmarkFilePath = QDir(settingsPath).filePath(QStringLiteral("bookmarks.ini"));
+    const QString bookmarkFilePath = Helpers::ConfigFilePath(QStringLiteral("bookmarks"));
 
-    if (!QFileInfo::exists(bookmarkFilePath)) {
+    if (bookmarkFilePath.isEmpty() || !QFileInfo::exists(bookmarkFilePath)) {
         return QString();
     }
 
@@ -3633,16 +3630,11 @@ void CMainWindow::SaveBookmark() {
         return;
     }
 
-    // 1. Pfade konfigurieren (QDir erstellt fehlende Pfade bei Bedarf automatisch)
-    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    const QDir bookmarkDir(settingsPath);
-    if (!bookmarkDir.exists()) {
-        if (!bookmarkDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
-            return;
-        }
+    // 1. Pfad der Lesezeichen-Datei (ConfigFilePath() legt den Ordner bei Bedarf an)
+    const QString bookmarkFilePath = Helpers::ConfigFilePath(QStringLiteral("bookmarks"));
+    if (bookmarkFilePath.isEmpty()) {
+        return;
     }
-
-    const QString bookmarkFilePath = bookmarkDir.filePath(QStringLiteral("bookmarks.ini"));
 
     // 2. Pfadanalyse mit QFileInfo & QString-Methoden
     const QFileInfo fileInfo(filePath);

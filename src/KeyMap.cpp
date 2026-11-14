@@ -1,4 +1,5 @@
 #include "KeyMap.h"
+#include "Helpers.h"
 
 #include <QDebug>
 #include <QDir>
@@ -6,7 +7,6 @@
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QSaveFile>
-#include <QStandardPaths>
 #include <QStringList>
 #include <QTextStream>
 
@@ -34,7 +34,7 @@ static constexpr int M_ALT     = 0x08000000;
 static constexpr int M_KEYPAD  = 0x20000000;  // entspricht Qt::KeypadModifier
 static constexpr int M_KEYMASK = 0x01FFFFFF;  // Bits, die der eigentliche Tastencode belegen darf
 
-// Modifier, die der Benutzer in keymap.txt als eigenes Token schreibt (Alt+, Ctrl+, Shift+).
+// Modifier, die der Benutzer in mkImageViewer_keymap.conf als eigenes Token schreibt (Alt+, Ctrl+, Shift+).
 // M_KEYPAD gehoert bewusst NICHT dazu: Es wird nur ueber die Numpad-Tokens gesetzt.
 static constexpr int M_USERMODS = M_SHIFT | M_CTRL | M_ALT;
 
@@ -50,7 +50,7 @@ static const SKey KeyTable[] = {
     { QStringLiteral("Esc"), Qt::Key_Escape },
     { QStringLiteral("Return"), Qt::Key_Return },
     // FIX: Die Enter-Taste des Nummernblocks liefert in Qt Key_Enter (nicht Key_Return).
-    // Vorher war sie ueber keymap.txt nicht ansprechbar.
+    // Vorher war sie ueber mkImageViewer_keymap.conf nicht ansprechbar.
     { QStringLiteral("Enter"), Qt::Key_Enter },
     { QStringLiteral("Space"), Qt::Key_Space },
     { QStringLiteral("End"), Qt::Key_End },
@@ -73,7 +73,7 @@ static const SKey KeyTable[] = {
     { QStringLiteral("Period"), Qt::Key_Period },
     // FIX (Numpad): Diese Eintraege hatten denselben Code wie die Ziffern der Haupttastatur
     // (Qt::Key_0..9). "1" und "Numpad1" landeten dadurch auf demselben Map-Schluessel, und die
-    // spaetere Zeile in keymap.txt hat die fruehere ueberschrieben (Numpad1 hat "1" = Zoom 100 %
+    // spaetere Zeile in mkImageViewer_keymap.conf hat die fruehere ueberschrieben (Numpad1 hat "1" = Zoom 100 %
     // ausgehebelt). Qt unterscheidet beide nur ueber Qt::KeypadModifier - das ist hier als
     // M_KEYPAD Teil des Codes.
     { QStringLiteral("Numpad0"), Qt::Key_0 | M_KEYPAD },
@@ -230,19 +230,17 @@ static QString _GetKeyShortcutName(int nShortcut) {
     return QString();
 }
 
-// Laedt die Tastenbelegung aus keymap.txt in der AppConfigLocation (z.B. ~/.config/mkImageViewer).
+// Laedt die Tastenbelegung aus ~/.config/mkProjects/mkImageViewer_keymap.conf.
 //
-// Gibt es dort keine keymap.txt, wird die eingebaute Standardbelegung (Cmd::defaultKeyMapFileText())
-// einmalig als keymap.txt dorthin geschrieben und von dort wie jede andere Datei geladen. Es gibt
+// Gibt es diese Datei nicht, wird die eingebaute Standardbelegung (Cmd::defaultKeyMapFileText())
+// einmalig dorthin geschrieben und von dort wie jede andere Datei geladen. Es gibt
 // damit nur EINEN Lade-Pfad; der Parser prueft so bei jedem Start auch die eingebauten Defaults.
 //
 // Die Datei ersetzt die Defaults vollstaendig (wie bisher). Neue Befehle in einer spaeteren
 // Programmversion tauchen in einer bereits geschriebenen Datei daher nicht automatisch auf -
 // das loest erst das Dialog-/Command-zentrierte Format.
 CKeyMap::CKeyMap() {
-    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    // Leerer settingsPath: QDir("").filePath() wuerde sonst relativ zum Arbeitsverzeichnis zeigen
-    const QString keyMapFilePath = settingsPath.isEmpty() ? QString() : QDir(settingsPath).filePath(QStringLiteral("keymap.txt"));
+    const QString keyMapFilePath = Helpers::ConfigFilePath(QStringLiteral("keymap"));   // leer = kein Config-Ordner
     const bool bKeyMapExists = !keyMapFilePath.isEmpty() && QFile::exists(keyMapFilePath);
 
     if (bKeyMapExists) {
@@ -263,9 +261,9 @@ CKeyMap::CKeyMap() {
 
     if (!bKeyMapExists && !keyMapFilePath.isEmpty()) {
         // QSaveFile schreibt in eine temporaere Datei und benennt erst bei commit() um: Ein Absturz
-        // mitten im Schreiben hinterlaesst keine halbe keymap.txt (die danach alle Tasten kappen wuerde).
+        // mitten im Schreiben hinterlaesst keine halbe mkImageViewer_keymap.conf (die danach alle Tasten kappen wuerde).
         QSaveFile out(keyMapFilePath);
-        if (QDir().mkpath(settingsPath) && out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (out.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream ts(&out);
             ts << defaultText;
             ts.flush();
@@ -363,7 +361,7 @@ int CKeyMap::GetCombinedKeyCode(int keyCode, bool alt, bool control, bool shift,
 
 void CKeyMap::AddDefaultEscapeHandling() {
     // Esc ist bewusst nicht entfernbar: Ohne eine Belegung kaeme man aus Vollbild/Slideshow nur
-    // noch ueber den Task-Manager heraus. Eine explizite Belegung in keymap.txt hat Vorrang.
+    // noch ueber den Task-Manager heraus. Eine explizite Belegung in mkImageViewer_keymap.conf hat Vorrang.
     if (m_keyMap.find(Qt::Key_Escape) == m_keyMap.end()) {
         m_keyMap[Qt::Key_Escape] = Cmd::CommandInvocation{ Cmd::Command::DefaultEscape, 0 };
     }

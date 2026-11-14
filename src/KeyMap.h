@@ -21,8 +21,8 @@ enum InternalMouseCodes {
 class CKeyMap
 {
 public:
-    // Laedt keymap.txt aus der AppConfigLocation. Existiert keine, wird die eingebaute
-    // Standardbelegung einmalig als keymap.txt ausgeschrieben und geladen.
+    // Laedt ~/.config/mkProjects/mkImageViewer_keymap.conf. Existiert sie nicht, wird die eingebaute
+    // Standardbelegung einmalig dorthin ausgeschrieben und geladen.
     CKeyMap();
 
     // Liefert den Befehl (inkl. Argument) fuer eine Taste samt Modifiern, std::nullopt wenn die
@@ -44,7 +44,7 @@ public:
         return GetKeyStringForCommand(Cmd::CommandInvocation{ cmd, arg });
     }
 
-    // Pfad der verwendeten keymap.txt, leer wenn keine existiert (nur die eingebauten Defaults gelten)
+    // Pfad der verwendeten mkImageViewer_keymap.conf, leer wenn keine existiert (nur die eingebauten Defaults gelten)
     const QString& GetFilePath() const { return m_sFilePath; }
 
     // gets a combined key code

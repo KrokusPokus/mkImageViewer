@@ -184,7 +184,7 @@ constexpr std::array<CommandInfo, kCommandCount> kTable = {{
     make(Command::Minimize,       "Minimize",       Category::Window, CMD_TR("Minimize window")),
     make(Command::ContextMenu,    "ContextMenu",    Category::Window, CMD_TR("Show context menu")),
     make(Command::SettingsDialog, "SettingsDialog", Category::Window, CMD_TR("Settings")),
-    make(Command::EditKeyMap,     "EditKeyMap",     Category::Window, CMD_TR("Edit key mapping (keymap.txt)")),
+    make(Command::EditKeyMap,     "EditKeyMap",     Category::Window, CMD_TR("Edit key mapping")),
     make(Command::Help,           "Help",           Category::Window, CMD_TR("Help")),
     make(Command::DefaultEscape,  "DefaultEscape",  Category::Window, CMD_TR("Escape (stop slideshow, close overlay, leave full screen, exit)")),
     make(Command::Exit,           "Exit",           Category::Window, CMD_TR("Exit")),

@@ -674,15 +674,11 @@ CSettingsProvider::CSettingsProvider() {
     // Load main settings
 
     // ----------------------------------------------------------------------------------
-    const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    const QDir settingsDir(settingsPath);
-    if (!settingsDir.exists()) {
-        if (!settingsDir.mkpath(QStringLiteral("."))) { // Erstellt Verzeichnis inkl. Unterordner
-            return;
-        }
+    // ~/.config/mkProjects/mkImageViewer.conf
+    m_settingsFileFullPath = Helpers::ConfigFilePath();
+    if (m_settingsFileFullPath.isEmpty()) {
+        return;
     }
-    
-    m_settingsFileFullPath = QDir(settingsPath).filePath(QStringLiteral("settings.ini"));
 
     // ----------------------------------------------------------------------------------
 

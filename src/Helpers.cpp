@@ -866,4 +866,20 @@ QString GetJPEGComment(const void* pJPEGStream, size_t nStreamLength) {
         return expandSingleLine(path);
     }
 
+    QString ConfigFilePath(const QString& sSuffix) {
+        const QString sConfigBase = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+        if (sConfigBase.isEmpty()) {
+            return QString();   // QDir("").filePath() would otherwise point into the working directory
+        }
+        const QString sDir = QDir(sConfigBase).filePath(QStringLiteral("mkProjects"));
+        if (!QDir().mkpath(sDir)) {
+            return QString();
+        }
+        QString sFileName = QCoreApplication::applicationName();
+        if (!sSuffix.isEmpty()) {
+            sFileName += QLatin1Char('_') + sSuffix;
+        }
+        return QDir(sDir).filePath(sFileName + QStringLiteral(".conf"));
+    }
+
 } // namespace Helpers

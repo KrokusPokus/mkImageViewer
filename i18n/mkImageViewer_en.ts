@@ -239,7 +239,7 @@ Press ESC to exit...</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1663"/>
-        <source>Could not open keymap.txt</source>
+        <source>Could not open the key mapping file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

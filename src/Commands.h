@@ -7,7 +7,7 @@
 // Idee: EINE Quelle der Wahrheit.
 //   - enum class Command            -> Identitaet, typsicher, im switch verwendbar
 //   - CommandInfo-Tabelle (.cpp)    -> Config-Name, Anzeigetext, Kategorie, Argument-Typ
-//   - DefaultBinding-Tabelle (.cpp) -> Standard-Tastenbelegung (ersetzt die mitgelieferte keymap.txt)
+//   - DefaultBinding-Tabelle (.cpp) -> Standard-Tastenbelegung (ersetzt die mitgelieferte mkImageViewer_keymap.conf)
 //   - static_asserts                -> Tabelle und Enum koennen nicht mehr auseinanderlaufen
 //
 // Header und Logik sind bewusst Qt-frei (nur std). Einzige Qt-Abhaengigkeit ist <QtGlobal> in
@@ -190,7 +190,7 @@ struct CommandInvocation {
 // ---------------------------------------------------------------------------------------------
 struct CommandInfo {
     Command id = Command::DoNothing;
-    std::string_view name;            // kanonischer Name in keymap.txt, z.B. "NextImage" (Klein/Gross egal)
+    std::string_view name;            // kanonischer Name in mkImageViewer_keymap.conf, z.B. "NextImage" (Klein/Gross egal)
     Category category = Category::Window;
     const char* displayText = "";     // Uebersetzungs-Schluessel (englischer Text), Kontext "Command"
     bool bindable = true;             // false = nur ueber Menue/intern erreichbar, nicht per Hotkey belegbar
@@ -215,7 +215,7 @@ struct CommandInfo {
     }
 };
 
-// Standardbelegung. 'keys' im selben Format wie in keymap.txt ("Ctrl+Shift+C", "MouseL", "Numpad1").
+// Standardbelegung. 'keys' im selben Format wie in mkImageViewer_keymap.conf ("Ctrl+Shift+C", "MouseL", "Numpad1").
 struct DefaultBinding {
     std::string_view keys;
     Command cmd;
@@ -232,22 +232,22 @@ const std::array<CommandInfo, kCommandCount>& allCommands();
 // O(1), garantiert gueltig (static_assert in Commands.cpp).
 const CommandInfo& info(Command id);
 
-// Standardbelegung (Grundlage fuer "keymap.txt einmalig ausschreiben" und "Standard wiederherstellen").
+// Standardbelegung (Grundlage fuer "mkImageViewer_keymap.conf einmalig ausschreiben" und "Standard wiederherstellen").
 std::span<const DefaultBinding> defaultBindings();
 
 // Sucht nach kanonischem Namen (Klein/Gross egal). nullptr, wenn unbekannt.
 const CommandInfo* findByName(std::string_view name);
 
-// Parst die rechte Spalte einer keymap.txt-Zeile. Akzeptiert:
+// Parst die rechte Spalte einer mkImageViewer_keymap.conf-Zeile. Akzeptiert:
 //     "NextImage"            kanonisch, ohne Argument
 //     "PlayMovie 25"         mit Argument  (auch "PlayMovie(25)")
 //     "SetSortMode Size"     benanntes Argument
 // Bei Fehler: std::nullopt, und *error (falls != nullptr) enthaelt eine lesbare Begruendung.
 std::optional<CommandInvocation> parseInvocation(std::string_view text, std::string* error = nullptr);
 
-// Text der Standard-keymap.txt (aus defaultBindings() und der Befehlstabelle erzeugt), inklusive
+// Text der Standard-mkImageViewer_keymap.conf (aus defaultBindings() und der Befehlstabelle erzeugt), inklusive
 // Syntax-Erlaeuterung und einer Referenzliste aller belegbaren Befehle als Kommentar.
-// KeyMap schreibt diesen Text einmalig auf die Platte, wenn noch keine keymap.txt existiert.
+// KeyMap schreibt diesen Text einmalig auf die Platte, wenn noch keine mkImageViewer_keymap.conf existiert.
 std::string defaultKeyMapFileText();
 
 // Gegenstueck zu parseInvocation: {PlayMovie, 25} -> "PlayMovie 25". Rundreise-sicher.

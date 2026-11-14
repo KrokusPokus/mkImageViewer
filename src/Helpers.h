@@ -250,6 +250,10 @@ namespace Helpers {
     QList<QStringList> expandDesktopExec(const DesktopEntry &entry, const QStringList &files);
     QString expandPath(QString path);
 
+    // Configuration file of this program: ~/.config/mkProjects/mkImageViewer[_<sSuffix>].conf
+    // Creates the folder if needed. Empty string if there is no usable config location.
+    QString ConfigFilePath(const QString& sSuffix = QString());
+
 } // namespace Helpers
 
 #endif // HELPERS_H
