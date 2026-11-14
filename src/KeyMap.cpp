@@ -301,7 +301,7 @@ void CKeyMap::LoadFromText(const QString& sText, const QString& sSourceName) {
     for (int i = 0; i < lines.size(); ++i) {
         const int nLine = i + 1;
         const QString line = lines[i].trimmed();   // trimmed() entfernt auch ein '\r' (CRLF-Dateien)
-        if (line.isEmpty() || line.startsWith(QStringLiteral("//"))) {
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) {
             continue;
         }
 

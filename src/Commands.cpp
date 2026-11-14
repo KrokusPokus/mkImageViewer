@@ -474,26 +474,26 @@ std::string defaultKeyMapFileText() {
 
     std::string out;
     out +=
-        "// Key mapping for mkImageViewer\n"
-        "//\n"
-        "// One binding per line:   <keys>   <command> [argument]\n"
-        "//   <keys>      Key names joined with '+', e.g.  Ctrl+Shift+C   F5   Space   Plus\n"
-        "//               Modifiers: Alt, Ctrl, Shift          (use 'Plus' for the + key)\n"
-        "//               Numeric keypad: Numpad0 .. Numpad9\n"
-        "//               Mouse: MouseL, MouseR, MouseM, MouseX1, MouseX2, MouseDblClk\n"
-        "//   <command>   Name from the list at the end of this file, optionally with an argument:\n"
-        "//                 PlayMovie 25      SetSortMode Size      StartSlideshow 5\n"
-        "//\n"
-        "// This file replaces the built-in defaults completely. To switch off a key, map it to DoNothing.\n"
-        "// Lines that cannot be understood are skipped and reported in the log.\n"
-        "// Delete this file to get the defaults back (it is written again on the next start).\n";
+        "# Key mapping for mkImageViewer\n"
+        "#\n"
+        "# One binding per line:   <keys>   <command> [argument]\n"
+        "#   <keys>      Key names joined with '+', e.g.  Ctrl+Shift+C   F5   Space   Plus\n"
+        "#               Modifiers: Alt, Ctrl, Shift          (use 'Plus' for the + key)\n"
+        "#               Numeric keypad: Numpad0 .. Numpad9\n"
+        "#               Mouse: MouseL, MouseR, MouseM, MouseX1, MouseX2, MouseDblClk\n"
+        "#   <command>   Name from the list at the end of this file, optionally with an argument:\n"
+        "#                 PlayMovie 25      SetSortMode Size      StartSlideshow 5\n"
+        "#\n"
+        "# This file replaces the built-in defaults completely. To switch off a key, map it to DoNothing.\n"
+        "# Lines that cannot be understood are skipped and reported in the log.\n"
+        "# Delete this file to get the defaults back (it is written again on the next start).\n";
 
     for (std::size_t c = 0; c < sizeof(kCategoryNames) / sizeof(kCategoryNames[0]); ++c) {
         bool headerWritten = false;
         for (const auto& b : kDefaultBindings) {
             if (static_cast<std::size_t>(info(b.cmd).category) != c) continue;
             if (!headerWritten) {
-                out += "\n// ";
+                out += "\n# ";
                 out += kCategoryNames[c];
                 out += '\n';
                 headerWritten = true;
@@ -506,7 +506,7 @@ std::string defaultKeyMapFileText() {
         }
     }
 
-    out += "\n// Available commands (argument in <...>, default value first where it matters)\n";
+    out += "\n# Available commands (argument in <...>, default value first where it matters)\n";
     for (const auto& ci : kTable) {
         if (!ci.bindable) continue;
         std::string name(ci.name);
@@ -526,7 +526,7 @@ std::string defaultKeyMapFileText() {
             break;
         }
         }
-        std::string line = "//   " + name;
+        std::string line = "#   " + name;
         if (line.size() < 56) line.append(56 - line.size(), ' '); else line += "  ";
         line += ci.displayText;
         out += line;
