@@ -1,6 +1,5 @@
 #include "KeyMap.h"
 
-#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -245,8 +244,7 @@ static QString _FindFirstExisting(const QStringList& dirs, const QString& sFileN
 
 // Laedt die Tastenbelegung. Suchreihenfolge fuer keymap.txt:
 //     1. AppConfigLocation  (z.B. ~/.config/mkImageViewer)
-//     2. Programmverzeichnis
-//     3. AppDataLocation    (z.B. /usr/share/mkImageViewer)
+//     2. AppDataLocation    (z.B. /usr/share/mkImageViewer)
 //
 // Gibt es in KEINEM dieser Verzeichnisse eine keymap.txt, wird die eingebaute Standardbelegung
 // (Cmd::defaultKeyMapFileText()) einmalig als keymap.txt in die AppConfigLocation geschrieben
@@ -257,12 +255,11 @@ static QString _FindFirstExisting(const QStringList& dirs, const QString& sFileN
 // Programmversion tauchen in einer bereits geschriebenen Datei daher nicht automatisch auf -
 // das loest erst das Dialog-/Command-zentrierte Format.
 CKeyMap::CKeyMap() {
-    const QString exePath = QCoreApplication::applicationDirPath();
     const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
     const QStringList appDataDirs = QStandardPaths::standardLocations(QStandardPaths::AppDataLocation);
 
     QStringList keyMapDirs;
-    keyMapDirs << settingsPath << exePath << appDataDirs;
+    keyMapDirs << settingsPath << appDataDirs;
     const QString keyMapFilePath = _FindFirstExisting(keyMapDirs, QStringLiteral("keymap.txt"));
 
     if (!keyMapFilePath.isEmpty()) {
