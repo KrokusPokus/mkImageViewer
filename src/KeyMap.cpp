@@ -230,39 +230,22 @@ static QString _GetKeyShortcutName(int nShortcut) {
     return QString();
 }
 
-// Sucht die Datei nacheinander in den angegebenen Verzeichnissen. Leerer String = nicht gefunden.
-static QString _FindFirstExisting(const QStringList& dirs, const QString& sFileName) {
-    for (const QString& dir : dirs) {
-        if (dir.isEmpty()) continue;   // QDir("").filePath() wuerde sonst relativ zum Arbeitsverzeichnis suchen
-        const QString path = QDir(dir).filePath(sFileName);
-        if (QFile::exists(path)) {
-            return path;
-        }
-    }
-    return QString();
-}
-
-// Laedt die Tastenbelegung. Suchreihenfolge fuer keymap.txt:
-//     1. AppConfigLocation  (z.B. ~/.config/mkImageViewer)
-//     2. AppDataLocation    (z.B. /usr/share/mkImageViewer)
+// Laedt die Tastenbelegung aus keymap.txt in der AppConfigLocation (z.B. ~/.config/mkImageViewer).
 //
-// Gibt es in KEINEM dieser Verzeichnisse eine keymap.txt, wird die eingebaute Standardbelegung
-// (Cmd::defaultKeyMapFileText()) einmalig als keymap.txt in die AppConfigLocation geschrieben
-// und von dort wie jede andere Datei geladen. Es gibt damit nur EINEN Lade-Pfad; der Parser
-// prueft so bei jedem Start auch die eingebauten Defaults.
+// Gibt es dort keine keymap.txt, wird die eingebaute Standardbelegung (Cmd::defaultKeyMapFileText())
+// einmalig als keymap.txt dorthin geschrieben und von dort wie jede andere Datei geladen. Es gibt
+// damit nur EINEN Lade-Pfad; der Parser prueft so bei jedem Start auch die eingebauten Defaults.
 //
 // Die Datei ersetzt die Defaults vollstaendig (wie bisher). Neue Befehle in einer spaeteren
 // Programmversion tauchen in einer bereits geschriebenen Datei daher nicht automatisch auf -
 // das loest erst das Dialog-/Command-zentrierte Format.
 CKeyMap::CKeyMap() {
     const QString settingsPath = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    const QStringList appDataDirs = QStandardPaths::standardLocations(QStandardPaths::AppDataLocation);
+    // Leerer settingsPath: QDir("").filePath() wuerde sonst relativ zum Arbeitsverzeichnis zeigen
+    const QString keyMapFilePath = settingsPath.isEmpty() ? QString() : QDir(settingsPath).filePath(QStringLiteral("keymap.txt"));
+    const bool bKeyMapExists = !keyMapFilePath.isEmpty() && QFile::exists(keyMapFilePath);
 
-    QStringList keyMapDirs;
-    keyMapDirs << settingsPath << appDataDirs;
-    const QString keyMapFilePath = _FindFirstExisting(keyMapDirs, QStringLiteral("keymap.txt"));
-
-    if (!keyMapFilePath.isEmpty()) {
+    if (bKeyMapExists) {
         m_sFilePath = keyMapFilePath;
         QFile kmFile(keyMapFilePath);
         if (kmFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -278,22 +261,21 @@ CKeyMap::CKeyMap() {
 
     const QString defaultText = QString::fromStdString(Cmd::defaultKeyMapFileText());
 
-    if (keyMapFilePath.isEmpty() && !settingsPath.isEmpty()) {
+    if (!bKeyMapExists && !keyMapFilePath.isEmpty()) {
         // QSaveFile schreibt in eine temporaere Datei und benennt erst bei commit() um: Ein Absturz
         // mitten im Schreiben hinterlaesst keine halbe keymap.txt (die danach alle Tasten kappen wuerde).
-        const QString targetPath = QDir(settingsPath).filePath(QStringLiteral("keymap.txt"));
-        QSaveFile out(targetPath);
+        QSaveFile out(keyMapFilePath);
         if (QDir().mkpath(settingsPath) && out.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream ts(&out);
             ts << defaultText;
             ts.flush();
             if (out.commit()) {
-                m_sFilePath = targetPath;
+                m_sFilePath = keyMapFilePath;
             } else {
-                qWarning().noquote() << "KeyMap: cannot write" << targetPath << ":" << out.errorString();
+                qWarning().noquote() << "KeyMap: cannot write" << keyMapFilePath << ":" << out.errorString();
             }
         } else {
-            qWarning().noquote() << "KeyMap: cannot create" << targetPath << ":" << out.errorString();
+            qWarning().noquote() << "KeyMap: cannot create" << keyMapFilePath << ":" << out.errorString();
         }
         // Ein Schreibfehler ist nicht fatal: Die Defaults gelten trotzdem fuer diese Sitzung.
     }

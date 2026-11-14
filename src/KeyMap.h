@@ -21,7 +21,7 @@ enum InternalMouseCodes {
 class CKeyMap
 {
 public:
-    // Laedt keymap.txt (Suchreihenfolge siehe KeyMap.cpp). Existiert keine, wird die eingebaute
+    // Laedt keymap.txt aus der AppConfigLocation. Existiert keine, wird die eingebaute
     // Standardbelegung einmalig als keymap.txt ausgeschrieben und geladen.
     CKeyMap();
 
