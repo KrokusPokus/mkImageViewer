@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=mkImageViewer
+GenericName=Image Viewer
+GenericName[de]=Bildbetrachter
+Comment=Minimalist image viewer
+Comment[de]=Minimalistischer Bildbetrachter
+TryExec=mkImageViewer
+Exec=mkImageViewer %F
+# No Icon= on purpose: KDE Plasma always shows the icon of the .desktop file in the task bar, also if the window
+# sets its own one. mkImageViewer shows the icon of the file type of the current image as its window icon.
+# The file name (mkImageViewer.desktop) must match the Wayland app_id, which Qt takes from the executable name.
+MimeType=image/avif;image/bmp;image/gif;image/heif;image/heic;image/jpeg;image/jxl;image/png;image/apng;image/qoi;image/tiff;image/webp;image/x-tga;image/vnd.adobe.photoshop;image/x-psd;image/vnd.microsoft.icon;application/vnd.comicbook+zip;application/x-cbz;application/x-cb7;
+StartupNotify=false
+Categories=Graphics;Viewer;2DGraphics;RasterGraphics;
+Keywords=image;picture;photo;viewer;comic;
+Keywords[de]=Bild;Foto;Betrachter;Comic;

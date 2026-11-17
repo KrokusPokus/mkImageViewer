@@ -160,6 +160,9 @@ install(TARGETS mkImageViewer
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(FILES res/mkImageViewer.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+endif()
 
 #qt_generate_deploy_app_script(
 #    TARGET mkImageViewer
