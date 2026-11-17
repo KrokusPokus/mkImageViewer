@@ -29,6 +29,10 @@ public:
         std::size_t sizebytes);                   // size of avif compressed data
 
     static void DeleteCache();
+
+    // Returns the Exif data of an AVIF file as a JPEG APP1 segment (allocated with malloc(), the caller frees it)
+    // or nullptr. Only the container is parsed, nothing is decoded.
+    static void* GetEXIFBlock(const void* buffer, std::size_t sizebytes);
 };
 
 #endif // AVIFWRAPPER_H

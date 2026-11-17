@@ -20,6 +20,16 @@ public:
         PixelFormat format // format of input pixels
     );
 
+    // Create a transform from the color space given by CICP code points (ITU-T H.273: colour primaries and
+    // transfer characteristics) to standard sRGB. AVIF and HEIF signal the color space this way (nclx) when they
+    // carry no ICC profile. Returns nullptr if the image already is sRGB or the combination is not supported
+    // (e.g. HDR with PQ or HLG transfer).
+    static void* CreateTransformFromCICP(
+        unsigned int colorPrimaries, // H.273 ColourPrimaries
+        unsigned int transferCharacteristics, // H.273 TransferCharacteristics
+        PixelFormat format // format of input pixels
+    );
+
     // Apply color transform to image. Returns true on success, false otherwise.
     static bool DoTransform(
         void* transform, // ICCP transform

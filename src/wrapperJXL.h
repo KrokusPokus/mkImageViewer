@@ -22,6 +22,10 @@ public:
 
     static void DeleteCache();
 
+    // Returns the Exif data of a JPEG XL file as a JPEG APP1 segment (allocated with malloc(), the caller frees it)
+    // or nullptr. Only the boxes of the container are read, nothing is decoded.
+    static void* GetEXIFBlock(const void* buffer, std::size_t sizebytes);
+
 private:
     struct jxl_cache;
     static jxl_cache cache;

@@ -11,6 +11,71 @@
 #include <new>
 #include <vector>
 
+namespace {
+
+// Creates the transform of the decoded RGBA pixels to sRGB, or nullptr if there is nothing to do.
+// An ICC profile takes precedence; without one the nclx profile (CICP code points) describes the color space.
+// The nclx profile is looked for in the colr box of the image first and then in the decoded image, which also
+// carries the color information of the bitstream (VUI).
+void* CreateColorTransform(const heif::ImageHandle& handle, const heif::Image& image) {
+    const std::vector<uint8_t> iccp = image.get_raw_color_profile();
+    if (!iccp.empty()) {
+        return ICCProfileTransform::CreateTransform(iccp.data(), static_cast<unsigned int>(iccp.size()), ICCProfileTransform::FORMAT_RGBA);
+    }
+
+    heif_color_profile_nclx* nclx = nullptr;
+    if (heif_image_handle_get_nclx_color_profile(handle.get_raw_image_handle(), &nclx).code == heif_error_Ok && nclx != nullptr) {
+        void* transform = ICCProfileTransform::CreateTransformFromCICP(nclx->color_primaries, nclx->transfer_characteristics,
+                                                                       ICCProfileTransform::FORMAT_RGBA);
+        heif_nclx_color_profile_free(nclx);
+        return transform;
+    }
+    if (image.get_color_profile_type() == heif_color_profile_type_nclx) {
+        const heif::ColorProfile_nclx imageNclx = image.get_nclx_color_profile(); // does not throw: the type is nclx
+        return ICCProfileTransform::CreateTransformFromCICP(imageNclx.get_color_primaries(), imageNclx.get_transfer_characteristics(),
+                                                            ICCProfileTransform::FORMAT_RGBA);
+    }
+    return nullptr;
+}
+
+// Returns the first Exif block of the image as a JPEG APP1 segment (malloc()) or nullptr.
+// The Exif item of HEIF/AVIF (ISO/IEC 23008-12, A.2.1) starts with a 4 byte big endian offset to the TIFF header,
+// counted from the end of that field. Usually it is 6 and skips "Exif\0\0", but 0 (TIFF header right away) is valid
+// as well. The JPEG APP1 segment is: FF E1, big endian length, "Exif\0\0", TIFF data.
+void* CopyExifBlock(const heif::ImageHandle& handle) {
+    const std::vector<heif_item_id> exif_blocks = handle.get_list_of_metadata_block_IDs("Exif");
+    if (exif_blocks.empty()) {
+        return nullptr;
+    }
+    const std::vector<uint8_t> exif = handle.get_metadata(exif_blocks[0]);
+    if (exif.size() < 4) {
+        return nullptr;
+    }
+    const size_t nTiffOffset = 4 + ((size_t)exif[0] << 24 | (size_t)exif[1] << 16 | (size_t)exif[2] << 8 | (size_t)exif[3]);
+    if (nTiffOffset >= exif.size()) {
+        return nullptr;
+    }
+    const uint8_t* pTiff = exif.data() + nTiffOffset;
+    const size_t nTiffSize = exif.size() - nTiffOffset;
+    const size_t nSegmentSize = 10 + nTiffSize;      // FF E1 + length + "Exif\0\0" + TIFF
+    if (nTiffSize <= 8 || nSegmentSize - 2 > 0xFFFF) { // the length field counts everything after FF E1
+        return nullptr;
+    }
+    auto* segment = static_cast<uint8_t*>(malloc(nSegmentSize));
+    if (segment == nullptr) {
+        return nullptr;
+    }
+    segment[0] = 0xFF;
+    segment[1] = 0xE1;
+    segment[2] = static_cast<uint8_t>((nSegmentSize - 2) >> 8);
+    segment[3] = static_cast<uint8_t>((nSegmentSize - 2) & 0xFF);
+    memcpy(segment + 4, "Exif\0\0", 6);
+    memcpy(segment + 10, pTiff, nTiffSize);
+    return segment;
+}
+
+} // namespace
+
 void * HeifReader::ReadImage(int &width,
                        int &height,
                        int &nchannels,
@@ -60,8 +125,7 @@ void * HeifReader::ReadImage(int &width,
         outOfMemory = true;
         return nullptr;
     }
-    std::vector<uint8_t> iccp = image.get_raw_color_profile();
-    void* transform = ICCProfileTransform::CreateTransform(iccp.data(), iccp.size(), ICCProfileTransform::FORMAT_RGBA);
+    void* transform = CreateColorTransform(handle, image);
     if (!ICCProfileTransform::DoTransform(transform, data, pPixelData, width, height, stride)) {
         unsigned int* o = (unsigned int*)pPixelData;
         for (size_t i = 0; i < nRows; i++) {
@@ -76,34 +140,21 @@ void * HeifReader::ReadImage(int &width,
     }
     ICCProfileTransform::DeleteTransform(transform);
 
-    std::vector<heif_item_id> exif_blocks = handle.get_list_of_metadata_block_IDs("Exif");
-
-    if (!exif_blocks.empty()) {
-        std::vector<uint8_t> exif = handle.get_metadata(exif_blocks[0]);
-        // 65538 magic number comes from investigations by qbnu
-        // see https://github.com/sylikc/jpegview/pull/213#pullrequestreview-1494451359 for more details
-        /*
-        * These libraries all have their own ideas about where to start the Exif data from.
-        * JPEG Exif blocks are in the format
-          FF E1 SS SS 45 78 69 66 00 00 [data]
-
-          The SS SS is a big-endian unsigned short representing the size of everything after FF E1.
-
-          libjxl gives 00 00 00 00 [data]
-          libheif gives 00 00 00 00 45 78 69 66 00 00 [data]
-          libavif, libwebp and libpng give [data], so they have different limits for size.
-
-          If you want I can change it to 65536 + an offset and add notes explaining why.
-        */
-        if (exif.size() > 8 && exif.size() < 65538) {
-            exif_chunk = malloc(exif.size());
-            if (exif_chunk != nullptr) {
-                memcpy(exif_chunk, exif.data(), exif.size());
-                *((unsigned short*)exif_chunk) = __builtin_bswap16(0xFFE1);
-                *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(exif.size() - 2);
-            }
-        }
-    }
+    exif_chunk = CopyExifBlock(handle);
 
     return (void*)pPixelData;
+}
+
+void* HeifReader::GetEXIFBlock(const void* buffer, std::size_t sizebytes) {
+    if (buffer == nullptr || sizebytes == 0) {
+        return nullptr;
+    }
+    try {
+        // Reading the context only parses the container, nothing is decoded
+        heif::Context context;
+        context.read_from_memory_without_copy(buffer, sizebytes);
+        return CopyExifBlock(context.get_primary_image_handle());
+    } catch (const heif::Error&) {
+        return nullptr;
+    }
 }

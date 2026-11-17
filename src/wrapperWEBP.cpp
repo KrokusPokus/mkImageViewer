@@ -23,6 +23,41 @@ struct WebpReaderWriter::webp_cache {
 
 WebpReaderWriter::webp_cache WebpReaderWriter::cache = {};
 
+// Returns the EXIF chunk of the file as a JPEG APP1 segment (malloc()) or nullptr
+static void* CopyExifChunk(const WebPDemuxer* demuxer) {
+    if (demuxer == nullptr) {
+        return nullptr;
+    }
+    void* exif_chunk = nullptr;
+    WebPChunkIterator chunk_iter;
+    if (WebPDemuxGetChunk(demuxer, "EXIF", 1, &chunk_iter)) {
+        WebPData exif = chunk_iter.chunk;
+        if (exif.size > 8 && exif.size < 65528 && exif.bytes != nullptr) {
+            exif_chunk = malloc(exif.size + 10);
+            if (exif_chunk != nullptr) {
+                memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
+                *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(exif.size + 8);
+                memcpy((uint8_t*)exif_chunk + 10, exif.bytes, exif.size);
+            }
+        }
+    }
+    WebPDemuxReleaseChunkIterator(&chunk_iter);
+    return exif_chunk;
+}
+
+void* WebpReaderWriter::GetEXIFBlock(const void* buffer, std::size_t sizebytes) {
+    if (buffer == nullptr || sizebytes == 0) {
+        return nullptr;
+    }
+    WebPData data;
+    data.bytes = (const uint8_t*)buffer;
+    data.size = sizebytes;
+    WebPDemuxer* demuxer = WebPDemux(&data);
+    void* exif_chunk = CopyExifChunk(demuxer);
+    WebPDemuxDelete(demuxer);
+    return exif_chunk;
+}
+
 void* WebpReaderWriter::ReadImage(int& width,
     int& height,
     int& nchannels,
@@ -65,18 +100,7 @@ void* WebpReaderWriter::ReadImage(int& width,
             transform = ICCProfileTransform::CreateTransform(chunk_iter.chunk.bytes, chunk_iter.chunk.size, ICCProfileTransform::FORMAT_BGRA);
         }
         WebPDemuxReleaseChunkIterator(&chunk_iter);
-        if (WebPDemuxGetChunk(demuxer, "EXIF", 1, &chunk_iter)) {
-            WebPData exif = chunk_iter.chunk;
-            if (exif.size > 8 && exif.size < 65528 && exif.bytes != nullptr) {
-                exif_chunk = malloc(exif.size + 10);
-                if (exif_chunk != nullptr) {
-                    memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
-                    *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(exif.size + 8);
-                    memcpy((uint8_t*)exif_chunk + 10, exif.bytes, exif.size);
-                }
-            }
-        }
-        WebPDemuxReleaseChunkIterator(&chunk_iter);
+        exif_chunk = CopyExifChunk(demuxer);
         WebPDemuxDelete(demuxer);
 
         has_animation = features.has_animation;

@@ -533,6 +533,48 @@ struct CFreeDeleter {
 };
 using ExifPtr = std::unique_ptr<void, CFreeDeleter>;
 
+// Reads the EXIF data of an encoded image without decoding it, as a JPEG APP1 segment (what CBaseImage expects).
+// Used where Qt decodes the pixels: Qt does not hand out the EXIF data. nullptr if there is none or the format
+// is not supported (GIF, TIFF, ICO, ...).
+ExifPtr ExtractEXIF(EImageFormat eFormat, const void* pData, size_t nSize) {
+    if (pData == nullptr || nSize == 0) {
+        return nullptr;
+    }
+    try {
+        switch (eFormat) {
+        case IF_JPEG:
+        {
+            // FindEXIFBlock() points into the data, the caller gets a copy
+            void* pBlock = Helpers::FindEXIFBlock(const_cast<void*>(pData), nSize);
+            if (pBlock == nullptr) {
+                return nullptr;
+            }
+            const auto* pSegment = static_cast<const uint8_t*>(pBlock);
+            const size_t nSegmentSize = pSegment[2] * 256u + pSegment[3] + 2u; // checked by FindEXIFBlock()
+            ExifPtr pCopy(std::malloc(nSegmentSize));
+            if (pCopy) {
+                std::memcpy(pCopy.get(), pSegment, nSegmentSize);
+            }
+            return pCopy;
+        }
+        case IF_PNG:  return ExifPtr(PngReader::GetEXIFBlock(pData, nSize));
+        case IF_WEBP: return ExifPtr(WebpReaderWriter::GetEXIFBlock(pData, nSize));
+        case IF_JXL:  return ExifPtr(JxlReader::GetEXIFBlock(pData, nSize));
+        case IF_AVIF: return ExifPtr(AvifReader::GetEXIFBlock(pData, nSize));
+        case IF_HEIF: return ExifPtr(HeifReader::GetEXIFBlock(pData, nSize));
+        default:      return nullptr;
+        }
+    } catch (...) {
+        return nullptr; // without EXIF data the image is still shown
+    }
+}
+
+// CBaseImage applies the EXIF orientation of these formats itself (CEXIFReader ignores it for JXL, HEIF and AVIF,
+// where the orientation is part of the image data and applied by the decoder).
+bool IsRotatedByCBaseImage(EImageFormat eFormat, bool bHaveEXIF) {
+    return bHaveEXIF && eFormat != IF_JXL && eFormat != IF_HEIF && eFormat != IF_AVIF;
+}
+
 // Pixel data is always allocated with new[]: CBaseImage releases it with delete[]
 using PixelPtr = std::unique_ptr<uint8_t[]>;
 
@@ -957,6 +999,9 @@ void CImageLoadThread::DeleteCachedQtImageReader() {
     m_bLastQtAnimation = false;
     m_nLastQtFrameIndex = -1;
     m_nLastQtFrameCount = 1;
+    m_bLastQtAutoTransform = true;
+    m_LastQtExif.clear();
+    m_sLastQtJPEGComment.clear();
 }
 
 void CImageLoadThread::DeleteCachedWebpDecoder() {
@@ -1116,12 +1161,11 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
             case IF_JPEG:
             case IF_WindowsBMP:
             case IF_TGA:
-                status = decodeWithQt(nullptr);
-                break;
             case IF_PNG:
             {
-                // libpng failed: Qt gets a chance. The EXIF data is taken from the PNG, the CBaseImage does the rotation.
-                const ExifPtr pQtEXIF(PngReader::GetEXIFBlock(in.pData, in.nSize));
+                // The dedicated decoder failed: Qt gets a chance. The EXIF data is taken from the file, the CBaseImage
+                // does the rotation.
+                const ExifPtr pQtEXIF = ExtractEXIF(eFormat, in.pData, in.nSize);
                 status = decodeWithQt(pQtEXIF.get());
             }
             break;
@@ -1153,6 +1197,8 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
 //          Any other frame rewinds the file and decodes forward (frames before the requested one are decoded and thrown away).
 //          The cache is dropped by ReleaseFile() or when another file is loaded.
 //  - TIFF: pages are random access (jumpToImage()), nothing is cached.
+// EXIF: Qt does not hand out the EXIF data. For JPEG, PNG, WebP, JXL, AVIF and HEIF it is read from the file
+// (ExtractEXIF()) when the file is opened and handed to every frame's CBaseImage.
 void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
     try {
         const bool bUseCachedReader = m_pLastImageReader && request->FileName == m_sLastFileName;
@@ -1169,6 +1215,23 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
             // Determine the format once: QImageReader::format() returns an empty name again as soon as the reader has
             // read the last frame of an animation, which made the second loop look like an unknown format.
             m_eLastQtFormat = MapQtImageFormat(m_pLastImageReader->format());
+
+            // Qt does not hand out the EXIF data: it is read from the file (mapped, nothing is copied).
+            // If the CBaseImage gets EXIF data with an orientation it rotates the image itself, Qt must not do it too.
+            if (uchar* pMapped = m_pLastImageFile->map(0, m_pLastImageFile->size())) {
+                const size_t nSize = static_cast<size_t>(m_pLastImageFile->size());
+                const ExifPtr pEXIF = ExtractEXIF(m_eLastQtFormat, pMapped, nSize);
+                if (pEXIF) {
+                    const auto* pSegment = static_cast<const uint8_t*>(pEXIF.get());
+                    m_LastQtExif.assign(pSegment, pSegment + pSegment[2] * 256u + pSegment[3] + 2u);
+                }
+                if (m_eLastQtFormat == IF_JPEG) {
+                    m_sLastQtJPEGComment = Helpers::GetJPEGComment(pMapped, nSize);
+                }
+                m_pLastImageFile->unmap(pMapped);
+            }
+            m_bLastQtAutoTransform = !IsRotatedByCBaseImage(m_eLastQtFormat, !m_LastQtExif.empty());
+            m_pLastImageReader->setAutoTransform(m_bLastQtAutoTransform && CSettingsProvider::This().AutoRotateEXIF());
         }
 
         const EImageFormat eFormat = m_eLastQtFormat;
@@ -1207,7 +1270,7 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
                     DeleteCachedQtImageReader();
                     return;
                 }
-                m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get(), true);
+                m_pLastImageReader = CreateQtImageReader(m_pLastImageFile.get(), m_bLastQtAutoTransform);
                 m_nLastQtFrameIndex = -1;
             }
             // decode (and discard) the frames in front of the requested one; for the next frame there is nothing to skip
@@ -1238,9 +1301,14 @@ void CImageLoadThread::ProcessReadQtImageRequest(CRequest * request) {
         }
 
         bool bOutOfMemory = false;
-        request->Image = ConvertQImageToJPEGImage(std::move(image), nullptr,
+        // CBaseImage copies the EXIF data: for an animation the cached copy is used for every frame
+        void* pEXIF = m_LastQtExif.empty() ? nullptr : m_LastQtExif.data();
+        request->Image = ConvertQImageToJPEGImage(std::move(image), pEXIF,
                                                   CImageFrameInfo{ eFormat, bIsAnimation, nFrameIndex, nFrameCount, nFrameTimeMs },
                                                   bOutOfMemory, request->ProcessParams.TransparencyMode);
+        if (request->Image != nullptr && eFormat == IF_JPEG) {
+            request->Image->SetJPEGComment(m_sLastQtJPEGComment);
+        }
         if (request->Image == nullptr && bOutOfMemory) {
             request->Error = ELoadError::OutOfMemory;
         }

@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -165,6 +166,9 @@ private:
     int m_nLastQtFrameCount = 1;
     EImageFormat m_eLastQtFormat = IF_Unknown;
     bool m_bLastQtAnimation = false;
+    bool m_bLastQtAutoTransform = true;    // Qt dreht nach EXIF (false: das macht die CBaseImage anhand von m_LastQtExif)
+    std::vector<uint8_t> m_LastQtExif;     // EXIF-Segment (JPEG APP1) der Datei, leer wenn keins
+    QString m_sLastQtJPEGComment;          // nur JPEG
     void DeleteCachedQtImageReader();
     void ProcessReadQtImageRequest(CRequest* request);
 

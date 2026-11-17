@@ -20,6 +20,10 @@ public:
 
     static void DeleteCache();
 
+    // Returns the EXIF chunk of a WebP file as a JPEG APP1 segment (allocated with malloc(), the caller frees it)
+    // or nullptr. Only the container is parsed, nothing is decoded.
+    static void* GetEXIFBlock(const void* buffer, std::size_t sizebytes);
+
 private:
     struct webp_cache;
     static webp_cache cache;

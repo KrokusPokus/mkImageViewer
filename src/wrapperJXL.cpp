@@ -37,6 +37,21 @@ static int CountJxlFrames(const uint8_t* jxl_data, size_t size) {
     return count > 0 ? count : 1;
 }
 
+// Converts the content of an Exif box (4 byte offset of the TIFF header, then the TIFF data) into a JPEG APP1
+// segment as understood by CEXIFReader. Returns nullptr if it does not fit (malloc(), the caller frees it).
+static void* BuildExifSegment(const std::vector<uint8_t>& exif) {
+    if (exif.size() <= 8 || exif.size() >= 65532) {
+        return nullptr;
+    }
+    void* exif_chunk = malloc(exif.size() + 6);
+    if (exif_chunk != nullptr) {
+        memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
+        *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(exif.size() + 4);
+        memcpy((uint8_t*)exif_chunk + 10, exif.data() + 4, exif.size() - 4);
+    }
+    return exif_chunk;
+}
+
 struct JxlReader::jxl_cache {
     JxlDecoderPtr decoder;
     JxlResizableParallelRunnerPtr runner;
@@ -256,14 +271,7 @@ void* JxlReader::ReadImage(int& width,
     }
 
     // Copy Exif data into the format understood by CEXIFReader
-    if (!cache.exif.empty() && cache.exif.size() > 8 && cache.exif.size() < 65532) {
-        exif_chunk = malloc(cache.exif.size() + 6);
-        if (exif_chunk != nullptr) {
-            memcpy(exif_chunk, "\xFF\xE1\0\0Exif\0\0", 10);
-            *((unsigned short*)exif_chunk + 1) = __builtin_bswap16(cache.exif.size() + 4);
-            memcpy((uint8_t*)exif_chunk + 10, cache.exif.data() + 4, cache.exif.size() - 4);
-        }
-    }
+    exif_chunk = BuildExifSegment(cache.exif);
 
     if (!has_animation)
         DeleteCache();
@@ -279,4 +287,59 @@ void JxlReader::DeleteCache() {
     ICCProfileTransform::DeleteTransform(cache.transform);
     // Setting the decoder and runner to 0 (nullptr) will automatically destroy them
     cache = {};
+}
+
+void* JxlReader::GetEXIFBlock(const void* buffer, std::size_t sizebytes) {
+    if (buffer == nullptr || sizebytes == 0) {
+        return nullptr;
+    }
+    // A decoder of its own that only reads the boxes: the cached one may be in the middle of an animation
+    JxlDecoderPtr decoder = JxlDecoderMake(nullptr);
+    if (!decoder ||
+        JxlDecoderSubscribeEvents(decoder.get(), JXL_DEC_BOX) != JXL_DEC_SUCCESS ||
+        JxlDecoderSetDecompressBoxes(decoder.get(), JXL_TRUE) != JXL_DEC_SUCCESS) {
+        return nullptr;
+    }
+    JxlDecoderSetInput(decoder.get(), static_cast<const uint8_t*>(buffer), sizebytes);
+    JxlDecoderCloseInput(decoder.get());
+
+    constexpr size_t kChunkSize = 65536;
+    constexpr size_t kMaxExifSize = 65532; // larger boxes do not fit into a JPEG APP1 segment anyway
+    std::vector<uint8_t> exif;
+    bool bInExifBox = false;
+    for (;;) {
+        const JxlDecoderStatus status = JxlDecoderProcessInput(decoder.get());
+        if (status == JXL_DEC_BOX) {
+            if (bInExifBox) {
+                break; // the Exif box is complete
+            }
+            JxlBoxType type;
+            if (JxlDecoderGetBoxType(decoder.get(), type, JXL_TRUE) != JXL_DEC_SUCCESS) {
+                return nullptr;
+            }
+            if (memcmp(type, "Exif", 4) == 0) {
+                bInExifBox = true;
+                exif.resize(kChunkSize);
+                JxlDecoderSetBoxBuffer(decoder.get(), exif.data(), exif.size());
+            }
+        } else if (status == JXL_DEC_BOX_NEED_MORE_OUTPUT) {
+            if (exif.size() >= kMaxExifSize) {
+                return nullptr;
+            }
+            const size_t used = exif.size() - JxlDecoderReleaseBoxBuffer(decoder.get());
+            exif.resize(exif.size() + kChunkSize);
+            JxlDecoderSetBoxBuffer(decoder.get(), exif.data() + used, exif.size() - used);
+        } else if (status == JXL_DEC_BOX_COMPLETE) {
+            break; // libjxl >= 0.11 reports the end of a box explicitly
+        } else if (status == JXL_DEC_SUCCESS) {
+            break; // no more boxes
+        } else {
+            return nullptr; // an error or truncated data
+        }
+    }
+    if (!bInExifBox) {
+        return nullptr;
+    }
+    exif.resize(exif.size() - JxlDecoderReleaseBoxBuffer(decoder.get()));
+    return BuildExifSegment(exif);
 }

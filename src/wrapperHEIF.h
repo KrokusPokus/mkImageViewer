@@ -16,6 +16,10 @@ public:
                          int frame_index, // index of requested frame
                          const void *buffer, // memory address containing heic compressed data.
                          std::size_t sizebytes); // size of heic compressed data.
+
+    // Returns the Exif data of the primary image as a JPEG APP1 segment (allocated with malloc(), the caller frees it)
+    // or nullptr. Only the container is parsed, nothing is decoded.
+    static void* GetEXIFBlock(const void* buffer, std::size_t sizebytes);
 };
 
 

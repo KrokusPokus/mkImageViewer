@@ -174,10 +174,16 @@ void* AvifReader::ReadImage(int& width,
         ReplacePixels(CBasicProcessing::Mirror32bpp(width, height, g_cache.rgb.pixels, g_cache.decoder->image->imir.axis));
     }
 
-    // The color transform only depends on the ICC profile, it is created once per cached file.
-    const avifRWData& icc = g_cache.decoder->image->icc;
+    // The color transform only depends on the color information of the file, it is created once per cached file.
+    // An ICC profile takes precedence; without one the CICP code points (nclx) describe the color space.
+    const avifImage* image = g_cache.decoder->image;
     if (g_cache.transform == nullptr) {
-        g_cache.transform = ICCProfileTransform::CreateTransform(icc.data, icc.size, ICCProfileTransform::FORMAT_BGRA);
+        if (image->icc.size > 0) {
+            g_cache.transform = ICCProfileTransform::CreateTransform(image->icc.data, image->icc.size, ICCProfileTransform::FORMAT_BGRA);
+        } else {
+            g_cache.transform = ICCProfileTransform::CreateTransformFromCICP(image->colorPrimaries, image->transferCharacteristics,
+                                                                             ICCProfileTransform::FORMAT_BGRA);
+        }
     }
     ICCProfileTransform::DoTransform(g_cache.transform, g_cache.rgb.pixels, g_cache.rgb.pixels, width, height);
 
@@ -192,6 +198,27 @@ void* AvifReader::ReadImage(int& width,
     }
 
     return pPixelData;
+}
+
+void* AvifReader::GetEXIFBlock(const void* buffer, std::size_t sizebytes) {
+    if (buffer == nullptr || sizebytes == 0) {
+        return nullptr;
+    }
+    // A decoder of its own: the cached one may be in the middle of an animation
+    avifDecoder* decoder = avifDecoderCreate();
+    if (decoder == nullptr) {
+        return nullptr;
+    }
+    decoder->strictFlags = AVIF_STRICT_DISABLED;
+    decoder->ignoreXMP = AVIF_TRUE;
+    void* exif_chunk = nullptr;
+    // avifDecoderParse() only reads the container (and the metadata), no pixels are decoded
+    if (avifDecoderSetIOMemory(decoder, static_cast<const std::uint8_t*>(buffer), sizebytes) == AVIF_RESULT_OK &&
+        avifDecoderParse(decoder) == AVIF_RESULT_OK) {
+        exif_chunk = BuildExifSegment(decoder->image->exif.data, decoder->image->exif.size);
+    }
+    avifDecoderDestroy(decoder);
+    return exif_chunk;
 }
 
 void AvifReader::DeleteCache() {
