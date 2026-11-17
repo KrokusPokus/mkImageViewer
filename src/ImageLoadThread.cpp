@@ -1103,6 +1103,18 @@ EDecodeStatus CImageLoadThread::DecodeFromBuffer(CRequest* request, EImageFormat
             return EDecodeStatus::NotDecodable;
         };
 
+        // "Read all formats with Qt": no dedicated wrapper. Single files do not get here with this setting
+        // (ProcessReadRequest() hands them to ProcessReadQtImageRequest()), this is for the entries of an archive.
+        // The EXIF data is taken from the data, the CBaseImage does the rotation.
+        if (bHaveData && CSettingsProvider::This().ForceQImageReader()) {
+            const ExifPtr pQtEXIF = ExtractEXIF(eFormat, in.pData, in.nSize);
+            const EDecodeStatus status = decodeWithQt(pQtEXIF.get());
+            if (request->Image != nullptr && eFormat == IF_JPEG) {
+                request->Image->SetJPEGComment(Helpers::GetJPEGComment(in.pData, in.nSize));
+            }
+            return status;
+        }
+
         const DecoderFn decode = DecoderFor(eFormat);
         if (decode == nullptr) {
             // No dedicated wrapper (GIF, TIFF, ICO in an archive)
