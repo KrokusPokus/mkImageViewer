@@ -53,6 +53,7 @@
 #include <QTimerEvent>
 #include <QUrl>
 #include <QVariant>
+#include <QWindow>
 #include <QtGlobal>
 #include <QtGui/private/qkeymapper_p.h>     // Private Qt-API: Liefert dieselben Tasten-Kandidaten, mit denen Qt QShortcut/QAction aufloest.
 
@@ -385,7 +386,7 @@ CMainWindow::CMainWindow(const QString& sStartupFile)
     /*############################################*/
 
     m_bShowInfo = false;
-    m_bPanTimerActive = false;
+    m_bSmoothPanActive = false;
     m_nBookModePageHeight = sp.BookModePageHeight();
     m_bAllowSmoothPanning = sp.AllowSmoothPanning();
     m_offsets_custom = QPoint(0, 0);
@@ -1366,58 +1367,93 @@ void CMainWindow::timerEvent(QTimerEvent* event) {
         // Repaint the box that was drawn (1 pixel more for the antialiased edge), not only GetToastTextRect()
         this->update(m_toastBoxRect.adjusted(-1, -1, 1, 1));
     }
-    else if (timerId == m_panTimerId) {
-        if (m_pCurrentImage != nullptr) {
-            // Wenn keine Taste mehr gedrückt wird, stoppen wir den Pan-Timer
-            if (!m_bPanKeyUp && !m_bPanKeyDown && !m_bPanKeyLeft && !m_bPanKeyRight) {
-                killTimer(m_panTimerId);
-                m_panTimerId = 0;
-                m_bPanTimerActive = false;
-                return;
-            }
+}
 
-            int PanXbase = 0;
-            int PanYbase = 0;
-            int PanX = 0;
-            int PanY = 0;
-            int iRealHeight = int(m_dZoom * (m_pCurrentImage->OrigHeight()));
-            int iRealWidth = int(m_dZoom * (m_pCurrentImage->OrigWidth()));
 
-            const int nStep = ScaleToPx(10);    // 10 logical pixels per timer tick, in device pixels
-            if (GetAutoZoomMode() == Helpers::ZM_BookMode && iRealHeight > m_clientRect.height() && iRealWidth <= m_clientRect.width()) {
-                if ((m_bPanKeyLeft && !m_bPanKeyRight) || (m_bPanKeyUp && !m_bPanKeyDown)) PanYbase = nStep;
-                else if ((!m_bPanKeyLeft && m_bPanKeyRight) || (!m_bPanKeyUp && m_bPanKeyDown)) PanYbase = -nStep;
-                else PanYbase = 0;
-            } else {
-                if (m_bPanKeyUp && !m_bPanKeyDown) PanYbase = nStep;
-                else if (!m_bPanKeyUp && m_bPanKeyDown) PanYbase = -nStep;
-                else PanYbase = 0;
+// Smooth panning with the cursor keys, paced by the display: instead of a fixed timer, every step waits for the
+// next QWindow::requestUpdate(). Under Wayland, Qt delivers that UpdateRequest only after the compositor's frame
+// callback, i.e. once per display refresh (60 Hz, 144 Hz, VRR alike; nothing while the window is not visible).
+// A plain QWidget::update() is NOT throttled (measured: ~770 paints/s at 60 Hz), so the loop must go through the QWindow.
+void CMainWindow::StartSmoothPan() {
+    if (m_bSmoothPanActive) return;
+    QWindow* pWindow = windowHandle();
+    if (pWindow == nullptr) return;
+    if (m_pPanEventWindow != pWindow) {
+        if (m_pPanEventWindow != nullptr) m_pPanEventWindow->removeEventFilter(this);
+        pWindow->installEventFilter(this);
+        m_pPanEventWindow = pWindow;
+    }
+    m_bSmoothPanActive = true;
+    m_dPanRestX = m_dPanRestY = 0.0;
+    m_panClock.start();
+    pWindow->requestUpdate();
+}
 
-                if (m_bPanKeyLeft && !m_bPanKeyRight) PanXbase = nStep;
-                else if (!m_bPanKeyLeft && m_bPanKeyRight) PanXbase = -nStep;
-                else PanXbase = 0;
-            }
+bool CMainWindow::eventFilter(QObject* pWatched, QEvent* pEvent) {
+    if (pEvent->type() == QEvent::UpdateRequest && pWatched == m_pPanEventWindow && m_bSmoothPanActive) {
+        PanFrame();
+    }
+    return QMainWindow::eventFilter(pWatched, pEvent);   // never consumed: Qt still has to process the UpdateRequest
+}
 
-            if (PanXbase != 0 && PanYbase != 0) { // Diagonale Bewegung
-                PanX = static_cast<int>(PanXbase * 0.7);
-                PanY = static_cast<int>(PanYbase * 0.7);
-            } else {
-                PanX = PanXbase;
-                PanY = PanYbase;
-            }
+void CMainWindow::PanFrame() {
+    // Stop as soon as no pan key is held any more (or there is no image)
+    if (m_pCurrentImage == nullptr || (!m_bPanKeyUp && !m_bPanKeyDown && !m_bPanKeyLeft && !m_bPanKeyRight)) {
+        m_bSmoothPanActive = false;
+        return;
+    }
 
-            if (PerformPan(PanX, PanY, false)) {
-                this->update(); // Alternative: this->repaint() = Erzwingt ein sofortiges Neuzeichnen ohne den Event-Loop zu blockieren
-            }
+    // Time based: the speed does not depend on the refresh rate. Clamped, so a stall (window hidden, slow paint)
+    // does not end in a jump.
+    const double dt = std::min(m_panClock.nsecsElapsed() / 1e9, 0.05);
+    m_panClock.restart();
+
+    int PanXbase = 0;
+    int PanYbase = 0;
+    int iRealHeight = int(m_dZoom * (m_pCurrentImage->OrigHeight()));
+    int iRealWidth = int(m_dZoom * (m_pCurrentImage->OrigWidth()));
+
+    if (GetAutoZoomMode() == Helpers::ZM_BookMode && iRealHeight > m_clientRect.height() && iRealWidth <= m_clientRect.width()) {
+        if ((m_bPanKeyLeft && !m_bPanKeyRight) || (m_bPanKeyUp && !m_bPanKeyDown)) PanYbase = 1;
+        else if ((!m_bPanKeyLeft && m_bPanKeyRight) || (!m_bPanKeyUp && m_bPanKeyDown)) PanYbase = -1;
+    } else {
+        if (m_bPanKeyUp && !m_bPanKeyDown) PanYbase = 1;
+        else if (!m_bPanKeyUp && m_bPanKeyDown) PanYbase = -1;
+
+        if (m_bPanKeyLeft && !m_bPanKeyRight) PanXbase = 1;
+        else if (!m_bPanKeyLeft && m_bPanKeyRight) PanXbase = -1;
+    }
+
+    // 10 logical pixels per 1/60 s (the former 17 ms timer step), in device pixels; diagonal: factor 0.7 per axis
+    const double dSpeed = ScaleToPx(10) * 60.0 * ((PanXbase != 0 && PanYbase != 0) ? 0.7 : 1.0);
+    m_dPanRestX += PanXbase * dSpeed * dt;
+    m_dPanRestY += PanYbase * dSpeed * dt;
+    const int PanX = int(m_dPanRestX);   // whole pixels now, the fraction is carried to the next frame
+    const int PanY = int(m_dPanRestY);
+    m_dPanRestX -= PanX;
+    m_dPanRestY -= PanY;
+
+    bool bMoved = false;
+    if (PanX != 0 || PanY != 0) {
+        bMoved = PerformPan(PanX, PanY, false);
+        if (bMoved) this->update();
+    }
+
+    if (bMoved) {
+        m_pPanEventWindow->requestUpdate();
+    } else {
+        // Nothing painted (at the border, or below one pixel): without a commit there is no frame callback pending,
+        // and requestUpdate() would fire immediately -> busy loop. Wait one frame time instead; the loop keeps running
+        // while the keys are held, as before (in book mode this prevents turning pages while panning).
+        if (m_bPanKeyUp || m_bPanKeyDown || m_bPanKeyLeft || m_bPanKeyRight) {
+            QTimer::singleShot(16, this, [this]() {
+                if (m_bSmoothPanActive && m_pPanEventWindow != nullptr) m_pPanEventWindow->requestUpdate();
+            });
         } else {
-            killTimer(m_panTimerId);
-            m_panTimerId = 0;
-            m_bPanTimerActive = false;
-            return;
+            m_bSmoothPanActive = false;
         }
     }
 }
-
 ///////////////////////////////////////////////////////////////////////////////////
 // Uebersetzung Befehlsargument -> Programm-Enums
 //
@@ -2135,10 +2171,8 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                     if (((iRealHeight > m_clientRect.height()) && (inv.id == Command::PanUp || inv.id == Command::PanDown))
                      || (( iRealWidth >  m_clientRect.width()) && (inv.id == Command::PanLeft || inv.id == Command::PanRight))) {
                         if (m_bAllowSmoothPanning) {
-                            if (m_bPanTimerActive == false) {
-                                m_bPanTimerActive = true;
-                                if (m_panTimerId != 0) killTimer(m_panTimerId);
-                                m_panTimerId = startTimer(17);
+                            if (m_bSmoothPanActive == false) {
+                                StartSmoothPan();
                             }
                         } else {
                             PerformPan((inv.id == Command::PanLeft) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanRight) ? -ScaleToPx(PAN_STEP) : 0,
@@ -2160,10 +2194,8 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                     if (((iRealHeight > m_clientRect.height()) && (inv.id == Command::PanUp || inv.id == Command::PanDown))
                      || (( iRealWidth >  m_clientRect.width()) && (inv.id == Command::PanLeft || inv.id == Command::PanRight))) {
                         if (m_bAllowSmoothPanning) {
-                            if (m_bPanTimerActive == false) {
-                                m_bPanTimerActive = true;
-                                if (m_panTimerId != 0) killTimer(m_panTimerId);
-                                m_panTimerId = startTimer(17);
+                            if (m_bSmoothPanActive == false) {
+                                StartSmoothPan();
                             }
                         } else {
                             PerformPan((inv.id == Command::PanLeft) ? ScaleToPx(PAN_STEP) : (inv.id == Command::PanRight) ? -ScaleToPx(PAN_STEP) : 0,
@@ -2177,23 +2209,21 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
                                 GotoImage(POS_Previous);
                         } else {
                             if (iRealHeight > m_clientRect.height()) {
-                                if (m_bPanTimerActive == false) {
+                                if (m_bSmoothPanActive == false) {
                                     if ((m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (inv.id == Command::PanLeft)) {    // Upper Border!
                                         GotoImage(POS_Previous);
                                     } else if ((-m_offsets.y() >= ((iRealHeight - m_clientRect.height()) / 2)) && (inv.id == Command::PanRight)) {    //Lower Border!
                                         GotoImage(POS_Next);
                                     } else {
                                         if (m_bAllowSmoothPanning) {
-                                            m_bPanTimerActive = true;
-                                            if (m_panTimerId != 0) killTimer(m_panTimerId);
-                                            m_panTimerId = startTimer(17);
+                                            StartSmoothPan();
                                         } else {
                                             PerformPan(0, ((inv.id == Command::PanUp) || (inv.id == Command::PanLeft)) ? ScaleToPx(PAN_STEP) : ((inv.id == Command::PanDown) || (inv.id == Command::PanRight)) ? -ScaleToPx(PAN_STEP) : 0, false);
                                         }
                                     }
                                 }
                             } else {
-                                if (m_bPanTimerActive == false) {
+                                if (m_bSmoothPanActive == false) {
                                     if (inv.id == Command::PanRight)
                                         GotoImage(POS_Next);
                                     else if (inv.id == Command::PanLeft)

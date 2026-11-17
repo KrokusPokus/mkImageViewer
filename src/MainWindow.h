@@ -15,10 +15,12 @@
 #include <QImage>
 #include <QMainWindow>
 #include <QPoint>
+#include <QPointer>
 #include <QRect>
 #include <QSize>
 #include <QString>
 #include <QStringList>
+#include <QWindow>
 
 #include <cstddef>
 
@@ -239,7 +241,7 @@ private:
     void StopAnimation();
 
     bool m_bShowInfo;
-    bool m_bPanTimerActive;
+    bool m_bSmoothPanActive;
     int m_nBookModePageHeight;
     bool  m_bAllowSmoothPanning;
     QPoint m_offsets_custom;
@@ -273,7 +275,6 @@ private:
     int m_zoomTimerId = 0;
     int m_zoomTextTimerId = 0;
     int m_toastTimerId = 0;
-    int m_panTimerId = 0;
     int m_transitionTimerId = 0;
 
     // Slide show transition (see StartTransition()): snapshots in device pixels (device pixel ratio 1)
@@ -285,6 +286,13 @@ private:
     bool m_bPanKeyDown = false;
     bool m_bPanKeyLeft = false;
     bool m_bPanKeyRight = false;
+    // Smooth panning, paced by the display refresh (see StartSmoothPan())
+    QPointer<QWindow> m_pPanEventWindow;   // window whose UpdateRequest drives the pan loop (event filter installed)
+    QElapsedTimer m_panClock;
+    double m_dPanRestX = 0.0;   // sub-pixel remainder carried to the next frame
+    double m_dPanRestY = 0.0;
+    void StartSmoothPan();
+    void PanFrame();
     bool m_bDropInput = false;
     void DiscardPendingInput();
 
@@ -304,6 +312,7 @@ protected:
     void timerEvent(QTimerEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
     bool event(QEvent*) override;
+    bool eventFilter(QObject* pWatched, QEvent* pEvent) override;
 };
 
 #endif // MAINWINDOW_H
