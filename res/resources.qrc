@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/icons">
-        <file>app.ico</file>
+        <file>gwenview.svg</file>
     </qresource>
 </RCC>

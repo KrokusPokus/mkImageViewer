@@ -69,6 +69,11 @@ Q_DECLARE_METATYPE(Cmd::CommandInvocation)
 
 namespace {
 
+    // App icon: gwenview from the current icon theme, the embedded copy (from breeze-icons) only if the theme lacks it
+    QIcon AppIcon() {
+        return QIcon::fromTheme(QStringLiteral("gwenview"), QIcon(QStringLiteral(":/icons/gwenview.svg")));
+    }
+
     const int MIN_WND_WIDTH = 320;
     const int MIN_WND_HEIGHT = 240;
 
@@ -449,7 +454,7 @@ CMainWindow::CMainWindow(const QString& sStartupFile)
     // in device pixels (the factor of the window is only exact after it is shown; resizeEvent()/paintEvent() correct it)
     m_clientRect = QRect(QPoint(0, 0), (m_bFullScreenMode ? m_monitorRect : CMultiMonitorSupport::GetDefaultWindowRect()).size() * devicePixelRatioF());
 
-    this->setWindowIcon(QIcon(":/icons/app.ico"));
+    this->setWindowIcon(AppIcon());
 
     // turn on/off mouse coursor
     m_bMouseOn = !m_bFullScreenMode;
@@ -3288,8 +3293,8 @@ void CMainWindow::UpdateWindowTitle(bool bForce) {
             if (!s_qtIconCache.contains(cacheKey)) {
                 QIcon fileIcon;
                 if (cacheKey == QStringLiteral("__default__")) {
-                    // Standard-App-Icon laden (z.B. aus Qt-Ressourcen)
-                    fileIcon = QIcon(QStringLiteral(":/icons/app.ico"));
+                    // Standard-App-Icon
+                    fileIcon = AppIcon();
                 } else {
                     // QFileIconProvider holt das System-Dateityp-Icon komplett plattformunabhängig!
                     QFileIconProvider iconProvider;

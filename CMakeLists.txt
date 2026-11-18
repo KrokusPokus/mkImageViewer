@@ -176,14 +176,3 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin"
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
 )
-
-if(LINUX)
-    add_custom_command(TARGET mkImageViewer POST_BUILD
-        # Erster Kopiervorgang
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:mkImageViewer>
-            $ENV{HOME}/.local/bin/mkImageViewer
-
-        COMMENT "Copying mkImageViewer. to ~/.local/bin/"
-    )
-endif()
