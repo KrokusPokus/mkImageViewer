@@ -31,11 +31,9 @@ endif()
 
 # Optimierungsstufe legt der Bauende fest: der Build-Typ (Release: -O3) bzw. beim Paketbau die CFLAGS/CXXFLAGS aus
 # der makepkg.conf (Build-Typ None).
-# -march=native ist fest eingebaut: der Code nutzt SSE4.1-, AVX2- und FMA-Intrinsics, die sich nur mit diesen
-# Befehlssaetzen kompilieren lassen. Das Programm laeuft daher nur auf CPUs wie der des Build-Rechners.
-add_compile_options(
-    $<$<NOT:$<CONFIG:Debug>>:-march=native>
-)
+# -march=native ist fest eingebaut, auch fuer Debug: der Code nutzt SSE4.1-, AVX2- und FMA-Intrinsics, die sich nur
+# mit diesen Befehlssaetzen kompilieren lassen. Das Programm laeuft daher nur auf CPUs wie der des Build-Rechners.
+add_compile_options(-march=native)
 
 
 # --- 2. QT & STANDARD SETUP ---
