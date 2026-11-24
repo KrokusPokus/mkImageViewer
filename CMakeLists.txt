@@ -29,14 +29,13 @@ if(result)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 endif()
 
-# Optimierungsstufe und CPU-Flags legt der Bauende fest: der Build-Typ (Release: -O3) bzw. beim Paketbau die
-# CFLAGS/CXXFLAGS aus der makepkg.conf (Build-Typ None).
-# MK_NATIVE: -march=native, nutzt SSE/AVX der aktuellen CPU. Das Programm laeuft dann evtl. nicht auf anderen CPUs,
-# daher standardmaessig aus (build.sh schaltet es fuer lokale Builds ein).
-option(MK_NATIVE "Optimize for the CPU of the build machine (-march=native)" OFF)
-if(MK_NATIVE)
-    add_compile_options(-march=native)
-endif()
+# Optimierungsstufe legt der Bauende fest: der Build-Typ (Release: -O3) bzw. beim Paketbau die CFLAGS/CXXFLAGS aus
+# der makepkg.conf (Build-Typ None).
+# -march=native ist fest eingebaut: der Code nutzt SSE4.1-, AVX2- und FMA-Intrinsics, die sich nur mit diesen
+# Befehlssaetzen kompilieren lassen. Das Programm laeuft daher nur auf CPUs wie der des Build-Rechners.
+add_compile_options(
+    $<$<NOT:$<CONFIG:Debug>>:-march=native>
+)
 
 
 # --- 2. QT & STANDARD SETUP ---
