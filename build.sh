@@ -5,5 +5,5 @@ if [ ! -d "build" ]; then
 fi
 
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release -DMK_NATIVE=ON ..
 cmake --build . --parallel

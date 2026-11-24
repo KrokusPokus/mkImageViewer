@@ -29,15 +29,14 @@ if(result)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 endif()
 
-# -O3: Aggressive Optimierung
-# -march=native: Nutzt SSE/AVX der aktuellen CPU
-# -flto: Link Time Optimization (removed here, since enabled by "set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)" above
-# -fomit-frame-pointer: Befreit ein Register fuer Daten (statt Stack-Tracking)
-add_compile_options(
-    $<$<NOT:$<CONFIG:Debug>>:-O3>
-    $<$<NOT:$<CONFIG:Debug>>:-march=native>
-    $<$<NOT:$<CONFIG:Debug>>:-fomit-frame-pointer>
-)
+# Optimierungsstufe und CPU-Flags legt der Bauende fest: der Build-Typ (Release: -O3) bzw. beim Paketbau die
+# CFLAGS/CXXFLAGS aus der makepkg.conf (Build-Typ None).
+# MK_NATIVE: -march=native, nutzt SSE/AVX der aktuellen CPU. Das Programm laeuft dann evtl. nicht auf anderen CPUs,
+# daher standardmaessig aus (build.sh schaltet es fuer lokale Builds ein).
+option(MK_NATIVE "Optimize for the CPU of the build machine (-march=native)" OFF)
+if(MK_NATIVE)
+    add_compile_options(-march=native)
+endif()
 
 
 # --- 2. QT & STANDARD SETUP ---
@@ -112,7 +111,7 @@ qt_add_translations(mkImageViewer
 target_compile_definitions(mkImageViewer PRIVATE
     BIT7Z_AUTO_FORMAT
     $<$<CONFIG:Debug>:_DEBUG>
-    $<$<CONFIG:Release>:NDEBUG>
+    $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
 )
 
 # Header-Suchpfade (mit src/ erweitert)
