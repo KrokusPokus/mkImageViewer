@@ -25,8 +25,8 @@
 #include <QSizePolicy>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QStringList>
 #include <QStringView>
-#include <QTextDocument>    // Qt::convertFromPlainText
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -47,9 +47,36 @@ namespace {
         return layout;
     }
 
-    // Tooltip as rich text: Qt wraps it to a readable width (plain text tooltips are one line per paragraph)
+    // Tooltip as plain text, wrapped here at about kTipLineLength characters. Qt shows plain text tooltips exactly as
+    // given; rich text it wraps itself, but squeezes short texts to 20-40 characters and breaks list items apart.
+    // Every line of sText is a paragraph. A line that starts like a list item ("Name: ...", "0 = ...") gets its
+    // continuation lines indented, so it stays visible where the next item begins. The wrapping is done on the
+    // translated text, so it applies to every language.
     void setTip(QWidget* widget, const QString& sText) {
-        widget->setToolTip(Qt::convertFromPlainText(sText, Qt::WhiteSpaceNormal));
+        constexpr qsizetype kTipLineLength = 70;
+        constexpr qsizetype kMaxItemNameLength = 30;
+        static const QString sIndent = QStringLiteral("    ");
+
+        QStringList result;
+        for (const QString& sParagraph : sText.split(QLatin1Char('\n'))) {
+            const qsizetype nColon = sParagraph.indexOf(QLatin1String(": "));
+            const qsizetype nEquals = sParagraph.indexOf(QLatin1String(" = "));
+            const bool bListItem = (nColon > 0 && nColon <= kMaxItemNameLength) || (nEquals > 0 && nEquals <= 12);
+
+            QString sLine;
+            for (const QString& sWord : sParagraph.split(QLatin1Char(' '), Qt::SkipEmptyParts)) {
+                if (!sLine.isEmpty() && sLine.size() + 1 + sWord.size() > kTipLineLength) {
+                    result.append(sLine);
+                    sLine = bListItem ? sIndent : QString();
+                }
+                if (!sLine.isEmpty() && sLine != sIndent) {
+                    sLine += QLatin1Char(' ');
+                }
+                sLine += sWord;
+            }
+            result.append(sLine);
+        }
+        widget->setToolTip(result.join(QLatin1Char('\n')));
     }
 
     // Scrollbereich um jeden Tab legen für kleine Bildschirmauflösungen
