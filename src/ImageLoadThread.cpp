@@ -9,7 +9,7 @@
 #include "ReaderBMP.h"
 #include "ReaderTGA.h"
 #include "SettingsProvider.h"
-#include "libjpeg-turbo/include/turbojpeg.h"
+#include <turbojpeg.h>
 #include "libheif/heif_cxx.h"
 #include "libbit7z/include/bitarchivereader.hpp"
 #include "wrapperAVIF.h"

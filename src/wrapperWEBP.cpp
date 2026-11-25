@@ -1,7 +1,7 @@
 #include "wrapperWEBP.h"
 
-#include "webp/decode.h"
-#include "webp/demux.h"
+#include <webp/decode.h>
+#include <webp/demux.h>
 #include "MaxImageDef.h"
 #include "ICCProfileTransform.h"
 

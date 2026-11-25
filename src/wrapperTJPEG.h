@@ -1,7 +1,7 @@
 #ifndef TJPEGWRAPPER_H
 #define TJPEGWRAPPER_H
 
-#include "libjpeg-turbo/include/turbojpeg.h" // for enum TJSAMP
+#include <turbojpeg.h> // for enum TJSAMP
 
 #include <cstddef>
 

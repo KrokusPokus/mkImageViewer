@@ -39,15 +39,15 @@ It replaces the defaults completely; delete it to get the defaults back.
 
 - 64-bit Linux
 - Qt ≥ 6.5 (Core, Widgets, Concurrent, DBus, Network, LinguistTools, GuiPrivate), CMake ≥ 3.16, a C++20 compiler
-- System libraries: libavif, libheif, libjxl, Little CMS 2, zlib
-- libjpeg-turbo, libpng, libwebp and bit7z are included as static libraries in `src/`
+- System libraries: libavif, libheif, libjxl, Little CMS 2, libjpeg-turbo (≥ 3.0), libwebp, zlib
+- libpng 1.8 (for APNG) and bit7z are included as static libraries in `src/`
   (build scripts for them are in `extras/scripts/`)
 - Optional at runtime: 7-Zip (CB7/7z archives), `kimageformats` and `qt6-imageformats` (more formats through Qt)
 
 On Arch Linux:
 
 ```bash
-sudo pacman -S --needed base-devel cmake qt6-base qt6-svg qt6-tools libavif libheif libjxl lcms2
+sudo pacman -S --needed base-devel cmake qt6-base qt6-svg qt6-tools libavif libheif libjxl lcms2 libjpeg-turbo libwebp zlib
 sudo pacman -S --needed 7zip kimageformats qt6-imageformats   # optional
 ```
 

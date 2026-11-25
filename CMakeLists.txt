@@ -42,12 +42,15 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools N
 # --- 3. DRITTANBIETER (ZLIB) GLOBAL BEREITSTELLEN ---
 find_package(ZLIB REQUIRED)
 
-# AVIF, HEIF, JPEG XL und Little CMS kommen aus den Systempaketen (Arch: libavif, libheif, libjxl, lcms2)
+# AVIF, HEIF, JPEG XL, Little CMS, libjpeg-turbo und WebP kommen aus den Systempaketen
+# (Arch: libavif, libheif, libjxl, lcms2, libjpeg-turbo, libwebp)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(AVIF REQUIRED IMPORTED_TARGET libavif)
 pkg_check_modules(HEIF REQUIRED IMPORTED_TARGET libheif)
 pkg_check_modules(JXL REQUIRED IMPORTED_TARGET libjxl libjxl_threads)
 pkg_check_modules(LCMS2 REQUIRED IMPORTED_TARGET lcms2)
+pkg_check_modules(TURBOJPEG REQUIRED IMPORTED_TARGET libturbojpeg>=3.0)
+pkg_check_modules(WEBP REQUIRED IMPORTED_TARGET libwebp libwebpdemux)
 
 qt_standard_project_setup()
 set(CMAKE_AUTORCC ON)
@@ -115,7 +118,6 @@ target_compile_definitions(mkImageViewer PRIVATE
 target_include_directories(mkImageViewer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/bit7z/include
 )
 
@@ -129,23 +131,21 @@ target_link_libraries(mkImageViewer PRIVATE
     Qt6::Network
 #static
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libbit7z/lib64/libbit7z64.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libjpeg-turbo/lib64/libturbojpeg.a
     ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/lib64/libpng.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libpng/lib64/libzs.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebp.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libwebpdemux.a
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/libwebp/lib64/libsharpyuv.a
 # dynamic (Systempakete, siehe pkg_check_modules oben)
     PkgConfig::LCMS2
     PkgConfig::AVIF
     PkgConfig::HEIF
     PkgConfig::JXL
+    PkgConfig::TURBOJPEG
+    PkgConfig::WEBP
+    ZLIB::ZLIB        # von der statischen libpng 1.8 benoetigt
 )
 
 # Beschleunigt den Start unter Linux, indem ungenutzte Shared Libraries ignoriert werden
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(mkImageViewer PRIVATE -Wl,--as-needed)
-    # Symbole der statisch gelinkten Bibliotheken (libpng 1.8, zlib, libjpeg-turbo, libwebp, ...) nicht exportieren.
+    # Symbole der statisch gelinkten Bibliotheken (libpng 1.8, bit7z) nicht exportieren.
     # Sonst landen Aufrufe von Qt/FreeType, die gegen die System-Versionen gebaut sind (z.B. libpng 1.6), in diesen
     # Kopien: libpng meldet dann "Application built with libpng-1.6.x but running with 1.8.0" und verweigert den Dienst.
     target_link_options(mkImageViewer PRIVATE -Wl,--exclude-libs,ALL)
