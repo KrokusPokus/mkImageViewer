@@ -26,6 +26,7 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QStringView>
+#include <QTextDocument>    // Qt::convertFromPlainText
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -44,6 +45,11 @@ namespace {
         layout->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
         layout->setContentsMargins(10, 10, 10, 10);
         return layout;
+    }
+
+    // Tooltip as rich text: Qt wraps it to a readable width (plain text tooltips are one line per paragraph)
+    void setTip(QWidget* widget, const QString& sText) {
+        widget->setToolTip(Qt::convertFromPlainText(sText, Qt::WhiteSpaceNormal));
     }
 
     // Scrollbereich um jeden Tab legen für kleine Bildschirmauflösungen
@@ -294,33 +300,46 @@ QWidget* SettingsDialog::createImagePage() {
                                  { tr("Book mode"), "BookMode" }, { tr("None (100 %)"), "None" } });
     };
     m_comboAutoZoomMode = autoZoomChoices();
-    m_comboAutoZoomMode->setToolTip(tr("Zoom when an image is opened in the window (AutoZoomMode)"));
+    const QString sZoomChoices = tr("Fit: the whole image is visible.\n"
+                                    "Fill: the image fills the window, edges are cut off.\n"
+                                    "\"Don't enlarge\": images smaller than the window stay at 100 %. With Fill, at "
+                                    "most a little is cut off; otherwise the image is fitted.\n"
+                                    "Book mode: see \"Book mode page height\".\n"
+                                    "None: always 100 %.\n"
+                                    "Comic archives (CBZ, CBR, CB7) and images in folders named \"manga\" or "
+                                    "\"comics\" always use book mode.");
+    setTip(m_comboAutoZoomMode, tr("Zoom when an image is opened in a window.") + QLatin1Char('\n') + sZoomChoices);
     m_comboAutoZoomModeFullscreen = autoZoomChoices();
-    m_comboAutoZoomModeFullscreen->setToolTip(tr("Zoom when an image is opened in fullscreen (AutoZoomModeFullscreen)"));
+    setTip(m_comboAutoZoomModeFullscreen,
+           tr("Zoom when an image is opened in fullscreen.") + QLatin1Char('\n') + sZoomChoices);
     layout->addRow(tr("Auto zoom (window):"), m_comboAutoZoomMode);
     layout->addRow(tr("Auto zoom (fullscreen):"), m_comboAutoZoomModeFullscreen);
 
     m_spinBookModePageHeight = new QSpinBox();
     m_spinBookModePageHeight->setRange(100, 1000);
     m_spinBookModePageHeight->setSuffix(" %");
-    m_spinBookModePageHeight->setToolTip(tr("BookModePageHeight"));
+    setTip(m_spinBookModePageHeight, tr("In book mode, portrait pages are zoomed to this percentage of the window "
+                                        "height, but never wider than the window. Landscape pages (double pages) fill "
+                                        "the window width."));
     layout->addRow(tr("Book mode page height:"), m_spinBookModePageHeight);
 
     m_checkAutoRotateExif = new QCheckBox(tr("Auto rotate according to EXIF"));
-    m_checkAutoRotateExif->setToolTip(tr("AutoRotateEXIF"));
+    setTip(m_checkAutoRotateExif, tr("Rotates and mirrors images according to the orientation stored in their EXIF "
+                                     "data, as written by cameras and phones."));
     layout->addRow("", m_checkAutoRotateExif);
 
     m_btnBgColor = new QPushButton();
-    m_btnBgColor->setToolTip(tr("BackgroundColor"));
+    setTip(m_btnBgColor, tr("Color of the window area around the image."));
     connect(m_btnBgColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorBg, m_btnBgColor); });
     layout->addRow(tr("Background color:"), m_btnBgColor);
 
     m_comboTransparencyMode = createChoiceBox({ { tr("Checkerboard"), "Checkerboard" },
                                                 { tr("Transparency color"), "Blend" },
                                                 { tr("Transparency color, inverted"), "BlendInverse" } });
-    m_comboTransparencyMode->setToolTip(tr("What is shown behind transparent parts of the image (TransparencyMode)"));
+    setTip(m_comboTransparencyMode, tr("What is shown behind transparent parts of an image: a gray checkerboard, the "
+                                       "transparency color, or its inverse."));
     m_btnTransColor = new QPushButton();
-    m_btnTransColor->setToolTip(tr("TransparencyColor"));
+    setTip(m_btnTransColor, tr("Color shown behind transparent parts of an image."));
     connect(m_btnTransColor, &QPushButton::clicked, this, [this]() { pickColor(m_colorTrans, m_btnTransColor); });
     // The color right of the mode, hidden for the checkerboard (it does not use the color)
     QWidget* transparencyRow = new QWidget();
@@ -350,31 +369,49 @@ QWidget* SettingsDialog::createQualityPage() {
     QFormLayout* layout = createFormLayout(panel);
 
     m_checkHighQualityResampling = new QCheckBox(tr("Use resampling"));
-    m_checkHighQualityResampling->setToolTip(tr("HighQualityResampling"));
+    setTip(m_checkHighQualityResampling, tr("Smooths the image when it is shown smaller or larger than 100 %: the "
+                                            "filter below is used for shrinking, a bicubic filter for enlarging.\n"
+                                            "Without it, pixels are simply skipped or repeated: faster, but with "
+                                            "jagged edges and moiré."));
     m_comboDownSamplingFilter = createChoiceBox({ { tr("None (fast)"), "None" }, { tr("Hermite"), "Hermite" },
                                                   { tr("Mitchell"), "Mitchell" }, { tr("Catmull-Rom"), "Catrom" },
                                                   { tr("Lanczos-2"), "Lanczos2" } });
-    m_comboDownSamplingFilter->setToolTip(tr("Filter used for downscaling (DownSamplingFilter)"));
+    setTip(m_comboDownSamplingFilter, tr("Filter used for shrinking images:\n"
+                                         "Hermite: soft, without halos.\n"
+                                         "Mitchell: a compromise between soft and sharp.\n"
+                                         "Catmull-Rom: sharp, recommended.\n"
+                                         "Lanczos-2: sharp, similar to Catmull-Rom.\n"
+                                         "None: no smoothing at all, also not when enlarging (fastest)."));
     layout->addRow("", m_checkHighQualityResampling);
     layout->addRow(tr("Downsampling filter:"), m_comboDownSamplingFilter);
     m_checkIntermediateDownsampling = new QCheckBox(tr("Use half size intermediate image for strong downscaling"));
-    m_checkIntermediateDownsampling->setToolTip(tr("IntermediateDownsampling"));
+    setTip(m_checkIntermediateDownsampling, tr("When an image is shrunk to a quarter of its width and height or less, "
+                                               "a half size copy of it is used as the source. Much faster when zooming "
+                                               "large images, with nearly the same result. The copy needs about a "
+                                               "quarter of the image's memory."));
     layout->addRow("", m_checkIntermediateDownsampling);
 
     m_checkUseEmbeddedColorProfiles = new QCheckBox(tr("Apply embedded ICC profiles"));
-    m_checkUseEmbeddedColorProfiles->setToolTip(tr("UseEmbeddedColorProfiles"));
+    setTip(m_checkUseEmbeddedColorProfiles, tr("Converts images with an embedded color profile to sRGB, so their "
+                                               "colors look as intended. Images without a profile are shown "
+                                               "unchanged.\n"
+                                               "Can also be switched while viewing (default key: E)."));
     layout->addRow("", m_checkUseEmbeddedColorProfiles);
 
     m_checkAutoContrastCorrection = new QCheckBox(tr("Enable auto contrast correction"));
-    m_checkAutoContrastCorrection->setToolTip(tr("AutoContrastCorrection"));
+    setTip(m_checkAutoContrastCorrection, tr("Applies the automatic contrast and brightness correction to every image "
+                                             "when it is opened.\n"
+                                             "Can also be switched while viewing (default key: F4)."));
     m_spinAutoContrastAmount = new QDoubleSpinBox();
     m_spinAutoContrastAmount->setRange(0.0, 1.0);
     m_spinAutoContrastAmount->setSingleStep(0.05);
-    m_spinAutoContrastAmount->setToolTip(tr("AutoContrastCorrectionAmount"));
+    setTip(m_spinAutoContrastAmount, tr("Strength of the automatic contrast correction: 0 = none, 1 = full stretch to "
+                                        "the black and white point."));
     m_spinAutoBrightnessAmount = new QDoubleSpinBox();
     m_spinAutoBrightnessAmount->setRange(0.0, 1.0);
     m_spinAutoBrightnessAmount->setSingleStep(0.05);
-    m_spinAutoBrightnessAmount->setToolTip(tr("AutoBrightnessCorrectionAmount"));
+    setTip(m_spinAutoBrightnessAmount, tr("Strength of the automatic brightness correction: 0 = none, 1 = full "
+                                          "correction towards middle gray."));
     layout->addRow("", m_checkAutoContrastCorrection);
     layout->addRow(tr("Contrast correction strength"), m_spinAutoContrastAmount);
     layout->addRow(tr("Brightness correction strength"), m_spinAutoBrightnessAmount);
@@ -390,23 +427,30 @@ QWidget* SettingsDialog::createWindowPage() {
     QFormLayout* layout = createFormLayout(panel);
 
     m_checkShowFullScreen = new QCheckBox(tr("Launch images fullscreen"));
-    m_checkShowFullScreen->setToolTip(tr("ShowFullScreen"));
+    setTip(m_checkShowFullScreen, tr("Opened images are shown in fullscreen instead of in a window."));
     m_checkBookModeLaunchFullscreen = new QCheckBox(tr("Launch comics/manga fullscreen"));
-    m_checkBookModeLaunchFullscreen->setToolTip(tr("BookModeLaunchFullscreen"));
+    setTip(m_checkBookModeLaunchFullscreen, tr("Comic archives (CBZ, CBR, CB7) and images in folders named \"manga\" "
+                                               "or \"comics\" are opened in fullscreen, even if fullscreen is not "
+                                               "enabled above."));
     layout->addRow("", m_checkShowFullScreen);
     layout->addRow("", m_checkBookModeLaunchFullscreen);
 
     m_spinDisplayMonitor = new QSpinBox();
     m_spinDisplayMonitor->setRange(-1, 16);
-    m_spinDisplayMonitor->setToolTip(tr("-1 = highest resolution, 0 = primary monitor, 1… = monitor number (DisplayMonitor)"));
+    setTip(m_spinDisplayMonitor, tr("Screen the window opens on:\n"
+                                    "-1 = the screen with the largest resolution\n"
+                                    "0 = the primary screen\n"
+                                    "1 and up = the screen with this number in the system's list (the primary screen "
+                                    "if there is no such screen)"));
     layout->addRow(tr("Startup monitor:"), m_spinDisplayMonitor);
 
     m_checkShowFilePathInTitle = new QCheckBox(tr("Show full file path"));
-    m_checkShowFilePathInTitle->setToolTip(tr("ShowFilePathInTitle"));
+    setTip(m_checkShowFilePathInTitle, tr("Shows the full path instead of only the file name. For images in an "
+                                          "archive, the path within the archive is included."));
     m_checkShowAppNameInTitle = new QCheckBox(tr("Show application name"));
-    m_checkShowAppNameInTitle->setToolTip(tr("\" - mkImageViewer\" at the end of the title (ShowAppNameInTitle)"));
+    setTip(m_checkShowAppNameInTitle, tr("Appends \" - mkImageViewer\" to the title."));
     m_checkTitleBarUseFileIcon = new QCheckBox(tr("Use specific file type icon"));
-    m_checkTitleBarUseFileIcon->setToolTip(tr("TitleBarUseFileIcon"));
+    setTip(m_checkTitleBarUseFileIcon, tr("Shows the icon of the current file type instead of the program icon."));
     layout->addRow(tr("Title bar:"), m_checkShowFilePathInTitle);
     layout->addRow("", m_checkShowAppNameInTitle);
     layout->addRow("", m_checkTitleBarUseFileIcon);
@@ -423,34 +467,53 @@ QWidget* SettingsDialog::createNavigationPage() {
 
     m_comboFileDisplayOrder = createChoiceBox({ { tr("File name"), "FileName" }, { tr("Modification date"), "LastModDate" },
                                                 { tr("File size"), "FileSize" }, { tr("Random"), "Random" } });
-    m_comboFileDisplayOrder->setToolTip(tr("FileDisplayOrder"));
+    setTip(m_comboFileDisplayOrder, tr("Order in which the images of a folder are shown. Numbers in file names are "
+                                       "sorted by value (2 before 10)."));
     m_checkFileSortAscending = new QCheckBox(tr("Ascending"));
-    m_checkFileSortAscending->setToolTip(tr("FileSortAscending"));
+    setTip(m_checkFileSortAscending, tr("On: A to Z, oldest first, smallest first. Off: the reverse order. Also "
+                                        "applies to the order of the folders."));
     layout->addRow(tr("Sorting:"), m_comboFileDisplayOrder);
     layout->addRow("", m_checkFileSortAscending);
 
     m_comboFolderNavigation = createChoiceBox({ { tr("This folder only"), "LoopFolder" },
                                                 { tr("Folders on the same level"), "LoopSameFolderLevel" },
                                                 { tr("Including subfolders"), "LoopSubFolders" } });
-    m_comboFolderNavigation->setToolTip(tr("FolderNavigation"));
+    setTip(m_comboFolderNavigation, tr("Which images are reached by going forward and back:\n"
+                                       "This folder only: the images of the folder.\n"
+                                       "Folders on the same level: continues with the next or previous folder beside "
+                                       "it.\n"
+                                       "Including subfolders: also goes into the subfolders."));
     m_checkWrapAroundFolder = new QCheckBox(tr("Wrap around at the end of the folder"));
-    m_checkWrapAroundFolder->setToolTip(tr("WrapAroundFolder"));
+    setTip(m_checkWrapAroundFolder, tr("After the last image, continue with the first one, and back from the first to "
+                                       "the last. When several folders are browsed, this happens at the end of the "
+                                       "last folder.\n"
+                                       "Off: browsing stops at the first and last image."));
     layout->addRow(tr("Folder:"), m_comboFolderNavigation);
     layout->addRow("", m_checkWrapAroundFolder);
 
     m_checkNavigateMouseWheel = new QCheckBox(tr("Use mouse wheel to switch images"));
-    m_checkNavigateMouseWheel->setToolTip(tr("NavigateWithMouseWheel"));
+    setTip(m_checkNavigateMouseWheel, tr("On: the wheel scrolls the image when it is taller than the window, otherwise "
+                                         "it switches to the next or previous image. In book mode it only scrolls. "
+                                         "Shift+wheel scrolls horizontally, Ctrl+wheel vertically, Ctrl+Shift+wheel "
+                                         "zooms.\n"
+                                         "Off: the wheel always zooms."));
     m_spinMouseWheelZoomSpeed = new QDoubleSpinBox();
     m_spinMouseWheelZoomSpeed->setRange(0.1, 10.0);
     m_spinMouseWheelZoomSpeed->setSingleStep(0.1);
-    m_spinMouseWheelZoomSpeed->setToolTip(tr("MouseWheelZoomSpeed"));
-    layout->addRow("Mouse wheel", m_checkNavigateMouseWheel);
+    setTip(m_spinMouseWheelZoomSpeed, tr("How much one step of the mouse wheel zooms: 1.0 = normal, smaller values "
+                                         "zoom in finer steps, larger values in bigger ones."));
+    layout->addRow(tr("Mouse wheel:"), m_checkNavigateMouseWheel);
     layout->addRow(tr("Zoom amount:"), m_spinMouseWheelZoomSpeed);
 
     m_checkSmoothPanning = new QCheckBox(tr("Smooth scrolling"));
-    m_checkSmoothPanning->setToolTip(tr("SmoothPanning"));
+    setTip(m_checkSmoothPanning, tr("While an arrow key is held down, the image scrolls smoothly instead of in steps. "
+                                    "Only works with the arrow keys themselves, not with other keys assigned to "
+                                    "scrolling."));
     m_checkSmartPanningKeys = new QCheckBox(tr("Arrow keys switch images when there is nothing to scroll"));
-    m_checkSmartPanningKeys->setToolTip(tr("SmartPanningKeys"));
+    setTip(m_checkSmartPanningKeys, tr("Left and Right switch to the previous or next image when there is nothing to "
+                                       "scroll in that direction. In book mode, they scroll the page and switch at its "
+                                       "top or bottom edge.\n"
+                                       "Off: the arrow keys only scroll."));
     layout->addRow(tr("Keyboard:"), m_checkSmoothPanning);
     layout->addRow("", m_checkSmartPanningKeys);
 
@@ -462,11 +525,12 @@ QWidget* SettingsDialog::createNavigationPage() {
         { tr("Roll from top"), "RollTB" }, { tr("Roll from bottom"), "RollBT" },
         { tr("Scroll from right"), "ScrollRL" }, { tr("Scroll from left"), "ScrollLR" },
         { tr("Scroll from top"), "ScrollTB" }, { tr("Scroll from bottom"), "ScrollBT" } });
-    m_comboSlideShowTransitionEffect->setToolTip(tr("SlideShowTransitionEffect"));
+    setTip(m_comboSlideShowTransitionEffect, tr("Effect between the images of a slideshow with an interval of at least "
+                                                "one second. Can also be changed in the context menu."));
     m_spinSlideShowEffectTimeMs = new QSpinBox();
     m_spinSlideShowEffectTimeMs->setRange(100, 5000);
     m_spinSlideShowEffectTimeMs->setSuffix(" ms");
-    m_spinSlideShowEffectTimeMs->setToolTip(tr("SlideShowEffectTime"));
+    setTip(m_spinSlideShowEffectTimeMs, tr("Duration of the slideshow transition effect."));
     layout->addRow(tr("Slideshow transition effect:"), m_comboSlideShowTransitionEffect);
     layout->addRow(tr("Slideshow transition duration:"), m_spinSlideShowEffectTimeMs);
 
@@ -481,9 +545,14 @@ QWidget* SettingsDialog::createSystemPage() {
     QFormLayout* layout = createFormLayout(panel);
 
     m_comboSingleInstance = createChoiceBox({ { tr("Never"), "Never" }, { tr("Per folder"), "PerFolder" }, { tr("Always"), "Always" } });
-    m_comboSingleInstance->setToolTip(tr("An already open window takes over newly opened images (SingleInstance)"));
+    setTip(m_comboSingleInstance, tr("When an image is opened while mkImageViewer is already running:\n"
+                                     "Never: it opens in a new window.\n"
+                                     "Per folder: a window showing the same folder takes it over.\n"
+                                     "Always: the open window takes it over."));
     m_checkSingleFullScreenInstance = new QCheckBox(tr("Only one fullscreen instance"));
-    m_checkSingleFullScreenInstance->setToolTip(tr("SingleFullScreenInstance"));
+    setTip(m_checkSingleFullScreenInstance, tr("A window in fullscreen takes over newly opened images instead of a new "
+                                               "window being opened, whatever is set above. It then switches to window "
+                                               "mode."));
 
     layout->addRow(tr("Single instance:"), m_comboSingleInstance);
     layout->addRow("", m_checkSingleFullScreenInstance);
@@ -491,35 +560,49 @@ QWidget* SettingsDialog::createSystemPage() {
     m_comboDeleteConfirmation = createChoiceBox({ { tr("Always"), "Always" },
                                                   { tr("Only for permanent deletion"), "OnlyWhenNoRecycleBin" },
                                                   { tr("Never"), "Never" } });
-    m_comboDeleteConfirmation->setToolTip(tr("Ask before a file is moved to the trash or deleted permanently (DeleteConfirmation)"));
+    setTip(m_comboDeleteConfirmation, tr("When to ask before deleting the current image:\n"
+                                         "Always: before moving it to the trash (Del) and before deleting it "
+                                         "permanently (Shift+Del).\n"
+                                         "Only for permanent deletion: only before deleting it permanently.\n"
+                                         "Never: no confirmation."));
     layout->addRow(tr("Confirm deletion:"), m_comboDeleteConfirmation);
 
     m_checkReloadWhenImageChanged = new QCheckBox(tr("Reload the image when it has changed"));
-    m_checkReloadWhenImageChanged->setToolTip(tr("ReloadWhenDisplayedImageChanged"));
+    setTip(m_checkReloadWhenImageChanged, tr("Shows the image again when another program changes it, and updates the "
+                                             "list of images when files are added to or removed from the folder."));
     layout->addRow("", m_checkReloadWhenImageChanged);
 
     m_spinCacheRange = new QSpinBox();
     m_spinCacheRange->setRange(0, 8);
-    m_spinCacheRange->setToolTip(tr("Number of images preloaded forward and backward (CacheRange)"));
+    setTip(m_spinCacheRange, tr("Number of images before and after the current one that are loaded in advance, so "
+                                "switching to them is instant. Larger values need more memory."));
     layout->addRow(tr("Preloading range:"), m_spinCacheRange);
 
     m_comboCpuType = createChoiceBox({ { tr("Automatic"), "AutoDetect" }, { tr("Generic"), "Generic" },
                                        { tr("MMX"), "MMX" }, { tr("SSE2"), "SSE" }, { tr("AVX2"), "AVX2" } });
-    m_comboCpuType->setToolTip(tr("Instruction set used for resampling (CPUType)"));
+    setTip(m_comboCpuType, tr("Instruction set used to resize images:\n"
+                              "Automatic: the best one this processor supports.\n"
+                              "Generic: works on every processor, but computes in gamma space, so fine detail and "
+                              "contrast edges come out slightly too dark.\n"
+                              "MMX and SSE2: compute in linear color space (correct brightness).\n"
+                              "AVX2: like SSE2, slightly faster."));
     m_spinCpuCores = new QSpinBox();
     m_spinCpuCores->setRange(0, 128);
-    m_spinCpuCores->setToolTip(tr("0 = automatic, then at most 8 (CPUCoresUsed)"));
+    setTip(m_spinCpuCores, tr("Number of threads used to resize images. 0 = automatic: as many as the processor has, "
+                              "but at most 8; more brought no measurable gain."));
     layout->addRow(tr("CPU instruction set:"), m_comboCpuType);
     layout->addRow(tr("CPU threads:"), m_spinCpuCores);
 
     m_checkForceQImageReader = new QCheckBox(tr("Read all formats with Qt (QImageReader)"));
-    m_checkForceQImageReader->setToolTip(tr("ForceQImageReader"));
+    setTip(m_checkForceQImageReader, tr("Reads all images with Qt instead of the built-in decoders. Qt cannot animate "
+                                        "PNG: animated PNGs (APNG) are then only shown as a still image."));
     layout->addRow("", m_checkForceQImageReader);
 
     m_editDefaultImageEditor = new QLineEdit();
     m_editDefaultImageEditor->setPlaceholderText(tr("System default"));
-    m_editDefaultImageEditor->setToolTip(tr("Program for \"Edit image in default editor\" (Ctrl+E): .desktop ID "
-                                            "(e.g. org.kde.krita.desktop), program name or path. Empty = system default (DefaultImageEditor)"));
+    setTip(m_editDefaultImageEditor, tr("Program used by \"Edit image in default editor\" (default key: Ctrl+E): a "
+                                        ".desktop ID (e.g. org.kde.krita.desktop), a program name or a path.\n"
+                                        "Empty: the system's default program for the file type."));
     layout->addRow(tr("Image editor:"), m_editDefaultImageEditor);
 
     return makeScrollable(panel);
