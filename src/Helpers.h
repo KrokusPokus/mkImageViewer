@@ -18,7 +18,7 @@ class CBaseImage;
 class CFileList;
 class QUrl;
 
-// Übernommen aus mkTools/shared/src/helpers.h (nur die Teile zum Starten von Programmen/.desktop-Dateien).
+// Übernommen aus mkFileTools/shared/src/helpers.h (nur die Teile zum Starten von Programmen/.desktop-Dateien).
 
 struct DesktopEntry {
     QString id;
