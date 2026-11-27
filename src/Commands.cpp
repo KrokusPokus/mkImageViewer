@@ -225,14 +225,14 @@ constexpr DefaultBinding kDefaultBindings[] = {
     { "Esc",    Command::DefaultEscape,           0 },
 
     { "Ctrl+C",       Command::CopyFull,          0 },
-    { "Ctrl+O",       Command::ExploreFile,       0 },
+    { "Ctrl+L",       Command::ExploreFile,       0 },
     { "Ctrl+Shift+C", Command::CopyPath,          0 },
     { "Ctrl+E",       Command::OpenDefaultEditor, 0 },
     { "Ctrl+Shift+Comma", Command::SettingsDialog,    0 },
     { "Ctrl+Shift+Period", Command::EditKeyMap,       0 },
-    { "Ctrl+L",       Command::ExifRotate270,     0 },
+    { "Ctrl+Shift+L", Command::ExifRotate270,     0 },
     { "Ctrl+M",       Command::ContextMenu,       0 },
-    { "Ctrl+R",       Command::ExifRotate90,      0 },
+    { "Ctrl+Shift+R", Command::ExifRotate90,      0 },
     { "Ctrl+X",       Command::CutFile,           0 },
 
     { "1", Command::ZoomTo, 100 },
