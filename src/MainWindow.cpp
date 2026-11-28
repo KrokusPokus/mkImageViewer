@@ -2117,6 +2117,8 @@ void CMainWindow::ExecuteCommand(const Cmd::CommandInvocation& inv) {
             if (m_bAutoContrast) {
                 double dInc = (inv.id == Command::ContrastCorrectionInc) ? 0.05 : -0.05;
                 m_pImageProcParams->ContrastCorrectionFactor = std::max(0.0, std::min(1.0, m_pImageProcParams->ContrastCorrectionFactor + dInc));
+                QString toastText = QStringLiteral("Auto Contrast strength: %1%").arg(m_pImageProcParams->ContrastCorrectionFactor*100);
+                SetToast(toastText);
                 this->update();
             }
             break;
