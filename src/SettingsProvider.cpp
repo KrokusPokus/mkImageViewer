@@ -1,4 +1,5 @@
 #include "SettingsProvider.h"
+#include "Helpers.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -232,6 +233,8 @@ bool CSettingsProvider::ShowSettingsDialog(QWidget* parent) {
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Settings"));
+    // Always the app icon: without its own icon the dialog would inherit the main window's, which can be a file type icon
+    setWindowIcon(Helpers::AppIcon());
     resize(750, 580);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);

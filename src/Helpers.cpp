@@ -891,4 +891,8 @@ QString GetJPEGComment(const void* pJPEGStream, size_t nStreamLength) {
         return MkProjectsFilePath(QStandardPaths::GenericStateLocation, QStringLiteral("state"));
     }
 
+    QIcon AppIcon() {
+        return QIcon::fromTheme(QStringLiteral("gwenview"), QIcon(QStringLiteral(":/icons/gwenview.svg")));
+    }
+
 } // namespace Helpers

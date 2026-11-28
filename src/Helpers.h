@@ -4,6 +4,7 @@
 #include "ImageLoadResult.h"
 
 #include <QFileInfo>
+#include <QIcon>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -257,6 +258,9 @@ namespace Helpers {
     // State file of this program: ~/.local/state/mkProjects/mkImageViewer_state.conf
     // Creates the folder if needed. Empty string if there is no usable state location.
     QString StateFilePath();
+
+    // App icon: gwenview from the current icon theme, the embedded copy (from breeze-icons) only if the theme lacks it
+    QIcon AppIcon();
 
 } // namespace Helpers
 
